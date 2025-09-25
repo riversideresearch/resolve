@@ -6,7 +6,7 @@ build-llvm-plugin: llvm-plugin build-libresolve
 	+$(MAKE) -C llvm-plugin
 
 build-libresolve: libresolve
-	cd libresolve && cargo build
+	cd libresolve && RUSTFLAGS="-D warnings" cargo build
 
 test: test-llvm-plugin
 

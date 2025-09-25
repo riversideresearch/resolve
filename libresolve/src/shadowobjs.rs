@@ -45,6 +45,7 @@ impl ShadowObject {
         self.bounds().contains(&addr)
     }
 
+    #[allow(dead_code)]
     pub fn is_allocation(&self) -> bool{
         self.alloc_type.is_allocation()
     }
@@ -52,6 +53,7 @@ impl ShadowObject {
     /**
      * @brief - Computes size of shadow object from base and limit
      */
+    #[allow(dead_code)]     
     pub fn size(&self) -> usize {
         self.limit - self.base + 1
     }
