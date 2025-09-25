@@ -1,2 +1,14 @@
-all: llvm-plugin
-	cd llvm-plugin && make
+all: build
+
+build: build-llvm-plugin build-libresolve
+
+build-llvm-plugin: llvm-plugin build-libresolve
+	+$(MAKE) -C llvm-plugin
+
+build-libresolve: libresolve
+	cd libresolve && cargo build
+
+test: test-llvm-plugin
+
+test-llvm-plugin:
+	+$(MAKE) -C llvm-plugin test
