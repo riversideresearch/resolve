@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(EnhancedFacts)
+project(resolve-llvm-plugin)
 
 find_package(LLVM CONFIG)
 
@@ -23,6 +23,23 @@ if(NOT LLVM_ENABLE_RTTI)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-rtti")
 endif()
 
+# Clang format
+find_program(CLANG_FORMAT_EXECUTABLE clang-format)
+if(NOT CLANG_FORMAT_EXECUTABLE)
+    message(FATAL_ERROR "clang-format not found. Please install it or add it to your PATH.")
+endif()
+
+file(GLOB_RECURSE PROJECT_SOURCE_FILES
+    "${CMAKE_SOURCE_DIR}/*.cpp"
+    "${CMAKE_SOURCE_DIR}/*.hpp"
+    "${CMAKE_SOURCE_DIR}/*.c"
+    "${CMAKE_SOURCE_DIR}/*.h"
+)
+
+add_custom_target(clangformat
+    COMMAND ${CLANG_FORMAT_EXECUTABLE} -i ${PROJECT_SOURCE_FILES}
+    COMMENT "Formatting source files with clang-format..."
+)
 
 add_library(EnhancedFacts SHARED EnhancedFacts.cpp)
 add_library(CVEAssert SHARED 
@@ -35,6 +52,3 @@ add_library(CVEAssert SHARED
 add_library(AnnotateFunctions SHARED AnnotateFunctions.cpp)
 add_library(ObjHook SHARED ObjHook.cpp)
 add_library(DlsymHook SHARED DlsymHook.cpp)
-
-
-
