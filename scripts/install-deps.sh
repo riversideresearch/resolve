@@ -33,5 +33,9 @@ apt-get update && apt-get install -y --no-install-recommends \
 apt-get clean
 rm -rf /var/lib/apt/lists/*
 
+curl --proto '=https' --tlsv1.3 https://sh.rustup.rs -sSf | sh -s -- -y
+rustup toolchain install nightly
+rustup default nightly
+
 python3 -m pip install lit wllvm --break-system-packages
 
