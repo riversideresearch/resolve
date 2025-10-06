@@ -1,3 +1,4 @@
+SHELL := /bin/bash
 all: build
 
 build: build-llvm-plugin build-libresolve

@@ -26,16 +26,19 @@ apt-get update && apt-get install -y --no-install-recommends \
     libncurses-dev \
     libz3-dev \
     zlib1g-dev \
-    curl \
-    rustc \
-    cargo
+    curl
 
 apt-get clean
 rm -rf /var/lib/apt/lists/*
 
-curl --proto '=https' --tlsv1.3 https://sh.rustup.rs -sSf | sh -s -- -y
-rustup toolchain install nightly
-rustup default nightly
-
+# Python packages
 python3 -m pip install lit wllvm --break-system-packages
 
+# Rust installation
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- --default-toolchain none -y
+. ~/.cargo/env
+echo 'export PATH="$PATH:~/.cargo/bin"' >> /etc/profile
+rustup toolchain install nightly --allow-downgrade --profile minimal --component clippy
+echo "Rust installation:"
+rustc --version
+cargo --version
