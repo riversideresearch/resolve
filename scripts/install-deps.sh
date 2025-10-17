@@ -32,7 +32,7 @@ apt-get clean
 rm -rf /var/lib/apt/lists/*
 
 # Python packages
-python3 -m pip install lit wllvm --break-system-packages
+python3 -m pip install lit wllvm univers --break-system-packages
 
 # Rust installation
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- --default-toolchain none -y
