@@ -7,11 +7,12 @@
 
 #include <stdexcept>
 #include <unordered_map>
+#include <utility>
+#include <vector>
 
 template <typename K, std::totally_ordered V>
 class binary_heap {
-public:
-
+ public:
   // Insert a key/value pair into the heap.
   void insert(const K& k, const V& v) {
     if (!this->contains(k)) {
@@ -50,7 +51,7 @@ public:
     return this->_ixs.contains(k);
   }
 
-private:
+ private:
   std::vector<std::pair<K, V>> _heap;
   std::unordered_map<K, size_t> _ixs;
 

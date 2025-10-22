@@ -2,17 +2,19 @@
 
 #include <chrono>
 #include <filesystem>
-#include <iostream>
 #include <fstream>
+#include <iostream>
+#include <string>
+#include <unordered_map>
+#include <utility>
+#include <vector>
 
 #include "argparse.hpp"
 #include "config.hpp"
 #include "distmap.hpp"
 #include "facts.hpp"
 #include "graph.hpp"
-#include "json.hpp"
 #include "search.hpp"
-#include "util.hpp"
 
 using namespace std;
 using namespace chrono;
@@ -28,7 +30,7 @@ conf::config load_config(const argparse::ArgumentParser& program) {
     if (in_path.has_value()) {
       const auto conf_opt = conf::load_config_from_file(in_path.value());
       if (conf_opt.has_value()) {
-	conf = conf_opt.value();
+        conf = conf_opt.value();
       }
     }
     if (program.present<string>("facts_dir")) {
@@ -37,11 +39,10 @@ conf::config load_config(const argparse::ArgumentParser& program) {
     conf.distmap = conf.distmap || program.get<bool>("distmap");
     if (program.present<string>("src") && program.present<string>("dst")) {
       conf.queries.push_back({
-	  program.get<string>("src"),
-	  program.get<string>("dst"),
-	});
-    }
-    else if (conf.distmap && program.present<string>("dst")) {
+          program.get<string>("src"),
+          program.get<string>("dst"),
+        });
+    } else if (conf.distmap && program.present<string>("dst")) {
       conf.queries.push_back({ "", program.get<string>("dst") });
     }
     conf.dynlink = conf.dynlink || program.get<bool>("dynlink");
@@ -53,14 +54,12 @@ conf::config load_config(const argparse::ArgumentParser& program) {
     }
     if (program.present<string>("graph")) {
       conf.graph_type = program.get<string>("graph");
-    }
-    else if (conf.graph_type == "") {
+    } else if (conf.graph_type == "") {
       conf.graph_type = "cfg";
     }
     if (program.present<size_t>("num-paths")) {
       conf.num_paths = program.get<size_t>("num-paths");
-    }
-    else if (conf.num_paths == 0) {
+    } else if (conf.num_paths == 0) {
       conf.num_paths = 1;
     }
     return conf;
@@ -82,19 +81,19 @@ build_loaded_syms(const optional<fs::path>& path) {
     // Ensure no duplicate entries
     for (const auto& sym : log.loaded_symbols) {
       if (find(syms.begin(), syms.end(), sym) == syms.end()) {
-	syms.push_back(sym);
+        syms.push_back(sym);
       }
     }
     return { syms };
-  }
-  else {
+  } else {
     return {};
   }
 }
 
 void validate_config(const conf::config& conf) {
   if (!fs::exists(conf.facts_dir)) {
-    cerr << "CONFIG ERROR: facts_dir " << conf.facts_dir << " doesn't exist." << endl;
+    cerr << "CONFIG ERROR: facts_dir "
+         << conf.facts_dir << " doesn't exist." << endl;
     exit(1);
   }
 }
@@ -150,9 +149,9 @@ int main(int argc, char* argv[]) {
     }
     const auto db = facts::load(conf.facts_dir, graph::CFG_LOAD_OPTIONS);
     const auto res = distmap::gen(db,
-				  conf.queries[0].dst,
-				  conf.dynlink,
-				  loaded_syms);
+                                  conf.queries[0].dst,
+                                  conf.dynlink,
+                                  loaded_syms);
     const json j = res;
     if (conf.out_path.has_value()) {
       ofstream f(conf.out_path.value());
@@ -169,30 +168,30 @@ int main(int argc, char* argv[]) {
 
   typedef pair<graph::handle_map, graph::T>
     (*graph_builder)(const filesystem::path&, bool,
-		     const optional<vector<dlsym::loaded_symbol>>&);
+                     const optional<vector<dlsym::loaded_symbol>>&);
 
   const unordered_map<string, graph_builder> graph_builders = {
     { "simple", [](const filesystem::path& facts_dir,
-		   bool dynlink,
-		   const optional<vector<dlsym::loaded_symbol>>& loaded_syms) {
+                   bool dynlink,
+                   const optional<vector<dlsym::loaded_symbol>>& loaded_syms) {
       const auto db = load(facts_dir, graph::SIMPLE_LOAD_OPTIONS);
       return graph::build_simple_graph(db, dynlink, loaded_syms);
     }},
     { "cfg", [](const filesystem::path& facts_dir,
-		bool dynlink,
-		const optional<vector<dlsym::loaded_symbol>>& loaded_syms) {
+                bool dynlink,
+                const optional<vector<dlsym::loaded_symbol>>& loaded_syms) {
       const auto db = load(facts_dir, graph::CFG_LOAD_OPTIONS);
       return graph::build_cfg(db, dynlink, loaded_syms);
     }},
     { "instr_cfg", [](const filesystem::path& facts_dir,
-		      bool dynlink,
-		      const optional<vector<dlsym::loaded_symbol>>& loaded_syms) {
+                      bool dynlink,
+                      const optional<vector<dlsym::loaded_symbol>>& loaded_syms) {
       const auto db = load(facts_dir, graph::CFG_LOAD_OPTIONS);
       return graph::build_instr_cfg(db, dynlink, loaded_syms);
     }},
     { "call", [](const filesystem::path& facts_dir,
-		 bool dynlink,
-		 const optional<vector<dlsym::loaded_symbol>>& loaded_syms) {
+                 bool dynlink,
+                 const optional<vector<dlsym::loaded_symbol>>& loaded_syms) {
       const auto db = load(facts_dir, graph::CALL_LOAD_OPTIONS);
       return graph::build_call_graph(db, dynlink, loaded_syms);
     }},
@@ -205,8 +204,8 @@ int main(int argc, char* argv[]) {
 
   const time_point<system_clock> t0 = system_clock::now();
   const auto [hm, g] = graph_builders.at(conf.graph_type)(conf.facts_dir,
-							  conf.dynlink,
-							  loaded_syms);
+                                                          conf.dynlink,
+                                                          loaded_syms);
   const time_point<system_clock> t1 = system_clock::now();
   duration<double> load_time = t1 - t0;
 
@@ -237,17 +236,17 @@ int main(int argc, char* argv[]) {
     // If both src and dst exist, try to find path.
     if (src_handle_opt.has_value() && dst_handle_opt.has_value()) {
       const auto [src_handle, dst_handle] = pair { src_handle_opt.value(),
-						   dst_handle_opt.value() };
+                                                   dst_handle_opt.value() };
 
       // const auto p_opt = search::path_bfs(g.edges, dst_handle, src_handle);
       // const auto p_opt = search::path_dijkstra(g.edges, dst_handle, src_handle);
       // vector<vector<graph::edge>> paths;
       // if (p_opt.has_value()) {
-      // 	paths.push_back(p_opt.value());
+      //   paths.push_back(p_opt.value());
       // }
 
       const auto paths = search::k_paths_yen(g.edges, dst_handle,
-					     src_handle, conf.num_paths);
+                                             src_handle, conf.num_paths);
 
       const time_point<system_clock> t2 = system_clock::now();
       duration<double> query_time = t2 - t1;
@@ -255,29 +254,28 @@ int main(int argc, char* argv[]) {
 
       vector<double> weights;
       for (const auto& p : paths) {
-	weights.push_back(graph::path_weight(p));
+        weights.push_back(graph::path_weight(p));
       }
       if (!is_sorted(weights.begin(), weights.end())) {
-	cerr << "WARNING: paths not sorted by weight" << endl;
+        cerr << "WARNING: paths not sorted by weight" << endl;
       }
 
       for (const auto& path : paths) {
-	vector<string> p_ids;
-	vector<string> edges;
-	for (const auto& e : path) {
-	  const auto id = hm.getId(e.node);
-	  p_ids.push_back(id);
-	  edges.push_back(EdgeType_to_string(e.type));
-	}
+        vector<string> p_ids;
+        vector<string> edges;
+        for (const auto& e : path) {
+          const auto id = hm.getId(e.node);
+          p_ids.push_back(id);
+          edges.push_back(EdgeType_to_string(e.type));
+        }
 
-	reverse(p_ids.begin(), p_ids.end());
-	reverse(edges.begin(), edges.end());
-	edges.pop_back();
+        reverse(p_ids.begin(), p_ids.end());
+        reverse(edges.begin(), edges.end());
+        edges.pop_back();
 
-	qres.paths.push_back({ p_ids, edges });
+        qres.paths.push_back({ p_ids, edges });
       }
-    }
-    else {
+    } else {
       exit(-1);
     }
 

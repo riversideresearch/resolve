@@ -1,5 +1,8 @@
 #pragma once
 
+#include <unordered_map>
+#include <vector>
+
 #include "graph.hpp"
 
 namespace search {
@@ -13,7 +16,7 @@ namespace search {
 
   std::optional<std::vector<graph::edge>>
   path_dijkstra(const graph::E& g, const K& src, const K& tgt);
-  
+
   std::vector<std::vector<graph::edge>>
   k_paths_yen(const graph::E& g, const K& src, const K& tgt, size_t k);
 
@@ -25,4 +28,4 @@ namespace search {
 
   // Build distances map wrt. given graph and source node
   std::unordered_map<size_t, size_t> min_distances(const graph::E& g, const K& src);
-} // search
+}  // namespace search

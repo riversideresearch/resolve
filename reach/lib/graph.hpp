@@ -1,5 +1,10 @@
 #pragma once
 
+#include <string>
+#include <unordered_map>
+#include <utility>
+#include <vector>
+
 #include "facts.hpp"
 
 namespace graph {
@@ -14,7 +19,7 @@ namespace graph {
     size_t getHandleConst(const std::string& id) const;
     std::optional<size_t> getHandleOpt(const std::string& id) const;
     std::string getId(size_t handle) const;
-  private:
+   private:
     std::vector<std::string> handle2id;
     std::unordered_map<std::string, size_t> id2handle;
     void build_id2handle();
@@ -33,7 +38,7 @@ namespace graph {
   std::string EdgeType_to_string(EdgeType ety);
 
   struct edge {
-    size_t node; // the node connected by this edge
+    size_t node;  // the node connected by this edge
     double weight;
     EdgeType type;
     bool operator==(const edge&) const = default;
@@ -46,7 +51,7 @@ namespace graph {
   // Directed graph
   struct T {
     E edges;
-    void addEdge(size_t l, size_t r, EdgeType ety); // default weight 1.0.
+    void addEdge(size_t l, size_t r, EdgeType ety);  // default weight 1.0.
     void addEdge(size_t l, size_t r, EdgeType ety, double weight);
   };
 
@@ -65,8 +70,8 @@ namespace graph {
   // first thing we did.
   std::pair<handle_map, T>
   build_simple_graph(const facts::database& db,
-		     bool dynlink,
-		     const std::optional<std::vector<dlsym::loaded_symbol>>& loaded_syms);
+                     bool dynlink,
+                     const std::optional<std::vector<dlsym::loaded_symbol>>& loaded_syms);
 
   constexpr facts::LoadOptions CALL_LOAD_OPTIONS =
     facts::LoadOptions::Contains | facts::LoadOptions::Calls
@@ -77,8 +82,8 @@ namespace graph {
   // Call graph with function nodes only.
   std::pair<handle_map, T>
   build_call_graph(const facts::database& db,
-		   bool dynlink,
-		   const std::optional<std::vector<dlsym::loaded_symbol>>& loaded_syms);
+                   bool dynlink,
+                   const std::optional<std::vector<dlsym::loaded_symbol>>& loaded_syms);
 
   constexpr facts::LoadOptions CFG_LOAD_OPTIONS =
     facts::LoadOptions::NodeType | facts::LoadOptions::Calls
@@ -90,15 +95,15 @@ namespace graph {
   // Interprocedural CFG with function and BB nodes.
   std::pair<handle_map, T>
   build_cfg(const facts::database& db,
-	    bool dynlink = false,
-	    const std::optional<std::vector<dlsym::loaded_symbol>>& loaded_syms = {});
+            bool dynlink = false,
+            const std::optional<std::vector<dlsym::loaded_symbol>>& loaded_syms = {});
 
   // Instruction-level granularity CFG (rather than BBs).
   std::pair<handle_map, T>
   build_instr_cfg(const facts::database& db,
-		  bool dynlink = false,
-		  const std::optional<std::vector<dlsym::loaded_symbol>>& loaded_syms = {});
-} // graph
+                  bool dynlink = false,
+                  const std::optional<std::vector<dlsym::loaded_symbol>>& loaded_syms = {});
+}  // namespace graph
 
 namespace std {
   template <>
@@ -110,4 +115,4 @@ namespace std {
       return h1 ^ h2 ^ h3;
     }
   };
-}
+}  // namespace std

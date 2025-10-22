@@ -1,4 +1,7 @@
+#include <algorithm>
 #include <fstream>
+#include <string>
+#include <unordered_map>
 
 #include "facts.hpp"
 
@@ -35,9 +38,9 @@ inline CallType parse_call_type(const string& s) {
 }
 
 database facts::load(istream& nodes,
-		     istream& nodeprops,
-		     istream& edges,
-		     LoadOptions options) {
+                     istream& nodeprops,
+                     istream& edges,
+                     LoadOptions options) {
   database db;
 
   if (is_set(options, LoadOptions::NodeType)) {
@@ -61,18 +64,13 @@ database facts::load(istream& nodes,
       getline(ss, s, ',');
       getline(ss, t);
       if (is_set(options, LoadOptions::Contains) && ty == "contains") {
-	db.contains[s].push_back(t);
+        db.contains[s].push_back(t);
+      } else if (is_set(options, LoadOptions::Calls) && ty == "calls") {
+        db.calls.emplace(s, t);
+      } else if (is_set(options, LoadOptions::ControlFlow) &&
+                 ty == "controlFlowTo") {
+        db.control_flow[s].push_back(t);
       }
-      else if (is_set(options, LoadOptions::Calls) && ty == "calls") {
-	db.calls.emplace(s, t);
-      }
-      else if (is_set(options, LoadOptions::ControlFlow) && ty == "controlFlowTo") {
-	db.control_flow[s].push_back(t);
-      }
-      // entryPoint facts are included with ControlFlow option.
-      // else if (is_set(options, LoadOptions::ControlFlow) && ty == "entryPoint") {
-      // 	db.entry_point.emplace(s, t);
-      // }
     }
   }
 
@@ -85,19 +83,18 @@ database facts::load(istream& nodes,
       getline(ss, prop, ',');
       getline(ss, val);
       if (is_set(options, LoadOptions::Name) && prop == "name") {
-	db.name.emplace(id, val);
-      }
-      else if (is_set(options, LoadOptions::Linkage) && prop == "linkage") {
-	db.linkage.emplace(id, parse_linkage(val));
-      }
-      else if (is_set(options, LoadOptions::CallType) && prop == "call_type") {
-	db.call_type.emplace(id, parse_call_type(val));
-      }
-      else if (is_set(options, LoadOptions::AddressTaken) && prop == "address_taken") {
-	db.address_taken.push_back(id);
-      }
-      else if (is_set(options, LoadOptions::FunctionType) && prop == "function_type") {
-	db.fun_sig.emplace(id, val.substr(1, val.length()-2));
+        db.name.emplace(id, val);
+      } else if (is_set(options, LoadOptions::Linkage) && prop == "linkage") {
+        db.linkage.emplace(id, parse_linkage(val));
+      } else if (is_set(options, LoadOptions::CallType)
+                 && prop == "call_type") {
+        db.call_type.emplace(id, parse_call_type(val));
+      } else if (is_set(options, LoadOptions::AddressTaken) &&
+               prop == "address_taken") {
+        db.address_taken.push_back(id);
+      } else if (is_set(options, LoadOptions::FunctionType) &&
+                 prop == "function_type") {
+        db.fun_sig.emplace(id, val.substr(1, val.length()-2));
       }
     }
   }
