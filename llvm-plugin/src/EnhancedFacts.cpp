@@ -170,7 +170,7 @@ static void embedFacts(Module &M) {
     SmallVector<uint8_t> compressedFacts;
 
     if (std::getenv("RESOLVE_IGNORE_COMPRESSION")) {
-      compressedFacts = SmallVector<uint8_t>(inputData);
+      compressedFacts = SmallVector<uint8_t>(inputData.begin(), inputData.end());
     } else {
       compression::Params params(compression::Format::Zstd);
       compression::compress(params, inputData, compressedFacts);
