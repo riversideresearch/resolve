@@ -13,8 +13,14 @@
 
 #include <utility>
 #include <vector>
+#include <string>
 
 using namespace llvm;
+
+bool starts_with(const std::string& str, const std::string& prefix) {
+  return str.size() >= prefix.size() && str.compare(0, prefix.size(), prefix) == 0;
+}
+
 
 struct ObjHook : public PassInfoMixin<ObjHook> {
 public:
@@ -213,36 +219,6 @@ public:
     Function *resolvestrdupFunc = getOrCreateResolveStrdup(M);
     Function *resolvestrndupFunc = getOrCreateResolveStrndup(M);
 
-    // FunctionCallee resolvemallocFunc = M.getOrInsertFunction(
-    // "resolve_malloc",
-    // FunctionType::get(PointerType::get(Ctx, 0), { Type::getInt64Ty(Ctx)},
-    // false ));
-
-    // FunctionCallee resolvecallocFunc = M.getOrInsertFunction(
-    // "resolve_calloc",
-    // FunctionType::get(PointerType::get(Ctx, 0), { Type::getInt64Ty(Ctx),
-    // Type::getInt64Ty(Ctx)}, false ));
-
-    // FunctionCallee resolvereallocFunc = M.getOrInsertFunction(
-    // "resolve_realloc",
-    // FunctionType::get(PointerType::get(Ctx, 0), { PointerType::get(Ctx, 0),
-    // Type::getInt64Ty(Ctx)}, false));
-
-    // FunctionCallee resolvestrdupFunc = M.getOrInsertFunction(
-    // "resolve_strdup",
-    // FunctionType::get(PointerType::get(Ctx, 0), { PointerType::get(Ctx, 0)},
-    // false));
-
-    // FunctionCallee resolvestrndupFunc = M.getOrInsertFunction(
-    // "resolve_strndup",
-    // FunctionType::get(PointerType::get(Ctx, 0), { PointerType::get(Ctx, 0),
-    // Type::getInt64Ty(Ctx)}, false));
-
-    // FunctionCallee resolvefreeFunc = M.getOrInsertFunction(
-    // "resolve_free",
-    // FunctionType::get(Type::getVoidTy(Ctx), { PointerType::get(Ctx, 0)},
-    // false ));
-
     for (auto &BB : F) {
       for (auto &inst : BB) {
         if (auto *call = dyn_cast<CallInst>(&inst)) {
@@ -347,8 +323,8 @@ public:
       if (F.isDeclaration())
         continue;
 
-      StringRef func_name = F.getName();
-      if (func_name.starts_with("resolve_"))
+      std::string func_name = F.getName().str();
+      if (starts_with(func_name, "resolve_"))
         continue;
 
       runOnFunction(F, M, Ctx);
