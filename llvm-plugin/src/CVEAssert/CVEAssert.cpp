@@ -131,7 +131,7 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
   PreservedAnalyses run(Function &F, ModuleAnalysisManager &MAM,
                         Vulnerability &vuln) {
     std::string mangledName = F.getName().str();
-    char *demangledNamePtr = llvm::itaniumDemangle(mangledName.c_str(), false);
+    char *demangledNamePtr = llvm::itaniumDemangle(mangledName.c_str(), nullptr, nullptr, nullptr);
     std::string demangledName(demangledNamePtr ?: "");
 
     if (CVE_ASSERT_DEBUG) {
@@ -180,15 +180,15 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
     return PreservedAnalyses::none();
   }
 
-  // PreservedAnalyses run(Module &M, ModuleAnalysisManager &MAM) {
-  //   auto result = PreservedAnalyses::all();
-  //   for (auto &F : M) {
-  //     for (auto &vuln : vulnerabilities) {
-  //       result.intersect(run(F, MAM, vuln));
-  //     }
-  //   }
-  //   return PreservedAnalyses::all();
-  // }
+  PreservedAnalyses run(Module &M, ModuleAnalysisManager &MAM) {
+    auto result = PreservedAnalyses::all();
+    for (auto &F : M) {
+      for (auto &vuln : vulnerabilities) {
+        result.intersect(run(F, MAM, vuln));
+      }
+    }
+    return PreservedAnalyses::all();
+  }
 };
 
 } // end anonymous namespace
