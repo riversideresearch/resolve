@@ -130,8 +130,7 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
   /// the triggering argument parsed from the JSON.
   PreservedAnalyses run(Function &F, ModuleAnalysisManager &MAM,
                         Vulnerability &vuln) {
-    std::string mangledName = F.getName().str();
-    char *demangledNamePtr = llvm::itaniumDemangle(mangledName.c_str(), false);
+    char *demangledNamePtr = llvm::itaniumDemangle(F.getName().str(), false);
     std::string demangledName(demangledNamePtr ?: "");
 
     if (CVE_ASSERT_DEBUG) {
