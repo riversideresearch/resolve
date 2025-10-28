@@ -1,5 +1,10 @@
 #pragma once
 
+#include <filesystem>
+#include <fstream>
+#include <string>
+#include <vector>
+
 #include "json.hpp"
 
 namespace conf {
@@ -26,7 +31,8 @@ namespace conf {
    out_path, graph_type, num_paths);
 
   // Load config from JSON file
-  inline std::optional<config> load_config_from_file(const std::filesystem::path& path) {
+  inline std::optional<config>
+  load_config_from_file(const std::filesystem::path& path) {
     std::ifstream f(path);
     if (!f.is_open()) {
       return {};
@@ -35,7 +41,7 @@ namespace conf {
     f >> j;
     return j.template get<config>();
   }
-} // namespace conf
+}  // namespace conf
 
 namespace output {
   struct path {
@@ -62,4 +68,4 @@ namespace output {
   (query_result, query_time, src, dst, paths);
   NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_ONLY_SERIALIZE
   (results, load_time, query_results);
-} // namespace output
+}  // namespace output

@@ -1,4 +1,10 @@
+#include <algorithm>
 #include <regex>
+#include <string>
+#include <unordered_map>
+#include <unordered_set>
+#include <utility>
+#include <vector>
 
 #include "facts.hpp"
 #include "graph.hpp"
@@ -8,7 +14,6 @@ using namespace facts;
 using namespace graph;
 using namespace std;
 using symbol = dlsym::loaded_symbol;
-namespace fs = filesystem;
 
 std::string graph::EdgeType_to_string(EdgeType ety) {
   switch (ety) {
@@ -44,7 +49,7 @@ bool graph::wf(const E& g) {
     unordered_set<size_t> seen;
     for (const auto& e : es) {
       if (!seen.insert(e.node).second) {
-	return false;
+        return false;
       }
     }
   }
@@ -69,8 +74,7 @@ size_t handle_map::getHandleConst(const string& id) const {
 optional<size_t> handle_map::getHandleOpt(const string& id) const {
   if (id2handle.contains(id)) {
     return id2handle.at(id);
-  }
-  else {
+  } else {
     return nullopt;
   }
 }
@@ -107,7 +111,7 @@ bool symbol_id_match(const dlsym::loaded_symbol& sym, const string& node_id) {
   const auto name = name_opt.value();
   if (name.size() && name[0] == 'f') {
     return string_view(name.data() + 1) == string_view(sym.symbol);
-  }  
+  }
   return false;
 }
 
@@ -117,7 +121,7 @@ bool symbol_id_match(const dlsym::loaded_symbol& sym, const string& node_id) {
 // for indirect calls.
 vector<string>
 map_loaded_symbols_to_ids(const database& db,
-			  const optional<vector<symbol>>& loaded_syms) {
+                          const optional<vector<symbol>>& loaded_syms) {
   if (!loaded_syms.has_value()) {
     return {};
   }
@@ -126,8 +130,8 @@ map_loaded_symbols_to_ids(const database& db,
   for (const auto& [id, _] : db.node_type) {
     for (const auto& sym : syms) {
       if (symbol_id_match(sym, id)) {
-	loaded_ids.push_back(id);
-	break;
+        loaded_ids.push_back(id);
+        break;
       }
     }
   }
@@ -137,8 +141,8 @@ map_loaded_symbols_to_ids(const database& db,
 // loaded_syms is the set of symbols loaded with dlsym.
 pair<handle_map, T>
 graph::build_simple_graph(const database& db,
-			  bool dynlink,
-			  const optional<vector<symbol>>& loaded_syms) {
+                          bool dynlink,
+                          const optional<vector<symbol>>& loaded_syms) {
   const auto loaded_ids = map_loaded_symbols_to_ids(db, loaded_syms);
 
   handle_map hm;
@@ -154,17 +158,17 @@ graph::build_simple_graph(const database& db,
   // Direct calls
   for (const auto& [instr, fn] : db.calls) {
     g.addEdge(hm.getHandle(fn), hm.getHandle(instr), EdgeType::DirectCall);
-    
+
     // Special case for direct calls to [pthread_create]: add
     // edges for all address-taken functions with type signature
     // "ptr (ptr)".
     if (AT(db.calls, instr).ends_with(":fpthread_create")) {
       for (const auto& fn : db.address_taken) {
-	if (AT(db.fun_sig, fn) == "ptr (ptr)") {
-	  g.addEdge(hm.getHandle(fn), hm.getHandle(instr),
-		    EdgeType::IndirectCall, INDIRECT_WEIGHT);
-	}
-      } 
+        if (AT(db.fun_sig, fn) == "ptr (ptr)") {
+          g.addEdge(hm.getHandle(fn), hm.getHandle(instr),
+                    EdgeType::IndirectCall, INDIRECT_WEIGHT);
+        }
+      }
     }
   }
 
@@ -172,25 +176,25 @@ graph::build_simple_graph(const database& db,
   for (const auto& [instr, call_type] : db.call_type) {
     if (call_type == CallType::Indirect) {
       for (const auto& fn : db.address_taken) {
-	if (AT(db.fun_sig, instr) == AT(db.fun_sig, fn)) {
-	  g.addEdge(hm.getHandle(fn), hm.getHandle(instr),
-		    EdgeType::IndirectCall, INDIRECT_WEIGHT);
-	}
+        if (AT(db.fun_sig, instr) == AT(db.fun_sig, fn)) {
+          g.addEdge(hm.getHandle(fn), hm.getHandle(instr),
+                    EdgeType::IndirectCall, INDIRECT_WEIGHT);
+        }
       }
 
       // If dynlink flag is set, also take functions with external
       // linkage as possible call targets.
       if (dynlink) {
-	for (const auto& [id, linkage] : db.linkage) {
-	  if (linkage == Linkage::ExternalLinkage &&
-	      AT(db.node_type, id) == NodeType::Function &&
-	      AT(db.fun_sig, instr) == AT(db.fun_sig, id) &&
-	      (!loaded_syms.has_value() ||
-	       find(loaded_ids.begin(), loaded_ids.end(), id) != loaded_ids.end())) {
-	    g.addEdge(hm.getHandle(id), hm.getHandle(instr),
-		      EdgeType::ExternIndirectCall, INDIRECT_WEIGHT);
-	  }
-	}
+        for (const auto& [id, linkage] : db.linkage) {
+          if (linkage == Linkage::ExternalLinkage &&
+              AT(db.node_type, id) == NodeType::Function &&
+              AT(db.fun_sig, instr) == AT(db.fun_sig, id) &&
+              (!loaded_syms.has_value() ||
+               find(loaded_ids.begin(), loaded_ids.end(), id) != loaded_ids.end())) {
+            g.addEdge(hm.getHandle(id), hm.getHandle(instr),
+                      EdgeType::ExternIndirectCall, INDIRECT_WEIGHT);
+          }
+        }
       }
     }
   }
@@ -205,8 +209,8 @@ graph::build_simple_graph(const database& db,
   for (const auto& [_, handles] : name2handles) {
     for (size_t i = 0; i < handles.size(); i++) {
       for (size_t j = i+1; j < handles.size(); j++) {
-	g.addEdge(handles[i], handles[j], EdgeType::Extern, INDIRECT_WEIGHT);
-	g.addEdge(handles[j], handles[i], EdgeType::Extern, INDIRECT_WEIGHT);
+        g.addEdge(handles[i], handles[j], EdgeType::Extern, INDIRECT_WEIGHT);
+        g.addEdge(handles[j], handles[i], EdgeType::Extern, INDIRECT_WEIGHT);
       }
     }
   }
@@ -216,8 +220,8 @@ graph::build_simple_graph(const database& db,
 
 pair<handle_map, T>
 graph::build_call_graph(const database& db,
-			bool dynlink,
-			const optional<vector<symbol>>& loaded_syms) {
+                        bool dynlink,
+                        const optional<vector<symbol>>& loaded_syms) {
   const auto loaded_ids = map_loaded_symbols_to_ids(db, loaded_syms);
 
   handle_map hm;
@@ -232,51 +236,51 @@ graph::build_call_graph(const database& db,
         continue;
       }
       for (const auto& instr : AT(db.contains, bb)) {
-	if (!db.call_type.contains(instr)) {
-	  continue;
-	}
-	const auto& call_ty = AT(db.call_type, instr);
-	// If direct, add one edge.
-	if (call_ty == CallType::Direct) {
-	  g.addEdge(hm.getHandle(AT(db.calls, instr)), hm.getHandle(f),
-		    EdgeType::DirectCall);
-	  
-	  // Special case for direct calls to [pthread_create]: add
-	  // edges for all address-taken functions with type signature
-	  // "ptr (ptr)".
-	  if (AT(db.calls, instr).ends_with(":fpthread_create")) {
-	    for (const auto& fn : db.address_taken) {
-	      if (AT(db.fun_sig, fn) == "ptr (ptr)") {
-		g.addEdge(hm.getHandle(fn), hm.getHandle(f),
-			  EdgeType::IndirectCall, INDIRECT_WEIGHT);
-	      }
-	    } 
-	  }
+        if (!db.call_type.contains(instr)) {
+          continue;
+        }
+        const auto& call_ty = AT(db.call_type, instr);
+        // If direct, add one edge.
+        if (call_ty == CallType::Direct) {
+          g.addEdge(hm.getHandle(AT(db.calls, instr)), hm.getHandle(f),
+                    EdgeType::DirectCall);
 
-	  continue;
-	}
-	// Else indirect. Add edges for all compatible address-taken functions.
-	for (const auto& fn : db.address_taken) {
-	  if (AT(db.fun_sig, fn) == AT(db.fun_sig, instr)) {
-	    g.addEdge(hm.getHandle(fn), hm.getHandle(f),
-		      EdgeType::IndirectCall, INDIRECT_WEIGHT);
-	  }
-	}
-	// If dynlink flag is set, also consider functions with
-	// external linkage to be possible call targets.
-	if (!dynlink) {
-	  continue;
-	}
-	for (const auto& [id, linkage] : db.linkage) {
-	  if (linkage == Linkage::ExternalLinkage &&
-	      AT(db.node_type, id) == NodeType::Function &&
-	      AT(db.fun_sig, instr) == AT(db.fun_sig, id) &&
-	      (!loaded_syms.has_value() ||
-	       find(loaded_ids.begin(), loaded_ids.end(), id) != loaded_ids.end())) {
-	    g.addEdge(hm.getHandle(id), hm.getHandle(f),
-		      EdgeType::ExternIndirectCall, INDIRECT_WEIGHT);
-	  }
-	}
+          // Special case for direct calls to [pthread_create]: add
+          // edges for all address-taken functions with type signature
+          // "ptr (ptr)".
+          if (AT(db.calls, instr).ends_with(":fpthread_create")) {
+            for (const auto& fn : db.address_taken) {
+              if (AT(db.fun_sig, fn) == "ptr (ptr)") {
+                g.addEdge(hm.getHandle(fn), hm.getHandle(f),
+                          EdgeType::IndirectCall, INDIRECT_WEIGHT);
+              }
+            }
+          }
+
+          continue;
+        }
+        // Else indirect. Add edges for all compatible address-taken functions.
+        for (const auto& fn : db.address_taken) {
+          if (AT(db.fun_sig, fn) == AT(db.fun_sig, instr)) {
+            g.addEdge(hm.getHandle(fn), hm.getHandle(f),
+                      EdgeType::IndirectCall, INDIRECT_WEIGHT);
+          }
+        }
+        // If dynlink flag is set, also consider functions with
+        // external linkage to be possible call targets.
+        if (!dynlink) {
+          continue;
+        }
+        for (const auto& [id, linkage] : db.linkage) {
+          if (linkage == Linkage::ExternalLinkage &&
+              AT(db.node_type, id) == NodeType::Function &&
+              AT(db.fun_sig, instr) == AT(db.fun_sig, id) &&
+              (!loaded_syms.has_value() ||
+               find(loaded_ids.begin(), loaded_ids.end(), id) != loaded_ids.end())) {
+            g.addEdge(hm.getHandle(id), hm.getHandle(f),
+                      EdgeType::ExternIndirectCall, INDIRECT_WEIGHT);
+          }
+        }
       }
     }
   }
@@ -291,8 +295,8 @@ graph::build_call_graph(const database& db,
   for (const auto& [_, handles] : name2handles) {
     for (size_t i = 0; i < handles.size(); i++) {
       for (size_t j = i+1; j < handles.size(); j++) {
-	g.addEdge(handles[i], handles[j], EdgeType::Extern, INDIRECT_WEIGHT);
-	g.addEdge(handles[j], handles[i], EdgeType::Extern, INDIRECT_WEIGHT);
+        g.addEdge(handles[i], handles[j], EdgeType::Extern, INDIRECT_WEIGHT);
+        g.addEdge(handles[j], handles[i], EdgeType::Extern, INDIRECT_WEIGHT);
       }
     }
   }
@@ -310,8 +314,8 @@ graph::build_call_graph(const database& db,
 // possible to specify functions as targets for directed KLEE.
 pair<handle_map, T>
 graph::build_cfg(const database& db,
-		 bool dynlink,
-		 const optional<vector<symbol>>& loaded_syms) {  
+                 bool dynlink,
+                 const optional<vector<symbol>>& loaded_syms) {
   const auto loaded_ids = map_loaded_symbols_to_ids(db, loaded_syms);
 
   handle_map hm;
@@ -323,14 +327,14 @@ graph::build_cfg(const database& db,
       continue;
     }
     for (const auto& bb : db.contains.at(fn)) {
-      const static regex pattern(".*:f.*:bb0");
+      static const regex pattern(".*:f.*:bb0");
       if (regex_match(bb, pattern)) {
-	g.addEdge(hm.getHandle(bb), hm.getHandle(fn), EdgeType::Contains);
-	goto next;
+        g.addEdge(hm.getHandle(bb), hm.getHandle(fn), EdgeType::Contains);
+        goto next;
       }
     }
     throw runtime_error("no entry point found for function " + fn);
-  next:;
+  next: {}
   }
 
   // BB control flow
@@ -347,48 +351,48 @@ graph::build_cfg(const database& db,
     }
     for (const auto& instr : instrs) {
       if (!db.call_type.contains(instr)) {
-	continue;
+        continue;
       }
       const auto& call_ty = AT(db.call_type, instr);
       // If direct, add one edge.
       if (call_ty == CallType::Direct) {
-	g.addEdge(hm.getHandle(AT(db.calls, instr)),
-		  hm.getHandle(bb), EdgeType::DirectCall);
+        g.addEdge(hm.getHandle(AT(db.calls, instr)),
+                  hm.getHandle(bb), EdgeType::DirectCall);
 
-	// Special case for direct calls to [pthread_create]: add
-	// edges for all address-taken functions with type signature
-	// "ptr (ptr)".
-	if (AT(db.calls, instr).ends_with(":fpthread_create")) {
-	  for (const auto& fn : db.address_taken) {
-	    if (AT(db.fun_sig, fn) == "ptr (ptr)") {
-	      g.addEdge(hm.getHandle(fn), hm.getHandle(bb),
-			EdgeType::IndirectCall, INDIRECT_WEIGHT);
-	    }
-	  } 
-	}
-	
-	continue;
+        // Special case for direct calls to [pthread_create]: add
+        // edges for all address-taken functions with type signature
+        // "ptr (ptr)".
+        if (AT(db.calls, instr).ends_with(":fpthread_create")) {
+          for (const auto& fn : db.address_taken) {
+            if (AT(db.fun_sig, fn) == "ptr (ptr)") {
+              g.addEdge(hm.getHandle(fn), hm.getHandle(bb),
+                        EdgeType::IndirectCall, INDIRECT_WEIGHT);
+            }
+          }
+        }
+
+        continue;
       }
       // Else indirect. Add edges for all compatible address-taken functions.
       for (const auto& fn : db.address_taken) {
-	if (AT(db.fun_sig, fn) == AT(db.fun_sig, instr)) {
-	  g.addEdge(hm.getHandle(fn), hm.getHandle(bb),
-		    EdgeType::IndirectCall, INDIRECT_WEIGHT);
-	}
+        if (AT(db.fun_sig, fn) == AT(db.fun_sig, instr)) {
+          g.addEdge(hm.getHandle(fn), hm.getHandle(bb),
+                    EdgeType::IndirectCall, INDIRECT_WEIGHT);
+        }
       }
       // If dynlink flag is set, also take functions with external
       // linkage as possible call targets.
       if (dynlink) {
-	for (const auto& [id, linkage] : db.linkage) {
-	  if (linkage == Linkage::ExternalLinkage &&
-	      AT(db.node_type, id) == NodeType::Function &&
-	      AT(db.fun_sig, instr) == AT(db.fun_sig, id) &&
-	      (!loaded_syms.has_value() ||
-	       find(loaded_ids.begin(), loaded_ids.end(), id) != loaded_ids.end())) {
-	    g.addEdge(hm.getHandle(id), hm.getHandle(bb),
-		      EdgeType::ExternIndirectCall, INDIRECT_WEIGHT);
-	  }
-	}
+        for (const auto& [id, linkage] : db.linkage) {
+          if (linkage == Linkage::ExternalLinkage &&
+              AT(db.node_type, id) == NodeType::Function &&
+              AT(db.fun_sig, instr) == AT(db.fun_sig, id) &&
+              (!loaded_syms.has_value() ||
+               find(loaded_ids.begin(), loaded_ids.end(), id) != loaded_ids.end())) {
+            g.addEdge(hm.getHandle(id), hm.getHandle(bb),
+                      EdgeType::ExternIndirectCall, INDIRECT_WEIGHT);
+          }
+        }
       }
     }
   }
@@ -403,8 +407,8 @@ graph::build_cfg(const database& db,
   for (const auto& [_, handles] : name2handles) {
     for (size_t i = 0; i < handles.size(); i++) {
       for (size_t j = i+1; j < handles.size(); j++) {
-	g.addEdge(handles[i], handles[j], EdgeType::Extern, INDIRECT_WEIGHT);
-	g.addEdge(handles[j], handles[i], EdgeType::Extern, INDIRECT_WEIGHT);
+        g.addEdge(handles[i], handles[j], EdgeType::Extern, INDIRECT_WEIGHT);
+        g.addEdge(handles[j], handles[i], EdgeType::Extern, INDIRECT_WEIGHT);
       }
     }
   }
@@ -416,8 +420,8 @@ graph::build_cfg(const database& db,
 // through intermediate function nodes.
 pair<handle_map, T>
 graph::build_instr_cfg(const database& db,
-		       bool dynlink,
-		       const optional<vector<symbol>>& loaded_syms) {
+                       bool dynlink,
+                       const optional<vector<symbol>>& loaded_syms) {
   const auto loaded_ids = map_loaded_symbols_to_ids(db, loaded_syms);
 
   handle_map hm;
@@ -429,15 +433,15 @@ graph::build_instr_cfg(const database& db,
       continue;
     }
     for (const auto& bb : db.contains.at(fn)) {
-      const static regex pattern(".*:f.*:bb0");
+      static const regex pattern(".*:f.*:bb0");
       if (regex_match(bb, pattern)) {
-	const auto& instr = db.contains.at(bb).front();
-	g.addEdge(hm.getHandle(instr), hm.getHandle(fn), EdgeType::Contains);
-	goto next;
+        const auto& instr = db.contains.at(bb).front();
+        g.addEdge(hm.getHandle(instr), hm.getHandle(fn), EdgeType::Contains);
+        goto next;
       }
     }
     throw runtime_error("no entry point found for function " + fn);
-  next:;
+  next: {}
   }
 
   // Intra-BB control flow (straight line)
@@ -447,7 +451,8 @@ graph::build_instr_cfg(const database& db,
     }
     const auto& instrs = AT(db.contains, bb);
     for (size_t i = 0; i < instrs.size()-1; i++) {
-      g.addEdge(hm.getHandle(instrs[i+1]), hm.getHandle(instrs[i]), EdgeType::Succ);
+      g.addEdge(hm.getHandle(instrs[i+1]), hm.getHandle(instrs[i]),
+                EdgeType::Succ);
     }
   }
 
@@ -456,7 +461,8 @@ graph::build_instr_cfg(const database& db,
     for (const auto& succ : succs) {
       const auto& src_instr = db.contains.at(bb).back();
       const auto& dst_instr = db.contains.at(succ).front();
-      g.addEdge(hm.getHandle(dst_instr), hm.getHandle(src_instr), EdgeType::Succ);
+      g.addEdge(hm.getHandle(dst_instr), hm.getHandle(src_instr),
+                EdgeType::Succ);
     }
   }
 
@@ -467,48 +473,48 @@ graph::build_instr_cfg(const database& db,
     }
     for (const auto& instr : instrs) {
       if (!db.call_type.contains(instr)) {
-	continue;
+        continue;
       }
       const auto& call_ty = AT(db.call_type, instr);
       // If direct, add one edge.
       if (call_ty == CallType::Direct) {
-	g.addEdge(hm.getHandle(AT(db.calls, instr)),
-		  hm.getHandle(instr), EdgeType::DirectCall);
+        g.addEdge(hm.getHandle(AT(db.calls, instr)),
+                  hm.getHandle(instr), EdgeType::DirectCall);
 
-	// Special case for direct calls to [pthread_create]: add
-	// edges for all address-taken functions with type signature
-	// "ptr (ptr)".
-	if (AT(db.calls, instr).ends_with(":fpthread_create")) {
-	  for (const auto& fn : db.address_taken) {
-	    if (AT(db.fun_sig, fn) == "ptr (ptr)") {
-	      g.addEdge(hm.getHandle(fn), hm.getHandle(instr),
-			EdgeType::IndirectCall, INDIRECT_WEIGHT);
-	    }
-	  } 
-	}
-	
-	continue;
+        // Special case for direct calls to [pthread_create]: add
+        // edges for all address-taken functions with type signature
+        // "ptr (ptr)".
+        if (AT(db.calls, instr).ends_with(":fpthread_create")) {
+          for (const auto& fn : db.address_taken) {
+            if (AT(db.fun_sig, fn) == "ptr (ptr)") {
+              g.addEdge(hm.getHandle(fn), hm.getHandle(instr),
+                        EdgeType::IndirectCall, INDIRECT_WEIGHT);
+            }
+          }
+        }
+
+        continue;
       }
       // Else indirect. Add edges for all compatible address-taken functions.
       for (const auto& fn : db.address_taken) {
-	if (AT(db.fun_sig, fn) == AT(db.fun_sig, instr)) {
-	  g.addEdge(hm.getHandle(fn), hm.getHandle(instr),
-		    EdgeType::IndirectCall, INDIRECT_WEIGHT);
-	}
+        if (AT(db.fun_sig, fn) == AT(db.fun_sig, instr)) {
+          g.addEdge(hm.getHandle(fn), hm.getHandle(instr),
+                    EdgeType::IndirectCall, INDIRECT_WEIGHT);
+        }
       }
       // If dynlink flag is set, also take functions with external
       // linkage as possible call targets.
       if (dynlink) {
-	for (const auto& [id, linkage] : db.linkage) {
-	  if (linkage == Linkage::ExternalLinkage &&
-	      AT(db.node_type, id) == NodeType::Function &&
-	      AT(db.fun_sig, instr) == AT(db.fun_sig, id) &&
-	      (!loaded_syms.has_value() ||
-	       find(loaded_ids.begin(), loaded_ids.end(), id) != loaded_ids.end())) {
-	    g.addEdge(hm.getHandle(id), hm.getHandle(instr),
-		      EdgeType::ExternIndirectCall, INDIRECT_WEIGHT);
-	  }
-	}
+        for (const auto& [id, linkage] : db.linkage) {
+          if (linkage == Linkage::ExternalLinkage &&
+              AT(db.node_type, id) == NodeType::Function &&
+              AT(db.fun_sig, instr) == AT(db.fun_sig, id) &&
+              (!loaded_syms.has_value() ||
+               find(loaded_ids.begin(), loaded_ids.end(), id) != loaded_ids.end())) {
+            g.addEdge(hm.getHandle(id), hm.getHandle(instr),
+                      EdgeType::ExternIndirectCall, INDIRECT_WEIGHT);
+          }
+        }
       }
     }
   }
@@ -523,8 +529,8 @@ graph::build_instr_cfg(const database& db,
   for (const auto& [_, handles] : name2handles) {
     for (size_t i = 0; i < handles.size(); i++) {
       for (size_t j = i+1; j < handles.size(); j++) {
-	g.addEdge(handles[i], handles[j], EdgeType::Extern, INDIRECT_WEIGHT);
-	g.addEdge(handles[j], handles[i], EdgeType::Extern, INDIRECT_WEIGHT);
+        g.addEdge(handles[i], handles[j], EdgeType::Extern, INDIRECT_WEIGHT);
+        g.addEdge(handles[j], handles[i], EdgeType::Extern, INDIRECT_WEIGHT);
       }
     }
   }

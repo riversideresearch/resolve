@@ -1,3 +1,8 @@
+#include <string>
+#include <unordered_map>
+#include <unordered_set>
+#include <vector>
+
 #include "distmap.hpp"
 #include "search.hpp"
 #include "util.hpp"
@@ -6,9 +11,9 @@ using namespace std;
 
 distmap_blacklist
 distmap::gen(const facts::database& db,
-	     const string& dst,
-	     bool dynlink,
-	     const optional<vector<dlsym::loaded_symbol>>& loaded_syms) {
+             const string& dst,
+             bool dynlink,
+             const optional<vector<dlsym::loaded_symbol>>& loaded_syms) {
   const auto [hm, g] = graph::build_instr_cfg(db, dynlink, loaded_syms);
 
   const auto dst_handle_opt = hm.getHandleOpt(dst);
@@ -23,10 +28,10 @@ distmap::gen(const facts::database& db,
   if (db.contains.contains(dst)) {
     for (const auto& bb : db.contains.at(dst)) {
       if (db.node_type.at(bb) != facts::NodeType::BasicBlock) {
-	continue;
+        continue;
       }
       for (const auto& instr : db.contains.at(bb)) {
-	distmap[hm.getHandleConst(instr)] = 0;
+        distmap[hm.getHandleConst(instr)] = 0;
       }
     }
   }
@@ -43,12 +48,12 @@ distmap::gen(const facts::database& db,
     }
     if (db.contains.contains(id)) {
       for (const auto& bb : db.contains.at(id)) {
-	if (db.node_type.at(bb) != facts::NodeType::BasicBlock) {
-	  continue;
-	}
-	for (const auto& instr : db.contains.at(bb)) {
-	  distmap[hm.getHandleConst(instr)] = 0;
-	}
+        if (db.node_type.at(bb) != facts::NodeType::BasicBlock) {
+          continue;
+        }
+        for (const auto& instr : db.contains.at(bb)) {
+          distmap[hm.getHandleConst(instr)] = 0;
+        }
       }
     }
   }

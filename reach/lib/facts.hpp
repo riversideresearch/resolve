@@ -1,7 +1,9 @@
 #pragma once
 
 #include <fstream>
-#include <unordered_set>
+#include <string>
+#include <unordered_map>
+#include <vector>
 
 #include "json.hpp"
 
@@ -12,7 +14,7 @@ namespace facts {
     NodeType     = 1 << 0,
     Contains     = 1 << 1,
     Calls        = 1 << 2,
-    ControlFlow  = 1 << 3, // includes f->bb entry block edges
+    ControlFlow  = 1 << 3,  // includes f->bb entry block edges
     Name         = 1 << 4,
     Linkage      = 1 << 5,
     CallType     = 1 << 6,
@@ -70,15 +72,15 @@ namespace facts {
     std::unordered_map<ID, Linkage> linkage;
     std::unordered_map<ID, CallType> call_type;
     std::vector<ID> address_taken;
-    std::unordered_map<ID, std::string> fun_sig; // id -> type sig as string
+    std::unordered_map<ID, std::string> fun_sig;  // id -> type sig as string
   };
 
   database load(std::istream& nodes,
-		std::istream& nodeprops,
-		std::istream& edges,
-		LoadOptions options);
+                std::istream& nodeprops,
+                std::istream& edges,
+                LoadOptions options);
   database load(const std::filesystem::path& facts_dir, LoadOptions options);
-}
+}  // namespace facts
 
 // Loaded symbol logs from dynamic analysis, for pruning
 // IndirectExtern edges that aren't seen at runtime.
@@ -88,7 +90,7 @@ namespace dlsym {
     std::string library;
     bool operator==(const loaded_symbol& rhs) const = default;
   };
-  
+
   struct log {
     std::vector<loaded_symbol> loaded_symbols;
   };
@@ -96,7 +98,8 @@ namespace dlsym {
   NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(loaded_symbol, symbol, library);
   NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(log, loaded_symbols);
 
-  inline std::optional<log> load_log_from_file(const std::filesystem::path& path) {
+  inline std::optional<log>
+  load_log_from_file(const std::filesystem::path& path) {
     std::ifstream f(path);
     if (!f.is_open()) {
       return {};
@@ -105,4 +108,4 @@ namespace dlsym {
     f >> j;
     return j.template get<log>();
   }
-} // namespace dlsym
+}  // namespace dlsym
