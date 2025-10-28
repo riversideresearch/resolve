@@ -5,13 +5,22 @@ and program analysis tools. The result is an enhanced toolchain where an analyst
 identify, triage, and remediate potential vulnerabilities.
 
 ## Getting started 
-There are several components to the RESOLVE toolchain.
+To get started with the RESOLVE toolchain here is a high-level overview of each component.
 
 ### COMPILER PASSES
+The RESOLVE toolchain modifies the Clang compiler with additional passes to perform analysis and remediation.  
+
+| LLVM Pass | Behavior |
+| --- | --- |
+| 'AnnotateFunctions` | Collect function summaries for each function definition |
+| 'CVEAssert' | Applies sanitizer to affected function given a CVE description | 
+| 'DlsymHook' | Instrument 'dlsym' function calls |
+| 'EnhancedFacts` | Embed facts derived from program source code into custom ELF sections |
+| 'ObjHook' | Instrument C memory allocators |
 
 
 ### LINKER
-The linker component handles extracting facts from the corresponding ELF binary sections. Those sections are then written to files to be consumed by the reach tool for reachability analysis.  
+The linker component handles extracting facts from the corresponding ELF binary sections embedded by the `EnhancedFacts` compiler pass. Those sections are then written to files to be consumed by the reach tool for reachability analysis.  
 
 ### LIBRESOLVE
 Libresolve is a runtime library written in the Rust programming language.
