@@ -46,6 +46,7 @@ chmod u+x scripts/install-deps.sh
 ./scripts/install-deps              # Install necessary dependencies
 make build                          # Builds compiler passes, reach tool, and libresolve runtime library
 make test                           # Runs test suite
+```
 
 ## EXAMPLE
 TODO
