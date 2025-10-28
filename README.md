@@ -45,13 +45,14 @@ A Python wrapper, `reach-wrapper.py`, provides a convenient command line interfa
 
 
 ## BUILDING RESOLVE
-To build the RESOLVE toolchain, download the required dependencies.
+To build the RESOLVE toolchain, download the required dependencies. 
 
 ```bash
 cd resolve/
-chmod u+x scripts/install-deps.sh
-./scripts/install-deps  # Install necessary dependencies
-make build      # Builds compiler passes, reach tool, and libresolve runtime library
+chmod u+x scripts/install-deps.sh   # Change permissions of bash script to be executable
+./scripts/install-deps              # Install necessary dependencies
+make build                          # Builds compiler passes, reach tool, and libresolve runtime library
+make test                           # Runs test suite
 ```
 
 ## EXAMPLE
