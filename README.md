@@ -25,10 +25,10 @@ The linker component handles extracting facts from the corresponding ELF binary 
 ### Libresolve
 Libresolve is a runtime library written in the Rust programming language.
 The purpose of this library is to track object allocations and other kernel interactions. Furthermore,
-the library can be configured to write runtime logs to a specific file descriptor. To learn more about libresolve and how it interacts with our suite of compiler passes check out this page <insert-link>.  
+the library can be configured to write runtime logs to a specific file descriptor. To learn more about libresolve and how it interacts with our suite of compiler passes check out this [page](https://github.com/riversideresearch/resolve/tree/main/libresolve).  
 
 ### Reach Tool
-The reach tool is a fast graph tool to facilitate reachability analysis on a codebase. The development is factored into two parts, a library and executable that uses the library. This tool loads the fact files produced by the linker component and determines if there is a path from the program entry to the vulnerability. Upon finding the path, the tool will package the paths into a JSON object and write the path to a designated path (if given) or STDOUT file descriptor. Furthermore, we wrapped reach via python to create a wrapper called reach-wrapper.py which enables quicker access to the tool. For more information about the reach tool, check out this page <insert-link>.    
+The reach tool is a fast graph tool to facilitate reachability analysis on a codebase. The development is factored into two parts, a library and executable that uses the library. This tool loads the fact files produced by the linker component and determines if there is a path from the program entry to the vulnerability. Upon finding the path, the tool will package the paths into a JSON object and write the path to a designated path (if given) or STDOUT file descriptor. Furthermore, we wrapped reach via python to create a wrapper called reach-wrapper.py which enables quicker access to the tool. For more information about the reach tool, check out this page: [reach](https://github.com/riversideresearch/resolve/tree/main/reach).    
 
 
 ## BUILDING RESOLVE
