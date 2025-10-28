@@ -8,7 +8,7 @@ identify, triage, and remediate potential vulnerabilities.
 To get started with the RESOLVE toolchain here is a high-level overview of each component.
 
 ### COMPILER PASSES
-The RESOLVE toolchain modifies the Clang compiler with additional passes to perform analysis and remediation.  
+The RESOLVE toolchain modifies the Clang compiler with additional passes to perform program fact generation and remediation. The `AnnotateFunctions` pass collects function summaries (function arguments and their types, function return values and their types, and basic block numbers) for each function definition in the program. The `CVEAssert` pass applies sanitizers to an affect function in a program given a CVE description. At the time of writing the sanitizer capabilities we support cover memory and arithmetic vulnerabilities. The `DlsymHook` pass instruments dlysm function calls and `ObjHook` instruments C memory allocators. Furthermore, `EnhancedFacts` pass embeds program facts derived from the source code into custom ELF sections.     
 
 | LLVM Pass | Behavior |
 | --- | --- |
