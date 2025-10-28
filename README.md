@@ -12,11 +12,11 @@ The RESOLVE toolchain modifies the Clang compiler with additional passes to perf
 
 | LLVM Pass | Behavior |
 | --- | --- |
-| 'AnnotateFunctions` | Collect function summaries for each function definition |
-| 'CVEAssert' | Applies sanitizer to affected function given a CVE description | 
-| 'DlsymHook' | Instrument 'dlsym' function calls |
-| 'EnhancedFacts` | Embed facts derived from program source code into custom ELF sections |
-| 'ObjHook' | Instrument C memory allocators |
+| `AnnotateFunctions` | Collect function summaries for each function definition |
+| `CVEAssert` | Applies sanitizer to affected function given a CVE description | 
+| `DlsymHook` | Instrument 'dlsym' function calls |
+| `EnhancedFacts` | Embed facts derived from program source code into custom ELF sections |
+| `ObjHook` | Instrument C memory allocators |
 
 
 ### LINKER
@@ -35,7 +35,7 @@ The reach tool is a fast graph tool to facilitate reachability analysis on a cod
 ```bash
 cd resolve/
 ./install-deps  # Install necessary dependencies
-make build      # Builds compiler passes, reach tool, and LibRESOLVE runtime library
+make build      # Builds compiler passes, reach tool, and libresolve runtime library
 ```
 
 ## EXAMPLE
