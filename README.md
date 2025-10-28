@@ -14,7 +14,7 @@ Program fact generation is a static program analysis technique that extracts str
 
 The `AnnotateFunctions` pass collects function summaries for each function definition in the program. Function summaries are defined as metadata that contains a function's arguments, return values This pass can be linked against Libresolve, a runtime library to record these summaries in a given file location.
 
-The `CVEAssert` pass applies sanitizers to an affect function in a program given a CVE description. At the time of writing, the sanitizer capabilities we support cover memory and arithmetic vulnerability classes.
+The `CVEAssert` pass applies sanitizers to an affect function in a program given a CVE description. At the time of writing, the sanitizer capabilities we support cover a subset of memory and arithmetic vulnerability classes.
 
 The `DlsymHook` pass instruments `dlysm` function calls and `ObjHook` instruments C memory allocators. These passes can also be linked against libresolve to enable logging `dlsym` calls and allocator calls, which can useful in tracing calls in the kernel to identify potential vulnerabilities.   
 
@@ -41,13 +41,16 @@ The reach tool is a fast graph-based utility designated to facilitate reachabili
 
 Reach consumes the fact files produced by the linker component and determines whether a path exists from the program entry point to a specified vulnerability. When a path is found, Reach packages the results into a JSON object and writes them either to a user specified output path or to STDOUT by default. 
 
-A Python wrapper, `reach-wrapper.py`, provides a convenient command line interface to interact with the reach tool. For more information about the reach tool, see the [documentation page](https://github.com/riversideresearch/resolve/tree/main/reach).
+A Python wrapper, `reach-wrapper.py`, provides a convenient command line interface to interact with the reach tool. For more information about the reach tool, see the [Reach documentation page](https://github.com/riversideresearch/resolve/tree/main/reach).
 
 
 ## BUILDING RESOLVE
+To build the RESOLVE toolchain, download the required dependencies.
+
 ```bash
 cd resolve/
-./install-deps  # Install necessary dependencies
+chmod u+x scripts/install-deps.sh
+./scripts/install-deps  # Install necessary dependencies
 make build      # Builds compiler passes, reach tool, and libresolve runtime library
 ```
 
