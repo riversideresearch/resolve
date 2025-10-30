@@ -5,6 +5,7 @@ apt-get update && apt-get install -y --no-install-recommends \
     lld \
     cmake \
     ninja-build \
+    python3-lit \
     git \
     make \
     wget \
