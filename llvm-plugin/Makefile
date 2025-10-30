@@ -8,6 +8,7 @@ clangformat: src
 	cd build && make clangformat
 
 test: build
+	llvm-lit -v tests
 	+$(MAKE) -C test/test_annotate_functions
 	+$(MAKE) -C test/test_cveassert
 
