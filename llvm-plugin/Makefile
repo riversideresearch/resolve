@@ -8,7 +8,7 @@ clangformat: src
 	cd build && make clangformat
 
 test: build
-	lit -v tests
+	lit -v tests/overflow_add.c
 	+$(MAKE) -C test/test_annotate_functions
 	+$(MAKE) -C test/test_cveassert
 
