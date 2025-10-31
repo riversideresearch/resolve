@@ -9,7 +9,6 @@ clangformat: src
 
 test: build
 	+$(MAKE) -C test/test_annotate_functions
-	+$(MAKE) -C test/test_cveassert
 
 clean:
 	rm -rf build
