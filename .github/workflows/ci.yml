@@ -9,8 +9,7 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v5
       - name: Install deps
-        run: chmod u+x /scripts/install-deps.sh
-        run: ./scripts/install-deps.sh
+        run: make install-packages
       - name: Build
         run: make build
       - name: Test
