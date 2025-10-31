@@ -8,7 +8,7 @@ echo "Installing dependencies for resolve..."
 UPDATE_CMD="sudo apt-get update"
 INSTALL_CMD="sudo apt-get install -y --no-install-recommends"
 
-PKGS="build essential \
+PKGS="build-essential \
     clang \
     clang-format \
     lld \
