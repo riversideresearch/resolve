@@ -9,7 +9,8 @@ clangformat: src
 
 test: build
 
-	@which llvm-lit >/dev/null 2&>1 || (echo " Error: llvm-lit not found in PATH" && exit 1)
+	LIT:= $(shell command -v lit)
+	$(LIT) -v tests
 	+$(MAKE) -C test/test_annotate_functions
 	+$(MAKE) -C test/test_cveassert
 
