@@ -29,5 +29,5 @@ clean-reach:
 	cd reach && make clean
 
 install-packages:
-	chmod u+x /scripts/install-deps.sh
+	chmod u+x ./scripts/install-deps.sh
 	./scripts/install-deps.sh
