@@ -27,7 +27,7 @@ config.substitutions.append(("%clang", clang))
 config.substitutions.append(("%FileCheck", filecheck))
 
 # Add path to pass plugin
-plugin = "/home/runner/work/resolve/resolve/llvm-plugin/build/libCVEAssert.so"
+plugin = "../../llvm-plugin/build/libCVEAssert.so"
 config.substitutions.append(("%plugin", plugin))
 
 # Add suffixes to test
