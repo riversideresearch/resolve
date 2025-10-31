@@ -1,0 +1,14 @@
+{
+    "vulnerabilities": [
+        {
+            "cve-id": "CVE-resolve-div-zero-1",
+            "cve-description": "",
+            "package-name": "resolve-test",
+            "package-version": "1.0.1",
+            "cwe-id": "369",
+            "cwe-name": "Divide By Zero",
+            "affected-function": "div_zero_main",
+            "affected-file": "div_zero.c"
+        }
+    ]
+}
