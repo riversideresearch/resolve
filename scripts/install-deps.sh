@@ -54,4 +54,4 @@ else
 
 fi 
 
-echo " All dependencies install successfully."
+echo " All dependencies installed successfully."
