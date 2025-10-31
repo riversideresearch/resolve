@@ -10,6 +10,11 @@ clangformat: src
 	cd build && make clangformat
 
 test: build
+	@if [ -z "$(LIT)" ]; then \
+		echo "Error: lit or llvm-lit not found."; \
+		exit 1; \
+	fi 
+	
 	$(LIT) -v tests
 	+$(MAKE) -C test/test_annotate_functions
 	+$(MAKE) -C test/test_cveassert
