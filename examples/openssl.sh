@@ -1,11 +1,15 @@
 #/bin/bash
 
+OPENSSL="https://github.com/openssl/openssl.git"
+
 # Ensure the parent repo has been built before running
 make -C "../"
 
 # get the OpenSSL repo
 if [ ! -d "openssl" ]; then
-    git clone https://github.com/openssl/openssl.git
+
+#    git clone https://github.com/openssl/openssl.git
+    git clone --branch openssl-3.5.0 --depth 1 $OPENSSL   
 fi
 
 cd openssl
@@ -30,3 +34,9 @@ mkdir openssl_facts
 
 python3 ../linker/AnalysisEngine_linkmap.py --in_bin=openssl/libssl.so --out_dir=openssl_facts
 
+# Run the reach-wrapper tool
+python3 ../reach-wrapper/reach-wrapper.py \
+        -i vulnerabilities.json \
+        -o reach_out.json \
+        -f openssl_facts \
+        -r ../reach/build/reach
