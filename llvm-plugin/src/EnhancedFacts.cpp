@@ -1,5 +1,6 @@
 // EnhancedFacts.cpp
 
+
 #include "Facts.hpp"
 #include "LLVMFacts.hpp"
 #include "NodeID.hpp"
@@ -145,6 +146,11 @@ static void getFunctionFacts(Function &F) {
 }
 
 static void getModuleFacts(Module &M) {
+  // In the rustc invocation this will typically segfault as all of the internal pointers are garbage
+  M.print(dbgs(), nullptr, false, true);
+  auto name = M.getSourceFileName();
+  auto id = M.getModuleIdentifier();
+  errs() << "Module: " << id << " File name: " << name << " length: " << name.size() << "\n";
   facts.addNodeProp(M, "source_file", M.getSourceFileName());
 
   for (GlobalVariable &G : M.globals()) {
@@ -194,8 +200,11 @@ static void embedFacts(Module &M) {
 
 struct EnhancedFactsPass : public PassInfoMixin<EnhancedFactsPass> {
   PreservedAnalyses run(Module &M, ModuleAnalysisManager &) {
+    errs() << "Module start\n";
     getModuleFacts(M);
+    errs() << "Module embed facts\n";
     embedFacts(M);
+    errs() << "Module embed facts done\n";
     return PreservedAnalyses::all();
   }
 };
@@ -203,9 +212,39 @@ struct EnhancedFactsPass : public PassInfoMixin<EnhancedFactsPass> {
 extern "C" LLVM_ATTRIBUTE_WEAK PassPluginLibraryInfo llvmGetPassPluginInfo() {
   return {LLVM_PLUGIN_API_VERSION, "EnhancedFacts", LLVM_VERSION_STRING,
           [](PassBuilder &PB) {
+            errs() << "Loading EnhancedFacts\n";
+
+            // Register so that the pass can be used with opt
+            // This might also work with rustc, however the memory corruption issues
+            // makes it hard to figure it out, e.g. outputs
+            // Pipeline: ����������
+            PB.registerPipelineParsingCallback(
+                [](auto Name, ModulePassManager& PM,
+                   auto /* PipelineElement*/) {
+                    errs() << "Pipeline: " << Name << "\n";
+                    if (Name == "enhanced-facts") {
+                        // if opt command line argument matches "enhanced-facts"
+                        // add the pass
+                        PM.addPass(EnhancedFactsPass());
+                        return true;
+                    }
+                    return false;
+                });
+
+            // As a workaround for now, this does get called when rustc runs the llvm optimizer
+            PB.registerOptimizerEarlyEPCallback(
+                    [&](ModulePassManager& MPM, auto) {
+                        errs() << "Adding Optimizer Early EnhancedFacts Module Pass\n";
+                        MPM.addPass(EnhancedFactsPass());
+                    }
+                );
+
+            // this function does not seem to be called with rustc
             PB.registerPipelineStartEPCallback(
                 [&](ModulePassManager &MPM, OptimizationLevel) {
+                    errs() << "Adding PipelineStart EnhancedFacts Module Pass\n";
                   MPM.addPass(EnhancedFactsPass());
                 });
+
           }};
 }

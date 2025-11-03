@@ -10,4 +10,7 @@ examples/openssl/
 examples/openssl_facts/
 examples/openssl_reach_out.json
 
+examples/rust/
+examples/llvm_facts/
+
 
