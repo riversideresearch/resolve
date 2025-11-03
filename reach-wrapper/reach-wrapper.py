@@ -404,7 +404,7 @@ class ReachToolManager:
         }
 
 class Orchestrator:
-    def __init__(self, facts_dir: str, vuln_json_path: str, final_out_path: str, reach_bin_path: str|None, reach_args: list[str], cp_src_dir: str|None, graph_dir: str|None):
+    def __init__(self, facts_dir: str, vuln_json_path: str, final_out_path: str, reach_bin_path: str|None, reach_args: list[str], cp_src_dir: str|None, graph_dir: str|None, entrypoint: str):
         default_reach_path = Path(__file__).absolute().parents[1] / "reach/build/reach"
         
         self.reach_args = reach_args
@@ -418,6 +418,8 @@ class Orchestrator:
         self.fact_parser.demangle_names()
 
         self.output_graph_path = graph_dir
+
+        self.entrypoint = entrypoint
 
         # Load vulnerabilities.json
         with open(self.vuln_json_path, "r") as vj:
@@ -489,8 +491,8 @@ class Orchestrator:
         "Run reach tool and update Results"
         # NOTE: we assume that we can always enter
         # the desired basic block from an 'fmain'
-        src = self.fact_parser.get_func_id("main")
-        assert src is not None, "Could not find source function 'main'"
+        src = self.fact_parser.get_func_id(self.entrypoint)
+        assert src is not None, f"Could not find source function '{self.entrypoint}'"
         # TODO (optional): implement flags to specify the intermediate file placements
 
         """
@@ -567,6 +569,7 @@ class Orchestrator:
     def main(self):
         self.parse_vulnerable_results()
         self.parse_facts()
+
         self.run_reach_tool()
         self.serialize_output()
         self.serialize_as_graph()
@@ -634,7 +637,16 @@ if __name__ == "__main__":
         required=False
     )
 
+    parser.add_argument(
+        "-e",
+        "--entry",
+        type=str,
+        help="The function to use as the entrypoint for reachability analysis. Defaults to `main`",
+        default="main",
+        required=False
+    )
+
     args = parser.parse_args()
     # reach_out = Path("/tmp/reach_out.json")
 
-    Orchestrator(args.facts, args.input, args.output, args.reach, args.args, args.src, args.graph).main()
+    Orchestrator(args.facts, args.input, args.output, args.reach, args.args, args.src, args.graph, args.entry).main()

@@ -1,13 +1,13 @@
 {
   "vulnerabilities": [
     {
-        "cve-id": "CVE-openssl-rri",
+        "cve-id": "CVE-2025-9230",
         "cve-description": "",
         "package-name": "openssl",
         "package-version": "3.5.0",
         "cwe-id": "133",
         "cwe-name": "OOB access",
-        "affected-file": "/openssl/crypto/cms/cms_pwri.c",
+        "affected-file": "openssl/crypto/cms/cms_pwri.c",
         "affected-function": "kek_unwrap_key"
     }
   ]

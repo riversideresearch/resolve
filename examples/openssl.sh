@@ -28,15 +28,20 @@ make -j
 # return to the examples folder
 cd ..
 
+# Ensure we build new facts
+if [ -d "openssl_facts" ]; then
+    rm openssl_facts
+fi
 mkdir openssl_facts
 
 # Extract the embedded info from the openssl binary
 
-python3 ../linker/AnalysisEngine_linkmap.py --in_bin=openssl/libssl.so --out_dir=openssl_facts
+python3 ../linker/AnalysisEngine_linkmap.py --in_bin=openssl/libcrypto.so --out_dir=openssl_facts
 
 # Run the reach-wrapper tool
 python3 ../reach-wrapper/reach-wrapper.py \
-        -i vulnerabilities.json \
-        -o reach_out.json \
+        -i openssl_vulnerabilities.json \
+        -o openssl_reach_out.json \
         -f openssl_facts \
+        -e "CMS_RecipientInfo_decrypt"
         -r ../reach/build/reach

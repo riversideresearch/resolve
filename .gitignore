@@ -1,0 +1,13 @@
+# no build files
+**/build/*
+__pycache__
+
+llvm-plugin/test/**/*.ll
+llvm-plugin/test/**/*.ll.mem
+
+# ignore repos/outputs from tests
+examples/openssl/
+examples/openssl_facts/
+examples/openssl_reach_out.json
+
+
