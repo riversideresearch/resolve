@@ -150,9 +150,10 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
       sanitizeMemInstBounds(&F, MAM);
     } else if (vuln.WeaknessID == 132) {
       sanitizeMemInstBounds(&F, MAM);
+    } else if (vuln.WeaknessID == 369 && vuln.UndesirableFunction.has_value()) {
+      sanitizeDivideByZeroinFunction(&F, vuln.UndesirableFunction);
     } else if (vuln.WeaknessID == 369) {
       sanitizeDivideByZero(&F);
-      sanitizeDivideByZeroinFunction(&F, vuln.UndesirableFunction);
     } else if (vuln.WeaknessID == 455) {
       sanitizeIntOverflow(&F);
     }
