@@ -5,12 +5,12 @@ from fastmcp import FastMCP
 
 mcp = FastMCP(
     name="resolve mcp server",
-    instructions="TODO: INTRODUCE RESOLVE AND HOW IT CAN BE USED"
+    instructions="This MCP server exposes tools which can be used to compile, instrument, remediate, debug, and input synthesize a challenge problem."
 )
 
 RESOLVE_CHALLENGE_META = os.environ.get("RESOLVE_CHALLENGE_META")
 if not RESOLVE_CHALLENGE_META:
-    print("[ERROR] Resolve MCP did not detect RESOLVE_CHALLENGE_META environment variable was set.")
+    print("[ERROR] resolve MCP did not detect RESOLVE_CHALLENGE_META environment variable was set.")
     sys.exit(1)
 
 CHALLENGE_META = json.load(open(RESOLVE_CHALLENGE_META))

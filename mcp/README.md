@@ -1,4 +1,4 @@
-# RESOLVE MCP
+# resolve MCP
 
 Exposes resolve tools through an MCP server to aid automated program analysis and expedite 0-day remediation.
 
