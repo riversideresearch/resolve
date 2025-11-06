@@ -1,31 +1,3 @@
-"""
-The first snippet (fully commented out) is the intended version, but
-I had to do a hack to get a version which streams to the terminal for
-debugging while I'm writing this tool. I intend to revert to the original
-version before release.
-"""
-
-# import os
-# import time
-# import shlex
-# import subprocess
-
-# def run_commands_list(cwd: str, commands: list[str], env=os.environ.copy()) -> dict:
-#     """Runs a list of commands and returns a dictionary with information about their execution."""
-#     outputs = {}
-#     for command in commands:
-#         start = time.perf_counter()
-#         res = subprocess.run(shlex.split(command), cwd=cwd, env=env, capture_output=True, text=True)
-#         end = time.perf_counter()
-#         outputs[command] = {
-#             "exit status": res.returncode,
-#             "stderr": res.stderr,
-#             # "stdout": res.stdout,
-#             # TODO: stdout?
-#             "time": end - start
-#         }
-#     return outputs
-
 import os
 import sys
 import time
@@ -37,11 +9,21 @@ def run_commands_list(cwd: str, commands: list[str], env=os.environ.copy()) -> d
     outputs = {}
     for command in commands:
         start = time.perf_counter()
+        parts = shlex.split(command)
+        cmd_env = env.copy()
+        actual_command = []
+        
+        for part in parts:
+            if '=' in part and not actual_command:
+                key, value = part.split('=', 1)
+                cmd_env[key] = value
+            else:
+                actual_command.append(part)
         
         process = subprocess.Popen(
-            shlex.split(command),
+            actual_command,
             cwd=cwd,
-            env=env,
+            env=cmd_env,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,

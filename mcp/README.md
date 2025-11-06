@@ -14,7 +14,7 @@ If you want to run it in http mode, you can start it with `fastmcp run main.py -
 
 If you want to run it using a MCP-to-OpenAPI proxy (for use with OpenWebUI) you can do so with `uvx mcpo --port 8002 --api-key "top-secret" -- uv run main.py`
 
-To run the program, you must either set the `RESOLVE_MCP_CHALLENGE_ROOT` environment variable, or pass the value as `--root` to the program. This value sets the directory that the server recursively searches for challenge problems inside.
+To run the program, you must set the `RESOLVE_CHALLENGE_META` environment variable. This value is the full path to the metadata file for the challenge problem the server will operate on.
 
 ## Development
 
