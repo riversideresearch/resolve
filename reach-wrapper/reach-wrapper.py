@@ -204,7 +204,7 @@ class FactParser:
     def get_func_id(self, func_name: str):
         # First try true symbol names
         for f in self.nodes.kinds["Function"]:
-            if func_name in f["name"]:
+            if func_name in f.get("name", ""):
                 return f.id
 
         # Next try demangled C++ symbol names

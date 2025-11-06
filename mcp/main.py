@@ -51,6 +51,25 @@ else:
         print(f"[ERROR] RESOLVE_ANALYSIS_ENGINE_FILE is set to {RESOLVE_ANALYSIS_ENGINE_FILE} but that path does not exist or is not a file.")
         sys.exit(1)
 
+"""
+Linkmap Tool Path (needed for facts extraction)
+"""
+RESOLVE_REACH_WRAPPER_FILE = os.environ.get("RESOLVE_REACH_WRAPPER_FILE")
+if not RESOLVE_REACH_WRAPPER_FILE:
+    # fallback to ../reach-wrapper/reach-wrapper.py
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    fallback = os.path.normpath(os.path.join(script_dir, "..", "reach-wrapper", "reach-wrapper.py"))
+    if os.path.exists(fallback) and os.path.isfile(fallback):
+        RESOLVE_REACH_WRAPPER_FILE = fallback
+        print(f"[WARNING] resolve MCP did not detect RESOLVE_REACH_WRAPPER_FILE environment variable. Using {RESOLVE_REACH_WRAPPER_FILE}")
+    else:
+        print(f"[ERROR] RESOLVE_REACH_WRAPPER_FILE not set and fallback {fallback} does not exist.")
+        sys.exit(1)
+else:
+    if not os.path.exists(RESOLVE_REACH_WRAPPER_FILE) or not os.path.isfile(RESOLVE_REACH_WRAPPER_FILE):
+        print(f"[ERROR] RESOLVE_REACH_WRAPPER_FILE is set to {RESOLVE_REACH_WRAPPER_FILE} but that path does not exist or is not a file.")
+        sys.exit(1)
+
 CHALLENGE_META = json.load(open(RESOLVE_CHALLENGE_META))
 CHALLENGE_FOLDER = os.path.dirname(RESOLVE_CHALLENGE_META)
 
