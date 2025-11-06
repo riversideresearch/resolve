@@ -145,7 +145,7 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
     switch (vuln.WeaknessID) {
       case 132: /* OOB access */ 
       case 133:
-        sanitizeMemInstBounds(&F);
+        sanitizeMemInstBounds(&F, MAM);
         break;
 
       case 369: /* Divide by zero */
