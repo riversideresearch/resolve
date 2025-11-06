@@ -2,7 +2,7 @@ import os
 import json
 import subprocess
 
-from main import mcp, CHALLENGE_META, CHALLENGE_FOLDER, RESOLVE_ANALYSIS_ENGINE_FILE, RESOLVE_REACH_WRAPPER_FILE
+from main import mcp, CHALLENGE_META, CHALLENGE_FOLDER, RESOLVE_ANALYSIS_ENGINE_FILE, RESOLVE_REACH_WRAPPER_FILE, RESOLVE_REACH_BINARY
 from support import run_commands_list, run_commands_list_without_capture
 
 @mcp.resource("resource://vulerabilities.json")
@@ -66,12 +66,15 @@ def extract_facts_from_targets() -> dict:
 @mcp.tool()
 def query_reachability(facts_folder: str, vulnerabilities_json: str = f"{CHALLENGE_FOLDER}/vulnerabilities.json", source_dir: str|None = None) -> dict:
     """Takes in a folder of facts about a target and the vulnerabilities.json file, and returns details about whether or not there is a path between the main function and sink functions. Useful for discovering if a vulnerability is reachable, and if so through what candidate paths. If you need to create a vulnerabilties.json, have a look at the reference resource."""
+    
+    # TODO: --reach flag might be redundant, because reach-wrapper is using it's own guess fallback
     subprocess.run([
         "python3",
         RESOLVE_REACH_WRAPPER_FILE,
         "--input", vulnerabilities_json,
         "--facts", facts_folder,
-        "--output", f"{CHALLENGE_FOLDER}/reachability.json"
+        "--output", f"{CHALLENGE_FOLDER}/reachability.json",
+        "--reach", RESOLVE_REACH_BINARY
         ] + (["--src", source_dir] if source_dir else []), check=True)
 
     with open(f"{CHALLENGE_FOLDER}/reachability.json", "r") as f:
