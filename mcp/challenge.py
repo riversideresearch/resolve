@@ -11,8 +11,8 @@ def get_challenge_info() -> dict:
 
 # TODO: should building challenges  throw an exception unless it exits 0?
 @mcp.tool()
-def build_challenge_vanilla() -> dict:
-    """Builds the challenge without any instrumentation and returns the status of the build."""
+def build_challenge_default_with_facts() -> dict:
+    """Builds the challenge without any instrumentation and returns the status of the build. This compilation will insert into the binary \"facts\" about its contents that can be analyzed with the reach tool."""
     # NOTE: consider using a oneshot LLM call to condense stdout into something reasonable?
     return run_commands_list(CHALLENGE_FOLDER, CHALLENGE_META["commands"]["build"])
 

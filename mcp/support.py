@@ -50,3 +50,16 @@ def run_commands_list(cwd: str, commands: list[str], env=os.environ.copy()) -> d
             "time": end - start
         }
     return outputs
+
+def run_commands_list_without_capture(cwd: str, commands: list[str], env=os.environ.copy()) -> dict:
+    """Runs a list of commands and returns a dictionary with information about their execution."""
+    outputs = {}
+    for command in commands:
+        start = time.perf_counter()
+        res = subprocess.run(command, shell=True, cwd=cwd, env=env)
+        end = time.perf_counter()
+        outputs[command] = {
+            "exit status": res.returncode,
+            "time": end - start
+        }
+    return outputs
