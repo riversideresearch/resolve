@@ -63,3 +63,4 @@ def run_commands_list_without_capture(cwd: str, commands: list[str], env=os.envi
             "time": end - start
         }
     return outputs
+    
