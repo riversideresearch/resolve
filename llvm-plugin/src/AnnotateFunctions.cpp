@@ -1,3 +1,8 @@
+/*
+ *   Copyright (c) 2025 Riverside Research.
+ *   See LICENSE.txt in the repo root for licensing information.
+ */
+
 #include "llvm/IR/Function.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/IntrinsicInst.h"

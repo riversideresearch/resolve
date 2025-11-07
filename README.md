@@ -1,3 +1,8 @@
+<!--
+  Copyright (c) 2025 Riverside Research.
+  See LICENSE.txt in the repo root for licensing information.
+-->
+
 # `resolve`
 
 `resolve` is an LLVM-based software security tool designed to anticipate, triage and remediate CVEs. It combines binary metadata based on enhanced software bills-of-material, or eSBOMs, with runtime components and program analysis tools that together speed up the process of identifying and remediating bugs.

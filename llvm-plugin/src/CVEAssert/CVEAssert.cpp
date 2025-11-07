@@ -1,3 +1,8 @@
+/*
+ *   Copyright (c) 2025 Riverside Research.
+ *   See LICENSE.txt in the repo root for licensing information.
+ */
+
 #include "llvm/Analysis/MemorySSA.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/GlobalAlias.h"

@@ -1,3 +1,8 @@
+/*
+ *   Copyright (c) 2025 Riverside Research.
+ *   See LICENSE.txt in the repo root for licensing information.
+ */
+
 #include <stdio.h>
 #include <limits.h>
 // RUN: RESOLVE_STRATEGY=SAT RESOLVE_LABEL_CVE=vulnerabilities/overflow_add_vuln.json \

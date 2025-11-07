@@ -1,3 +1,7 @@
+/*
+ *   Copyright (c) 2025 Riverside Research.
+ *   See LICENSE.txt in the repo root for licensing information.
+ */
 
 #ifndef RESOLVE_LLVM_LLVMFACTS_HPP
 #define RESOLVE_LLVM_LLVMFACTS_HPP

@@ -1,3 +1,8 @@
+/*
+ *   Copyright (c) 2025 Riverside Research.
+ *   See LICENSE.txt in the repo root for licensing information.
+ */
+
 
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Twine.h"

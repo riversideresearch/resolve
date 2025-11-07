@@ -1,3 +1,8 @@
+/*
+ *   Copyright (c) 2025 Riverside Research.
+ *   See LICENSE.txt in the repo root for licensing information.
+ */
+
 // Array-backed min-heap.
 
 // Use this instead of std::priority_queue for fast 'contains' and

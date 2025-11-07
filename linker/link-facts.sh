@@ -1,3 +1,6 @@
+// Copyright (c) 2025 Riverside Research.
+// See LICENSE.txt in the repo root for licensing information.
+
 # link-facts.sh
 #
 # Link facts from multiple object files, storing them in <build-dir>
