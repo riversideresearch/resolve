@@ -1,7 +1,7 @@
+#!/usr/bin/env bash 
+#
 # Copyright (c) 2025 Riverside Research.
 # See LICENSE.txt in the repo root for licensing information.
-
-#!/usr/bin/env bash 
 
 set -e 
 

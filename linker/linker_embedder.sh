@@ -1,7 +1,8 @@
-// Copyright (c) 2025 Riverside Research.
-// See LICENSE.txt in the repo root for licensing information.
-
 #!/bin/env bash
+# 
+# Copyright (c) 2025 Riverside Research.
+# See LICENSE.txt in the repo root for licensing information.
+
 set -e
 SCRIPT_DIR=$(dirname "$(realpath "$0")")
 

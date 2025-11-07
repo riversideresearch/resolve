@@ -1,7 +1,8 @@
+#!/usr/bin/env python3
+#
 # Copyright (c) 2025 Riverside Research.
 # See LICENSE.txt in the repo root for licensing information.
 
-#!/usr/bin/env python3
 import argparse
 import json
 from pathlib import Path
