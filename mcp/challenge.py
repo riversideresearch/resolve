@@ -42,5 +42,5 @@ def build_challenge_instrumented(cwe_id: str, target_function_name: str, affecte
 
 @mcp.tool()
 def test_challenge() -> dict:
-    """Runs the testing/evlauation commands and returns it's findings. Cross reference the exit code with the challenge info to understand the results."""
+    """Runs the testing/evaluation commands and returns it's findings. Cross reference the exit code with the challenge info to understand the results."""
     return run_commands_list(CHALLENGE_FOLDER, CHALLENGE_META["commands"]["test"])
