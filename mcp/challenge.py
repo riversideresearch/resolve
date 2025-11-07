@@ -9,7 +9,7 @@ def get_challenge_info() -> dict:
     """Lists the information about the active challenge problem"""
     return CHALLENGE_META
 
-# TODO: should building challenges  throw an exception unless it exits 0?
+# TODO: should building challenges throw an exception unless it exits 0?
 @mcp.tool()
 def build_challenge_default_with_facts() -> dict:
     """Builds the challenge without any instrumentation and returns the status of the build. This compilation will insert into the binary \"facts\" about its contents that can be analyzed with the reach tool."""
