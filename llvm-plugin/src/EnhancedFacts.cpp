@@ -3,8 +3,6 @@
  *   See LICENSE.txt in the repo root for licensing information.
  */
 
-// EnhancedFacts.cpp
-
 #include "Facts.hpp"
 #include "LLVMFacts.hpp"
 #include "NodeID.hpp"
