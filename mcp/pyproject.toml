@@ -1,0 +1,7 @@
+[project]
+name = "resolve-mcp"
+version = "0.1.0"
+description = "Exposes resolve tools through an MCP server to aid automated program analysis and expedite 0-day remediation."
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = ["fastmcp", "univers"]

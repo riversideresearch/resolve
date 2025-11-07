@@ -37,7 +37,7 @@ def append_to_section(section: str, input_file: Path, target_bin: Path):
 def embed_facts(out_dir: Path, target_bin: Path):
     # compress if needed
     if USE_COMPRESSION:
-        subprocess.run([f"zstd", *(str(out_dir/file) for _, file in FACT_SECTION_MAP)], check=True)
+        subprocess.run([f"zstd", "-f", *(str(out_dir/file) for _, file in FACT_SECTION_MAP)], check=True)
 
     for section, file in FACT_SECTION_MAP:
         append_to_section(section, out_dir/(file+COMPRESSION_SUFFIX), target_bin)
@@ -54,7 +54,7 @@ def extract_facts(out_dir: Path, target_bin: Path):
 
     # decompress if needed
     if USE_COMPRESSION:
-        subprocess.run([f"zstd", "-d", *(str(out_dir/file)+COMPRESSION_SUFFIX for _, file in FACT_SECTION_MAP)], check=True)
+        subprocess.run([f"zstd", "-f", "-d", *(str(out_dir/file)+COMPRESSION_SUFFIX for _, file in FACT_SECTION_MAP)], check=True)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Fact Extraction Helper.")
