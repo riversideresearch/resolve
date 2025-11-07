@@ -152,6 +152,8 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
 
     switch (vuln.WeaknessID) {
       case VulnID::OOB_ACCESS: /* NOTE: These IDs correspond to CWEs found in analyze-image */
+      case 125:
+      case 135:
         sanitizeMemInstBounds(&F, MAM);
         break;
 
