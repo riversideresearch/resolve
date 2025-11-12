@@ -1,5 +1,8 @@
 # link-facts.sh
 #
+# Copyright (c) 2025 Riverside Research.
+# LGPL-3; See LICENSE.txt in the repo root for details.
+#
 # Link facts from multiple object files, storing them in <build-dir>
 # See HELP for usage.
 

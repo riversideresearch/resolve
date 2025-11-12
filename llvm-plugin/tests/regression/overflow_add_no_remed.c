@@ -1,3 +1,8 @@
+/*
+ *   Copyright (c) 2025 Riverside Research.
+ *   LGPL-3; See LICENSE.txt in the repo root for details.
+ */
+
 // RUN: %clang -S -emit-llvm \
 // RUN: %s -o - | %FileCheck %s 
 // CHECK-LABEL: dso_local i32 @main

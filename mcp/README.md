@@ -1,3 +1,8 @@
+<!--
+  Copyright (c) 2025 Riverside Research.
+  LGPL-3; See LICENSE.txt in the repo root for details.
+-->
+
 # resolve MCP
 
 Exposes resolve tools through an MCP server to aid automated program analysis and expedite 0-day remediation.

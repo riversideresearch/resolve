@@ -1,3 +1,8 @@
+<!--
+  Copyright (c) 2025 Riverside Research.
+  LGPL-3; See LICENSE.txt in the repo root for details.
+-->
+
 # LIBRESOLVE
 
 Libresolve is a runtime library that tracks object allocations and other kernel interactions.
