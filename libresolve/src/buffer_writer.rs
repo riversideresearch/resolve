@@ -1,5 +1,5 @@
 // Copyright (c) 2025 Riverside Research.
-// See LICENSE.txt in the repo root for licensing information.
+// LGPL-3; See LICENSE.txt in the repo root for licensing information.
 
 use core::fmt::Write;
 use libc::{c_int, c_char, open, O_APPEND, O_WRONLY, O_CREAT, S_IRUSR, S_IWUSR};

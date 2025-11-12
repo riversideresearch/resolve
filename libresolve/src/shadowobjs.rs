@@ -1,5 +1,5 @@
 // Copyright (c) 2025 Riverside Research.
-// See LICENSE.txt in the repo root for licensing information.
+// LGPL-3; See LICENSE.txt in the repo root for licensing information.
 
 use std::collections::BTreeMap;
 use std::sync::{LazyLock, Mutex};
