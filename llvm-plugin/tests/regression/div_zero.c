@@ -1,6 +1,6 @@
 /*
  *   Copyright (c) 2025 Riverside Research.
- *   LGPL-3; See LICENSE.txt in the repo root for licensing information.
+ *   LGPL-3; See LICENSE.txt in the repo root for details.
  */
 
 // RUN: RESOLVE_LABEL_CVE=vulnerabilities/div_zero_vuln.json %clang -S -emit-llvm \

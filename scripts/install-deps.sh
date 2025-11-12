@@ -1,7 +1,7 @@
 #!/usr/bin/env bash 
 #
 # Copyright (c) 2025 Riverside Research.
-# LGPL-3; See LICENSE.txt in the repo root for licensing information.
+# LGPL-3; See LICENSE.txt in the repo root for details.
 
 set -e 
 
