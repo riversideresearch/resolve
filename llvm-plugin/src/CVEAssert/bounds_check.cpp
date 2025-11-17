@@ -500,9 +500,57 @@ void sanitizeMemcpy(Function *f, ModuleAnalysisManager &MAM) {
   }
 }
 
+void sanitizeAlloca(Function *F) {
+    Module *M = F->getParent();
+    LLVMContext &Ctx = M->getContext();
+    IRBuilder<> builder(Ctx);
+    const DataLayout &DL = M->getDataLayout();
+
+    // Initialize list to store pointers to alloca and instructions
+    std::vector<AllocaInst *> allocaList;
+    
+    auto void_ty = Type::getVoidTy(Ctx);
+    auto ptr_ty = PointerType::get(Ctx, 0);
+    auto int64_ty = Type::getInt64Ty(Ctx);
+
+    FunctionType *resolveStackObjFnTy = FunctionType::get(
+        void_ty,
+        { ptr_ty, int64_ty },
+        false
+    );
+    
+    /* Initialize function callee object for libresolve resolve_stack_obj runtime fn */
+    FunctionCallee resolveStackObjFn = M->getOrInsertFunction(
+        "resolve_stack_obj",
+        resolveStackObjFnTy   
+    );
+
+    for (auto &BB: *F) {
+        for (auto &instr: BB) {
+            if (auto *inst = dyn_cast<AllocaInst>(&instr)) {
+                allocaList.push_back(inst);
+            }
+        }
+    }
+
+    for (auto* allocaInst: allocaList) {
+        // Insert after the alloca instruction
+        builder.SetInsertPoint(allocaInst->getNextNode());
+        Value* allocatedPtr = allocaInst;
+
+        Value *sizeVal = nullptr;
+        Type *allocatedType = allocaInst->getAllocatedType();
+        uint64_t typeSize = DL.getTypeAllocSize(allocatedType); 
+        sizeVal = ConstantInt::get(int64_ty, typeSize);
+        builder.CreateCall(resolveStackObjFn, { allocatedPtr, sizeVal });
+        
+    }
+  }
+
 void sanitizeMemInstBounds(Function *f, ModuleAnalysisManager &MAM) {
   // FIXME: bad alias analysis is causing compilation to fail
   // TBD: why does TBAA not work right
   sanitizeLoadStore(f, MAM);
+  sanitizeAlloca(f);
   sanitizeMemcpy(f, MAM);
 }

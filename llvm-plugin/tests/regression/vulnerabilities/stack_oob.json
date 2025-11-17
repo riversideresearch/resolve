@@ -1,0 +1,14 @@
+{
+    "vulnerabilities": [
+        {
+            "cve-id": "CVE-resolve-oob-2",
+            "cve-description": "",
+            "package-name": "resolve-test",
+            "package-version": "1.4.5",
+            "cwe-id": "132",
+            "cwe-name": "Stack OOB access",
+            "affected-function": "main",
+            "affected-file": "stack_oob.c" 
+        }
+    ]
+}
