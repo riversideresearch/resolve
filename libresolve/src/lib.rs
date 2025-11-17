@@ -35,7 +35,7 @@ pub extern "C" fn resolve_stack_obj(ptr: *mut c_void, size: usize) -> () {
 
     let mut buf = [0u8; 128];
     let mut writer = BufferWriter::new(&mut buf);
-    let _ = writeln!(&mut writer, "[STACK] Logging stack allocated object: {}", ptr as Vaddr);
+    let _ = writeln!(&mut writer, "[STACK] Stack allocated object at addr: 0x{:x}", ptr as Vaddr);
     let written = writer.as_bytes();
     unsafe {libc::write(*RESOLVE_LOG_FD, written.as_ptr() as *const _, written.len()) };
 }
@@ -58,7 +58,7 @@ pub extern "C" fn resolve_malloc(size: usize) -> *mut c_void {
 
     let mut buf = [0u8; 128];
     let mut writer = BufferWriter::new(&mut buf);
-    let _ = writeln!(&mut writer, "[FUNC] Malloc function recorded with size: {}, ptr: 0x{:x}", size, ptr as Vaddr);
+    let _ = writeln!(&mut writer, "[HEAP] Allocating obj with size: {}, ptr: 0x{:x}", size, ptr as Vaddr);
     let written = writer.as_bytes();
     unsafe { libc::write(*RESOLVE_LOG_FD, written.as_ptr() as *const _, written.len()) };
 
@@ -89,7 +89,7 @@ pub extern "C" fn resolve_memcpy(dest: *mut c_void, src: *mut c_void, size: usiz
     let mut buf = [0u8; 128];
     let mut writer = BufferWriter::new(&mut buf);
 
-    let _ = writeln!(&mut writer, "[FUNC] Memcpy function recorded with dest: {:?}, src {:?}, size: {}, ptr: 0x{:x}", dest, src, size, ptr as Vaddr);
+    let _ = writeln!(&mut writer, "[HEAP] Memcpy function recorded with dest: {:?}, src {:?}, size: {}, ptr: 0x{:x}", dest, src, size, ptr as Vaddr);
     let written = writer.as_bytes();
     unsafe { libc::write(*RESOLVE_LOG_FD, written.as_ptr() as *const _, written.len()) };
 
