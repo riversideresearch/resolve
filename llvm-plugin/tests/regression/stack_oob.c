@@ -1,4 +1,4 @@
-// RUN: RESOLVE_LABEL_CVE=vulnerabilities/div_zero_vuln.json %clang -S -emit-llvm \
+// RUN: RESOLVE_LABEL_CVE=vulnerabilities/stack_oob.json %clang -S -emit-llvm \
 // RUN: -fpass-plugin=%plugin \
 // RUN: %s -o - | %FileCheck %s 
 // CHECK-LABEL: define dso_local i32 @main
