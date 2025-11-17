@@ -18,7 +18,7 @@ use crate::shadowobjs::{ShadowObject, AllocType, Vaddr, ALIVE_OBJ_LIST, FREED_OB
  * but we do not currently support removing stack objects from 
  * ALIVE_OBJ_LIST once the stack objects are freed at the end
  * of a function scope
- * /
+ **/
 
 /**
  * @brief - Allocator interface for stack objects
