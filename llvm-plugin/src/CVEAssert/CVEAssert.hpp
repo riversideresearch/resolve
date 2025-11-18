@@ -19,4 +19,6 @@ extern bool CVE_ASSERT_DEBUG;
 // EXIT:      exit the program with the EBOSS
 //            exit code (3)
 //
-extern const char *CVE_ASSERT_STRATEGY;
+
+// TODO: Comment this out when testing is complete
+//extern const char *CVE_ASSERT_STRATEGY;

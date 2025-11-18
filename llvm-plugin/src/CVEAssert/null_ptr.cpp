@@ -11,6 +11,7 @@
 #include "llvm/IR/Verifier.h"
 #include "llvm/Support/raw_ostream.h"
 
+#include "Vulnerability.hpp"
 #include "helpers.hpp"
 
 using namespace llvm;
@@ -136,7 +137,7 @@ static Function *getOrCreateNullPtrStoreSanitizer(Module *M, LLVMContext &Ctx, T
     return SanitizeFunc;
 }
 
-void sanitizeNullPointers(Function *f) {
+void sanitizeNullPointers(Function *f, RemediationStrategies strategy) {
     IRBuilder<> builder(f->getContext());
 
     std::vector<LoadInst*> loadList;
