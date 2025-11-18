@@ -5,7 +5,7 @@
 // CHECK: call void @resolve_stack_obj
  
 #include <stdio.h>
-
+#include <stdlib.h>
 int main(int argc, char *argv[]) {
   int i;
   int idx = atoi(argv[0]);
