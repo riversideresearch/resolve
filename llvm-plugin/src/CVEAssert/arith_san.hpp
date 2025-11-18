@@ -7,7 +7,7 @@
 #pragma once
 
 #include "llvm/IR/Function.h"
-
+#include "Vulnerability.hpp"
 void sanitizeDivideByZero(llvm::Function *F, RemediationStrategies strategy);
 void sanitizeDivideByZeroRecover(llvm::Function *F, RemediationStrategies strategy);
 llvm::Function *replaceUndesirableFunction(llvm::Function *F,

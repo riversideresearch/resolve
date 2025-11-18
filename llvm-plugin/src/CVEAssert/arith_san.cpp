@@ -14,7 +14,6 @@
 #include "llvm/Support/raw_ostream.h"
 
 #include "CVEAssert.hpp"
-#include "Vulnerability.hpp"
 #include "arith_san.hpp"
 #include "helpers.hpp"
 

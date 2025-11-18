@@ -14,7 +14,6 @@
 #include "llvm/Support/raw_ostream.h"
 
 #include "Worklist.hpp"
-#include "Vulnerability.hpp"
 #include "helpers.hpp"
 
 static const bool FIND_PTR_ROOT_DEBUG = true;

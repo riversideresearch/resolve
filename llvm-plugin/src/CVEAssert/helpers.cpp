@@ -13,7 +13,6 @@
 #include "llvm/IR/Verifier.h"
 
 #include "CVEAssert.hpp"
-#include "Vulnerability.hpp"
 #include "helpers.hpp"
 
 using namespace llvm;
