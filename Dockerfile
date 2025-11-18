@@ -1,12 +1,10 @@
 FROM ubuntu:24.04
 
 ENV DEBIAN_FRONTEND=noninteractive
-RUN apt update && apt install -y --no-install-recommends \
-    curl \
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git \
     sudo \
-    time \
-    ca-certificates
-RUN update-ca-certificates
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Copy in resolve tools
 COPY llvm-plugin /opt/resolve/llvm-plugin
@@ -21,8 +19,7 @@ COPY Makefile /opt/resolve/Makefile
 WORKDIR /opt/resolve/
 RUN echo -n "resolve version: "
 RUN git log --pretty=format:'%h' -n 1 | tee /RESOLVE_VERSION
-RUN ./scripts/install-deps.sh
-RUN apt-get clean && rm -rf /var/lib/apt/lists/*
+RUN ./scripts/install-deps.sh && apt-get clean && rm -rf /var/lib/apt/lists/*
 RUN PATH="$PATH:~/.cargo/bin" make
 
 # Executable Scripts
