@@ -104,7 +104,7 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
       return SanitizeFunc;
   }
 
-  void sanitizeFreeOfNonHeap(Function *f) {
+  void sanitizeFreeOfNonHeap(Function *f, std::optional<std::string> strategy) {
     IRBuilder<> builder(f->getContext());
     std::vector<CallInst*> workList;
 

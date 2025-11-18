@@ -131,7 +131,7 @@ static Function *getOrCreateNullPtrStoreSanitizer(Module *M, LLVMContext &Ctx, T
     return SanitizeFunc;
 }
 
-void sanitizeNullPointers(Function *f) {
+void sanitizeNullPointers(Function *f, std::optional<std::string> strategy) {
     IRBuilder<> builder(f->getContext());
 
     std::vector<LoadInst*> loadList;

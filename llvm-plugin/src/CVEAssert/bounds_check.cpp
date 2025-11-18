@@ -547,7 +547,7 @@ void sanitizeAlloca(Function *F) {
     }
   }
 
-void sanitizeMemInstBounds(Function *f, ModuleAnalysisManager &MAM) {
+void sanitizeMemInstBounds(Function *f, ModuleAnalysisManager &MAM, std::optional<std::string> strategy) {
   // FIXME: bad alias analysis is causing compilation to fail
   // TBD: why does TBAA not work right
   sanitizeLoadStore(f, MAM);
