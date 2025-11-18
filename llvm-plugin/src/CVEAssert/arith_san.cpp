@@ -536,7 +536,7 @@ void sanitizeIntOverflow(Function *F, RemediationStrategies strategy) {
   IRBuilder<> Builder(Ctx);
 
   if (strategy == RemediationStrategies::RECOVER) {
-    sanitizeIntOverflowRecover(F);
+    sanitizeIntOverflowRecover(F, strategy);
   } else {
 
     for (auto &BB : *F) {
