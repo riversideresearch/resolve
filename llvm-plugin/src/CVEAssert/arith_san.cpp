@@ -127,14 +127,14 @@ void sanitizeBinShift(Function *F) {
   }
 }
 
-void sanitizeDivideByZero(Function *F) {
+void sanitizeDivideByZero(Function *F, std::optional<std::string> strategy) {
   std::vector<Instruction *> worklist;
   Module *M = F->getParent();
   auto &Ctx = M->getContext();
   IRBuilder<> Builder(Ctx);
 
-  if (strcmp(CVE_ASSERT_STRATEGY, "RECOVER") == 0) {
-    sanitizeDivideByZeroRecover(F);
+  if (strategy.value() == "RECOVER") {
+    sanitizeDivideByZeroRecover(F, strategy);
   } else {
 
     // Loop over each basic block
@@ -201,7 +201,7 @@ void sanitizeDivideByZero(Function *F) {
       // remedDivBB: Perform safe division
       Builder.SetInsertPoint(remedDivBB);
       Builder.CreateCall(getOrCreateResolveReportSanitizerTriggered(M));
-      Builder.CreateCall(getOrCreateRemediationBehavior(M));
+      Builder.CreateCall(getOrCreateRemediationBehavior(M, strategy));
       Value *safeDiv = nullptr;
       Value *safeIntDivisor;
       Value *safeFpDivisor;
@@ -291,7 +291,7 @@ void sanitizeDivideByZero(Function *F) {
   }
 }
 
-void sanitizeDivideByZeroRecover(Function *F) {
+void sanitizeDivideByZeroRecover(Function *F, std::optional<std::string> strategy) {
   std::vector<Instruction *> worklist;
   Module *M = F->getParent();
   auto &Ctx = M->getContext();
@@ -326,7 +326,7 @@ void sanitizeDivideByZeroRecover(Function *F) {
   entryBuilder.CreateCondBr(isInitial, &originalEntry, recoverBB);
 
   IRBuilder<> recoverBuilder(recoverBB);
-  recoverBuilder.CreateCall(getOrCreateRemediationBehavior(M));
+  recoverBuilder.CreateCall(getOrCreateRemediationBehavior(M, strategy));
 
   Type *retTy = F->getReturnType();
   if (retTy->isVoidTy()) {
@@ -523,14 +523,14 @@ void sanitizeDivideByZeroInFunction(Function *F,
 }
 
 // Driver function for integer overflow
-void sanitizeIntOverflow(Function *F) {
+void sanitizeIntOverflow(Function *F, std::optional<std::string> strategy) {
   std::vector<Instruction *> worklist;
   Module *M = F->getParent();
   auto &Ctx = M->getContext();
   IRBuilder<> Builder(Ctx);
 
-  if (strcmp(CVE_ASSERT_STRATEGY, "RECOVER") == 0) {
-    sanitizeIntOverflowRecover(F);
+  if (strategy.value() == "RECOVER") {
+    sanitizeIntOverflowRecover(F, strategy);
   } else {
 
     for (auto &BB : *F) {
@@ -615,7 +615,7 @@ void sanitizeIntOverflow(Function *F) {
       // remedOverflowBB: Construct saturated instructions
       Builder.SetInsertPoint(remedOverflowBB);
       Builder.CreateCall(getOrCreateResolveReportSanitizerTriggered(M));
-      Builder.CreateCall(getOrCreateRemediationBehavior(M));
+      Builder.CreateCall(getOrCreateRemediationBehavior(M, strategy));
 
       auto insertSatOp = [&Builder, M](Instruction *binary_inst, Value *op1,
                                        Value *op2) -> Value * {
@@ -670,7 +670,7 @@ void sanitizeIntOverflow(Function *F) {
       PHINode *phi = Builder.CreatePHI(binary_inst->getType(), 2);
       phi->addIncoming(safeResult, originalBB);
 
-      if (strcmp(CVE_ASSERT_STRATEGY, "SAT") == 0) {
+      if (strategy.value() == "sat") {
         phi->addIncoming(satResult, remedOverflowBB);
 
       } else {
@@ -685,7 +685,7 @@ void sanitizeIntOverflow(Function *F) {
   }
 }
 
-void sanitizeIntOverflowRecover(Function *F) {
+void sanitizeIntOverflowRecover(Function *F, std::optional<std::string> strategy) {
   std::vector<Instruction *> worklist;
   Module *M = F->getParent();
   auto &Ctx = M->getContext();
@@ -721,7 +721,7 @@ void sanitizeIntOverflowRecover(Function *F) {
   entryBuilder.CreateCondBr(isInitial, &originalEntry, recoverBB);
 
   IRBuilder<> recoverBuilder(recoverBB);
-  recoverBuilder.CreateCall(getOrCreateRemediationBehavior(M));
+  recoverBuilder.CreateCall(getOrCreateRemediationBehavior(M, strategy));
 
   Type *retTy = F->getReturnType();
   if (retTy->isVoidTy()) {

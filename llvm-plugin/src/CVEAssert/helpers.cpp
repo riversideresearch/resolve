@@ -80,7 +80,7 @@ Function *getOrCreateResolveReportSanitizerTriggered(Module *M) {
 } 
 
 // Create a function getOrCreateRemediateBehavior function to handle do nothing or exit
-Function *getOrCreateRemediationBehavior(Module *M) {
+Function *getOrCreateRemediationBehavior(Module *M, std::optional<std::string> strategy) {
     auto &Ctx = M->getContext();
     auto ptr_ty = PointerType::get(Ctx, 0);
     auto void_ty = Type::getVoidTy(Ctx);
@@ -100,7 +100,7 @@ Function *getOrCreateRemediationBehavior(Module *M) {
     BasicBlock *BB = BasicBlock::Create(Ctx, "", resolve_remed_behavior);
     IRBuilder<> Builder(BB);
 
-    if (strcmp(CVE_ASSERT_STRATEGY, "EXIT") == 0) {
+    if (strategy.value() == "exit") {
         // void exit(i32)
         FunctionType *exitTy = FunctionType::get(
             void_ty,
@@ -112,7 +112,7 @@ Function *getOrCreateRemediationBehavior(Module *M) {
         Value *exitCode = Builder.getInt32(3);
         Builder.CreateCall(exitFn, { exitCode });
     
-    } else if (strcmp(CVE_ASSERT_STRATEGY, "RECOVER") == 0) {
+    } else if (strategy.value() == "recover") {
         FunctionType *errorhandlerTy = FunctionType::get(
             void_ty,
             {},
@@ -121,9 +121,6 @@ Function *getOrCreateRemediationBehavior(Module *M) {
 
         FunctionCallee errorHandlerFn = M->getOrInsertFunction("error_handler", errorhandlerTy);
         Builder.CreateCall(errorHandlerFn);
-    } else {
-        raw_ostream &out = errs();
-        out << "[CVEAssert] Remediation strategy not selected. \n";
     }
 
     Builder.CreateRetVoid();

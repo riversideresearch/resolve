@@ -6,10 +6,21 @@
  
 #include <stdio.h>
 
-int main() {
-  int arr[2] = { 0, 1 };
-  int x = arr[3];
+int main(int argc, char *argv[]) {
+  int i;
+  int idx = atoi(argv[0]);
+  int buffer[10] = { 0 };
 
-  return x;
+  if (idx >= 0) {
+    buffer[idx] = 1;
 
+    for (i = 0; i < 10; ++i) {
+      printf("%d ", buffer[i]);
+    }
+    return 0;
+  
+  } else {
+    printf("ERROR: Negative indexing results in OOB access: %d", idx);
+    return -1;
+  }
 }

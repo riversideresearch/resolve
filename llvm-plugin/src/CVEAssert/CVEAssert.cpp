@@ -32,7 +32,7 @@ using namespace llvm;
 
 // Global env vars
 bool CVE_ASSERT_DEBUG;
-const char *CVE_ASSERT_STRATEGY;
+//const char *CVE_ASSERT_STRATEGY;
 
 namespace {
 
@@ -50,7 +50,7 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
   
   LabelCVEPass() {
     // Initialize env vars
-    CVE_ASSERT_STRATEGY = strdup(std::getenv("RESOLVE_STRATEGY") ?: "");
+    //CVE_ASSERT_STRATEGY = strdup(std::getenv("RESOLVE_STRATEGY") ?: "");
     CVE_ASSERT_DEBUG = strlen(std::getenv("CVE_ASSERT_DEBUG") ?: "") > 0;
 
     vulnerabilities = Vulnerability::parseVulnerabilityFile();
@@ -154,28 +154,28 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
     switch (vuln.WeaknessID) {
       case VulnID::OOB_READ:           /* NOTE: Found in stb-resize, lamartine challenge problems */
       case VulnID::INCORRECT_BUF_SIZE: /* NOTE: These IDs correspond to CWEs found in analyze-image */
-        sanitizeMemInstBounds(&F, MAM);
+        sanitizeMemInstBounds(&F, MAM, vuln.RemediationStrategy);
         break;
 
       case VulnID::DIVIDE_BY_ZERO: /* NOTE: This ID corresponds to CWE description in ros2 challenge problem */
         if (vuln.UndesirableFunction.has_value()) {
           sanitizeDivideByZeroInFunction(&F, vuln.UndesirableFunction);
         } else {
-          sanitizeDivideByZero(&F);
+          sanitizeDivideByZero(&F, vuln.RemediationStrategy);
         }
         break;
 
       case VulnID::INT_OVERFLOW: /* NOTE: This ID has not been found in any challenge problem,
                                    implemented to for arithmetic sanitizer coverage   */
-        sanitizeIntOverflow(&F);
+        sanitizeIntOverflow(&F, vuln.RemediationStrategy);
         break;
 
       case VulnID::NULL_PTR_DEREF: /* NOTE: This ID has been found in OpenALPR, NASA CFS, stb-convert challenge problems */
-        sanitizeNullPointers(&F);
+        sanitizeNullPointers(&F, vuln.RemediationStrategy);
         break;
 
       case VulnID::STACK_FREE: /* NOTE: This ID has been found in NASA CFS challenge problem */
-        sanitizeFreeOfNonHeap(&F);
+        sanitizeFreeOfNonHeap(&F, vuln.RemediationStrategy);
         break;
 
       default:
