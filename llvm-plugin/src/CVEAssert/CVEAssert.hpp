@@ -5,17 +5,5 @@
 
 
 #pragma once
-
-/// Set me true to get more verbose printouts
+// Set value to true to get more verbose printouts
 extern bool CVE_ASSERT_DEBUG;
-
-// Specifies the approach CVE_ASSERT should take
-// to instrument sinks.
-//
-// values:
-// SANE_PASS: attempt to continue past a sink by
-//            returning a sane default value.
-//
-// EXIT:      exit the program with the EBOSS
-//            exit code (3)
-//
