@@ -140,7 +140,7 @@ void sanitizeDivideByZero(Function *F,  Vulnerability::RemediationStrategies str
   auto &Ctx = M->getContext();
   IRBuilder<> Builder(Ctx);
 
-  if (strategy == RemediationStrategies::RECOVER) {
+  if (strategy == Vulnerability::RemediationStrategies::RECOVER) {
     sanitizeDivideByZeroRecover(F, strategy);
   } else {
 
@@ -677,7 +677,7 @@ void sanitizeIntOverflow(Function *F, Vulnerability::RemediationStrategies strat
       PHINode *phi = Builder.CreatePHI(binary_inst->getType(), 2);
       phi->addIncoming(safeResult, originalBB);
 
-      if (strategy == RemediationStrategies::SAT) {
+      if (strategy == Vulnerability::RemediationStrategies::SAT) {
         phi->addIncoming(satResult, remedOverflowBB);
 
       } else {

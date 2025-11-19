@@ -106,7 +106,7 @@ Function *getOrCreateRemediationBehavior(Module *M, Vulnerability::RemediationSt
     BasicBlock *BB = BasicBlock::Create(Ctx, "", resolve_remed_behavior);
     IRBuilder<> Builder(BB);
 
-    if (strategy == RemediationStrategies::EXIT) {
+    if (strategy == Vulnerability::RemediationStrategies::EXIT) {
         // void exit(i32)
         FunctionType *exitTy = FunctionType::get(
             void_ty,
@@ -118,7 +118,7 @@ Function *getOrCreateRemediationBehavior(Module *M, Vulnerability::RemediationSt
         Value *exitCode = Builder.getInt32(3);
         Builder.CreateCall(exitFn, { exitCode });
     
-    } else if (strategy == RemediationStrategies::RECOVER) {
+    } else if (strategy == Vulnerability::RemediationStrategies::RECOVER) {
         FunctionType *errorhandlerTy = FunctionType::get(
             void_ty,
             {},
