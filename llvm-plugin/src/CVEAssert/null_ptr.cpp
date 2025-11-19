@@ -132,7 +132,6 @@ static Function *getOrCreateNullPtrStoreSanitizer(Module *M, LLVMContext &Ctx, T
     FunctionCallee LogMemInstFunc = M->getOrInsertFunction("resolve_report_sanitize_mem_inst_triggered", LogMemInstFuncTy);
     Builder.CreateCall(LogMemInstFunc, { InputPtr });
     
-    // TODO: Add exit strategy
     if (strategy == Vulnerability::RemediationStrategies::EXIT) {
         Builder.CreateCall(getOrCreateRemediationBehavior(M, strategy));
         Builder.CreateUnreachable();
