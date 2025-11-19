@@ -14,6 +14,7 @@
 #include "llvm/Support/raw_ostream.h"
 
 #include "Worklist.hpp"
+#include "Vulnerability.hpp"
 #include "helpers.hpp"
 
 static const bool FIND_PTR_ROOT_DEBUG = true;
@@ -552,7 +553,7 @@ void sanitizeAlloca(Function *F) {
     }
   }
 
-void sanitizeMemInstBounds(Function *f, ModuleAnalysisManager &MAM, RemediationStrategies strategy) {
+void sanitizeMemInstBounds(Function *f, ModuleAnalysisManager &MAM, Vulnerability::RemediationStrategies strategy) {
   // FIXME: bad alias analysis is causing compilation to fail
   // TBD: why does TBAA not work right
   sanitizeLoadStore(f, MAM);

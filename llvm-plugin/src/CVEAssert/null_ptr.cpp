@@ -60,8 +60,10 @@ static Function *getOrCreateNullPtrLoadSanitizer(Module *M, LLVMContext &Ctx, Ty
     );
     FunctionCallee LogMemInstFunc = M->getOrInsertFunction("resolve_report_sanitize_mem_inst_triggered", LogMemInstFuncTy);
     Builder.CreateCall(LogMemInstFunc, { InputPtr });
-    Value *Arbitrary = Constant::getNullValue(ty);
-    Builder.CreateRet(Arbitrary);
+    Builder.CreateRetVoid();
+    
+    // TODO: Add exit strategy
+
 
     // Return Block: returns pointer if non-null
     Builder.SetInsertPoint(LoadBlock);
@@ -123,7 +125,8 @@ static Function *getOrCreateNullPtrStoreSanitizer(Module *M, LLVMContext &Ctx, T
     );
     FunctionCallee LogMemInstFunc = M->getOrInsertFunction("resolve_report_sanitize_mem_inst_triggered", LogMemInstFuncTy);
     Builder.CreateCall(LogMemInstFunc, { InputPtr });
-    Builder.CreateRetVoid();
+    
+    // TODO: Add exit strategy
 
     // Return Block: returns pointer if non-null
     Builder.SetInsertPoint(StoreBlock);
@@ -137,7 +140,7 @@ static Function *getOrCreateNullPtrStoreSanitizer(Module *M, LLVMContext &Ctx, T
     return SanitizeFunc;
 }
 
-void sanitizeNullPointers(Function *f, RemediationStrategies strategy) {
+void sanitizeNullPointers(Function *f, Vulnerability::RemediationStrategies strategy) {
     IRBuilder<> builder(f->getContext());
 
     std::vector<LoadInst*> loadList;

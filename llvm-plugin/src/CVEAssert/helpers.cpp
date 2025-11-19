@@ -13,6 +13,7 @@
 #include "llvm/IR/Verifier.h"
 
 #include "CVEAssert.hpp"
+#include "Vulnerability.hpp"
 #include "helpers.hpp"
 
 using namespace llvm;
@@ -85,7 +86,7 @@ Function *getOrCreateResolveReportSanitizerTriggered(Module *M) {
 } 
 
 // Create a function getOrCreateRemediateBehavior function to handle do nothing or exit
-Function *getOrCreateRemediationBehavior(Module *M, RemediationStrategies strategy) {
+Function *getOrCreateRemediationBehavior(Module *M, Vulnerability::RemediationStrategies strategy) {
     auto &Ctx = M->getContext();
     auto ptr_ty = PointerType::get(Ctx, 0);
     auto void_ty = Type::getVoidTy(Ctx);

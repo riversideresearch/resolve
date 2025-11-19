@@ -14,8 +14,10 @@
 #include "llvm/Support/raw_ostream.h"
 
 #include "CVEAssert.hpp"
+#include "Vulnerability.hpp"
 #include "arith_san.hpp"
 #include "helpers.hpp"
+
 
 #include <memory>
 #include <optional>
@@ -132,7 +134,7 @@ void sanitizeBinShift(Function *F) {
   }
 }
 
-void sanitizeDivideByZero(Function *F, RemediationStrategies strategy) {
+void sanitizeDivideByZero(Function *F,  Vulnerability::RemediationStrategies strategy) {
   std::vector<Instruction *> worklist;
   Module *M = F->getParent();
   auto &Ctx = M->getContext();
@@ -296,7 +298,7 @@ void sanitizeDivideByZero(Function *F, RemediationStrategies strategy) {
   }
 }
 
-void sanitizeDivideByZeroRecover(Function *F, RemediationStrategies strategy) {
+void sanitizeDivideByZeroRecover(Function *F, Vulnerability::RemediationStrategies strategy) {
   std::vector<Instruction *> worklist;
   Module *M = F->getParent();
   auto &Ctx = M->getContext();
@@ -528,7 +530,7 @@ void sanitizeDivideByZeroInFunction(Function *F,
 }
 
 // Driver function for integer overflow
-void sanitizeIntOverflow(Function *F, RemediationStrategies strategy) {
+void sanitizeIntOverflow(Function *F, Vulnerability::RemediationStrategies strategy) {
   std::vector<Instruction *> worklist;
   Module *M = F->getParent();
   auto &Ctx = M->getContext();
@@ -690,7 +692,7 @@ void sanitizeIntOverflow(Function *F, RemediationStrategies strategy) {
   }
 }
 
-void sanitizeIntOverflowRecover(Function *F, RemediationStrategies strategy) {
+void sanitizeIntOverflowRecover(Function *F, Vulnerability::RemediationStrategies strategy) {
   std::vector<Instruction *> worklist;
   Module *M = F->getParent();
   auto &Ctx = M->getContext();
