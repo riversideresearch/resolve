@@ -35,11 +35,8 @@
 
 using namespace llvm;
 
-// Global env vars
+// Global env var
 bool CVE_ASSERT_DEBUG;
-
-// TODO: Remove this when finished testing 
-//const char *CVE_ASSERT_STRATEGY;
 
 namespace {
 
@@ -56,10 +53,7 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
   };
   
   LabelCVEPass() {
-    // Initialize env vars
-    // TODO: Remove this when testing is complete!
-    //CVE_ASSERT_STRATEGY = strdup(std::getenv("RESOLVE_STRATEGY") ?: "");
-    
+    // Initialize env var    
     CVE_ASSERT_DEBUG = strlen(std::getenv("CVE_ASSERT_DEBUG") ?: "") > 0;
 
     vulnerabilities = Vulnerability::parseVulnerabilityFile();

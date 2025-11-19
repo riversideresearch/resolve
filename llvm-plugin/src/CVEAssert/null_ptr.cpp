@@ -16,7 +16,7 @@
 
 using namespace llvm;
 
-static Function *getOrCreateNullPtrLoadSanitizer(Module *M, LLVMContext &Ctx, Type *ty) {
+static Function *getOrCreateNullPtrLoadSanitizer(Module *M, LLVMContext &Ctx, Type *ty, Vulnerability::RemediationStrategies strategy) {
     Twine handlerName = "resolve_sanitize_null_ptr_ld_" + getLLVMType(ty);
     SmallVector<char> handlerNameStr;
 
@@ -62,7 +62,13 @@ static Function *getOrCreateNullPtrLoadSanitizer(Module *M, LLVMContext &Ctx, Ty
     Builder.CreateCall(LogMemInstFunc, { InputPtr });
     Builder.CreateRetVoid();
     
-    // TODO: Add exit strategy
+    if (strategy == Vulnerability::RemediationStrategies::EXIT) {
+        Builder.CreateCall(getOrCreateRemediationBehavior(M, strategy));
+        Builder.CreateUnreachable();
+    
+    } else if (strategy == Vulnerability::RemediationStrategies::SAFE) {
+        Builder.CreateRet(Constant::getNullValue(ty));
+    }
 
 
     // Return Block: returns pointer if non-null
@@ -77,7 +83,7 @@ static Function *getOrCreateNullPtrLoadSanitizer(Module *M, LLVMContext &Ctx, Ty
     return SanitizeFunc;
 }
 
-static Function *getOrCreateNullPtrStoreSanitizer(Module *M, LLVMContext &Ctx, Type *ty) {
+static Function *getOrCreateNullPtrStoreSanitizer(Module *M, LLVMContext &Ctx, Type *ty, Vulnerability::RemediationStrategies strategy) {
     Twine handlerName = "resolve_sanitize_null_ptr_st_" + getLLVMType(ty);
     SmallVector<char> handlerNameStr;
 
@@ -127,6 +133,12 @@ static Function *getOrCreateNullPtrStoreSanitizer(Module *M, LLVMContext &Ctx, T
     Builder.CreateCall(LogMemInstFunc, { InputPtr });
     
     // TODO: Add exit strategy
+    if (strategy == Vulnerability::RemediationStrategies::EXIT) {
+        Builder.CreateCall(getOrCreateRemediationBehavior(M, strategy));
+        Builder.CreateUnreachable();
+    } else {
+        Builder.CreateRetVoid();
+    }
 
     // Return Block: returns pointer if non-null
     Builder.SetInsertPoint(StoreBlock);
@@ -164,7 +176,7 @@ void sanitizeNullPointers(Function *f, Vulnerability::RemediationStrategies stra
             continue;
         }
 
-        auto loadFn = getOrCreateNullPtrLoadSanitizer(f->getParent(), f->getContext(), valueTy);
+        auto loadFn = getOrCreateNullPtrLoadSanitizer(f->getParent(), f->getContext(), valueTy, strategy);
 
         auto sanitized_load = builder.CreateCall(loadFn, {Inst->getPointerOperand()});
         Inst->replaceAllUsesWith(sanitized_load);
@@ -180,7 +192,7 @@ void sanitizeNullPointers(Function *f, Vulnerability::RemediationStrategies stra
             continue;
         }
 
-        auto storeFn = getOrCreateNullPtrStoreSanitizer(f->getParent(), f->getContext(), valueTy);
+        auto storeFn = getOrCreateNullPtrStoreSanitizer(f->getParent(), f->getContext(), valueTy, strategy);
 
         auto sanitized_load = builder.CreateCall(storeFn, {Inst->getPointerOperand(), Inst->getValueOperand()});
         Inst->removeFromParent();
