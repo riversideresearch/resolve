@@ -88,11 +88,6 @@ std::string handle_map::getId(size_t handle) const {
   return AT(this->handle2id, handle);
 }
 
-// Add edge [l->r] with default weight and type.
-void T::addEdge(size_t l, size_t r, EdgeType ety) {
-  this->addEdge(l, r, ety, 1.0);
-}
-
 // Add edge [l->r]. Does nothing if [r] already exists in the
 // adjacency list of [l].
 void T::addEdge(size_t l, size_t r, EdgeType ety, double weight) {

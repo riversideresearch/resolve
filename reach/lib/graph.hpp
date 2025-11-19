@@ -56,8 +56,10 @@ namespace graph {
   // Directed graph
   struct T {
     E edges;
-    void addEdge(size_t l, size_t r, EdgeType ety);  // default weight 1.0.
     void addEdge(size_t l, size_t r, EdgeType ety, double weight);
+    inline void addEdge(size_t l, size_t r, EdgeType ety) {
+      this->addEdge(l, r, ety, 1.0); // default weight 1.0.
+    }
   };
 
   // Check that a graph is well-formed (currently just that there are

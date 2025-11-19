@@ -16,7 +16,6 @@
 
 #include "argparse.hpp"
 #include "config.hpp"
-#include "distmap.hpp"
 #include "facts.hpp"
 #include "graph.hpp"
 #include "search.hpp"
