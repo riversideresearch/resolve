@@ -536,7 +536,7 @@ void sanitizeIntOverflow(Function *F, Vulnerability::RemediationStrategies strat
   auto &Ctx = M->getContext();
   IRBuilder<> Builder(Ctx);
 
-  if (strategy == RemediationStrategies::RECOVER) {
+  if (strategy == Vulnerability::RemediationStrategies::RECOVER) {
     sanitizeIntOverflowRecover(F, strategy);
   } else {
 
