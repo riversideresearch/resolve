@@ -116,7 +116,6 @@ static Function *getOrCreateNullPtrStoreSanitizer(Module *M, LLVMContext &Ctx, T
     // Updating conditional check for ptr value less than 0x1000
     // Unix systems do not map first page of memory, 
     // we need to detect remdiate pointers within this range. 
-    //Value *IsNull = Builder.CreateICmpEQ(InputPtr, ConstantPointerNull::get(ptr_ty));
     Value *PtrValue = Builder.CreatePtrToInt(InputPtr, int64_ty);
     Value *IsNull = Builder.CreateICmpULT(PtrValue, ConstantInt::get(int64_ty, 0x1000));
     // Conditional branch
