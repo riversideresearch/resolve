@@ -6,10 +6,10 @@ find_package(LLVM CONFIG)
 set(CMAKE_COMPILE_WARNING_AS_ERROR ON)
 
 # Add LLVM headers to include search paths
-#include_directories(SYSTEM ${LLVM_INCLUDE_DIRS})
-include_directories(SYSTEM /home/srosefield/projects/rust/build/x86_64-unknown-linux-gnu/llvm/include/llvm)
+include_directories(SYSTEM ${LLVM_INCLUDE_DIRS})
+#include_directories(SYSTEM /home/srosefield/projects/rust/build/x86_64-unknown-linux-gnu/llvm/include/llvm)
 
-link_libraries(/home/srosefield/projects/rust/build/host/stage0/lib/libLLVM-21-rust-1.92.0-beta.so)
+#link_libraries(/home/srosefield/projects/rust/build/host/stage0/lib/libLLVM-21-rust-1.92.0-beta.so)
 
 # Debug by default
 if(NOT CMAKE_BUILD_TYPE)

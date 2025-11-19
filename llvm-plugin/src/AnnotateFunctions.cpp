@@ -43,7 +43,9 @@ std::string getLLVMType(Type *ty) {
   if (ty->isVoidTy())
     return "void";
 
-  report_fatal_error("unsupported type");
+  std::string error = "unsupported type: " + std::to_string(ty->getTypeID());
+
+  report_fatal_error(llvm::StringRef(error), true);
 }
 
 struct AnnotateFunctions : public PassInfoMixin<AnnotateFunctions> {

@@ -1,6 +1,5 @@
 // EnhancedFacts.cpp
 
-
 #include "Facts.hpp"
 #include "LLVMFacts.hpp"
 #include "NodeID.hpp"
@@ -147,10 +146,10 @@ static void getFunctionFacts(Function &F) {
 
 static void getModuleFacts(Module &M) {
   // In the rustc invocation this will typically segfault as all of the internal pointers are garbage
-  M.print(dbgs(), nullptr, false, true);
+  //M.print(errs(), nullptr, false, true);
   auto name = M.getSourceFileName();
   auto id = M.getModuleIdentifier();
-  errs() << "Module: " << id << " File name: " << name << " length: " << name.size() << "\n";
+  errs() << "Module: " << id << "\n";
   facts.addNodeProp(M, "source_file", M.getSourceFileName());
 
   for (GlobalVariable &G : M.globals()) {
@@ -182,6 +181,7 @@ static void embedFacts(Module &M) {
       compression::compress(params, inputData, compressedFacts);
     }
 
+    errs() << sectionName << " size " << facts.size() << " compressed " << compressedFacts.size() << "\n";
     Constant *dataArr = ConstantDataArray::get(C, compressedFacts);
     GlobalVariable *gv =
         new GlobalVariable(M, dataArr->getType(),
@@ -200,11 +200,11 @@ static void embedFacts(Module &M) {
 
 struct EnhancedFactsPass : public PassInfoMixin<EnhancedFactsPass> {
   PreservedAnalyses run(Module &M, ModuleAnalysisManager &) {
-    errs() << "Module start\n";
+    //errs() << "Module start\n";
     getModuleFacts(M);
-    errs() << "Module embed facts\n";
+    //errs() << "Module embed facts\n";
     embedFacts(M);
-    errs() << "Module embed facts done\n";
+    //errs() << "Module embed facts done\n";
     return PreservedAnalyses::all();
   }
 };
@@ -232,12 +232,14 @@ extern "C" LLVM_ATTRIBUTE_WEAK PassPluginLibraryInfo llvmGetPassPluginInfo() {
                 });
 
             // As a workaround for now, this does get called when rustc runs the llvm optimizer
+            /*
             PB.registerOptimizerEarlyEPCallback(
                     [&](ModulePassManager& MPM, auto) {
                         errs() << "Adding Optimizer Early EnhancedFacts Module Pass\n";
                         MPM.addPass(EnhancedFactsPass());
                     }
                 );
+            */
 
             // this function does not seem to be called with rustc
             PB.registerPipelineStartEPCallback(

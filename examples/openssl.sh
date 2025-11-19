@@ -1,5 +1,7 @@
 #/bin/bash
 
+set -e -v
+
 OPENSSL="https://github.com/openssl/openssl.git"
 
 # Ensure the parent repo has been built before running

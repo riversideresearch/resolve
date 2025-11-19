@@ -27,11 +27,16 @@ define dso_local i32 @main() #0 {
   ret i32 0
 }
 
+define weak void @resolve_report_sanitizer_triggered() {
+  ret void
+}
+
 define internal i8 @resolve_sanitize_null_ptr_ld_i8(ptr %0) {
   %2 = icmp eq ptr %0, null
   br i1 %2, label %3, label %4
 
 3:                                                ; preds = %1
+  call void @resolve_report_sanitizer_triggered()
   ret i8 0
 
 4:                                                ; preds = %1
@@ -44,6 +49,7 @@ define internal ptr @resolve_sanitize_null_ptr_ld_ptr(ptr %0) {
   br i1 %2, label %3, label %4
 
 3:                                                ; preds = %1
+  call void @resolve_report_sanitizer_triggered()
   ret ptr null
 
 4:                                                ; preds = %1
@@ -56,6 +62,7 @@ define internal void @resolve_sanitize_null_ptr_st_ptr(ptr %0, ptr %1) {
   br i1 %3, label %4, label %5
 
 4:                                                ; preds = %2
+  call void @resolve_report_sanitizer_triggered()
   ret void
 
 5:                                                ; preds = %2
@@ -68,6 +75,7 @@ define internal void @resolve_sanitize_null_ptr_st_i8(ptr %0, i8 %1) {
   br i1 %3, label %4, label %5
 
 4:                                                ; preds = %2
+  call void @resolve_report_sanitizer_triggered()
   ret void
 
 5:                                                ; preds = %2

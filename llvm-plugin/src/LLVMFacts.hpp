@@ -46,13 +46,20 @@ public:
 
   NodeID addNode(const llvm::Module &M) {
     if (moduleIDs.find(&M) == moduleIDs.end()) {
-      llvm::SmallString<128> src_path = llvm::StringRef(M.getSourceFileName());
-      llvm::sys::fs::make_absolute(src_path);
+      if (M.getName().empty()) {
+        std::string id = prefix + "<UNKNOWN>";
+        moduleIDs[&M] = id;
+        facts.recordNode(id, "Module");
+        return id;
+      } else {
+          llvm::SmallString<128> src_path = llvm::StringRef(M.getSourceFileName());
+          llvm::sys::fs::make_absolute(src_path);
 
-      std::string id = prefix + std::string(src_path.str());
-      moduleIDs[&M] = id;
-      facts.recordNode(id, "Module");
-      return id;
+          std::string id = prefix + std::string(src_path.str());
+          moduleIDs[&M] = id;
+          facts.recordNode(id, "Module");
+          return id;
+      }
     }
     return moduleIDs[&M];
   }
@@ -136,6 +143,8 @@ public:
       idx += 1;
       id = src + "-[" + kind + "; " + std::to_string(idx) + "]->" + dst;
     }
+
+    llvm::errs() << "edge id length: " << id.size() << " src length: " << src.size() << " dst length: " << dst.size() << "\n";
 
     facts.recordEdge(id, kind, src, dst);
 
