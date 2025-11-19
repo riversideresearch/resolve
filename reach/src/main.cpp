@@ -41,16 +41,17 @@ conf::config load_config(const argparse::ArgumentParser& program) {
     if (program.present<string>("facts_dir")) {
       conf.facts_dir = program.get<string>("facts_dir");
     }
-    conf.distmap = conf.distmap || program.get<bool>("distmap");
     if (program.present<string>("src") && program.present<string>("dst")) {
       conf.queries.push_back({
           program.get<string>("src"),
           program.get<string>("dst"),
         });
-    } else if (conf.distmap && program.present<string>("dst")) {
-      conf.queries.push_back({ "", program.get<string>("dst") });
     }
-    conf.dynlink = conf.dynlink || program.get<bool>("dynlink");
+    if (program.present<bool>("dynlink")) {
+      conf.dynlink = program.get<bool>("dynlink");
+    } else {
+      conf.dynlink = conf.dynlink.has_value() && conf.dynlink.value();
+    }
     if (program.present<string>("output")) {
       conf.out_path = program.present<string>("output");
     }
@@ -64,7 +65,7 @@ conf::config load_config(const argparse::ArgumentParser& program) {
     }
     if (program.present<size_t>("num-paths")) {
       conf.num_paths = program.get<size_t>("num-paths");
-    } else if (conf.num_paths == 0) {
+    } else if (!conf.num_paths.has_value()) {
       conf.num_paths = 1;
     }
     return conf;
@@ -118,7 +119,7 @@ int main(int argc, char* argv[]) {
     .help("JSON output path");
   program.add_argument("-m", "--distmap")
     .help("enable to output distance map and blacklist for query destination")
-    .flag();
+    .implicit_value(true);
   program.add_argument("-dl", "--dynlink")
     .help("treat functions with external linkage as having their address taken")
     .flag();
@@ -145,29 +146,7 @@ int main(int argc, char* argv[]) {
   validate_config(conf);
   const auto loaded_syms = build_loaded_syms(conf.dlsym_log_path);
 
-  // If distmap flag is set, generate BB distance map files for query
-  // destination.
-  if (conf.distmap) {
-    if (!conf.queries.size()) {
-      cerr << "no query for distmap generation" << endl;
-      exit(-1);
-    }
-    const auto db = facts::load(conf.facts_dir, graph::CFG_LOAD_OPTIONS);
-    const auto res = distmap::gen(db,
-                                  conf.queries[0].dst,
-                                  conf.dynlink,
-                                  loaded_syms);
-    const json j = res;
-    if (conf.out_path.has_value()) {
-      ofstream f(conf.out_path.value());
-      f << setw(4) << j << endl;
-    } else {
-      cout << setw(4) << j << endl;
-    }
-    exit(0);
-  }
-
-  // Else execute reachability queries.
+  // Execute reachability queries.
 
   // First, build graph.
 
@@ -209,7 +188,7 @@ int main(int argc, char* argv[]) {
 
   const time_point<system_clock> t0 = system_clock::now();
   const auto [hm, g] = graph_builders.at(conf.graph_type)(conf.facts_dir,
-                                                          conf.dynlink,
+                                                          conf.dynlink.value(),
                                                           loaded_syms);
   const time_point<system_clock> t1 = system_clock::now();
   duration<double> load_time = t1 - t0;
@@ -251,7 +230,7 @@ int main(int argc, char* argv[]) {
       // }
 
       const auto paths = search::k_paths_yen(g.edges, dst_handle,
-                                             src_handle, conf.num_paths);
+                                             src_handle, conf.num_paths.value());
 
       const time_point<system_clock> t2 = system_clock::now();
       duration<double> query_time = t2 - t1;

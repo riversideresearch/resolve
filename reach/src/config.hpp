@@ -21,18 +21,17 @@ namespace conf {
   struct config {
     std::filesystem::path facts_dir;
     std::vector<query> queries;
-    bool dynlink;
-    bool distmap;
+    std::optional<bool> dynlink;
     std::optional<std::filesystem::path> out_path;
     std::optional<std::filesystem::path> dlsym_log_path;
     std::string graph_type;
-    size_t num_paths;
+    std::optional<size_t> num_paths;
   };
 
   // Generate JSON deserializers for config
   NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(query, src, dst);
   NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT
-  (config, facts_dir, queries, dynlink, distmap, dlsym_log_path,
+  (config, facts_dir, queries, dynlink, dlsym_log_path,
    out_path, graph_type, num_paths);
 
   // Load config from JSON file
