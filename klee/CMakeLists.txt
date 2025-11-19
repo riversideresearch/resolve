@@ -662,7 +662,9 @@ add_subdirectory(resolve)
 ################################################################################
 # REACH
 ################################################################################
-add_subdirectory(../reach/lib ../reach/build EXCLUDE_FROM_ALL)
+set(REACH_SOURCE_DIR "${CMAKE_SOURCE_DIR}/../reach")
+set(REACH_BUILD_DIR "${CMAKE_BINARY_DIR}/reach_build")
+add_subdirectory(${REACH_SOURCE_DIR} ${REACH_BUILD_DIR})
 
 ################################################################################
 # Testing

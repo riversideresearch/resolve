@@ -135,11 +135,17 @@ cl::opt<bool> SingleObjectResolution(
              "when offsets are symbolic (default=false)"),
     cl::init(false), cl::cat(MiscCat));
 
-cl::opt<bool> NullOnMallocBound(
-    "return-null-on-malloc-bound",
-    llvm::cl::desc("Return NULL if malloc(n) with n>INT_MAX/2"),
+// cl::opt<bool> NullOnMallocBound(
+//     "return-null-on-malloc-bound",
+//     llvm::cl::desc("Return NULL if malloc(n) with n>INT_MAX/2"),
+//     llvm::cl::init(false),
+//     llvm::cl::cat(MemoryCat));
+
+cl::opt<bool> AllowFreeze(
+    "allow-freeze",
+    llvm::cl::desc("Don't exit on FREEZE instructions and treat them as moves"),
     llvm::cl::init(false),
-    llvm::cl::cat(MemoryCat));
+    llvm::cl::cat(MiscCat));
   
 } // namespace klee
 
@@ -197,6 +203,7 @@ enum class ExternalCallPolicy {
   Concrete,   // Only external calls with concrete arguments allowed
   All,        // All external calls allowed, symbolic arguments concretized
   OverApprox, // All external calls allowed, symbolic inputs are not constrained by the call
+  // TODO: option to treat failed external calls as nops?
 };
 
 cl::opt<ExternalCallPolicy> ExternalCalls(
@@ -3461,28 +3468,29 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
                               "lowered by LowerAtomicInstructionPass");
     break;
   case Instruction::Freeze: {
-    std::string instrStr;
-    llvm::raw_string_ostream rso(instrStr);
-    rso << *i;
-    rso.flush();
-    // std::cout << "FREEZE: " << instrStr << std::endl;
-    
-    ref<Expr> arg = eval(ki, 0, state).value;
-    // if (arg->getKind() == Expr::Kind::InvalidKind) {
-    //   bindLocal(ki, state, ConstantExpr::create(0, arg->getWidth()));
-    // } else {
-    bindLocal(ki, state, arg);
-    // }
+    if (AllowFreeze) {
+      // std::string instrStr;
+      // llvm::raw_string_ostream rso(instrStr);
+      // rso << *i;
+      // rso.flush();
+      // std::cout << "FREEZE: " << instrStr << std::endl;
+
+      ref<Expr> arg = eval(ki, 0, state).value;
+      bindLocal(ki, state, arg);
+    } else {
+      terminateStateOnExecError(state, "illegal instruction");
+    }
     break;
   }
   // Other instructions...
   // Unhandled
   default:
-    std::string instrStr;
-    llvm::raw_string_ostream rso(instrStr);
-    rso << *i;
-    rso.flush();
+    // std::string instrStr;
+    // llvm::raw_string_ostream rso(instrStr);
+    // rso << *i;
+    // rso.flush();
     // std::cout << "BAD INSTRUCTION: " << instrStr << std::endl;
+
     terminateStateOnExecError(state, "illegal instruction");
     break;
   }
