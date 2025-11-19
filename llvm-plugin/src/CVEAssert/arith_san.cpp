@@ -140,6 +140,13 @@ void sanitizeDivideByZero(Function *F,  Vulnerability::RemediationStrategies str
   auto &Ctx = M->getContext();
   IRBuilder<> Builder(Ctx);
 
+  if (strategy == Vulnerability::RemediationStrategies::SAT ||
+      strategy == Vulnerability::RemediationStrategies::SAFE ) {
+        llvm::errs() << "[CVEAssert] Error: sanitzeDivideByZero does not support SAT or SAFE "
+                     << " remediation strategies defaulting to EXIT strategy!\n";
+        strategy = Vulnerability::RemediationStrategies::EXIT;
+  }
+
   if (strategy == Vulnerability::RemediationStrategies::RECOVER) {
     sanitizeDivideByZeroRecover(F, strategy);
   } else {
@@ -535,6 +542,12 @@ void sanitizeIntOverflow(Function *F, Vulnerability::RemediationStrategies strat
   Module *M = F->getParent();
   auto &Ctx = M->getContext();
   IRBuilder<> Builder(Ctx);
+
+  if (strategy == Vulnerability::RemediationStrategies::SAFE) {
+    llvm::errs() << "[CVEAssert] Error: sanitizeIntOverflow does not support SAFE remediation strategy "
+                 << " defaulting to SAT remediation strategy!\n";
+    strategy = Vulnerability::RemediationStrategies::SAT;
+  }
 
   if (strategy == Vulnerability::RemediationStrategies::RECOVER) {
     sanitizeIntOverflowRecover(F, strategy);
