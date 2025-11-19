@@ -128,8 +128,6 @@ Function *getOrCreateRemediationBehavior(Module *M, Vulnerability::RemediationSt
         FunctionCallee errorHandlerFn = M->getOrInsertFunction("error_handler", errorhandlerTy);
         Builder.CreateCall(errorHandlerFn);
     }
-    
     Builder.CreateRetVoid();
-
     return resolve_remed_behavior;
 } 
