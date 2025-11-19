@@ -50,14 +50,6 @@ double graph::path_weight(const vector<edge>& path) {
 }
 
 bool graph::wf(const E& g) {
-  for (const auto& es : g) {
-    unordered_set<size_t> seen;
-    for (const auto& e : es) {
-      if (!seen.insert(e.node).second) {
-        return false;
-      }
-    }
-  }
   return true;
 }
 
@@ -88,18 +80,12 @@ std::string handle_map::getId(size_t handle) const {
   return AT(this->handle2id, handle);
 }
 
-// Add edge [l->r]. Does nothing if [r] already exists in the
-// adjacency list of [l].
+// Add edge [l->r].
 void T::addEdge(size_t l, size_t r, EdgeType ety, double weight) {
   if (max(l, r) >= this->edges.size()) {
     this->edges.resize(max(l, r) + 1);
   }
-  for (const auto& e : this->edges[l]) {
-    if (e.node == r) {
-      return;
-    }
-  }
-  this->edges[l].push_back({ r, weight, ety });
+  this->edges[l].insert({ r, weight, ety });
 }
 
 // Determine if symbol 'sym' matches node id 'node_id'.

@@ -201,7 +201,8 @@ int main(int argc, char* argv[]) {
   output::results res;
   res.load_time = load_time.count();
 
-  for (const auto& q : conf.queries) {
+  for (const auto &q : conf.queries) {
+    const time_point<system_clock> t0 = system_clock::now();
     output::query_result qres;
     qres.src = q.src;
     qres.dst = q.dst;
@@ -231,8 +232,7 @@ int main(int argc, char* argv[]) {
       const auto paths = search::k_paths_yen(g.edges, dst_handle,
                                              src_handle, conf.num_paths.value());
 
-      const time_point<system_clock> t2 = system_clock::now();
-      duration<double> query_time = t2 - t1;
+      duration<double> query_time = system_clock::now() - t0;
       qres.query_time = query_time.count();
 
       vector<double> weights;
