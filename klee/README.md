@@ -14,12 +14,6 @@ python -m pip install lit wllvm && \
 sudo apt install ninja-build libncurses-dev libz3-dev zlib1g-dev libgoogle-perftools-dev libsqlite3-dev llvm-16-dev
 ```
 
-### Install llvm-16 and clang-16
-
-```bash
-BASE=$HOME/klee_deps LLVM_VERSION=16 UCLIBC_VERSION=klee_uclibc_v1.4 Z3_VERSION=4.8.14 ENABLE_OPTIMIZED=1 ENABLE_DEBUG=0 DISABLE_ASSERTIONS=1 REQUIRES_RTTI=0 ENABLE_DOXYGEN=0 ./scripts/build/build.sh uclibc clang z3
-```
-
 ### Build klee-uclibc 1.4 with our modifications (see section below for details)
 ```bash
 cd klee-uclibc-160/ && \
@@ -34,10 +28,6 @@ mkdir build && cd build && \
 cmake -DLLVM_DIR=/usr/lib/llvm-16 -DCMAKE_BUILD_TYPE=Release -DENABLE_SOLVER_STP=OFF -DENABLE_SOLVER_Z3=ON -DENABLE_POSIX_RUNTIME=ON -DKLEE_UCLIBC_PATH=../klee-uclibc-160 -DENABLE_UNIT_TESTS=OFF -DENABLE_KLEE_ASSERTS=OFF -DKLEE_RUNTIME_BUILD_TYPE=Release .. && \
 make -j$(nproc)
 ```
-
-mkdir build && cd build && \
-cmake -DLLVM_DIR=$HOME/klee_deps/llvm-160-build_O_ND_NA -DCMAKE_BUILD_TYPE=Debug -DENABLE_SOLVER_STP=OFF -DENABLE_SOLVER_Z3=ON -DENABLE_POSIX_RUNTIME=ON -DKLEE_UCLIBC_PATH=../klee-uclibc-160 -DENABLE_UNIT_TESTS=OFF -DENABLE_KLEE_ASSERTS=OFF -DKLEE_RUNTIME_BUILD_TYPE=Debug -DLLVMCC=/usr/bin/clang-16 .. && \
-make -j$(nproc)
 
 ### Run KLEE
 
