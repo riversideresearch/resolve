@@ -61,15 +61,19 @@ static Function *getOrCreateNullPtrLoadSanitizer(Module *M, LLVMContext &Ctx, Ty
     FunctionCallee LogMemInstFunc = M->getOrInsertFunction("resolve_report_sanitize_mem_inst_triggered", LogMemInstFuncTy);
     Builder.CreateCall(LogMemInstFunc, { InputPtr });
     Builder.CreateRetVoid();
-    
-    if (strategy == Vulnerability::RemediationStrategies::EXIT) {
-        Builder.CreateCall(getOrCreateRemediationBehavior(M, strategy));
-        Builder.CreateUnreachable();
-    
-    } else if (strategy == Vulnerability::RemediationStrategies::SAFE) {
-        Builder.CreateRet(Constant::getNullValue(ty));
-    }
 
+    switch(strategy) {
+        case Vulnerability::RemediationStrategies::EXIT:
+            Builder.CreateCall(getOrCreateRemediationBehavior(M, strategy));
+            Builder.CreateUnreachable();
+            break;
+
+        // TODO: Add support for recover remediation strategy. 
+        case Vulnerability::RemediationStrategies::SAFE:
+            Builder.CreateRet(Constant::getNullValue(ty));
+            break;
+    }
+    
 
     // Return Block: returns pointer if non-null
     Builder.SetInsertPoint(LoadBlock);
@@ -118,10 +122,9 @@ static Function *getOrCreateNullPtrStoreSanitizer(Module *M, LLVMContext &Ctx, T
     // we need to detect remdiate pointers within this range. 
     Value *PtrValue = Builder.CreatePtrToInt(InputPtr, int64_ty);
     Value *IsNull = Builder.CreateICmpULT(PtrValue, ConstantInt::get(int64_ty, 0x1000));
-    // Conditional branch
     Builder.CreateCondBr(IsNull, SanitizeBlock, StoreBlock);
 
-    // Trap Block: calls libmemorizer_trap
+    // Trap Block: calls libresolve_trap
     Builder.SetInsertPoint(SanitizeBlock);
     FunctionType* LogMemInstFuncTy = FunctionType::get(
         void_ty,
@@ -155,6 +158,18 @@ void sanitizeNullPointers(Function *f, Vulnerability::RemediationStrategies stra
 
     std::vector<LoadInst*> loadList;
     std::vector<StoreInst*> storeList;
+
+    switch(strategy) {
+        case Vulnerability::RemediationStrategies::EXIT:
+        case Vulnerability::RemediationStrategies::RECOVER:
+            break;
+        
+        default:
+            llvm::errs() << "[CVEAssert] Error: sanitizeNullPointers does not support remediation strategy "
+                         << "defaulting to EXIT strategy!\n";
+            strategy = Vulnerability::Remediation::EXIT;
+            break;
+    }
     
     for (auto &BB : *f) {
         for (auto &I : BB) {
