@@ -140,13 +140,12 @@ void sanitizeDivideByZero(Function *F,  Vulnerability::RemediationStrategies str
   auto &Ctx = M->getContext();
   IRBuilder<> Builder(Ctx);
 
-  // TODO: Make this a switch statement
   switch (strategy) {
     case Vulnerability::RemediationStrategies::EXIT:
       break;
     case Vulnerability::RemediationStrategies::RECOVER:
       sanitizeDivideByZeroRecover(F, strategy);
-      return; // I am not sure if this works test in CI
+      return;
     
     default:
       llvm::errs() << "[CVEAssert] Error: sanitizeDivideByZero does not support "
@@ -546,7 +545,6 @@ void sanitizeIntOverflow(Function *F, Vulnerability::RemediationStrategies strat
   auto &Ctx = M->getContext();
   IRBuilder<> Builder(Ctx);
 
-  // TODO: Convert this to switch statement
   switch(strategy) {
     case Vulnerability::RemediationStrategies::RECOVER:
       sanitizeIntOverflowRecover(F, strategy);
