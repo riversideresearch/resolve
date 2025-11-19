@@ -122,7 +122,7 @@ int main(int argc, char* argv[]) {
     .implicit_value(true);
   program.add_argument("-dl", "--dynlink")
     .help("treat functions with external linkage as having their address taken")
-    .flag();
+    .implicit_value(true);
   program.add_argument("-ds", "--dlsym-log")
     .help("path to file containing dlsym log of loaded symbols");
   program.add_argument("-o", "--output")
