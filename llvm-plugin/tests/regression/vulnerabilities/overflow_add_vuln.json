@@ -8,7 +8,8 @@
             "cwe-id": "455",
             "cwe-name": "Integer Overflow",
             "affected-function": "main",
-            "affected-file": "overflow_add.c"
+            "affected-file": "overflow_add.c",
+            "remediation-strategy": "sat"
         }
     ]
 }

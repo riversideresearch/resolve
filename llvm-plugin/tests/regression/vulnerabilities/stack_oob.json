@@ -8,7 +8,8 @@
             "cwe-id": "125",
             "cwe-name": "Stack OOB access",
             "affected-function": "main",
-            "affected-file": "stack_oob.c" 
+            "affected-file": "stack_oob.c",
+            "remediation-strategy": "exit" 
         }
     ]
 }

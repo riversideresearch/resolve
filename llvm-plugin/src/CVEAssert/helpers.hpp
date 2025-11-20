@@ -9,6 +9,7 @@
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Type.h"
 #include "llvm/ADT/StringRef.h"
+#include "Vulnerability.hpp"
 /* Helper function to get the argument type as a string */
 inline llvm::StringRef getLLVMType(llvm::Type *ty) {
     if (ty->isPointerTy())          return "ptr";
@@ -21,4 +22,4 @@ inline llvm::StringRef getLLVMType(llvm::Type *ty) {
 }
 llvm::Function *getOrCreateIsHeap(llvm::Module *M, llvm::LLVMContext &Ctx);
 llvm::Function *getOrCreateResolveReportSanitizerTriggered(llvm::Module *M);
-llvm::Function *getOrCreateRemediationBehavior(llvm::Module *M);
+llvm::Function *getOrCreateRemediationBehavior(llvm::Module *M, Vulnerability::RemediationStrategies strategy);

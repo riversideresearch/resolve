@@ -11,8 +11,8 @@
 // CHECK: icmp eq i32 
 // CHECK-LABEL: define dso_local i32 @main
 // RUN: RESOLVE_LABEL_CVE=vulnerabilities/div_zero_vuln.json %clang -fpass-plugin=%plugin %s -o %t.exe 
-// RUN: %t.exe 1 || true
-// RUN: echo $? 
+// RUN: %t.exe 1; test $? -eq 3
+// RUN: %t.exe; test $? -eq 42
 #include <stdio.h>
 #include <stdlib.h>
 

@@ -5,7 +5,7 @@
 
 #include <stdio.h>
 #include <limits.h>
-// RUN: RESOLVE_STRATEGY=SAT RESOLVE_LABEL_CVE=vulnerabilities/overflow_add_vuln.json \
+// RUN: RESOLVE_LABEL_CVE=vulnerabilities/overflow_add_vuln.json \
 // RUN:  %clang -S -emit-llvm \
 // RUN: -fpass-plugin=%plugin \
 // RUN: %s -o - | %FileCheck %s 
