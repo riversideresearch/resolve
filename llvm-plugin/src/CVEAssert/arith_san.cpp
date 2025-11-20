@@ -547,10 +547,11 @@ void sanitizeIntOverflow(Function *F, Vulnerability::RemediationStrategies strat
 
   switch(strategy) {
     case Vulnerability::RemediationStrategies::RECOVER:
+    case Vulnerability::RemediationStrategies::EXIT:
       sanitizeIntOverflowRecover(F, strategy);
       return; 
 
-    case Vulnerability::RemediationStrategies::EXIT:
+    case Vulnerability::RemediationStrategies::SAFE:
     case Vulnerability::RemediationStrategies::SAT:
       break;
     
@@ -701,7 +702,7 @@ void sanitizeIntOverflow(Function *F, Vulnerability::RemediationStrategies strat
     if (strategy == Vulnerability::RemediationStrategies::SAT) {
       phi->addIncoming(satResult, remedOverflowBB);
 
-    } else {
+    } else if (strategy == Vulnerability::RemediationStrategies::SAFE) {
       phi->addIncoming(safeResult, remedOverflowBB);
     }
 
@@ -749,21 +750,7 @@ void sanitizeIntOverflowRecover(Function *F, Vulnerability::RemediationStrategie
 
   IRBuilder<> recoverBuilder(recoverBB);
   recoverBuilder.CreateCall(getOrCreateRemediationBehavior(M, strategy));
-
-  Type *retTy = F->getReturnType();
-  if (retTy->isVoidTy()) {
-    recoverBuilder.CreateRetVoid();
-  } else if (retTy->isIntegerTy()) {
-    // return zero for integer return types
-    Constant *zero = Constant::getNullValue(retTy);
-    recoverBuilder.CreateRet(zero);
-  } else if (retTy->isPointerTy()) {
-    // return null for pointer return types
-    recoverBuilder.CreateRet(Constant::getNullValue(retTy));
-  } else {
-    // fallback: return undef (less ideal, but keeps verifier happy)
-    recoverBuilder.CreateRet(UndefValue::get(retTy));
-  }
+  recoverBuilder.CreateUnreachable();
 
   for (auto &BB : *F) {
     for (auto &instr : BB) {
