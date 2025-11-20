@@ -38,3 +38,44 @@ See the above list of required and inferred environment variables.
 2. Start the MCP server locally
 3. `npx @modelcontextprotocol/inspector`
 4. Connect to the MCP server through the inspector webUI
+
+## Challenge Problem Integration
+
+To integrate challenge problems, you must create a `.resolve_meta` file, and update the Dockerfile to allow for workspaced builds.
+
+### Resolve Metadata File
+
+TODO: document
+
+### Workspaces
+
+In a EBOSS CP Dockerfile, you can simply replace
+
+```Dockerfile
+COPY src /challenge/src
+```
+
+with
+
+```Dockerfile
+ARG WORKSPACE=""
+COPY src /challenge/src
+COPY workspaces /tmp/workspaces/
+RUN if [ -n "$WORKSPACE" ] && [ -d "/tmp/workspaces/${WORKSPACE}/src" ]; then \
+        echo "Overriding src with workspace: $WORKSPACE"; \
+        rm -rf /challenge/src && \
+        cp -r /tmp/workspaces/${WORKSPACE}/src /challenge/src; \
+    else \
+        echo "Using default src"; \
+    fi && \
+    rm -rf /tmp/workspaces
+```
+
+You need to make sure that the WORKSPACE environment variable is also passed as a build arg in your compose file, like so:
+
+```yaml
+app:
+  build:
+    args:
+      WORKSPACE: ${WORKSPACE:-}
+```
