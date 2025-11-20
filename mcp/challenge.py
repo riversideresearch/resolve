@@ -14,14 +14,14 @@ def get_challenge_info() -> dict:
 
 # TODO: should building challenges throw an exception unless it exits 0?
 @mcp.tool()
-def build_challenge_default_with_facts() -> dict:
-    """Builds the challenge without any instrumentation and returns the status of the build. This compilation will insert into the binary \"facts\" about its contents that can be analyzed with the reach tool."""
+def build_challenge_default_with_facts(workspace: str = "") -> dict:
+    """Builds the challenge without any instrumentation and returns the status of the build. This compilation will insert into the binary \"facts\" about its contents that can be analyzed with the reach tool. Optionally specify a workspace name to build from that workspace instead of the default challenge files."""
     # NOTE: consider using a oneshot LLM call to condense stdout into something reasonable?
-    return run_commands_list(CHALLENGE_FOLDER, CHALLENGE_META["commands"]["build"])
+    return run_commands_list(CHALLENGE_FOLDER, CHALLENGE_META["commands"]["build"], workspace=workspace)
 
 @mcp.tool()
-def build_challenge_instrumented(cwe_id: str, target_function_name: str, affected_file: str = "unknown.c"):
-    """Builds the challenge problem using the resolve remediation engine, which will remediate a CWE automatically based on the ID. Specify the function name you wish to remediate without return type or parameters. The cwe_id should be a string like '476' for CWE-476. The affected_file is the source file containing the vulnerability (optional, defaults to 'unknown.c')."""
+def build_challenge_instrumented(cwe_id: str, target_function_name: str, affected_file: str = "unknown.c", workspace: str = ""):
+    """Builds the challenge problem using the resolve remediation engine, which will remediate a CWE automatically based on the ID. Specify the function name you wish to remediate without return type or parameters. The cwe_id should be a string like '476' for CWE-476. The affected_file is the source file containing the vulnerability (optional, defaults to 'unknown.c'). Optionally specify a workspace name to build from that workspace instead of the default challenge files."""
     # TODO: reject un-implemented CWEs, give better examples for LLMs
     # TODO: can we ever handle multiple vulnerabilities?
     # TODO: what if we already have a vuln.json? - feed forward from .resolve_meta?
@@ -41,7 +41,7 @@ def build_challenge_instrumented(cwe_id: str, target_function_name: str, affecte
         }, f, indent=4)
 
     # TODO: RESOLVE_STRATEGY env var    
-    return run_commands_list(CHALLENGE_FOLDER, CHALLENGE_META["commands"]["build remediated"])
+    return run_commands_list(CHALLENGE_FOLDER, CHALLENGE_META["commands"]["build remediated"], workspace=workspace)
 
 @mcp.tool()
 def test_challenge() -> dict:

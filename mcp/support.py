@@ -7,13 +7,18 @@ import time
 import shlex
 import subprocess
 
-def run_commands_list(cwd: str, commands: list[str], env=os.environ.copy()) -> dict:
-    """Runs a list of commands and returns a dictionary with information about their execution."""
+def run_commands_list(cwd: str, commands: list[str], env=os.environ.copy(), workspace: str = "") -> dict:
+    """Runs a list of commands and returns a dictionary with information about their execution. If workspace is specified, sets WORKSPACE environment variable for docker compose builds."""
     outputs = {}
     for command in commands:
         start = time.perf_counter()
+        
         parts = shlex.split(command)
         cmd_env = env.copy()
+        
+        if workspace:
+            cmd_env["WORKSPACE"] = workspace
+        
         actual_command = []
         
         for part in parts:
@@ -54,12 +59,17 @@ def run_commands_list(cwd: str, commands: list[str], env=os.environ.copy()) -> d
         }
     return outputs
 
-def run_commands_list_without_capture(cwd: str, commands: list[str], env=os.environ.copy()) -> dict:
-    """Runs a list of commands and returns a dictionary with information about their execution."""
+def run_commands_list_without_capture(cwd: str, commands: list[str], env=os.environ.copy(), workspace: str = "") -> dict:
+    """Runs a list of commands and returns a dictionary with information about their execution. If workspace is specified, sets WORKSPACE environment variable for docker compose builds."""
     outputs = {}
     for command in commands:
         start = time.perf_counter()
-        res = subprocess.run(command, shell=True, cwd=cwd, env=env)
+        
+        cmd_env = env.copy()
+        if workspace:
+            cmd_env["WORKSPACE"] = workspace
+        
+        res = subprocess.run(command, shell=True, cwd=cwd, env=cmd_env)
         end = time.perf_counter()
         outputs[command] = {
             "exit status": res.returncode,

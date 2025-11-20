@@ -38,3 +38,23 @@ See the above list of required and inferred environment variables.
 2. Start the MCP server locally
 3. `npx @modelcontextprotocol/inspector`
 4. Connect to the MCP server through the inspector webUI
+
+## Challenge Problem Integration
+
+To integrate challenge problems, you must create a `.resolve_meta` file.
+
+### Resolve Metadata File
+
+TODO: document
+
+### Workspaces
+
+When executing commands in the resolve meta file, the environment WORKSPACE will be set to the name of the workspace in the workspaces folder.
+
+For example, when building with docker compose, you may want to use that variable to override the build context.
+
+```yaml
+app:
+  build:
+    context: workspaces/${WORKSPACE:-..}
+```

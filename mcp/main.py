@@ -76,9 +76,9 @@ else:
 CHALLENGE_META = json.load(open(RESOLVE_CHALLENGE_META))
 CHALLENGE_FOLDER = os.path.dirname(RESOLVE_CHALLENGE_META)
 
-# from tools import *
 from challenge import *
 from reachability import *
+from workspaces import *
 
 if __name__ == "__main__":
     mcp.run()
