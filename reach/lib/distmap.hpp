@@ -11,9 +11,11 @@
 
 #include "facts.hpp"
 
+using NNodeId = ReachFacts::NamespacedNodeId;
+
 struct distmap_blacklist {
-  std::unordered_map<std::string, size_t> distmap;
-  std::unordered_set<std::string> blacklist;
+  ReachFacts::NodeMap<size_t> distmap;
+  std::unordered_set<NNodeId, ReachFacts::pair_hash> blacklist;
 };
 
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_ONLY_SERIALIZE
@@ -21,8 +23,8 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_ONLY_SERIALIZE
 
 namespace distmap {
   distmap_blacklist
-  gen(const facts::database& db,
-      const std::string& dst,
+  gen(const ReachFacts::database& db,
+      const NNodeId& dst,
       bool dynlink = false,
       const std::optional<std::vector<dlsym::loaded_symbol>>& loaded_syms = {});
 }

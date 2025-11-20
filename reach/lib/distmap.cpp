@@ -15,15 +15,15 @@
 using namespace std;
 
 distmap_blacklist
-distmap::gen(const facts::database& db,
-             const string& dst,
+distmap::gen(const ReachFacts::database& db,
+             const NNodeId& dst,
              bool dynlink,
              const optional<vector<dlsym::loaded_symbol>>& loaded_syms) {
   const auto [hm, g] = graph::build_instr_cfg(db, dynlink, loaded_syms);
 
   const auto dst_handle_opt = hm.getHandleOpt(dst);
   if (!dst_handle_opt.has_value()) {
-    throw runtime_error("distmap::gen: node '" + dst + "' not found");
+    throw runtime_error("distmap::gen: node not found");
   }
   const auto dst_handle = dst_handle_opt.value();
   auto distmap = search::min_distances(g.edges, dst_handle);
@@ -32,7 +32,7 @@ distmap::gen(const facts::database& db,
   // destination.
   if (db.contains.contains(dst)) {
     for (const auto& bb : db.contains.at(dst)) {
-      if (db.node_type.at(bb) != facts::NodeType::BasicBlock) {
+      if (db.node_type.at(bb) != ReachFacts::NodeType::BasicBlock) {
         continue;
       }
       for (const auto& instr : db.contains.at(bb)) {
@@ -42,18 +42,18 @@ distmap::gen(const facts::database& db,
   }
 
   // Do the same for all nodes with external linkage with the same name.
-  const auto dst_name = util::name_of_id(dst);
+  const auto dst_name = db.name.at(dst);
   for (const auto& [id, linkage] : db.linkage) {
-    if (linkage != facts::Linkage::ExternalLinkage) {
+    if (linkage != ReachFacts::Linkage::ExternalLinkage) {
       continue;
     }
-    const auto id_name = util::name_of_id(id);
+    const auto id_name = db.name.at(id);
     if (id_name != dst_name) {
       continue;
     }
     if (db.contains.contains(id)) {
       for (const auto& bb : db.contains.at(id)) {
-        if (db.node_type.at(bb) != facts::NodeType::BasicBlock) {
+        if (db.node_type.at(bb) != ReachFacts::NodeType::BasicBlock) {
           continue;
         }
         for (const auto& instr : db.contains.at(bb)) {
@@ -64,18 +64,18 @@ distmap::gen(const facts::database& db,
   }
 
   // Build distmap with node id keys
-  unordered_map<string, size_t> id_distmap;
+  ReachFacts::NodeMap<size_t> id_distmap;
   for (const auto& [h, d] : distmap) {
     const auto id = hm.getId(h);
-    if (AT(db.node_type, id) == facts::NodeType::Instruction) {
+    if (AT(db.node_type, id) == ReachFacts::NodeType::Instruction) {
       id_distmap.emplace(id, d);
     }
   }
 
   // Build blacklist of node ids
-  unordered_set<string> blacklist;
+  unordered_set<NNodeId, ReachFacts::pair_hash> blacklist;
   for (const auto& [id, ty] : db.node_type) {
-    if (ty == facts::NodeType::Instruction && !id_distmap.contains(id)) {
+    if (ty == ReachFacts::NodeType::Instruction && !id_distmap.contains(id)) {
       blacklist.insert(id);
     }
   }
