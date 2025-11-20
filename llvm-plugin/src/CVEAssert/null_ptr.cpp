@@ -51,7 +51,6 @@ static Function *getOrCreateNullPtrLoadSanitizer(Module *M, LLVMContext &Ctx, Ty
     // Conditional branch
     Builder.CreateCondBr(IsNull, SanitizeBlock, LoadBlock);
 
-    // Trap Block: calls libmemorizer_trap
     Builder.SetInsertPoint(SanitizeBlock);
     FunctionType* LogMemInstFuncTy = FunctionType::get(
         void_ty,
@@ -61,19 +60,13 @@ static Function *getOrCreateNullPtrLoadSanitizer(Module *M, LLVMContext &Ctx, Ty
     FunctionCallee LogMemInstFunc = M->getOrInsertFunction("resolve_report_sanitize_mem_inst_triggered", LogMemInstFuncTy);
     Builder.CreateCall(LogMemInstFunc, { InputPtr });
 
-    switch(strategy) {
-        case Vulnerability::RemediationStrategies::EXIT:
-            Builder.CreateCall(getOrCreateRemediationBehavior(M, strategy));
-            Builder.CreateUnreachable();
-            break;
-
-        // TODO: Add support for recover remediation strategy. 
-        case Vulnerability::RemediationStrategies::SAFE:
-            Builder.CreateRet(Constant::getNullValue(ty));
-            break;
+    if (strategy == Vulnerability::RemediationStrategies::SAFE) {
+        Builder.CreateRet(Constant::getNullValue(ty));
+    } else {
+        Builder.CreateCall(getOrCreateRemediationBehavior(M, strategy));
+        Builder.CreateUnreachable();
     }
     
-
     // Return Block: returns pointer if non-null
     Builder.SetInsertPoint(LoadBlock);
     Value *ld = Builder.CreateLoad(ty, InputPtr);
@@ -123,7 +116,6 @@ static Function *getOrCreateNullPtrStoreSanitizer(Module *M, LLVMContext &Ctx, T
     Value *IsNull = Builder.CreateICmpULT(PtrValue, ConstantInt::get(int64_ty, 0x1000));
     Builder.CreateCondBr(IsNull, SanitizeBlock, StoreBlock);
 
-    // Trap Block: calls libresolve_trap
     Builder.SetInsertPoint(SanitizeBlock);
     FunctionType* LogMemInstFuncTy = FunctionType::get(
         void_ty,
@@ -133,11 +125,11 @@ static Function *getOrCreateNullPtrStoreSanitizer(Module *M, LLVMContext &Ctx, T
     FunctionCallee LogMemInstFunc = M->getOrInsertFunction("resolve_report_sanitize_mem_inst_triggered", LogMemInstFuncTy);
     Builder.CreateCall(LogMemInstFunc, { InputPtr });
     
-    if (strategy == Vulnerability::RemediationStrategies::EXIT) {
+    if (strategy == Vulnerability::RemediationStrategies::SAFE) {
+        Builder.CreateRetVoid();
+    } else {
         Builder.CreateCall(getOrCreateRemediationBehavior(M, strategy));
         Builder.CreateUnreachable();
-    } else {
-        Builder.CreateRetVoid();
     }
 
     // Return Block: returns pointer if non-null
