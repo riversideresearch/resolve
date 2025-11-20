@@ -274,17 +274,20 @@ void sanitizeNullPointers(Function *F, Vulnerability::RemediationStrategies stra
     std::vector<StoreInst*> storeList;
 
     switch(strategy) {
-        case Vulnerability::RemediationStrategies::EXIT:
+        case Vulnerability::RemediationStrategies::EXIT: {
             break;
-        case Vulnerability::RemediationStrategies::RECOVER:
+        }
+        case Vulnerability::RemediationStrategies::RECOVER: {
             sanitizeNullPointersRecover(F, strategy);
             return;
+        }
         
-        default:
+        default: {
             llvm::errs() << "[CVEAssert] Error: sanitizeNullPointers does not support remediation strategy "
                          << "defaulting to EXIT strategy!\n";
             strategy = Vulnerability::RemediationStrategies::EXIT;
             break;
+        }
     }
     
     for (auto &BB : *F) {
