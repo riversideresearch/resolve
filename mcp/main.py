@@ -78,6 +78,7 @@ CHALLENGE_FOLDER = os.path.dirname(RESOLVE_CHALLENGE_META)
 
 from challenge import *
 from reachability import *
+from klee import *
 from workspaces import *
 
 if __name__ == "__main__":

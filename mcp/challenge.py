@@ -17,6 +17,23 @@ def get_challenge_info() -> dict:
 def build_challenge_default_with_facts(workspace: str = "") -> dict:
     """Builds the challenge without any instrumentation and returns the status of the build. This compilation will insert into the binary \"facts\" about its contents that can be analyzed with the reach tool. Optionally specify a workspace name to build from that workspace instead of the default challenge files."""
     # NOTE: consider using a oneshot LLM call to condense stdout into something reasonable?
+    
+    if workspace:
+        workspaces_dir = os.path.join(CHALLENGE_FOLDER, "workspaces")
+        workspace_path = os.path.join(workspaces_dir, workspace)
+        
+        if not os.path.exists(workspace_path):
+            return {
+                "success": False,
+                "error": f"Workspace '{workspace}' does not exist at {workspace_path}. Please create it first using create_workspace."
+            }
+        
+        if not os.path.isdir(workspace_path):
+            return {
+                "success": False,
+                "error": f"Path {workspace_path} exists but is not a directory"
+            }
+    
     return run_commands_list(CHALLENGE_FOLDER, CHALLENGE_META["commands"]["build"], workspace=workspace)
 
 @mcp.tool()
@@ -26,6 +43,22 @@ def build_challenge_instrumented(cwe_id: str, target_function_name: str, affecte
     # TODO: can we ever handle multiple vulnerabilities?
     # TODO: what if we already have a vuln.json? - feed forward from .resolve_meta?
     
+    if workspace:
+        workspaces_dir = os.path.join(CHALLENGE_FOLDER, "workspaces")
+        workspace_path = os.path.join(workspaces_dir, workspace)
+        
+        if not os.path.exists(workspace_path):
+            return {
+                "success": False,
+                "error": f"Workspace '{workspace}' does not exist at {workspace_path}. Please create it first using create_workspace."
+            }
+        
+        if not os.path.isdir(workspace_path):
+            return {
+                "success": False,
+                "error": f"Path {workspace_path} exists but is not a directory"
+            }
+
     # write vulnerabilities.json in the challenge folder
     vuln_json_path = os.path.join(CHALLENGE_FOLDER, "resolve_vulnerabilities.json")
     with open(vuln_json_path, "w") as f:
