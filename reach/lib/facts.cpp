@@ -5,10 +5,12 @@
 
 #include <algorithm>
 #include <fstream>
+#include <iostream>
 #include <string>
 #include <unordered_map>
 
 #include "facts.hpp"
+#include "util.hpp"
 
 using namespace facts;
 using namespace std;
@@ -132,4 +134,69 @@ database facts::load(const fs::path& facts_dir, LoadOptions options) {
   }
 
   return load(nodes, nodeprops, edges, options);
+}
+
+// These checks ensure that the hashmap lookups in
+// graph::build_call_graph and graph::build_cfg will succeed.
+bool facts::validate(const database& db) {
+  // All nodes are assigned a type.
+  if (!(KEYS_SUBSET(db.contains, db.node_type) &&
+        KEYS_SUBSET(db.calls, db.node_type) &&
+        KEYS_SUBSET(db.control_flow, db.node_type) &&
+        KEYS_SUBSET(db.name, db.node_type) &&
+        KEYS_SUBSET(db.linkage, db.node_type) &&
+        KEYS_SUBSET(db.call_type, db.node_type) &&
+        KEYS_SUBSET(db.fun_sig, db.node_type))) {
+    return false;
+  }
+
+  // Nodes with Direct call type are in [calls] and [fun_sig].
+  for (const auto& [id, call_type] : db.call_type) {
+    if (call_type == CallType::Direct) {
+      if (!db.calls.contains(id)) {
+        DB_ERR(id, db.call_type, db.calls);
+        return false;
+      }
+      if (!db.fun_sig.contains(id)) {
+        DB_ERR(id, db.call_type, db.fun_sig);
+        return false;
+      }
+    }
+  }
+
+  // Nodes in [address_taken] are in [fun_sig].
+  for (const auto &id : db.address_taken) {
+    if (!db.fun_sig.contains(id)) {
+      DB_ERR(id, db.address_taken, db.fun_sig);
+      return false;
+    }
+  }
+
+  // Functions with external linkage appear in [fun_sig] and [name].
+  for (const auto& [id, linkage] : db.linkage) {
+    if (linkage == Linkage::ExternalLinkage &&
+        db.node_type.at(id) == NodeType::Function) {
+      if (!db.fun_sig.contains(id)) {
+        DB_ERR(id, db.linkage, db.fun_sig);
+        return false;
+      }
+      if (!db.name.contains(id)) {
+        DB_ERR(id, db.linkage, db.name);
+        return false;
+      }
+    }
+  }
+
+  // Basic blocks are in [contains].
+  for (const auto& [id, node_type] : db.node_type) {
+    if (node_type == NodeType::BasicBlock) {
+      if (!db.contains.contains(id)) {
+        std::cerr << "Basic block with id " << id
+                  << " not found in db.contains" << std::endl;
+        return false;
+      }
+    }
+  }
+
+  return true;
 }

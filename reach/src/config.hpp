@@ -21,18 +21,20 @@ namespace conf {
   struct config {
     std::filesystem::path facts_dir;
     std::vector<query> queries;
-    std::optional<bool> dynlink;
-    std::optional<std::filesystem::path> out_path;
-    std::optional<std::filesystem::path> dlsym_log_path;
-    std::string graph_type;
-    std::optional<size_t> num_paths;
+    bool dynlink = false;
+    std::optional<std::filesystem::path> out_path = {};
+    std::optional<std::filesystem::path> dlsym_log_path = {};
+    std::string graph_type = "";
+    std::optional<size_t> num_paths = {};
+    bool validate_facts = false;
+    bool verbose = false;
   };
 
   // Generate JSON deserializers for config
   NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(query, src, dst);
   NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT
-  (config, facts_dir, queries, dynlink, dlsym_log_path,
-   out_path, graph_type, num_paths);
+  (config, facts_dir, queries, dynlink, out_path,
+   dlsym_log_path, graph_type, num_paths, validate_facts, verbose);
 
   // Load config from JSON file
   inline std::optional<config>
@@ -61,7 +63,8 @@ namespace output {
   };
 
   struct results {
-    double load_time;
+    double facts_load_time;
+    double graph_build_time;
     std::vector<query_result> query_results;
   };
 
@@ -71,5 +74,5 @@ namespace output {
   NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_ONLY_SERIALIZE
   (query_result, query_time, src, dst, paths);
   NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_ONLY_SERIALIZE
-  (results, load_time, query_results);
+  (results, facts_load_time, graph_build_time, query_results);
 }  // namespace output
