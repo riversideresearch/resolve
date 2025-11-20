@@ -41,7 +41,7 @@ See the above list of required and inferred environment variables.
 
 ## Challenge Problem Integration
 
-To integrate challenge problems, you must create a `.resolve_meta` file, and update the Dockerfile to allow for workspaced builds.
+To integrate challenge problems, you must create a `.resolve_meta` file.
 
 ### Resolve Metadata File
 
@@ -49,33 +49,12 @@ TODO: document
 
 ### Workspaces
 
-In a EBOSS CP Dockerfile, you can simply replace
+When executing commands in the resolve meta file, the environment WORKSPACE will be set to the name of the workspace in the workspaces folder.
 
-```Dockerfile
-COPY src /challenge/src
-```
-
-with
-
-```Dockerfile
-ARG WORKSPACE=""
-COPY src /challenge/src
-COPY workspaces /tmp/workspaces/
-RUN if [ -n "$WORKSPACE" ] && [ -d "/tmp/workspaces/${WORKSPACE}/src" ]; then \
-        echo "Overriding src with workspace: $WORKSPACE"; \
-        rm -rf /challenge/src && \
-        cp -r /tmp/workspaces/${WORKSPACE}/src /challenge/src; \
-    else \
-        echo "Using default src"; \
-    fi && \
-    rm -rf /tmp/workspaces
-```
-
-You need to make sure that the WORKSPACE environment variable is also passed as a build arg in your compose file, like so:
+For example, when building with docker compose, you may want to use that variable to override the build context.
 
 ```yaml
 app:
   build:
-    args:
-      WORKSPACE: ${WORKSPACE:-}
+    context: workspaces/${WORKSPACE:-..}
 ```
