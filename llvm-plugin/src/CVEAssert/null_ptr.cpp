@@ -63,13 +63,14 @@ static Function *getOrCreateNullPtrLoadSanitizer(Module *M, LLVMContext &Ctx, Ty
     Builder.CreateRetVoid();
 
     switch(strategy) {
-        case Vulnerability::RemediationStrategies::EXIT:
+        case Vulnerability::RemediationStrategies::EXIT: {
             Builder.CreateCall(getOrCreateRemediationBehavior(M, strategy));
             Builder.CreateUnreachable();
             break;
+        }
 
         // TODO: Add support for recover remediation strategy.
-        case Vulnerability::RemediationStrategies::RECOVER:
+        case Vulnerability::RemediationStrategies::RECOVER: {
             FunctionCallee longjmpFn = M->getOrInsertFunction(
                 "longjmp", FunctionType::get(void_ty, { ptr_ty }, false)
             );
@@ -78,11 +79,13 @@ static Function *getOrCreateNullPtrLoadSanitizer(Module *M, LLVMContext &Ctx, Ty
             Builder.CreateCall(longjmpFn, { jmpBufPtr, longjmpVal });
             Builder.CreateUnreachable();
             break;
+        }
 
         
-        case Vulnerability::RemediationStrategies::SAFE:
+        case Vulnerability::RemediationStrategies::SAFE: {
             Builder.CreateRet(Constant::getNullValue(ty));
             break;
+        }
     }
     
 
@@ -147,12 +150,13 @@ static Function *getOrCreateNullPtrStoreSanitizer(Module *M, LLVMContext &Ctx, T
     
     // TODO: Add support for recovery remediation strategy 
     switch(strategy) {
-        case Vulnerability::RemediationStrategies::EXIT:
+        case Vulnerability::RemediationStrategies::EXIT: {
             Builder.CreateCall(getOrCreateRemediationBehavior(M, strategy));
             Builder.CreateUnreachable();
             break;
+        }
         
-        case Vulnerability::RemediationStrategies::RECOVER:
+        case Vulnerability::RemediationStrategies::RECOVER: {
             FunctionCallee longjmpFn = M->getOrInsertFunction(
                 "longjmp", FunctionType::get(void_ty, { ptr_ty }, false)
             );
@@ -161,6 +165,7 @@ static Function *getOrCreateNullPtrStoreSanitizer(Module *M, LLVMContext &Ctx, T
             Builder.CreateCall(longjmpFn, { jmpBufPtr, longjmpVal });
             Builder.CreateUnreachable();
             break;
+        }
     }
 
     // Return Block: returns pointer if non-null
@@ -173,69 +178,6 @@ static Function *getOrCreateNullPtrStoreSanitizer(Module *M, LLVMContext &Ctx, T
     if (verifyFunction(*SanitizeFunc, &out)) {}
 
     return SanitizeFunc;
-}
-
-void sanitizeNullPointers(Function *F, Vulnerability::RemediationStrategies strategy) {
-    IRBuilder<> builder(F->getContext());
-
-    std::vector<LoadInst*> loadList;
-    std::vector<StoreInst*> storeList;
-
-    switch(strategy) {
-        case Vulnerability::RemediationStrategies::EXIT:
-            break;
-        case Vulnerability::RemediationStrategies::RECOVER:
-            sanitizeNullPointersRecover(F, strategy);
-            return;
-        
-        default:
-            llvm::errs() << "[CVEAssert] Error: sanitizeNullPointers does not support remediation strategy "
-                         << "defaulting to EXIT strategy!\n";
-            strategy = Vulnerability::RemediationStrategies::EXIT;
-            break;
-    }
-    
-    for (auto &BB : *F) {
-        for (auto &I : BB) {
-            if (auto Inst = dyn_cast<LoadInst>(&I)) {
-                loadList.push_back(Inst);
-            } else if (auto Inst = dyn_cast<StoreInst>(&I)) {
-                storeList.push_back(Inst);
-            }
-        }
-    }
-
-    for (auto Inst : loadList) {
-        builder.SetInsertPoint(Inst);
-        auto valueTy = Inst->getType();
-        if (getLLVMType(valueTy) == "") {
-            errs() << "[CVEAssert] Warning: skipping unsupported type " << *valueTy << "\n";
-            continue;
-        }
-
-        auto loadFn = getOrCreateNullPtrLoadSanitizer(F->getParent(), F->getContext(), valueTy, strategy);
-
-        auto sanitizedloadFn = builder.CreateCall(loadFn, {Inst->getPointerOperand()});
-        Inst->replaceAllUsesWith(sanitizedloadFn);
-        Inst->removeFromParent();
-        Inst->deleteValue();
-    }
-        
-    for (auto Inst : storeList) {
-        builder.SetInsertPoint(Inst);
-        auto valueTy = Inst->getValueOperand()->getType();
-        if (getLLVMType(valueTy) == "") {
-            errs() << "[CVEAssert] Warning: skipping unsupported type " << *valueTy << "\n";
-            continue;
-        }
-
-        auto storeFn = getOrCreateNullPtrStoreSanitizer(F->getParent(), F->getContext(), valueTy, strategy);
-
-        auto sanitizedstoreFn = builder.CreateCall(storeFn, {Inst->getPointerOperand(), Inst->getValueOperand()});
-        Inst->replaceAllUsesWith(sanitizedstoreFn);
-        Inst->removeFromParent();
-        Inst->deleteValue();
-    }
 }
 
 void sanitizeNullPointersRecover(Function *F, Vulnerability::RemediationStrategies strategy) {
@@ -317,8 +259,71 @@ void sanitizeNullPointersRecover(Function *F, Vulnerability::RemediationStrategi
             continue;
         }
 
-        auto storeFn = getOrCreatePtrStoreSanitizer(F->getParent(), F->getContext(), valueTy, strategy, jmpBufAlloca);
+        auto storeFn = getOrCreateNullPtrStoreSanitizer(F->getParent(), F->getContext(), valueTy, strategy, jmpBufAlloca);
         auto sanitizedstoreFn = builder.CreateCall(storeFn, { Inst->getPointerOperand(), Inst->getValueOperand() });
+        Inst->replaceAllUsesWith(sanitizedstoreFn);
+        Inst->removeFromParent();
+        Inst->deleteValue();
+    }
+}
+
+void sanitizeNullPointers(Function *F, Vulnerability::RemediationStrategies strategy) {
+    IRBuilder<> builder(F->getContext());
+
+    std::vector<LoadInst*> loadList;
+    std::vector<StoreInst*> storeList;
+
+    switch(strategy) {
+        case Vulnerability::RemediationStrategies::EXIT:
+            break;
+        case Vulnerability::RemediationStrategies::RECOVER:
+            sanitizeNullPointersRecover(F, strategy);
+            return;
+        
+        default:
+            llvm::errs() << "[CVEAssert] Error: sanitizeNullPointers does not support remediation strategy "
+                         << "defaulting to EXIT strategy!\n";
+            strategy = Vulnerability::RemediationStrategies::EXIT;
+            break;
+    }
+    
+    for (auto &BB : *F) {
+        for (auto &I : BB) {
+            if (auto Inst = dyn_cast<LoadInst>(&I)) {
+                loadList.push_back(Inst);
+            } else if (auto Inst = dyn_cast<StoreInst>(&I)) {
+                storeList.push_back(Inst);
+            }
+        }
+    }
+
+    for (auto Inst : loadList) {
+        builder.SetInsertPoint(Inst);
+        auto valueTy = Inst->getType();
+        if (getLLVMType(valueTy) == "") {
+            errs() << "[CVEAssert] Warning: skipping unsupported type " << *valueTy << "\n";
+            continue;
+        }
+
+        auto loadFn = getOrCreateNullPtrLoadSanitizer(F->getParent(), F->getContext(), valueTy, strategy);
+
+        auto sanitizedloadFn = builder.CreateCall(loadFn, {Inst->getPointerOperand()});
+        Inst->replaceAllUsesWith(sanitizedloadFn);
+        Inst->removeFromParent();
+        Inst->deleteValue();
+    }
+        
+    for (auto Inst : storeList) {
+        builder.SetInsertPoint(Inst);
+        auto valueTy = Inst->getValueOperand()->getType();
+        if (getLLVMType(valueTy) == "") {
+            errs() << "[CVEAssert] Warning: skipping unsupported type " << *valueTy << "\n";
+            continue;
+        }
+
+        auto storeFn = getOrCreateNullPtrStoreSanitizer(F->getParent(), F->getContext(), valueTy, strategy);
+
+        auto sanitizedstoreFn = builder.CreateCall(storeFn, {Inst->getPointerOperand(), Inst->getValueOperand()});
         Inst->replaceAllUsesWith(sanitizedstoreFn);
         Inst->removeFromParent();
         Inst->deleteValue();
