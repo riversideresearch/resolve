@@ -58,7 +58,7 @@ pub extern "C" fn resolve_malloc(size: usize) -> *mut c_void {
 
     let mut buf = [0u8; 128];
     let mut writer = BufferWriter::new(&mut buf);
-    let _ = writeln!(&mut writer, "[FUNC] Malloc function recorded with size: {}, ptr: 0x{:x}", size, ptr as Vaddr);
+    let _ = writeln!(&mut writer, "[HEAP] Object allocated with size: {}, address: 0x{:x}", size, ptr as Vaddr);
     let written = writer.as_bytes();
     unsafe { libc::write(*RESOLVE_LOG_FD, written.as_ptr() as *const _, written.len()) };
 
@@ -89,7 +89,7 @@ pub extern "C" fn resolve_memcpy(dest: *mut c_void, src: *mut c_void, size: usiz
     let mut buf = [0u8; 128];
     let mut writer = BufferWriter::new(&mut buf);
 
-    let _ = writeln!(&mut writer, "[FUNC] Memcpy function recorded with dest: {:?}, src {:?}, size: {}, ptr: 0x{:x}", dest, src, size, ptr as Vaddr);
+    let _ = writeln!(&mut writer, "[HEAP] Object copied to dst: {:?}, from src {:?}, with size: {}, ptr: 0x{:x}", dest, src, size, ptr as Vaddr);
     let written = writer.as_bytes();
     unsafe { libc::write(*RESOLVE_LOG_FD, written.as_ptr() as *const _, written.len()) };
 
@@ -110,7 +110,7 @@ pub extern "C" fn resolve_free(ptr: *mut c_void) -> () {
     let mut buf = [0u8; 128];
     let mut writer = BufferWriter::new(&mut buf);
 
-    let _ = writeln!(&mut writer, "[FUNC] Free function input ptr: 0x{:x}", ptr as Vaddr);
+    let _ = writeln!(&mut writer, "[FREE] Allocated object freed at address: 0x{:x}", ptr as Vaddr);
     let written = writer.as_bytes();
     unsafe { libc::write(*RESOLVE_LOG_FD, written.as_ptr() as *const _, written.len()) };
 
@@ -126,7 +126,7 @@ pub extern "C" fn resolve_free(ptr: *mut c_void) -> () {
             let mut writer = BufferWriter::new(&mut buf);
             let _ = writeln!(
                 &mut writer,
-                "[INFO] Found shadow object for 0x{:x}, size = {}",
+                "[INFO] Found shadow object for allocated object, 0x{:x}, size = {}",
                 ptr as Vaddr,
                 ptr_size
             );
@@ -138,7 +138,7 @@ pub extern "C" fn resolve_free(ptr: *mut c_void) -> () {
             let mut writer = BufferWriter::new(&mut buf);
             let _ = writeln!(
                 &mut writer,
-                "[WARNING] No shadow object found for pointer: 0x{:x}",
+                "[WARNING] No shadow object found for allocated object: 0x{:x}",
                 ptr as Vaddr
         );
         let written = writer.as_bytes();
@@ -179,7 +179,7 @@ pub extern "C" fn resolve_realloc(ptr: *mut c_void, size: usize) -> *mut c_void 
     let mut buf = [0u8; 128];
     let mut writer = BufferWriter::new(&mut buf);
 
-    let _ = writeln!(&mut writer, "[FUNC] Realloc function recorded with src ptr: {:?}, size: {}, dst ptr: 0x{:x}", ptr, size, realloc_ptr as Vaddr);
+    let _ = writeln!(&mut writer, "[HEAP] Allocated object reallocated mem from src: {:?}, size: {}, dst ptr: 0x{:x}", ptr, size, realloc_ptr as Vaddr);
     let written = writer.as_bytes();
     unsafe { libc::write(*RESOLVE_LOG_FD, written.as_ptr() as *const _, written.len()) };
 
@@ -208,7 +208,7 @@ pub extern "C" fn resolve_calloc(n_items: usize, size: usize) -> *mut c_void {
     let mut buf = [0u8; 128];
     let mut writer = BufferWriter::new(&mut buf);
 
-    let _ = writeln!(&mut writer, "[FUNC] Calloc function recorded with n items: {}, size (bytes): {}, dst ptr: 0x{:x}", n_items, size, ptr as Vaddr);
+    let _ = writeln!(&mut writer, "[HEAP] Logging allocation with {} items, size (bytes): {}, dst ptr: 0x{:x}", n_items, size, ptr as Vaddr);
     let written = writer.as_bytes();
     unsafe { libc::write(*RESOLVE_LOG_FD, written.as_ptr() as *const _, written.len()) };
 
@@ -237,7 +237,7 @@ pub extern "C" fn resolve_strdup(ptr: *mut c_char) -> *mut c_char {
      let mut buf = [0u8; 128];
     let mut writer = BufferWriter::new(&mut buf);
 
-    let _ = writeln!(&mut writer, "strdup function recorded with dst ptr: 0x{:x}", string_ptr as Vaddr);
+    let _ = writeln!(&mut writer, "[HEAP] Logging 'strdup' function call with dst ptr: 0x{:x}", string_ptr as Vaddr);
     let written = writer.as_bytes();
     unsafe { libc::write(*RESOLVE_LOG_FD, written.as_ptr() as *const _, written.len()) };
 
@@ -269,7 +269,7 @@ pub extern "C" fn resolve_strndup(ptr: *mut c_char, size: usize) -> *mut c_char 
      let mut buf = [0u8; 128];
     let mut writer = BufferWriter::new(&mut buf);
 
-    let _ = writeln!(&mut writer, "[FUNC] strndup function recorded with size (bytes): {}, dst ptr: {:?}", size, string_ptr as Vaddr);
+    let _ = writeln!(&mut writer, "[HEAP] Logging 'strndup' function call with size (bytes): {}, dst ptr: {:?}", size, string_ptr as Vaddr);
     let written = writer.as_bytes();
     unsafe { libc::write(*RESOLVE_LOG_FD, written.as_ptr() as *const _, written.len()) };
 
