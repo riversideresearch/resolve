@@ -5,10 +5,12 @@
 
 #include <algorithm>
 #include <fstream>
+#include <iostream>
 #include <string>
 #include <unordered_map>
 
 #include "facts.hpp"
+#include "util.hpp"
 
 using namespace facts;
 using namespace std;
@@ -132,4 +134,46 @@ database facts::load(const fs::path& facts_dir, LoadOptions options) {
   }
 
   return load(nodes, nodeprops, edges, options);
+}
+
+// These checks ensure at least that the hashmap lookups in
+// graph::build_cfg will succeed.
+bool facts::validate(const database& db) {
+  // All nodes are assigned a type.
+  if (!(KEYS_SUBSET(db.contains, db.node_type) &&
+        KEYS_SUBSET(db.calls, db.node_type) &&
+        KEYS_SUBSET(db.control_flow, db.node_type) &&
+        KEYS_SUBSET(db.name, db.node_type) &&
+        KEYS_SUBSET(db.linkage, db.node_type) &&
+        KEYS_SUBSET(db.call_type, db.node_type) &&
+        KEYS_SUBSET(db.fun_sig, db.node_type))) {
+    return false;
+  }
+
+  // Nodes with Direct call type appear in [calls] and [fun_sig].
+  unordered_map<ID, CallType> direct_calls(db.call_type);
+  erase_if(direct_calls, [](const auto& item) {
+    return item.second != CallType::Direct;
+  });
+  if (!(KEYS_SUBSET(direct_calls, db.calls) &&
+        KEYS_SUBSET(direct_calls, db.fun_sig))) {
+    return false;
+  }
+
+  // Nodes in [address_taken] appear in [fun_sig].
+  for (const auto &id : db.address_taken) {
+    if (!db.fun_sig.contains(id)) {
+      std::cerr << "id " << id << " in db.address_taken"
+                << " not found in db.fun_sig" << std::endl;
+      return false;
+    }
+  }
+
+  // Nodes in [linkage] appear in [fun_sig] and [name].
+  if (!(KEYS_SUBSET(db.linkage, db.fun_sig) &&
+        KEYS_SUBSET(db.linkage, db.name))) {
+    return false;
+  }
+
+  return true;
 }

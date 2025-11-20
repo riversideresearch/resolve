@@ -85,6 +85,8 @@ namespace facts {
                 std::istream& edges,
                 LoadOptions options);
   database load(const std::filesystem::path& facts_dir, LoadOptions options);
+
+  bool validate(const database& db);
 }  // namespace facts
 
 // Loaded symbol logs from dynamic analysis, for pruning
