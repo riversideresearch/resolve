@@ -262,35 +262,41 @@ void sanitizeDivideByZero(Function *F,  Vulnerability::RemediationStrategies str
     Value *normalResult = nullptr;
 
     switch (binary_instr->getOpcode()) {
-    case Instruction::SDiv:
-      normalResult = Builder.CreateSDiv(dividend, divisor);
-      Builder.CreateBr(contExeBB);
-      break;
+      case Instruction::SDiv: {
+        normalResult = Builder.CreateSDiv(dividend, divisor);
+        Builder.CreateBr(contExeBB);
+        break;
+      }
 
-    case Instruction::UDiv:
-      normalResult = Builder.CreateUDiv(dividend, divisor);
-      Builder.CreateBr(contExeBB);
-      break;
+      case Instruction::UDiv: {
+        normalResult = Builder.CreateUDiv(dividend, divisor);
+        Builder.CreateBr(contExeBB);
+        break;
+      }
 
-    case Instruction::FDiv:
-      normalResult = Builder.CreateFDiv(dividend, divisor);
-      Builder.CreateBr(contExeBB);
-      break;
+      case Instruction::FDiv: {
+        normalResult = Builder.CreateFDiv(dividend, divisor);
+        Builder.CreateBr(contExeBB);
+        break;
+      }
 
-    case Instruction::SRem:
-      normalResult = Builder.CreateSRem(dividend, divisor);
-      Builder.CreateBr(contExeBB);
-      break;
+      case Instruction::SRem: {
+        normalResult = Builder.CreateSRem(dividend, divisor);
+        Builder.CreateBr(contExeBB);
+        break;
+      }
 
-    case Instruction::URem:
-      normalResult = Builder.CreateURem(dividend, divisor);
-      Builder.CreateBr(contExeBB);
-      break;
+      case Instruction::URem: {
+        normalResult = Builder.CreateURem(dividend, divisor);
+        Builder.CreateBr(contExeBB);
+        break;
+      }
 
-    case Instruction::FRem:
-      normalResult = Builder.CreateFRem(dividend, divisor);
-      Builder.CreateBr(contExeBB);
-      break;
+      case Instruction::FRem: {
+        normalResult = Builder.CreateFRem(dividend, divisor);
+        Builder.CreateBr(contExeBB);
+        break;
+      }
     }
 
     // contExeBB: Collect results from both control flow branchs using phi

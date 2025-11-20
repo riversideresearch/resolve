@@ -159,7 +159,7 @@ static Function *getOrCreateNullPtrStoreSanitizer(Module *M, LLVMContext &Ctx, T
         
         case Vulnerability::RemediationStrategies::RECOVER: {
             FunctionCallee longjmpFn = M->getOrInsertFunction(
-                "longjmp", FunctionType::get(void_ty, { ptr_ty, int32_ty }, false)
+                "longjmp", FunctionType::get(void_ty, { ptr_ty, i32_ty }, false)
             );
 
             Value *longjmpVal = ConstantInt::get(Type::getInt32Ty(Ctx), 42);
