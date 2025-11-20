@@ -8,6 +8,7 @@
 #include <string>
 #include <unordered_map>
 #include <utility>
+#include <unordered_set>
 #include <vector>
 
 #include "facts.hpp"
@@ -51,13 +52,15 @@ namespace graph {
 
   double path_weight(const std::vector<edge>& path);
 
-  using E = std::vector<std::vector<edge>>;
+  using E = std::vector<std::unordered_set<edge>>;
 
   // Directed graph
   struct T {
     E edges;
-    void addEdge(size_t l, size_t r, EdgeType ety);  // default weight 1.0.
     void addEdge(size_t l, size_t r, EdgeType ety, double weight);
+    inline void addEdge(size_t l, size_t r, EdgeType ety) {
+      this->addEdge(l, r, ety, 1.0); // default weight 1.0.
+    }
   };
 
   // Check that a graph is well-formed (currently just that there are

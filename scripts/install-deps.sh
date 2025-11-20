@@ -30,9 +30,12 @@ PKGS="build-essential \
     llvm-dev \
     clang-16 \
     llvm-16 \
+    llvm-16-dev \
     libncurses-dev \
     libz3-dev \
-    zlib1g-dev"
+    zlib1g-dev \
+    libsqlite3-dev \
+    libgoogle-perftools-dev"
 
 # Update package list
 echo "[*] Updating packages..."

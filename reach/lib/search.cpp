@@ -138,12 +138,13 @@ search::path_dijkstra(const graph::E& g, const K& src, const K& tgt) {
 //   cout << endl;
 // }
 
-optional<graph::edge> find_and_remove(vector<graph::edge>& edges,
+optional<graph::edge> find_and_remove(unordered_set<graph::edge>& edges,
                                       size_t node) {
-  for (size_t i = 0; i < edges.size(); i++) {
-    if (edges[i].node == node) {
-      const auto e = edges[i];
-      edges.erase(edges.begin() + i);
+
+  for (auto it = edges.begin(); it != edges.end();) {
+    const auto& e = *it;
+    if (e.node == node) {
+      edges.erase(it);
       return { e };
     }
   }
@@ -161,7 +162,7 @@ bool prefix_eq(const vector<T>& a, const vector<T>& b, size_t n) {
 }
 
 vector<graph::edge> remove_used_edges(const vector<vector<graph::edge>>& paths,
-                                      vector<graph::edge>& edges,
+                                      unordered_set<graph::edge>& edges,
                                       size_t i) {
   vector<graph::edge> removed_edges;
 
@@ -209,7 +210,7 @@ search::k_paths_yen(const graph::E& g, const K& src, const K& tgt, size_t K) {
       }
 
       const auto spur_opt = dijkstra(local_g, last_path[i].node, tgt, root);
-      edges.insert(edges.end(), es.begin(), es.end());
+      edges.insert(es.begin(), es.end());
       if (!spur_opt.has_value()) {
         continue;
       }
