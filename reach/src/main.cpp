@@ -46,11 +46,7 @@ conf::config load_config(const argparse::ArgumentParser& program) {
           program.get<string>("dst"),
         });
     }
-    if (program.present<bool>("dynlink")) {
-      conf.dynlink = program.get<bool>("dynlink");
-    } else {
-      conf.dynlink = conf.dynlink.has_value() && conf.dynlink.value();
-    }
+    conf.dynlink = program.get<bool>("dynlink") || conf.dynlink;
     if (program.present<string>("output")) {
       conf.out_path = program.present<string>("output");
     }
@@ -67,6 +63,9 @@ conf::config load_config(const argparse::ArgumentParser& program) {
     } else if (!conf.num_paths.has_value()) {
       conf.num_paths = 1;
     }
+    conf.validate_facts =
+      program.get<bool>("validate-facts") || conf.validate_facts;
+    conf.verbose = program.get<bool>("verbose") || conf.verbose;
     return conf;
   }
   catch (exception &e) {
@@ -103,6 +102,11 @@ void validate_config(const conf::config& conf) {
   }
 }
 
+void print_config(const conf::config &conf) {
+  const json j = conf;
+  cout << setw(4) << j << endl;
+}
+
 int main(int argc, char* argv[]) {
   argparse::ArgumentParser program("reach");
 
@@ -116,12 +120,9 @@ int main(int argc, char* argv[]) {
     .help("JSON input path");
   program.add_argument("-o", "--output")
     .help("JSON output path");
-  program.add_argument("-m", "--distmap")
-    .help("enable to output distance map and blacklist for query destination")
-    .implicit_value(true);
   program.add_argument("-dl", "--dynlink")
     .help("treat functions with external linkage as having their address taken")
-    .implicit_value(true);
+    .flag();
   program.add_argument("-ds", "--dlsym-log")
     .help("path to file containing dlsym log of loaded symbols");
   program.add_argument("-o", "--output")
@@ -130,7 +131,13 @@ int main(int argc, char* argv[]) {
     .help("graph type (\"simple\", \"cfg\", or \"call\"). Default \"cfg\"");
   program.add_argument("-n", "--num-paths")
     .help("number of paths to generate (n shortest)")
-    .scan<'i', size_t>();;
+    .scan<'i', size_t>();
+  program.add_argument("--validate-facts")
+    .help("validate facts database after loading")
+    .flag();
+  program.add_argument("--verbose")
+    .help("print misc information to stdout")
+    .flag();
 
   try {
     program.parse_args(argc, argv);
@@ -142,42 +149,32 @@ int main(int argc, char* argv[]) {
   }
 
   const conf::config conf = load_config(program);
+  if (conf.verbose) {
+    cout << "Loaded config:" << endl;
+    print_config(conf);
+  }
   validate_config(conf);
   const auto loaded_syms = build_loaded_syms(conf.dlsym_log_path);
 
   // Execute reachability queries.
-
   // First, build graph.
 
+  const unordered_map<string, facts::LoadOptions> load_options = {
+    { "simple", graph::SIMPLE_LOAD_OPTIONS },
+    { "cfg", graph::CFG_LOAD_OPTIONS },
+    { "instr-cfg", graph::CFG_LOAD_OPTIONS },
+    { "call", graph::CALL_LOAD_OPTIONS },
+  };
+
   typedef pair<graph::handle_map, graph::T>
-    (*graph_builder)(const filesystem::path&, bool,
+    (*graph_builder)(const facts::database&, bool,
                      const optional<vector<dlsym::loaded_symbol>>&);
 
   const unordered_map<string, graph_builder> graph_builders = {
-    { "simple", [](const filesystem::path& facts_dir,
-                   bool dynlink,
-                   const optional<vector<dlsym::loaded_symbol>>& loaded_syms) {
-      const auto db = load(facts_dir, graph::SIMPLE_LOAD_OPTIONS);
-      return graph::build_simple_graph(db, dynlink, loaded_syms);
-    }},
-    { "cfg", [](const filesystem::path& facts_dir,
-                bool dynlink,
-                const optional<vector<dlsym::loaded_symbol>>& loaded_syms) {
-      const auto db = load(facts_dir, graph::CFG_LOAD_OPTIONS);
-      return graph::build_cfg(db, dynlink, loaded_syms);
-    }},
-    { "instr_cfg", [](const filesystem::path& facts_dir,
-                      bool dynlink,
-                      const optional<vector<dlsym::loaded_symbol>>& loaded_syms) {
-      const auto db = load(facts_dir, graph::CFG_LOAD_OPTIONS);
-      return graph::build_instr_cfg(db, dynlink, loaded_syms);
-    }},
-    { "call", [](const filesystem::path& facts_dir,
-                 bool dynlink,
-                 const optional<vector<dlsym::loaded_symbol>>& loaded_syms) {
-      const auto db = load(facts_dir, graph::CALL_LOAD_OPTIONS);
-      return graph::build_call_graph(db, dynlink, loaded_syms);
-    }},
+    { "simple", graph::build_simple_graph },
+    { "cfg", graph::build_cfg },
+    { "instr-cfg", graph::build_instr_cfg },
+    { "call", graph::build_call_graph }
   };
 
   if (!graph_builders.contains(conf.graph_type)) {
@@ -185,13 +182,33 @@ int main(int argc, char* argv[]) {
     exit(-1);
   }
 
-  const time_point<system_clock> t0 = system_clock::now();
-  const auto [hm, g] = graph_builders.at(conf.graph_type)(conf.facts_dir,
-                                                          conf.dynlink.value(),
-                                                          loaded_syms);
-  const time_point<system_clock> t1 = system_clock::now();
-  duration<double> load_time = t1 - t0;
+  time_point<system_clock> t0 = system_clock::now();
+  const auto db = load(conf.facts_dir, load_options.at(conf.graph_type));
+  duration<double> facts_load_time = system_clock::now() - t0;
 
+  if (conf.verbose) {
+    cout << "Loaded facts. # nodes = " << db.node_type.size() << endl;
+  }
+  if (conf.validate_facts) {
+    t0 = system_clock::now();
+    if (!facts::validate(db)) {
+      cerr << "WARNING: facts failed validation!" << endl;
+    }
+    if (conf.verbose) {
+      duration<double> facts_validate_time = system_clock::now() - t0;
+      cout << "Validated facts in "
+           << facts_validate_time.count() << " seconds" << endl;
+    }
+  }
+
+  t0 = system_clock::now();
+  const auto [hm, g] = graph_builders.at(conf.graph_type)
+    (db, conf.dynlink, loaded_syms);
+  duration<double> graph_build_time = system_clock::now() - t0;
+
+  if (conf.verbose) {
+    cout << "Loaded graph. # nodes = " << g.edges.size() << endl;
+  }
   if (!graph::wf(g.edges)) {
     cerr << "WARNING: graph not well-formed" << endl;
   }
@@ -199,10 +216,11 @@ int main(int argc, char* argv[]) {
   // Then execute queries against the graph and accumulate results.
 
   output::results res;
-  res.load_time = load_time.count();
+  res.facts_load_time = facts_load_time.count();
+  res.graph_build_time = graph_build_time.count();
 
   for (const auto &q : conf.queries) {
-    const time_point<system_clock> t0 = system_clock::now();
+    t0 = system_clock::now();
     output::query_result qres;
     qres.src = q.src;
     qres.dst = q.dst;
