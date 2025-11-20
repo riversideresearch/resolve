@@ -187,7 +187,8 @@ int main(int argc, char* argv[]) {
   duration<double> facts_load_time = system_clock::now() - t0;
 
   if (conf.verbose) {
-    cout << "Loaded facts. # nodes = " << db.node_type.size() << endl;
+    cout << "Loaded facts in " << facts_load_time.count()
+         << " seconds. # nodes = " << db.node_type.size() << endl;
   }
   if (conf.validate_facts) {
     t0 = system_clock::now();
@@ -207,7 +208,8 @@ int main(int argc, char* argv[]) {
   duration<double> graph_build_time = system_clock::now() - t0;
 
   if (conf.verbose) {
-    cout << "Loaded graph. # nodes = " << g.edges.size() << endl;
+    cout << "Loaded graph in " << graph_build_time.count()
+         << " seconds. # nodes = " << g.edges.size() << endl;
   }
   if (!graph::wf(g.edges)) {
     cerr << "WARNING: graph not well-formed" << endl;

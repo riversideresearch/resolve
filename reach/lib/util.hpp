@@ -18,6 +18,9 @@
 #define AT(map, key) util::at(map, key, #map)
 #define KEYS_SUBSET(a, b) util::keys_subset(#a, a, #b, b)
 
+#define DB_ERR(id, m1, m2) \
+  std::cerr << "id " << id << " in " << #m1 << " not found in " << #m2 << std::endl
+
 namespace util {
   template <typename K, typename V>
   inline V at(const std::unordered_map<K, V>& m, const K& k, const std::string& msg) {

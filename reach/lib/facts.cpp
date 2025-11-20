@@ -136,8 +136,8 @@ database facts::load(const fs::path& facts_dir, LoadOptions options) {
   return load(nodes, nodeprops, edges, options);
 }
 
-// These checks ensure at least that the hashmap lookups in
-// graph::build_cfg will succeed.
+// These checks ensure that the hashmap lookups in
+// graph::build_call_graph and graph::build_cfg will succeed.
 bool facts::validate(const database& db) {
   // All nodes are assigned a type.
   if (!(KEYS_SUBSET(db.contains, db.node_type) &&
@@ -150,29 +150,52 @@ bool facts::validate(const database& db) {
     return false;
   }
 
-  // Nodes with Direct call type appear in [calls] and [fun_sig].
-  unordered_map<ID, CallType> direct_calls(db.call_type);
-  erase_if(direct_calls, [](const auto& item) {
-    return item.second != CallType::Direct;
-  });
-  if (!(KEYS_SUBSET(direct_calls, db.calls) &&
-        KEYS_SUBSET(direct_calls, db.fun_sig))) {
-    return false;
+  // Nodes with Direct call type are in [calls] and [fun_sig].
+  for (const auto& [id, call_type] : db.call_type) {
+    if (call_type == CallType::Direct) {
+      if (!db.calls.contains(id)) {
+        DB_ERR(id, db.call_type, db.calls);
+        return false;
+      }
+      if (!db.fun_sig.contains(id)) {
+        DB_ERR(id, db.call_type, db.fun_sig);
+        return false;
+      }
+    }
   }
 
-  // Nodes in [address_taken] appear in [fun_sig].
+  // Nodes in [address_taken] are in [fun_sig].
   for (const auto &id : db.address_taken) {
     if (!db.fun_sig.contains(id)) {
-      std::cerr << "id " << id << " in db.address_taken"
-                << " not found in db.fun_sig" << std::endl;
+      DB_ERR(id, db.address_taken, db.fun_sig);
       return false;
     }
   }
 
-  // Nodes in [linkage] appear in [fun_sig] and [name].
-  if (!(KEYS_SUBSET(db.linkage, db.fun_sig) &&
-        KEYS_SUBSET(db.linkage, db.name))) {
-    return false;
+  // Functions with external linkage appear in [fun_sig] and [name].
+  for (const auto& [id, linkage] : db.linkage) {
+    if (linkage == Linkage::ExternalLinkage &&
+        db.node_type.at(id) == NodeType::Function) {
+      if (!db.fun_sig.contains(id)) {
+        DB_ERR(id, db.linkage, db.fun_sig);
+        return false;
+      }
+      if (!db.name.contains(id)) {
+        DB_ERR(id, db.linkage, db.name);
+        return false;
+      }
+    }
+  }
+
+  // Basic blocks are in [contains].
+  for (const auto& [id, node_type] : db.node_type) {
+    if (node_type == NodeType::BasicBlock) {
+      if (!db.contains.contains(id)) {
+        std::cerr << "Basic block with id " << id
+                  << " not found in db.contains" << std::endl;
+        return false;
+      }
+    }
   }
 
   return true;
