@@ -60,7 +60,6 @@ static Function *getOrCreateNullPtrLoadSanitizer(Module *M, LLVMContext &Ctx, Ty
     );
     FunctionCallee LogMemInstFunc = M->getOrInsertFunction("resolve_report_sanitize_mem_inst_triggered", LogMemInstFuncTy);
     Builder.CreateCall(LogMemInstFunc, { InputPtr });
-    Builder.CreateRetVoid();
 
     switch(strategy) {
         case Vulnerability::RemediationStrategies::EXIT:
