@@ -11,11 +11,14 @@
 #include <vector>
 
 #include "json.hpp"
+#include "facts.hpp"
+
+using NNodeId = ReachFacts::NamespacedNodeId;
 
 namespace conf {
   struct query {
-    std::string src;
-    std::string dst;
+    NNodeId src;
+    NNodeId dst;
   };
 
   struct config {
@@ -51,14 +54,14 @@ namespace conf {
 
 namespace output {
   struct path {
-    std::vector<std::string> nodes;
+    std::vector<NNodeId> nodes;
     std::vector<std::string> edges;
   };
 
   struct query_result {
     double query_time;
-    std::string src;
-    std::string dst;
+    NNodeId src;
+    NNodeId dst;
     std::vector<path> paths;
   };
 

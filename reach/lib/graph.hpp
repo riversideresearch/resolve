@@ -13,6 +13,8 @@
 
 #include "facts.hpp"
 
+using NNodeId = ReachFacts::NamespacedNodeId;
+
 namespace graph {
 
   // Weight assigned to indirect calls. The default weight for other
@@ -21,13 +23,13 @@ namespace graph {
 
   // Bidirectional mapping between node ids and integer handles (keys).
   struct handle_map {
-    size_t getHandle(const std::string& id);
-    size_t getHandleConst(const std::string& id) const;
-    std::optional<size_t> getHandleOpt(const std::string& id) const;
-    std::string getId(size_t handle) const;
+    size_t getHandle(const NNodeId& id);
+    size_t getHandleConst(const NNodeId& id) const;
+    std::optional<size_t> getHandleOpt(const NNodeId& id) const;
+    NNodeId getId(size_t handle) const;
    private:
-    std::vector<std::string> handle2id;
-    std::unordered_map<std::string, size_t> id2handle;
+    std::vector<NNodeId> handle2id;
+    ReachFacts::NodeMap<size_t> id2handle;
     void build_id2handle();
   };
 
@@ -67,48 +69,48 @@ namespace graph {
   // no duplicate nodes in edge lists).
   bool wf(const E& g);
 
-  constexpr facts::LoadOptions SIMPLE_LOAD_OPTIONS  =
-    facts::LoadOptions::Contains | facts::LoadOptions::Calls
-    | facts::LoadOptions::Name | facts::LoadOptions::Linkage
-    | facts::LoadOptions::CallType | facts::LoadOptions::AddressTaken
-    | facts::LoadOptions::FunctionType;
+  constexpr ReachFacts::LoadOptions SIMPLE_LOAD_OPTIONS  =
+    ReachFacts::LoadOptions::Contains | ReachFacts::LoadOptions::Calls
+    | ReachFacts::LoadOptions::Name | ReachFacts::LoadOptions::Linkage
+    | ReachFacts::LoadOptions::CallType | ReachFacts::LoadOptions::AddressTaken
+    | ReachFacts::LoadOptions::FunctionType;
 
   // Reachability graph with functions, BBs, instructions, and
   // contains and calls edges, but no control flow edges. This is the
   // first thing we did.
   std::pair<handle_map, T>
-  build_simple_graph(const facts::database& db,
+  build_simple_graph(const ReachFacts::database& db,
                      bool dynlink,
                      const std::optional<std::vector<dlsym::loaded_symbol>>& loaded_syms);
 
-  constexpr facts::LoadOptions CALL_LOAD_OPTIONS =
-    facts::LoadOptions::Contains | facts::LoadOptions::Calls
-    | facts::LoadOptions::Name | facts::LoadOptions::Linkage
-    | facts::LoadOptions::CallType | facts::LoadOptions::AddressTaken
-    | facts::LoadOptions::FunctionType | facts::LoadOptions::NodeType;
+  constexpr ReachFacts::LoadOptions CALL_LOAD_OPTIONS =
+    ReachFacts::LoadOptions::Contains | ReachFacts::LoadOptions::Calls
+    | ReachFacts::LoadOptions::Name | ReachFacts::LoadOptions::Linkage
+    | ReachFacts::LoadOptions::CallType | ReachFacts::LoadOptions::AddressTaken
+    | ReachFacts::LoadOptions::FunctionType | ReachFacts::LoadOptions::NodeType;
 
   // Call graph with function nodes only.
   std::pair<handle_map, T>
-  build_call_graph(const facts::database& db,
+  build_call_graph(const ReachFacts::database& db,
                    bool dynlink,
                    const std::optional<std::vector<dlsym::loaded_symbol>>& loaded_syms);
 
-  constexpr facts::LoadOptions CFG_LOAD_OPTIONS =
-    facts::LoadOptions::NodeType | facts::LoadOptions::Calls
-    | facts::LoadOptions::Contains | facts::LoadOptions::ControlFlow
-    | facts::LoadOptions::Name | facts::LoadOptions::Linkage
-    | facts::LoadOptions::CallType | facts::LoadOptions::AddressTaken
-    | facts::LoadOptions::FunctionType;
+  constexpr ReachFacts::LoadOptions CFG_LOAD_OPTIONS =
+    ReachFacts::LoadOptions::NodeType | ReachFacts::LoadOptions::Calls
+    | ReachFacts::LoadOptions::Contains | ReachFacts::LoadOptions::ControlFlow
+    | ReachFacts::LoadOptions::Name | ReachFacts::LoadOptions::Linkage
+    | ReachFacts::LoadOptions::CallType | ReachFacts::LoadOptions::AddressTaken
+    | ReachFacts::LoadOptions::FunctionType;
 
   // Interprocedural CFG with function and BB nodes.
   std::pair<handle_map, T>
-  build_cfg(const facts::database& db,
+  build_cfg(const ReachFacts::database& db,
             bool dynlink = false,
             const std::optional<std::vector<dlsym::loaded_symbol>>& loaded_syms = {});
 
   // Instruction-level granularity CFG (rather than BBs).
   std::pair<handle_map, T>
-  build_instr_cfg(const facts::database& db,
+  build_instr_cfg(const ReachFacts::database& db,
                   bool dynlink = false,
                   const std::optional<std::vector<dlsym::loaded_symbol>>& loaded_syms = {});
 }  // namespace graph

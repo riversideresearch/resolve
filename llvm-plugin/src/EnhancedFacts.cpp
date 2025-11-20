@@ -40,7 +40,7 @@ using namespace llvm;
 
 static Facts all_facts;
 
-static LLVMFacts facts(all_facts, std::getenv("GlobalContext") ?: "");
+static LLVMFacts facts(all_facts);
 
 static std::string debugLocToString(DebugLoc dbgLoc) {
   auto line = std::to_string(dbgLoc.getLine());
@@ -179,6 +179,8 @@ static void embedFacts(Module &M) {
       compression::compress(params, inputData, compressedFacts);
     }
 
+    errs() << "Embedding facts for " << sectionName << " with original size " << facts.size() << " and compressed size " << compressedFacts.size() << "\n";
+
     Constant *dataArr = ConstantDataArray::get(C, compressedFacts);
     GlobalVariable *gv =
         new GlobalVariable(M, dataArr->getType(),
@@ -189,10 +191,13 @@ static void embedFacts(Module &M) {
     appendToCompilerUsed(M, {gv});
   };
 
+  embedFactsSection(".facts", facts.serialize());
+  /*
   embedFactsSection(".fact_nodes", facts.getNodes());
   embedFactsSection(".fact_node_props", facts.getNodeProps());
   embedFactsSection(".fact_edges", facts.getEdges());
   embedFactsSection(".fact_edge_props", facts.getEdgeProps());
+  */
 }
 
 struct EnhancedFactsPass : public PassInfoMixin<EnhancedFactsPass> {

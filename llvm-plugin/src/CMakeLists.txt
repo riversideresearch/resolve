@@ -13,7 +13,7 @@ if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Debug)
 endif()
 
-set(CMAKE_CXX_STANDARD 17 STRING "")
+set(CMAKE_CXX_STANDARD 20 STRING "")
 
 # LLVM is normally built without RTTI. Be consistent with that.
 if(NOT LLVM_ENABLE_RTTI)
@@ -39,6 +39,9 @@ add_custom_target(clangformat
 )
 
 add_library(EnhancedFacts SHARED EnhancedFacts.cpp)
+target_include_directories(EnhancedFacts PUBLIC "../../reach/lib")
+
+
 add_library(CVEAssert SHARED 
   CVEAssert/CVEAssert.cpp
   CVEAssert/bounds_check.cpp

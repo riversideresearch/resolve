@@ -4,7 +4,6 @@
  */
 
 #include <algorithm>
-#include <regex>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -15,7 +14,7 @@
 #include "graph.hpp"
 #include "util.hpp"
 
-using namespace facts;
+using namespace ReachFacts;
 using namespace graph;
 using namespace std;
 using symbol = dlsym::loaded_symbol;
@@ -53,7 +52,7 @@ bool graph::wf(const E& g) {
   return true;
 }
 
-size_t handle_map::getHandle(const string& id) {
+size_t handle_map::getHandle(const NNodeId& id) {
   if (id2handle.contains(id)) {
     return id2handle.at(id);
   } else {
@@ -64,11 +63,11 @@ size_t handle_map::getHandle(const string& id) {
   }
 }
 
-size_t handle_map::getHandleConst(const string& id) const {
+size_t handle_map::getHandleConst(const NNodeId& id) const {
   return AT(id2handle, id);
 }
 
-optional<size_t> handle_map::getHandleOpt(const string& id) const {
+optional<size_t> handle_map::getHandleOpt(const NNodeId& id) const {
   if (id2handle.contains(id)) {
     return id2handle.at(id);
   } else {
@@ -76,7 +75,7 @@ optional<size_t> handle_map::getHandleOpt(const string& id) const {
   }
 }
 
-std::string handle_map::getId(size_t handle) const {
+NNodeId handle_map::getId(size_t handle) const {
   return AT(this->handle2id, handle);
 }
 
@@ -88,36 +87,27 @@ void T::addEdge(size_t l, size_t r, EdgeType ety, double weight) {
   this->edges[l].insert({ r, weight, ety });
 }
 
-// Determine if symbol 'sym' matches node id 'node_id'.
-bool symbol_id_match(const dlsym::loaded_symbol& sym, const string& node_id) {
-  const auto name_opt = util::name_of_id(node_id);
-  if (!name_opt.has_value()) {
-    return false;
-  }
-  const auto name = name_opt.value();
-  if (name.size() && name[0] == 'f') {
-    return string_view(name.data() + 1) == string_view(sym.symbol);
-  }
-  return false;
-}
-
 // Transform set of loaded symbols into set of matching node ids. If
 // [loaded_syms] doesn't have a value, we do nothing here and the
 // graph constructions don't do any filtering of external functions
 // for indirect calls.
-vector<string>
+vector<NNodeId>
 map_loaded_symbols_to_ids(const database& db,
                           const optional<vector<symbol>>& loaded_syms) {
   if (!loaded_syms.has_value()) {
     return {};
   }
   const auto syms = loaded_syms.value();
-  vector<string> loaded_ids;
-  for (const auto& [id, _] : db.node_type) {
-    for (const auto& sym : syms) {
-      if (symbol_id_match(sym, id)) {
-        loaded_ids.push_back(id);
-        break;
+  vector<NNodeId> loaded_ids;
+  // TODO: currently O(NM)
+  for (const auto& [id, ty] : db.node_type) {
+    if (ty == NodeType::Function) {
+      auto fn = db.name.at(id);
+      for (const auto& sym : syms) {
+        if (sym.symbol == fn) {
+          loaded_ids.push_back(id);
+          break;
+        }
       }
     }
   }
@@ -148,7 +138,8 @@ graph::build_simple_graph(const database& db,
     // Special case for direct calls to [pthread_create]: add
     // edges for all address-taken functions with type signature
     // "ptr (ptr)".
-    if (AT(db.calls, instr).ends_with(":fpthread_create")) {
+    const auto& fn_name = db.name.at(fn);
+    if (fn_name.ends_with(":fpthread_create")) {
       for (const auto& fn : db.address_taken) {
         if (AT(db.fun_sig, fn) == "ptr (ptr)") {
           g.addEdge(hm.getHandle(fn), hm.getHandle(instr),
@@ -234,7 +225,9 @@ graph::build_call_graph(const database& db,
           // Special case for direct calls to [pthread_create]: add
           // edges for all address-taken functions with type signature
           // "ptr (ptr)".
-          if (db.calls.at(instr).ends_with(":fpthread_create")) {
+          const auto& call_id = db.calls.at(instr);
+          const auto& fn_name = db.name.at(call_id);
+          if (fn_name.ends_with(":fpthread_create")) {
             for (const auto& fn : db.address_taken) {
               if (db.fun_sig.at(fn) == "ptr (ptr)") {
                 g.addEdge(hm.getHandle(fn), hm.getHandle(f),
@@ -308,19 +301,8 @@ graph::build_cfg(const database& db,
   T g;
 
   // function -> entry BB
-  for (const auto& [fn, fn_ty] : db.node_type) {
-    if (fn_ty != NodeType::Function || !db.contains.contains(fn)) {
-      continue;
-    }
-    for (const auto& bb : db.contains.at(fn)) {
-      static const regex pattern(".*:f.*:bb0");
-      if (regex_match(bb, pattern)) {
-        g.addEdge(hm.getHandle(bb), hm.getHandle(fn), EdgeType::Contains);
-        goto next;
-      }
-    }
-    throw runtime_error("no entry point found for function " + fn);
-  next: {}
+  for (const auto& [fn, bb] : db.function_entrypoints) {
+    g.addEdge(hm.getHandle(bb), hm.getHandle(fn), EdgeType::Contains);
   }
 
   // BB control flow
@@ -348,7 +330,9 @@ graph::build_cfg(const database& db,
         // Special case for direct calls to [pthread_create]: add
         // edges for all address-taken functions with type signature
         // "ptr (ptr)".
-        if (db.calls.at(instr).ends_with(":fpthread_create")) {
+        const auto& call_id = db.calls.at(instr);
+        const auto& fn_name = db.name.at(call_id);
+        if (fn_name.ends_with(":fpthread_create")) {
           for (const auto& fn : db.address_taken) {
             if (db.fun_sig.at(fn) == "ptr (ptr)") {
               g.addEdge(hm.getHandle(fn), hm.getHandle(bb),
@@ -414,20 +398,9 @@ graph::build_instr_cfg(const database& db,
   T g;
 
   // function -> entry instruction
-  for (const auto& [fn, fn_ty] : db.node_type) {
-    if (fn_ty != NodeType::Function || !db.contains.contains(fn)) {
-      continue;
-    }
-    for (const auto& bb : db.contains.at(fn)) {
-      static const regex pattern(".*:f.*:bb0");
-      if (regex_match(bb, pattern)) {
-        const auto& instr = db.contains.at(bb).front();
-        g.addEdge(hm.getHandle(instr), hm.getHandle(fn), EdgeType::Contains);
-        goto next;
-      }
-    }
-    throw runtime_error("no entry point found for function " + fn);
-  next: {}
+  for (const auto& [fn, bb] : db.function_entrypoints) {
+    const auto& first_instr = db.contains.at(bb).front();
+    g.addEdge(hm.getHandle(first_instr), hm.getHandle(fn), EdgeType::Contains);
   }
 
   // Intra-BB control flow (straight line)
@@ -470,7 +443,9 @@ graph::build_instr_cfg(const database& db,
         // Special case for direct calls to [pthread_create]: add
         // edges for all address-taken functions with type signature
         // "ptr (ptr)".
-        if (AT(db.calls, instr).ends_with(":fpthread_create")) {
+        const auto& call_id = db.calls.at(instr);
+        const auto& fn_name = db.name.at(call_id);
+        if (fn_name.ends_with(":fpthread_create")) {
           for (const auto& fn : db.address_taken) {
             if (AT(db.fun_sig, fn) == "ptr (ptr)") {
               g.addEdge(hm.getHandle(fn), hm.getHandle(instr),

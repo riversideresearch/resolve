@@ -12,7 +12,7 @@
 #include "facts.hpp"
 #include "util.hpp"
 
-using namespace facts;
+using namespace ReachFacts;
 using namespace std;
 namespace fs = filesystem;
 
@@ -44,12 +44,15 @@ inline CallType parse_call_type(const string& s) {
   return m[s];
 }
 
-database facts::load(istream& nodes,
+database ReachFacts::load(istream& nodes,
                      istream& nodeprops,
                      istream& edges,
                      LoadOptions options) {
   database db;
 
+  // TODO: Load from new format
+
+  /*
   if (is_set(options, LoadOptions::NodeType)) {
     string line;
     while (getline(nodes, line)) {
@@ -110,11 +113,12 @@ database facts::load(istream& nodes,
   for (auto& [_, ids] : db.contains) {
     sort(ids.begin(), ids.end());
   }
+  */
 
   return db;
 }
 
-database facts::load(const fs::path& facts_dir, LoadOptions options) {
+database ReachFacts::load(const fs::path& facts_dir, LoadOptions options) {
   const string nodes_path = facts_dir / "nodes.facts";
   ifstream nodes(nodes_path);
   if (is_set(options, LoadOptions::NodeType) && !nodes.is_open()) {

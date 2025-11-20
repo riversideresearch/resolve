@@ -40,12 +40,15 @@ conf::config load_config(const argparse::ArgumentParser& program) {
     if (program.present<string>("facts_dir")) {
       conf.facts_dir = program.get<string>("facts_dir");
     }
+    // TODO: argument passing with new id format
+    /*
     if (program.present<string>("src") && program.present<string>("dst")) {
       conf.queries.push_back({
           program.get<string>("src"),
           program.get<string>("dst"),
         });
     }
+    */
     conf.dynlink = program.get<bool>("dynlink") || conf.dynlink;
     if (program.present<string>("output")) {
       conf.out_path = program.present<string>("output");
@@ -230,11 +233,16 @@ int main(int argc, char* argv[]) {
     const auto src_handle_opt = hm.getHandleOpt(q.src);
     const auto dst_handle_opt = hm.getHandleOpt(q.dst);
 
+    auto print_missing = [&](auto node) {
+      const auto [m, n] = node;
+      cerr << "node '(" << m << ", " << n << ")' not found" << endl;
+    };
+
     if (!src_handle_opt.has_value()) {
-      cerr << "node '" << q.src << "' not found" << endl;
+      print_missing(q.src);
     }
     if (!dst_handle_opt.has_value()) {
-      cerr << "node '" << q.dst << "' not found" << endl;
+      print_missing(q.dst);
     }
 
     // If both src and dst exist, try to find path.
@@ -264,7 +272,7 @@ int main(int argc, char* argv[]) {
       }
 
       for (const auto& path : paths) {
-        vector<string> p_ids;
+        vector<NNodeId> p_ids;
         vector<string> edges;
         for (const auto& e : path) {
           const auto id = hm.getId(e.node);

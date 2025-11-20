@@ -12,7 +12,7 @@
 
 #include "json.hpp"
 
-namespace facts {
+namespace ReachFacts {
 
   enum class LoadOptions : int {
     None         = 0,
@@ -62,22 +62,66 @@ namespace facts {
     Indirect,
   };
 
-  // Type synonym for node IDs.
-  using ID = std::string;
+  // Type synonym for node NodeIds.
+  //using NodeId = std::string;
+  using NodeId = uint32_t;
+
+  struct pair_hash : public std::function<std::size_t(std::pair<NodeId, NodeId>)> {
+    std::hash<NodeId> hasher;
+    std::size_t operator()(const std::pair<NodeId, NodeId> &k) const {
+      return hasher(std::get<0>(k)) ^ hasher(std::get<1>(k));
+    }
+
+    pair_hash() {}
+  };
+
+  struct ModuleFacts {
+    std::unordered_map<NodeId, std::string> node_types;
+    std::unordered_map<NodeId, std::unordered_map<std::string, std::string>> node_props;
+    std::unordered_map<std::pair<NodeId, NodeId>, std::vector<std::string>, pair_hash> edge_kinds;
+
+    using json = nlohmann::json;
+
+    ModuleFacts() :
+        node_types(), node_props(), edge_kinds()
+    {}
+
+
+    json as_json() {
+      json obj = json::object({});
+      obj["node_types"] = node_types;
+      obj["node_props"] = node_props;
+      obj["edge_kinds"] = edge_kinds;
+      return obj;
+    }
+
+    std::string serialize() {
+      auto obj = as_json();
+
+      return obj.dump();
+    }
+  };
+
+  // Basic node ids are only unique within the context of a compilation Module which has its own NodeId.
+  // The full id would then be (ModuleId, NodeId)
+  using NamespacedNodeId = std::pair<NodeId, NodeId>;
+
+  template<typename V>
+  using NodeMap = std::unordered_map<NamespacedNodeId, V, pair_hash>;
 
   struct database {
-    std::unordered_map<ID, NodeType> node_type;
+    NodeMap<NodeType> node_type;
+    NodeMap<std::vector<NamespacedNodeId>> contains;
+    NodeMap<NamespacedNodeId> calls;
+    NodeMap<NamespacedNodeId> function_entrypoints;
+    NodeMap<std::vector<NamespacedNodeId>> control_flow;
+    // std::unordered_map<NamespacedNodeId, NamespacedNodeId> entry_point;
 
-    std::unordered_map<ID, std::vector<ID>> contains;
-    std::unordered_map<ID, ID> calls;
-    std::unordered_map<ID, std::vector<ID>> control_flow;
-    // std::unordered_map<ID, ID> entry_point;
-
-    std::unordered_map<ID, std::string> name;
-    std::unordered_map<ID, Linkage> linkage;
-    std::unordered_map<ID, CallType> call_type;
-    std::vector<ID> address_taken;
-    std::unordered_map<ID, std::string> fun_sig;  // id -> type sig as string
+    NodeMap<std::string> name;
+    NodeMap<Linkage> linkage;
+    NodeMap<CallType> call_type;
+    NodeMap<std::string> fun_sig; // id -> type sig as string
+    std::vector<NamespacedNodeId> address_taken;
   };
 
   database load(std::istream& nodes,

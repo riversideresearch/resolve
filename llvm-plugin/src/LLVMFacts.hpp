@@ -7,7 +7,6 @@
 #define RESOLVE_LLVM_LLVMFACTS_HPP
 
 #include "Facts.hpp"
-#include "NodeID.hpp"
 
 #include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/Constants.h"
@@ -19,18 +18,21 @@
 
 #include <unordered_map>
 
+using NodeId = ReachFacts::NodeId;
+
 class LLVMFacts {
   Facts &facts;
-  NodeID prefix;
+  NodeId next_node_id = 1;
 
-  std::unordered_map<const llvm::Module *, std::string> moduleIDs;
-  std::unordered_map<const llvm::Function *, std::string> functionIDs;
-  std::unordered_map<const llvm::BasicBlock *, std::string> basicBlockIDs;
-  std::unordered_map<const llvm::Argument *, std::string> argumentIDs;
-  std::unordered_map<const llvm::Instruction *, std::string> instructionIDs;
-  std::unordered_map<const llvm::GlobalVariable *, std::string> globalVarIDs;
+  std::unordered_map<const llvm::Module *, NodeId> moduleIDs;
+  std::unordered_map<const llvm::Function *, NodeId> functionIDs;
+  std::unordered_map<const llvm::BasicBlock *, NodeId> basicBlockIDs;
+  std::unordered_map<const llvm::Argument *, NodeId> argumentIDs;
+  std::unordered_map<const llvm::Instruction *, NodeId> instructionIDs;
+  std::unordered_map<const llvm::GlobalVariable *, NodeId> globalVarIDs;
 
-  using edge_rec_t = std::tuple<std::string, std::string, std::string>;
+  /*
+  using edge_rec_t = std::tuple<std::string, NodeId, NodeId>;
   struct edge_rec_hash : public std::function<std::size_t(edge_rec_t)> {
     std::hash<std::string> hasher;
     std::size_t operator()(const edge_rec_t &k) const {
@@ -41,28 +43,48 @@ class LLVMFacts {
     edge_rec_hash() {}
   };
   std::unordered_map<edge_rec_t, std::size_t, edge_rec_hash> edgeIdx;
+  */
 
 public:
-  LLVMFacts(Facts &facts, NodeID prefix = NodeID())
-      : facts(facts), prefix(prefix), edgeIdx() {
-    prefix += "llvm";
+  LLVMFacts(Facts &facts)
+      : facts(facts) {
   }
 
-  NodeID addNode(const llvm::Module &M) {
+  NodeId addNode(const llvm::Module &M) {
     if (moduleIDs.find(&M) == moduleIDs.end()) {
+
       llvm::SmallString<128> src_path = llvm::StringRef(M.getSourceFileName());
       llvm::sys::fs::make_absolute(src_path);
 
-      std::string id = prefix + std::string(src_path.str());
+      std::string src = (std::string)src_path;
+      size_t hash = std::hash<std::string>{}(src);
+      auto id = 0; //(NodeId) hash;
+
+      llvm::errs() << "Creating new module: " << id << "\n";
+
       moduleIDs[&M] = id;
+
       facts.recordNode(id, "Module");
       return id;
     }
     return moduleIDs[&M];
   }
 
-  template <typename T> NodeID getParentID(const T &item) {
-    return addNode(*item.getParent());
+  template<typename T>
+  NodeId getModuleId(const T& i) {
+      const llvm::Module* module;
+      constexpr bool parent_is_module = std::is_same_v<decltype(i.getParent()), const llvm::Module*>;
+      constexpr bool is_argument = std::is_same_v<T, llvm::Argument>;
+      if constexpr (parent_is_module) {
+          module = i.getParent();
+      } else if constexpr (is_argument) {
+          module = i.getParent()->getParent();
+      } else {
+          module = i.getModule();
+      }
+
+      assert(module);
+      return addNode(*module);
   }
 
   template <typename T> static std::size_t getIndexInParent(const T &item) {
@@ -70,9 +92,12 @@ public:
     return std::distance(parent.begin(), item.getIterator());
   }
 
-  NodeID addNode(const llvm::GlobalVariable &GV) {
+  NodeId addNode(const llvm::GlobalVariable &GV) {
     if (globalVarIDs.find(&GV) == globalVarIDs.end()) {
-      std::string id = getParentID(GV) + ("g" + GV.getName().str());
+      auto id = next_node_id;
+      next_node_id += 1;
+      auto module_id = getModuleId(GV);
+
       globalVarIDs[&GV] = id;
       facts.recordNode(id, "GlobalVariable");
       return id;
@@ -80,9 +105,12 @@ public:
     return globalVarIDs[&GV];
   }
 
-  NodeID addNode(const llvm::Function &F) {
+  NodeId addNode(const llvm::Function &F) {
     if (functionIDs.find(&F) == functionIDs.end()) {
-      std::string id = getParentID(F) + ("f" + F.getName().str());
+      auto id = next_node_id;
+      next_node_id += 1;
+      auto module_id = getModuleId(F);
+
       functionIDs[&F] = id;
       facts.recordNode(id, "Function");
       return id;
@@ -90,10 +118,12 @@ public:
     return functionIDs[&F];
   }
 
-  NodeID addNode(const llvm::Argument &A) {
+  NodeId addNode(const llvm::Argument &A) {
     if (argumentIDs.find(&A) == argumentIDs.end()) {
-      auto idx = A.getArgNo();
-      std::string id = getParentID(A) + ("a" + std::to_string(idx));
+      auto id = next_node_id;
+      next_node_id += 1;
+      auto module_id = getModuleId(A);
+
       argumentIDs[&A] = id;
       facts.recordNode(id, "Argument");
       return id;
@@ -101,10 +131,12 @@ public:
     return argumentIDs[&A];
   }
 
-  NodeID addNode(const llvm::BasicBlock &BB) {
+  NodeId addNode(const llvm::BasicBlock &BB) {
     if (basicBlockIDs.find(&BB) == basicBlockIDs.end()) {
-      auto idx = getIndexInParent(BB);
-      std::string id = getParentID(BB) + ("bb" + std::to_string(idx));
+      auto id = next_node_id;
+      next_node_id += 1;
+      auto module_id = getModuleId(BB);
+
       basicBlockIDs[&BB] = id;
       facts.recordNode(id, "BasicBlock");
       return id;
@@ -112,10 +144,12 @@ public:
     return basicBlockIDs[&BB];
   }
 
-  NodeID addNode(const llvm::Instruction &I) {
+  NodeId addNode(const llvm::Instruction &I) {
     if (instructionIDs.find(&I) == instructionIDs.end()) {
-      auto idx = getIndexInParent(I);
-      std::string id = getParentID(I) + ("i" + std::to_string(idx));
+      auto id = next_node_id;
+      next_node_id += 1;
+      auto module_id = getModuleId(I);
+
       instructionIDs[&I] = id;
       facts.recordNode(id, "Instruction");
       return id;
@@ -124,26 +158,12 @@ public:
   }
 
   template <typename S, typename D>
-  std::string addEdge(std::string kind, S &src, D &dst) {
-    return addEdge(kind, addNode(src), addNode(dst));
+  void addEdge(std::string kind, S &src, D &dst) {
+    addEdge(kind, addNode(src), addNode(dst));
   }
 
-  std::string addEdge(std::string kind, std::string src, std::string dst) {
-    auto [it, created] =
-        edgeIdx.try_emplace(std::make_tuple(kind, src, dst), 0);
-    auto &idx = it->second;
-
-    std::string id;
-    if (created) {
-      id = src + "-[" + kind + "]->" + dst;
-    } else {
-      idx += 1;
-      id = src + "-[" + kind + "; " + std::to_string(idx) + "]->" + dst;
-    }
-
-    facts.recordEdge(id, kind, src, dst);
-
-    return id;
+  void addEdge(std::string kind, NodeId src, NodeId dst) {
+    facts.recordEdge(kind, src, dst);
   }
 
   template <typename N>
@@ -152,11 +172,17 @@ public:
     facts.recordNodeProp(addNode(node), key, value);
   }
 
-  void addEdgeProp(const std::string &edgeID, const std::string &key,
-                   const std::string &value) {
-    facts.recordEdgeProp(edgeID, key, value);
+  const std::string serialize() const { 
+      auto nodes = facts.bf.node_types.size();
+      auto node_props = facts.bf.node_props.size();
+      auto edges = facts.bf.edge_kinds.size();
+
+      llvm::errs() << "Created " << nodes << " nodes, " << node_props << " node props, and " << edges << "edges\n";
+
+      return facts.bf.serialize();
   }
 
+  /*
   const std::string &getNodes() const { return facts.nodes; }
 
   const std::string &getNodeProps() const { return facts.nodeProps; }
@@ -164,6 +190,7 @@ public:
   const std::string &getEdges() const { return facts.edges; }
 
   const std::string &getEdgeProps() const { return facts.edgeProps; }
+  */
 };
 
 #endif // RESOLVE_LLVM_LLVMFACTS_HPP
