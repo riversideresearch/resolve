@@ -214,29 +214,29 @@ graph::build_call_graph(const database& db,
   T g;
 
   for (const auto& [f, bbs] : db.contains) {
-    if (AT(db.node_type, f) != NodeType::Function) {
+    if (db.node_type.at(f) != NodeType::Function) {
       continue;
     }
     for (const auto& bb : bbs) {
-      if (AT(db.node_type, bb) != NodeType::BasicBlock) {
+      if (db.node_type.at(bb) != NodeType::BasicBlock) {
         continue;
       }
-      for (const auto& instr : AT(db.contains, bb)) {
+      for (const auto& instr : db.contains.at(bb)) {
         if (!db.call_type.contains(instr)) {
           continue;
         }
-        const auto& call_ty = AT(db.call_type, instr);
+        const auto& call_ty = db.call_type.at(instr);
         // If direct, add one edge.
         if (call_ty == CallType::Direct) {
-          g.addEdge(hm.getHandle(AT(db.calls, instr)), hm.getHandle(f),
+          g.addEdge(hm.getHandle(db.calls.at(instr)), hm.getHandle(f),
                     EdgeType::DirectCall);
 
           // Special case for direct calls to [pthread_create]: add
           // edges for all address-taken functions with type signature
           // "ptr (ptr)".
-          if (AT(db.calls, instr).ends_with(":fpthread_create")) {
+          if (db.calls.at(instr).ends_with(":fpthread_create")) {
             for (const auto& fn : db.address_taken) {
-              if (AT(db.fun_sig, fn) == "ptr (ptr)") {
+              if (db.fun_sig.at(fn) == "ptr (ptr)") {
                 g.addEdge(hm.getHandle(fn), hm.getHandle(f),
                           EdgeType::IndirectCall, INDIRECT_WEIGHT);
               }
@@ -247,7 +247,7 @@ graph::build_call_graph(const database& db,
         }
         // Else indirect. Add edges for all compatible address-taken functions.
         for (const auto& fn : db.address_taken) {
-          if (AT(db.fun_sig, fn) == AT(db.fun_sig, instr)) {
+          if (db.fun_sig.at(fn) == db.fun_sig.at(instr)) {
             g.addEdge(hm.getHandle(fn), hm.getHandle(f),
                       EdgeType::IndirectCall, INDIRECT_WEIGHT);
           }
@@ -259,8 +259,8 @@ graph::build_call_graph(const database& db,
         }
         for (const auto& [id, linkage] : db.linkage) {
           if (linkage == Linkage::ExternalLinkage &&
-              AT(db.node_type, id) == NodeType::Function &&
-              AT(db.fun_sig, instr) == AT(db.fun_sig, id) &&
+              db.node_type.at(id) == NodeType::Function &&
+              db.fun_sig.at(instr) == db.fun_sig.at(id) &&
               (!loaded_syms.has_value() ||
                find(loaded_ids.begin(), loaded_ids.end(), id) != loaded_ids.end())) {
             g.addEdge(hm.getHandle(id), hm.getHandle(f),
@@ -275,7 +275,7 @@ graph::build_call_graph(const database& db,
   unordered_map<string, vector<size_t>> name2handles;
   for (const auto& [id, linkage] : db.linkage) {
     if (linkage == Linkage::ExternalLinkage) {
-      name2handles[AT(db.name, id)].push_back(hm.getHandle(id));
+      name2handles[db.name.at(id)].push_back(hm.getHandle(id));
     }
   }
   for (const auto& [_, handles] : name2handles) {
