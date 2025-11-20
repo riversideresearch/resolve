@@ -26,6 +26,7 @@ static Function *getOrCreateNullPtrLoadSanitizer(Module *M, LLVMContext &Ctx, Ty
     IRBuilder<> Builder(Ctx);
     // TODO: handle address spaces other than 0
     auto ptr_ty = PointerType::get(Ctx, 0);
+    auto i32_ty = Type::getInt32Ty(Ctx); 
     auto int64_ty = Type::getInt64Ty(Ctx);
     auto void_ty = Type::getVoidTy(Ctx);
 
@@ -60,7 +61,6 @@ static Function *getOrCreateNullPtrLoadSanitizer(Module *M, LLVMContext &Ctx, Ty
     );
     FunctionCallee LogMemInstFunc = M->getOrInsertFunction("resolve_report_sanitize_mem_inst_triggered", LogMemInstFuncTy);
     Builder.CreateCall(LogMemInstFunc, { InputPtr });
-    Builder.CreateRetVoid();
 
     switch(strategy) {
         case Vulnerability::RemediationStrategies::EXIT: {
@@ -72,7 +72,7 @@ static Function *getOrCreateNullPtrLoadSanitizer(Module *M, LLVMContext &Ctx, Ty
         // TODO: Add support for recover remediation strategy.
         case Vulnerability::RemediationStrategies::RECOVER: {
             FunctionCallee longjmpFn = M->getOrInsertFunction(
-                "longjmp", FunctionType::get(void_ty, { ptr_ty }, false)
+                "longjmp", FunctionType::get(void_ty, { ptr_ty, i32_ty }, false)
             );
 
             Value *longjmpVal = ConstantInt::get(Type::getInt32Ty(Ctx), 42);
@@ -111,6 +111,7 @@ static Function *getOrCreateNullPtrStoreSanitizer(Module *M, LLVMContext &Ctx, T
     IRBuilder<> Builder(Ctx);
     // TODO: handle address spaces other than 0
     auto ptr_ty = PointerType::get(Ctx, 0);
+    auto i32_ty = Type::getInt32Ty(Ctx);
     auto int64_ty = Type::getInt64Ty(Ctx);
     auto void_ty = Type::getVoidTy(Ctx);
 
@@ -158,7 +159,7 @@ static Function *getOrCreateNullPtrStoreSanitizer(Module *M, LLVMContext &Ctx, T
         
         case Vulnerability::RemediationStrategies::RECOVER: {
             FunctionCallee longjmpFn = M->getOrInsertFunction(
-                "longjmp", FunctionType::get(void_ty, { ptr_ty }, false)
+                "longjmp", FunctionType::get(void_ty, { ptr_ty, int32_ty }, false)
             );
 
             Value *longjmpVal = ConstantInt::get(Type::getInt32Ty(Ctx), 42);
