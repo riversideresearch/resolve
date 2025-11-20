@@ -153,6 +153,7 @@ void sanitizeNullPointers(Function *f, Vulnerability::RemediationStrategies stra
     switch(strategy) {
         case Vulnerability::RemediationStrategies::EXIT:
         case Vulnerability::RemediationStrategies::RECOVER:
+        case Vulnerability::RemediationStrategies::SAFE:
             break;
         
         default:
