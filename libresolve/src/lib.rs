@@ -47,7 +47,7 @@ pub extern "C" fn resolve_stack_obj(ptr: *mut c_void, size: usize) -> () {
  */
 #[unsafe(no_mangle)]
 pub extern "C" fn resolve_malloc(size: usize) -> *mut c_void {
-    let ptr = unsafe { malloc(size) };
+    let ptr = unsafe { malloc(size + 1) };
     
     if ptr.is_null() {
         return ptr
