@@ -747,8 +747,8 @@ void sanitizeMalloc(Function *F, Vulnerability::RemediationStrategies strategy) 
       offset = ConstantInt::get(size_ty, gepOffset.getSExtValue());
     } else {
       // case 2. Dynamic offset 
-      Value *baseInt = builder.CreatePtrToInt(basePtr);
-      Value * derivedInt = builder.CreatePtrToInt(derivedPtr);
+      Value *baseInt = builder.CreatePtrToInt(basePtr, size_ty);
+      Value * derivedInt = builder.CreatePtrToInt(derivedPtr, size_ty);
       offset = builder.CreateSub(derivedInt, baseInt);
     }
 
