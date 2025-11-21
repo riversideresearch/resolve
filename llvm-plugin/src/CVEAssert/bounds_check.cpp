@@ -23,8 +23,7 @@ static const bool FIND_PTR_ROOT_DEBUG = true;
 
 using namespace llvm;
 
-static Function *
-getOrCreateBoundsCheckLoadSanitizer(Module *M, LLVMContext &Ctx, Type *ty) {
+static Function *getOrCreateBoundsCheckLoadSanitizer(Module *M, LLVMContext &Ctx, Type *ty) {
   Twine handlerName = "resolve_sanitize_bounds_ld_" + getLLVMType(ty);
   SmallVector<char> handlerNameStr;
 
@@ -110,8 +109,7 @@ getOrCreateBoundsCheckLoadSanitizer(Module *M, LLVMContext &Ctx, Type *ty) {
   return SanitizeLoadFunc;
 }
 
-static Function *
-getOrCreateBoundsCheckStoreSanitizer(Module *M, LLVMContext &Ctx, Type *ty) {
+static Function *getOrCreateBoundsCheckStoreSanitizer(Module *M, LLVMContext &Ctx, Type *ty) {
   Twine handlerName = "resolve_sanitize_bounds_st_" + getLLVMType(ty);
   SmallVector<char> handlerNameStr;
 
@@ -192,6 +190,71 @@ getOrCreateBoundsCheckStoreSanitizer(Module *M, LLVMContext &Ctx, Type *ty) {
 
   return SanitizeStoreFunc;
 }
+
+static Function *getOrCreateResolveGEP(Module *M, Type *ty, Vulnerability::RemediationStrategies strategy) {
+  Twine handlerName = "resolve_gep_" + getLLVMType(ty);
+  SmallVector<char> handlerNameStr;
+
+  if (auto handler = M->getFunction(handlerName.toStringRef(handlerNameStr))) {
+    return handler;
+  }
+
+  LLVMContext &Ctx = M->getContext();
+  IRBuilder<> builder(Ctx);
+
+  auto ptr_ty = PointerType::get(Ctx, 0);
+  auto i8_ty = Type::getInt8Ty(Ctx);
+  auto size_ty = Type::getInt64Ty(Ctx);
+
+  FunctionType *resolveGEPFnTy = FunctionType::get(
+    ptr_ty,
+    { ptr_ty, size_ty },
+    false
+  );
+
+  FunctionCallee resolveGEPFn = Function::Create(resolveGEPFnTy, Function::InternalLinkage, handlerName, M);
+
+  BasicBlock *EntryBB = BasicBlock::Create(Ctx, "", resolveGEPFn);
+  BasicBlock *GEPCalcBB = BasicBlock::Create(Ctx, "", resolveGEPFn);
+  BasicBlock *TaintedGepBB = BasicBlock::Create(Ctx, "", resolveGEPFn);
+
+  // Collect the base pointer and offset argument
+  Value *basePtr = resolveGEPFn->getArg(0);
+  Value *offset = resolveGEPFn->getArg(1);
+  
+  FunctionType *resolveCheckBoundsFnTy = FunctionType::get(
+    Type::getInt1Ty(Ctx),
+    { ptr_ty, ptr_ty, size_ty },
+    false
+  );
+
+  FunctioCallee resolveCheckBoundsFn = M->getOrInsertFunction(
+    "resolve_check_bounds",
+    resolveCheckBoundsFnTy
+  );
+
+  builder.SetInsertPoint(EntryBB);
+  Value *derivedPtr = builder.CreateInBoundsGEP(i8_ty, basePtr, offset);
+
+  Value* withinBounds = builder.CreateCall(resolveCheckBoundsFn, { basePtr, derivedPtr, offset });
+  builder.CreateCondBr(withinBounds, GEPCalcBB, SanitizeGEPBB);
+
+  // GEPCalcBB: Compute derived pointer and return 
+  builder.SetInsertPoint(GEPCalcBB);
+  builder.CreateRet(derivedPtr);
+
+  // TaintedGEPBB: Return the tainted pointer
+  builder.SetInsertPoint(TaintedGepBB);
+  builder.CreateRet(derivedPtr);
+
+  // DEBUGGING
+  raw_ostream &out = errs();
+  out << *resolveGEPFn;
+  if (verifyFunction(*resolveGEPFn, &out)) {}
+
+  return resolveGEPFn;
+}
+
 
 static Function *getOrCreateBoundsCheckMemcpySanitizer(Module *M) {
   LLVMContext &Ctx = M->getContext();
@@ -353,118 +416,176 @@ static Value *findPtrBase(Function *F, Value *V, MemorySSA &MSSA,
   return roots.front();
 }
 
-void sanitizeLoadStore(Function *f, ModuleAnalysisManager &MAM) {
-  IRBuilder<> builder(f->getContext());
-  // Compute MSSA for this Function
-  auto &FAMProxy =
-      MAM.getResult<FunctionAnalysisManagerModuleProxy>(*f->getParent());
-  FunctionAnalysisManager &FAM = FAMProxy.getManager();
-  MemorySSA &MSSA = FAM.getResult<MemorySSAAnalysis>(*f).getMSSA();
-  MSSA.ensureOptimizedUses();
-  if (FIND_PTR_ROOT_DEBUG)
-    MemorySSAPrinterPass(errs(), true).run(*f, FAM);
-  MemorySSAWalker *Walker = MSSA.getWalker();
+// void sanitizeLoadStore(Function *F, ModuleAnalysisManager &MAM) {
+//   IRBuilder<> builder(F->getContext());
+//   // Compute MSSA for this Function
+//   auto &FAMProxy =
+//       MAM.getResult<FunctionAnalysisManagerModuleProxy>(*F->getParent());
+//   FunctionAnalysisManager &FAM = FAMProxy.getManager();
+//   MemorySSA &MSSA = FAM.getResult<MemorySSAAnalysis>(*F).getMSSA();
+//   MSSA.ensureOptimizedUses();
+//   if (FIND_PTR_ROOT_DEBUG)
+//     MemorySSAPrinterPass(errs(), true).run(*F, FAM);
+//   MemorySSAWalker *Walker = MSSA.getWalker();
+
+//   std::vector<LoadInst *> loadList;
+//   std::vector<StoreInst *> storeList;
+
+//   for (auto &BB : *F) {
+//     for (auto &I : BB) {
+//       if (auto Inst = dyn_cast<LoadInst>(&I)) {
+//         loadList.push_back(Inst);
+//       } else if (auto Inst = dyn_cast<StoreInst>(&I)) {
+//         storeList.push_back(Inst);
+//       }
+//     }
+//   }
+
+//   // This object maps Load/Store ptr arguments to their "base"
+//   // TBD: Define "base"
+//   // The base ptr is defined as the original ptr allocation
+//   // which is passed to load or store instruction as an argument
+//   // For example with a stack-based object:
+//   //
+//   // %base = alloca [3 * i32]
+//   // ...
+//   // %mem_access = getelementptr [3 * i32], ptr %base, i64 0, i64 0
+//   // %result = call i32 @resolve_sanitize_bounds_ld_i32(ptr %base, %ptr
+//   // mem_access)
+
+//   std::map<Value *, Value *> ptrBase;
+
+//   for (auto Inst : loadList) {
+//     auto ptr = Inst->getPointerOperand();
+//     if (ptrBase.find(ptr) == ptrBase.end()) {
+//       ptrBase[ptr] = findPtrBase(F, ptr, MSSA, Walker);
+//     }
+//   }
+//   for (auto Inst : storeList) {
+//     auto ptr = Inst->getPointerOperand();
+//     if (ptrBase.find(ptr) == ptrBase.end()) {
+//       ptrBase[ptr] = findPtrBase(F, ptr, MSSA, Walker);
+//     }
+//   }
+
+//   errs() << "[CVEAssert] Found " << ptrBase.size() << " roots" << "\n";
+
+//   for (auto Inst : loadList) {
+//     builder.SetInsertPoint(Inst);
+//     // getOrCreateBoundsSanitizerLoad call
+//     auto ptr = Inst->getPointerOperand();
+//     auto valueTy = Inst->getType();
+//     if (getLLVMType(valueTy) == "") {
+//       errs() << "[CVEAssert] Warning: skipping unsupported type " << *valueTy
+//              << "\n";
+//       continue;
+//     }
+
+//     auto loadFn = getOrCreateBoundsCheckLoadSanitizer(F->getParent(),
+//                                                       F->getContext(), valueTy);
+//     // Nothing to sanitize
+//     if (ptr == ptrBase[ptr])
+//       continue;
+
+//     auto sanitized_load = builder.CreateCall(loadFn, {ptrBase[ptr], ptr});
+//     Inst->replaceAllUsesWith(sanitized_load);
+//     Inst->removeFromParent();
+//     Inst->deleteValue();
+//   }
+
+//   for (auto Inst : storeList) {
+//     builder.SetInsertPoint(Inst);
+//     // getOrCreateBoundsSanitizerStore call
+//     auto ptr = Inst->getPointerOperand();
+//     auto valueTy = Inst->getValueOperand()->getType();
+//     if (getLLVMType(valueTy) == "") {
+//       errs() << "[CVEAssert] Warning: skipping unsupported type " << *valueTy
+//              << "\n";
+//       continue;
+//     }
+//     auto storeFn = getOrCreateBoundsCheckStoreSanitizer(
+//         F->getParent(), F->getContext(), valueTy);
+//     // Nothing to sanitize
+//     if (ptr == ptrBase[ptr])
+//       continue;
+
+//     auto sanitized_store = builder.CreateCall(
+//         storeFn, {ptrBase[ptr], ptr, Inst->getValueOperand()});
+//     Inst->removeFromParent();
+//     Inst->deleteValue();
+//   }
+// }
+
+void sanitizeLoadStore(Function *F, Vulnerability::RemediationStrategies strategy) 
+{
+  LLVMContext &Ctx = F->getContext();
+  IRBuilder<> builder(Ctx);
 
   std::vector<LoadInst *> loadList;
   std::vector<StoreInst *> storeList;
 
-  for (auto &BB : *f) {
+  for (auto &BB : *F) {
     for (auto &I : BB) {
-      if (auto Inst = dyn_cast<LoadInst>(&I)) {
-        loadList.push_back(Inst);
-      } else if (auto Inst = dyn_cast<StoreInst>(&I)) {
-        storeList.push_back(Inst);
+      if (auto *load = dyn_cast<LoadInst>(&I)) {
+        loadList.push_back(load);
+      } else if (auto *store = dyn_cast<StoreInst>(&I)) {
+        storeList.push_back(store);
       }
     }
   }
 
-  // This object maps Load/Store ptr arguments to their "base"
-  // TBD: Define "base"
-  // The base ptr is defined as the original ptr allocation
-  // which is passed to load or store instruction as an argument
-  // For example with a stack-based object:
-  //
-  // %base = alloca [3 * i32]
-  // ...
-  // %mem_access = getelementptr [3 * i32], ptr %base, i64 0, i64 0
-  // %result = call i32 @resolve_sanitize_bounds_ld_i32(ptr %base, %ptr
-  // mem_access)
-
-  std::map<Value *, Value *> ptrBase;
-
-  for (auto Inst : loadList) {
-    auto ptr = Inst->getPointerOperand();
-    if (ptrBase.find(ptr) == ptrBase.end()) {
-      ptrBase[ptr] = findPtrBase(f, ptr, MSSA, Walker);
-    }
-  }
-  for (auto Inst : storeList) {
-    auto ptr = Inst->getPointerOperand();
-    if (ptrBase.find(ptr) == ptrBase.end()) {
-      ptrBase[ptr] = findPtrBase(f, ptr, MSSA, Walker);
-    }
-  }
-
-  errs() << "[CVEAssert] Found " << ptrBase.size() << " roots" << "\n";
-
   for (auto Inst : loadList) {
     builder.SetInsertPoint(Inst);
-    // getOrCreateBoundsSanitizerLoad call
     auto ptr = Inst->getPointerOperand();
     auto valueTy = Inst->getType();
     if (getLLVMType(valueTy) == "") {
-      errs() << "[CVEAssert] Warning: skipping unsupported type " << *valueTy
+      errs() << "[CVEAssert] Warning: skipping unsupported type " << *valueTy 
              << "\n";
       continue;
     }
 
-    auto loadFn = getOrCreateBoundsCheckLoadSanitizer(f->getParent(),
-                                                      f->getContext(), valueTy);
-    // Nothing to sanitize
-    if (ptr == ptrBase[ptr])
-      continue;
+    auto loadFn = getOrCreateBoundsCheckLoadSanitizer(F->getParent(),
+                                                      F->getContext(), valueTy);
 
-    auto sanitized_load = builder.CreateCall(loadFn, {ptrBase[ptr], ptr});
-    Inst->replaceAllUsesWith(sanitized_load);
+    auto sanitizedLoad = builder.CreateCall(loadFn, { ptr });
+    Inst->replaceAllUsesWith(sanitizedLoad);
     Inst->removeFromParent();
     Inst->deleteValue();
   }
 
-  for (auto Inst : storeList) {
+  for (auto Inst: storeList) {
     builder.SetInsertPoint(Inst);
-    // getOrCreateBoundsSanitizerStore call
     auto ptr = Inst->getPointerOperand();
     auto valueTy = Inst->getValueOperand()->getType();
+
     if (getLLVMType(valueTy) == "") {
       errs() << "[CVEAssert] Warning: skipping unsupported type " << *valueTy
              << "\n";
-      continue;
+      continue; 
     }
-    auto storeFn = getOrCreateBoundsCheckStoreSanitizer(
-        f->getParent(), f->getContext(), valueTy);
-    // Nothing to sanitize
-    if (ptr == ptrBase[ptr])
-      continue;
 
-    auto sanitized_store = builder.CreateCall(
-        storeFn, {ptrBase[ptr], ptr, Inst->getValueOperand()});
+    auto storeFn = getOrCreateBoundsCheckStoreSanitizer(
+      F->getParent(), F->getContext(), valueTy
+    );
+
+    auto sanitizedStore = builder.CreateCall(storeFn, { ptr, Inst->getValueOperand() });
     Inst->removeFromParent();
     Inst->deleteValue();
   }
 }
 
-void sanitizeMemcpy(Function *f, ModuleAnalysisManager &MAM) {
-  IRBuilder<> builder(f->getContext());
+void sanitizeMemcpy(Function *F, ModuleAnalysisManager &MAM) {
+  IRBuilder<> builder(F->getContext());
   // Compute MSSA for this Function
   auto &FAMProxy =
-      MAM.getResult<FunctionAnalysisManagerModuleProxy>(*f->getParent());
+      MAM.getResult<FunctionAnalysisManagerModuleProxy>(*F->getParent());
   FunctionAnalysisManager &FAM = FAMProxy.getManager();
-  MemorySSA &MSSA = FAM.getResult<MemorySSAAnalysis>(*f).getMSSA();
+  MemorySSA &MSSA = FAM.getResult<MemorySSAAnalysis>(*F).getMSSA();
   MemorySSAWalker *Walker = MSSA.getWalker();
 
   std::vector<MemCpyInst *> memcpyList;
 
-  for (auto &BB : *f) {
+  for (auto &BB : *F) {
     for (auto &inst : BB) {
       if (auto *memcpyInst = dyn_cast<MemCpyInst>(&inst)) {
         memcpyList.push_back(memcpyInst);
@@ -494,7 +615,7 @@ void sanitizeMemcpy(Function *f, ModuleAnalysisManager &MAM) {
     auto dst_ptr = Inst->getDest();
     auto src_ptr = Inst->getSource();
     auto size_arg = Inst->getLength();
-    auto memcpyFn = getOrCreateBoundsCheckMemcpySanitizer(f->getParent());
+    auto memcpyFn = getOrCreateBoundsCheckMemcpySanitizer(F->getParent());
 
     // FIXME: it would be nice to use find allocation root here
     // auto sanitized_memcpy = builder.CreateCall(memcpyFn, { dst_ptr,
@@ -507,56 +628,143 @@ void sanitizeMemcpy(Function *f, ModuleAnalysisManager &MAM) {
 }
 
 void sanitizeAlloca(Function *F) {
-    Module *M = F->getParent();
-    LLVMContext &Ctx = M->getContext();
-    IRBuilder<> builder(Ctx);
-    const DataLayout &DL = M->getDataLayout();
+  Module *M = F->getParent();
+  LLVMContext &Ctx = M->getContext();
+  IRBuilder<> builder(Ctx);
+  const DataLayout &DL = M->getDataLayout();
 
-    // Initialize list to store pointers to alloca and instructions
-    std::vector<AllocaInst *> allocaList;
-    
-    auto void_ty = Type::getVoidTy(Ctx);
-    auto ptr_ty = PointerType::get(Ctx, 0);
-    auto int64_ty = Type::getInt64Ty(Ctx);
+  // Initialize list to store pointers to alloca and instructions
+  std::vector<AllocaInst *> allocaList;
+  
+  auto void_ty = Type::getVoidTy(Ctx);
+  auto ptr_ty = PointerType::get(Ctx, 0);
+  auto int64_ty = Type::getInt64Ty(Ctx);
 
-    FunctionType *resolveStackObjFnTy = FunctionType::get(
-        void_ty,
-        { ptr_ty, int64_ty },
-        false
-    );
-    
-    /* Initialize function callee object for libresolve resolve_stack_obj runtime fn */
-    FunctionCallee resolveStackObjFn = M->getOrInsertFunction(
-        "resolve_stack_obj",
-        resolveStackObjFnTy   
-    );
+  FunctionType *resolveStackObjFnTy = FunctionType::get(
+      void_ty,
+      { ptr_ty, int64_ty },
+      false
+  );
+  
+  /* Initialize function callee object for libresolve resolve_stack_obj runtime fn */
+  FunctionCallee resolveStackObjFn = M->getOrInsertFunction(
+      "resolve_stack_obj",
+      resolveStackObjFnTy   
+  );
 
-    for (auto &BB: *F) {
-        for (auto &instr: BB) {
-            if (auto *inst = dyn_cast<AllocaInst>(&instr)) {
-                allocaList.push_back(inst);
-            }
-        }
-    }
+  for (auto &BB: *F) {
+      for (auto &instr: BB) {
+          if (auto *inst = dyn_cast<AllocaInst>(&instr)) {
+              allocaList.push_back(inst);
+          }
+      }
+  }
 
-    for (auto* allocaInst: allocaList) {
-        // Insert after the alloca instruction
-        builder.SetInsertPoint(allocaInst->getNextNode());
-        Value* allocatedPtr = allocaInst;
+  for (auto* allocaInst: allocaList) {
+      // Insert after the alloca instruction
+      builder.SetInsertPoint(allocaInst->getNextNode());
+      Value* allocatedPtr = allocaInst;
 
-        Value *sizeVal = nullptr;
-        Type *allocatedType = allocaInst->getAllocatedType();
-        uint64_t typeSize = DL.getTypeAllocSize(allocatedType); 
-        sizeVal = ConstantInt::get(int64_ty, typeSize);
-        builder.CreateCall(resolveStackObjFn, { allocatedPtr, sizeVal });
+      Value *sizeVal = nullptr;
+      Type *allocatedType = allocaInst->getAllocatedType();
+      uint64_t typeSize = DL.getTypeAllocSize(allocatedType); 
+      sizeVal = ConstantInt::get(int64_ty, typeSize);
+      builder.CreateCall(resolveStackObjFn, { allocatedPtr, sizeVal });
+      
+  }
+}
+
+void sanitizeMalloc(Function *F, Vulnerability::RemediationStrategies strategy) {
+  Module *M = F->getParent();
+  LLVMContext &Ctx = M->getContext();
+  IRBuilder<> builder(Ctx);
+  const DataLayout &DL = M->getDataLayout();
+
+  auto ptr_ty = PointerType::get(Ctx, 0);
+  auto size_ty = Type::getInt64Ty(Ctx);
+  FunctionType *resolveMallocFnTy = FunctionType::get(ptr_ty, { size_ty }, false);
+  FunctionCallee resolveMallocFn = M->getOrInsertFunction(
+    "resolve_malloc",
+    resolveMallocFnTy
+  );
+
+  std::vector<CallInst *> mallocList;
+  std::vector<GetElementPtrInst *> gepList;
+
+  switch(strategy) {
+    case Vulnerability::RemediationStrategies::CONTINUE-WRAP: /* TODO: Not yet supported. Implement this remediaion strategy */
+    case Vulnerability::RemediationStrategies::CONTINUE-ZERO: /* TODO: Not yet supported. Implement this remediation strategy */
+    case Vulnerability::RemediationStrategies::EXIT:
+    case Vulnerability::RemediationStrategies::RECOVER:
+    case Vulnerability::Remediation::SAT:                     /* TODO: Not yet supported. Implement this remediation strategy */
+      break;
+
+    default:
+      llvm::errs() << "[CVEAssert] Error: sanitizeMalloc does not support remediation strategy "
+                   << "defaulting to EXIT strategy!\n";
+      strategy = Vulnerability::RemediationStrategies::EXIT;
+      break;
+  }
+
+
+  for (auto &BB : *F) {
+    for (auto &inst: BB) {
+      if (auto *call = dyn_cast<CallInst>(&inst)) {
+        Function *calledFunc = call->getCalledFunction();
+
+        if (!calledFunc) { continue; }
+
+        StringRef fnName = calledFunc->getName();
         
+        if (fnName == "malloc") { mallocList.push_back(call); }
+      } else if (auto *gep = dyn_cast<GetElementPtrInst>(&inst)) {
+        gepList.push_back(gep);
+      }
     }
   }
 
-void sanitizeMemInstBounds(Function *f, ModuleAnalysisManager &MAM, Vulnerability::RemediationStrategies strategy) {
+  for (auto Inst : mallocList) {
+    builder.SetInsertPoint(Inst);
+    Value *arg = Inst->getArgOperand(0);
+    Value *normalizeArg = builder.CreateZExtOrBitCast(arg, size_ty);
+    CallInst *resolveMallocCall = builder.CreateCall(resolveMallocFn, { normalizeArg });
+    Inst->replaceAllUsesWith(resolveMallocCall);
+    Inst->eraseFromParent();  
+  }
+
+  for (auto GEPInst: gepList) {
+    builder.SetInsertPoint(GEPInst);
+
+    // Get the pointer operand and offset from GEP
+    Value *basePtr = GEPInst->getPointerOperand();
+    Value * derivedPtr = GEPInst;
+
+    APInt gepOffset(DL.getPointerSizeInBits(0), 0);
+    Value *offset = nullptr;
+
+    if (GEPInst->stripAndAccumulateConstantOffsets(DL, gepOffset, true)) {
+      // case 1. Constant offset
+      offset = ConstantInt::get(size_ty, gepOffset.getSExtValue());
+    } else {
+      // case 2. Dynamic offset 
+      Value *baseInt = builder.CreatePtrToInt(basePtr);
+      Value * derivedInt = builder.CreatePtrToInt(derivedPtr);
+      offset = builder.CreateSub(derivedInt, baseInt);
+    }
+
+    CallInst *resolveGEPCall = builder.CreateCall(getOrCreateResolveGEP(M, GEPInst->getSourceElementType(), strategy), { basePtr, offset });
+    GEPInst->replaceAllUsesWith(resolveGEPCall);
+    GEPInst->eraseFromParent();
+  }
+
+  sanitizeLoadStore(F, strategy);
+}
+
+void sanitizeMemInstBounds(Function *F, ModuleAnalysisManager &MAM, Vulnerability::RemediationStrategies strategy) {
   // FIXME: bad alias analysis is causing compilation to fail
   // TBD: why does TBAA not work right
-  sanitizeLoadStore(f, MAM);
-  sanitizeAlloca(f);
-  sanitizeMemcpy(f, MAM);
+  // sanitizeLoadStore(f, MAM);
+  // sanitizeAlloca(f);
+  sanitizeMalloc(F, strategy);
+  // sanitizeMemcpy(f, MAM);
 }
