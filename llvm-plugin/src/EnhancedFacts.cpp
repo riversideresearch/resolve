@@ -191,7 +191,8 @@ static void embedFacts(Module &M) {
     appendToCompilerUsed(M, {gv});
   };
 
-  embedFactsSection(".facts", facts.serialize());
+  // add a newline afterwards to help-distinguish between combined modules
+  embedFactsSection(".facts", facts.serialize() + "\n");
 }
 
 struct EnhancedFactsPass : public PassInfoMixin<EnhancedFactsPass> {
