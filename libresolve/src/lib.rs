@@ -66,6 +66,22 @@ pub extern "C" fn resolve_malloc(size: usize) -> *mut c_void {
     ptr
 }
 
+#[unsafe(no_mangle)]
+pub extern "C" fn resolve_gep(ptr: *mut c_void, derived: *mut c_void) -> *mut c_void {
+    let sobj_table = ALIVE_OBJ_LIST.lock().expect("Mutex not poisoned");
+
+    // Look up the shadow object corresponding to this access.
+    // NOTE: Return 0 ('null') if shadow object cannot be found.
+    let Some(sobj) = sobj_table.search_intersection(ptr as Vaddr) else { return 0 as *mut c_void; };
+
+    // If shadow object exists then check if the access is within bounds
+    if sobj.contains(derived as Vaddr) {
+        return derived as *mut c_void
+    } 
+
+    // Return 1-past limit of allocation @ ptr
+    sobj.past_limit() as *mut c_void
+}
 
 /**
  * @brief - Allocator logging interface for memcpy 
@@ -607,22 +623,20 @@ pub extern "C" fn flush_dlsym_log() {
  * @return ptr  
  */
 #[unsafe(no_mangle)]
-pub extern "C" fn resolve_check_bounds(base_ptr: *mut c_void, derived_ptr: *mut c_void, size: usize) -> bool {
+pub extern "C" fn resolve_check_bounds(base_ptr: *mut c_void, size: usize) -> bool {
     let base = base_ptr as Vaddr;
-    let derived = derived_ptr as Vaddr;
 
     // If not print "Object not found" and return false
     let sobj_table = ALIVE_OBJ_LIST.lock().expect("Mutex not poisoned");
 
     // Look up the shadow object corresponding to this access.
-    let Some(sobj) = sobj_table.search_intersection(base) else { return false; };
-
-    // If shadow object exists then check if the access is within bounds
-    if sobj.contains(derived) && sobj.contains(ShadowObject::limit(derived, size)) {
+    if let Some(sobj) = sobj_table.search_intersection(base) {
+        // If shadow object exists then check if the access is within bounds
+        if sobj.contains(ShadowObject::limit(base, size)) {
         // Access in Bounds
-        return true
+            return true
+        }
     }
-
     // Access _not_ in Bounds
     let mut buf = [0u8; 128];
     let mut writer = BufferWriter::new(&mut buf);
