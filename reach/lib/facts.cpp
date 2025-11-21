@@ -58,8 +58,6 @@ database ReachFacts::load(istream& facts,
   db.node_type.reserve(num_nodes);
   db.name.reserve(num_nodes);
 
-  // TODO: how do we respect the options?
-
   for (const auto& [mid, m]: pf.modules) {
 
     if (is_set(options, LoadOptions::NodeType)) {
@@ -104,77 +102,13 @@ database ReachFacts::load(istream& facts,
           } else if (is_set(options, LoadOptions::ControlFlow) &&
                      k == "controlFlowTo") {
             db.control_flow[sid].push_back(did);
+          } else if (k == "entryPoint") {
+            db.function_entrypoints[sid] = did;
           }
         }
       }
     }
   }
-
-
-  // TODO: Load from new format
-
-  /*
-  if (is_set(options, LoadOptions::NodeType)) {
-    string line;
-    while (getline(nodes, line)) {
-      stringstream ss(line);
-      string id, ty;
-      getline(ss, id, ',');
-      getline(ss, ty);
-      db.node_type.emplace(id, parse_node_type(ty));
-    }
-  }
-
-  if (is_set(options, LoadOptions::Edges)) {
-    string line;
-    while (getline(edges, line)) {
-      stringstream ss(line);
-      string id, ty, s, t;
-      getline(ss, id, ',');
-      getline(ss, ty, ',');
-      getline(ss, s, ',');
-      getline(ss, t);
-      if (is_set(options, LoadOptions::Contains) && ty == "contains") {
-        db.contains[s].push_back(t);
-      } else if (is_set(options, LoadOptions::Calls) && ty == "calls") {
-        db.calls.emplace(s, t);
-      } else if (is_set(options, LoadOptions::ControlFlow) &&
-                 ty == "controlFlowTo") {
-        db.control_flow[s].push_back(t);
-      }
-    }
-  }
-
-  if (is_set(options, LoadOptions::NodeProps)) {
-    string line;
-    while (getline(nodeprops, line)) {
-      stringstream ss(line);
-      string id, prop, val;
-      getline(ss, id, ',');
-      getline(ss, prop, ',');
-      getline(ss, val);
-      if (is_set(options, LoadOptions::Name) && prop == "name") {
-        db.name.emplace(id, val);
-      } else if (is_set(options, LoadOptions::Linkage) && prop == "linkage") {
-        db.linkage.emplace(id, parse_linkage(val));
-      } else if (is_set(options, LoadOptions::CallType)
-                 && prop == "call_type") {
-        db.call_type.emplace(id, parse_call_type(val));
-      } else if (is_set(options, LoadOptions::AddressTaken) &&
-               prop == "address_taken") {
-        db.address_taken.push_back(id);
-      } else if (is_set(options, LoadOptions::FunctionType) &&
-                 prop == "function_type") {
-        db.fun_sig.emplace(id, val.substr(1, val.length()-2));
-      }
-    }
-  }
-
-  // Sort contains vectors so the BBs and instructions are: order.
-  for (auto& [_, ids] : db.contains) {
-    sort(ids.begin(), ids.end());
-  }
-  */
 
   return db;
 }

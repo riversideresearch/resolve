@@ -174,16 +174,6 @@ public:
   const std::string serialize() const { 
       return facts.pf.serialize();
   }
-
-  /*
-  const std::string &getNodes() const { return facts.nodes; }
-
-  const std::string &getNodeProps() const { return facts.nodeProps; }
-
-  const std::string &getEdges() const { return facts.edges; }
-
-  const std::string &getEdgeProps() const { return facts.edgeProps; }
-  */
 };
 
 #endif // RESOLVE_LLVM_LLVMFACTS_HPP

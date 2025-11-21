@@ -223,21 +223,16 @@ class FactParser:
         name = self.nodes[module_id].props["source_file"]
         return name
 
-    def get_func_id(self, func_name: str, src_hint: NodeID | None = None):
+    def get_func_id(self, func_name: str):
         # First try true symbol names
-        id = None
         for f in self.nodes.kinds["Function"]:
             if func_name in f.get("name", ""):
-                print(f"Found {func_name} in module {self.get_module_name_for_node(f.id)}")
-                id = f.id
+                return f.id
 
         # Next try demangled C++ symbol names
         for f in self.nodes.kinds["Function"]:
             if func_name in f.props.get("demangled_name", ""):
-                print(f"Found {func_name} in module {self.get_module_name_for_node(f.id)}")
-                id = f.id
-
-        return id
+                return f.id
 
 @dataclass
 class ReachToolResult:
@@ -306,12 +301,12 @@ class ReachabilityResult:
     # from reach tool
     paths: list[ReachToolResult] | None = None
 
-    def update_from_fact_parser(self, fact_parser: 'FactParser', src_hint: NodeID) -> None:
+    def update_from_fact_parser(self, fact_parser: 'FactParser') -> None:
         """
         Looks for the function signature of a sink in nodeprops.facts
         and updates it with its func_id
         """
-        func_id = fact_parser.get_func_id(self.sink.affected_function, src_hint)
+        func_id = fact_parser.get_func_id(self.sink.affected_function)
 
         module_name = fact_parser.get_module_name_for_node(func_id) 
         print(f"Found function '{self.sink.affected_function}' in module '{module_name}'")
@@ -427,7 +422,7 @@ class ReachToolManager:
         
         # Convert list of KV pairs to map
         def parse_result_path(nodes: list[NodeID], edges: list[str]):
-            return ReachToolResult(nodes=[fact_parser.nodes[id] for id in nodes], edges=edges)
+            return ReachToolResult(nodes=[fact_parser.nodes[tuple(id)] for id in nodes], edges=edges)
                 
         return {
             tuple(result["dst"]): [parse_result_path(**r) for r in result["paths"]] for result in reach_file["query_results"]
@@ -513,6 +508,8 @@ class Orchestrator:
         return [result for result in self.results if result.reachability == Reachability.UNKNOWN]
 
     def parse_facts(self):
+        "Update results from fact_parser to get func_id"
+
         # NOTE: we assume that we can always enter
         # the desired basic block from an 'fmain'
         src = self.fact_parser.get_func_id(self.entrypoint)
@@ -522,9 +519,8 @@ class Orchestrator:
 
         print(f"Found function '{self.entrypoint}' in module '{module_name}'")
         self.src = src
-        "Update results from fact_parser to get func_id"
         for result in self.results:
-            result.update_from_fact_parser(self.fact_parser, src)
+            result.update_from_fact_parser(self.fact_parser)
 
     def run_reach_tool(self):
         "Run reach tool and update Results"
