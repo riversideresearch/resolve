@@ -63,7 +63,6 @@ namespace ReachFacts {
   };
 
   // Type synonym for node NodeIds.
-  //using NodeId = std::string;
   using NodeId = uint32_t;
 
   struct pair_hash : public std::function<std::size_t(std::pair<NodeId, NodeId>)> {
@@ -153,7 +152,6 @@ namespace ReachFacts {
     NodeMap<NamespacedNodeId> calls;
     NodeMap<NamespacedNodeId> function_entrypoints;
     NodeMap<std::vector<NamespacedNodeId>> control_flow;
-    // std::unordered_map<NamespacedNodeId, NamespacedNodeId> entry_point;
 
     NodeMap<std::string> name;
     NodeMap<Linkage> linkage;
