@@ -192,12 +192,6 @@ static void embedFacts(Module &M) {
   };
 
   embedFactsSection(".facts", facts.serialize());
-  /*
-  embedFactsSection(".fact_nodes", facts.getNodes());
-  embedFactsSection(".fact_node_props", facts.getNodeProps());
-  embedFactsSection(".fact_edges", facts.getEdges());
-  embedFactsSection(".fact_edge_props", facts.getEdgeProps());
-  */
 }
 
 struct EnhancedFactsPass : public PassInfoMixin<EnhancedFactsPass> {

@@ -11,6 +11,7 @@
 
 #include "facts.hpp"
 
+using ProgramFacts = ReachFacts::ProgramFacts;
 using ModuleFacts = ReachFacts::ModuleFacts;
 using NodeId = ReachFacts::NodeId;
 
@@ -20,34 +21,38 @@ using NodeId = ReachFacts::NodeId;
 // Nodes can be connected by "edges" of a particular kind. Currently these edges can have multiplicity. e.g. ("Contains", node1, node2) is an edge
 
 struct Facts {
-  ModuleFacts bf;
+  ProgramFacts pf;
+
+  void recordNewModule(const NodeId& id, const size_t size_hint) {
+      ModuleFacts mf{};
+      // Try to avoid reallocations
+      mf.node_props.reserve(size_hint);
+      mf.node_types.reserve(size_hint);
+      mf.edge_kinds.reserve(2*size_hint);
+
+      pf.modules[id] = mf;
+  }
 
   /// Record a node fact.
-  void recordNode(const NodeId& id, const std::string &type) {
-    bf.node_types.emplace(id, type);
+  void recordNode(const NodeId& module, const NodeId& id, const std::string &type) {
+    pf.modules.at(module).node_types.emplace(id, type);
   }
 
   /// Record a node property.
-  void recordNodeProp(const NodeId& nodeID, const std::string &key,
+  void recordNodeProp(const NodeId& module, const NodeId& nodeID, const std::string &key,
                       const std::string &value) {
-    if (bf.node_props.contains(nodeID)) {
-        bf.node_props[nodeID][key] = value;
-    } else {
-        std::unordered_map<std::string, std::string> new_map = { std::make_pair(key, value) };
-        bf.node_props.try_emplace(nodeID, new_map);
-    }
+    auto& mf = pf.modules.at(module);
+    auto [it, exists] = mf.node_props.try_emplace(nodeID);
+    it->second[key] = value;
   }
 
   /// Record an edge fact.
-  void recordEdge(const std::string &type,
+  void recordEdge(const NodeId& module, const std::string &type,
                   const NodeId &srcID, const NodeId &tgtID) {
     auto pair = std::make_pair(srcID, tgtID);
-    if (bf.edge_kinds.contains(pair)) {
-      bf.edge_kinds[pair].emplace_back(type);
-    } else {
-        std::vector<std::string> new_kinds = {type};
-        bf.edge_kinds[pair] = new_kinds;
-    }
+    auto& mf = pf.modules.at(module);
+    auto [it, exists] = mf.edge_kinds.try_emplace(pair);
+    it->second.emplace_back(type);
   }
 };
 

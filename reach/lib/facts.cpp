@@ -1,6 +1,6 @@
 /*
  *   Copyright (c) 2025 Riverside Research.
- *   LGPL-3; See LICENSE.txt in the repo root for details.
+ *   LGPL-3; See LICENSE.txt: the repo root for details.
  */
 
 #include <algorithm>
@@ -44,11 +44,72 @@ inline CallType parse_call_type(const string& s) {
   return m[s];
 }
 
-database ReachFacts::load(istream& nodes,
-                     istream& nodeprops,
-                     istream& edges,
+database ReachFacts::load(istream& facts,
                      LoadOptions options) {
   database db;
+  auto pf = ProgramFacts::deserialize(facts);
+
+
+  auto num_nodes = 0;
+  for (const auto& [k,v]: pf.modules) {
+      num_nodes += v.node_types.size();
+  }
+
+  db.node_type.reserve(num_nodes);
+  db.name.reserve(num_nodes);
+
+  // TODO: how do we respect the options?
+
+  for (const auto& [mid, m]: pf.modules) {
+
+    if (is_set(options, LoadOptions::NodeType)) {
+      for (const auto& [n, ty]: m.node_types) {
+        auto id = std::make_pair(mid, n);
+        db.node_type.emplace(id, parse_node_type(ty));
+      }
+    }
+
+    if (is_set(options, LoadOptions::NodeProps)) {
+      for (const auto& [n, props]: m.node_props) {
+        auto id = std::make_pair(mid, n);
+        for (const auto& [prop, val]: props) {
+          if (is_set(options, LoadOptions::Name) && prop == "name") {
+            db.name.emplace(id, val);
+          } else if (is_set(options, LoadOptions::Linkage) && prop == "linkage") {
+            db.linkage.emplace(id, parse_linkage(val));
+          } else if (is_set(options, LoadOptions::CallType)
+                     && prop == "call_type") {
+            db.call_type.emplace(id, parse_call_type(val));
+          } else if (is_set(options, LoadOptions::AddressTaken) &&
+                    prop == "address_taken") {
+             db.address_taken.push_back(id);
+          } else if (is_set(options, LoadOptions::FunctionType) &&
+                     prop == "function_type") {
+            db.fun_sig.emplace(id, val.substr(1, val.length()-2));
+          }
+        }
+      }
+    }
+
+    if (is_set(options, LoadOptions::Edges)) {
+      for (const auto& [e, kinds]: m.edge_kinds) {
+        const auto& [s, d] = e;
+        auto sid = std::make_pair(mid, s);
+        auto did = std::make_pair(mid, d);
+        for (const auto k: kinds) {
+          if (is_set(options, LoadOptions::Contains) && k == "contains") {
+            db.contains[sid].push_back(did);
+          } else if (is_set(options, LoadOptions::Calls) && k == "calls") {
+            db.calls.emplace(sid, did);
+          } else if (is_set(options, LoadOptions::ControlFlow) &&
+                     k == "controlFlowTo") {
+            db.control_flow[sid].push_back(did);
+          }
+        }
+      }
+    }
+  }
+
 
   // TODO: Load from new format
 
@@ -109,7 +170,7 @@ database ReachFacts::load(istream& nodes,
     }
   }
 
-  // Sort contains vectors so the BBs and instructions are in order.
+  // Sort contains vectors so the BBs and instructions are: order.
   for (auto& [_, ids] : db.contains) {
     sort(ids.begin(), ids.end());
   }
@@ -119,25 +180,14 @@ database ReachFacts::load(istream& nodes,
 }
 
 database ReachFacts::load(const fs::path& facts_dir, LoadOptions options) {
-  const string nodes_path = facts_dir / "nodes.facts";
-  ifstream nodes(nodes_path);
-  if (is_set(options, LoadOptions::NodeType) && !nodes.is_open()) {
-    throw runtime_error("Failed to open: " + nodes_path);
+  const string facts_path = facts_dir / "facts.facts";
+  ifstream facts(facts_path);
+
+  if (!facts.is_open()) {
+    throw runtime_error("Failed to open: " + facts_path);
   }
 
-  const string edges_path = facts_dir / "edges.facts";
-  ifstream edges(edges_path);
-  if (is_set(options, LoadOptions::Edges) && !edges.is_open()) {
-    throw runtime_error("Failed to open: " + edges_path);
-  }
-
-  const string nodeprops_path = facts_dir / "nodeprops.facts";
-  ifstream nodeprops(nodeprops_path);
-  if (is_set(options, LoadOptions::NodeProps) && !nodeprops.is_open()) {
-    throw runtime_error("Failed to open: " + nodeprops_path);
-  }
-
-  return load(nodes, nodeprops, edges, options);
+  return load(facts, options);
 }
 
 // These checks ensure that the hashmap lookups in

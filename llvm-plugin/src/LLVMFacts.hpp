@@ -31,20 +31,6 @@ class LLVMFacts {
   std::unordered_map<const llvm::Instruction *, NodeId> instructionIDs;
   std::unordered_map<const llvm::GlobalVariable *, NodeId> globalVarIDs;
 
-  /*
-  using edge_rec_t = std::tuple<std::string, NodeId, NodeId>;
-  struct edge_rec_hash : public std::function<std::size_t(edge_rec_t)> {
-    std::hash<std::string> hasher;
-    std::size_t operator()(const edge_rec_t &k) const {
-      return hasher(std::get<0>(k)) ^ hasher(std::get<1>(k)) ^
-             hasher(std::get<2>(k));
-    }
-
-    edge_rec_hash() {}
-  };
-  std::unordered_map<edge_rec_t, std::size_t, edge_rec_hash> edgeIdx;
-  */
-
 public:
   LLVMFacts(Facts &facts)
       : facts(facts) {
@@ -58,21 +44,29 @@ public:
 
       std::string src = (std::string)src_path;
       size_t hash = std::hash<std::string>{}(src);
-      auto id = 0; //(NodeId) hash;
+      auto id = (NodeId) hash;
 
       llvm::errs() << "Creating new module: " << id << "\n";
 
       moduleIDs[&M] = id;
 
-      facts.recordNode(id, "Module");
+      // Estimate how many total nodes we will be creating to prevent rehashes
+      auto instrs = M.getInstructionCount();
+      facts.recordNewModule(id, 2*instrs);
+      facts.recordNode(id, id, "Module");
       return id;
     }
     return moduleIDs[&M];
   }
 
+  NodeId getModuleId(const llvm::Module& m) {
+      return addNode(m);
+  }
+
   template<typename T>
   NodeId getModuleId(const T& i) {
       const llvm::Module* module;
+
       constexpr bool parent_is_module = std::is_same_v<decltype(i.getParent()), const llvm::Module*>;
       constexpr bool is_argument = std::is_same_v<T, llvm::Argument>;
       if constexpr (parent_is_module) {
@@ -99,7 +93,7 @@ public:
       auto module_id = getModuleId(GV);
 
       globalVarIDs[&GV] = id;
-      facts.recordNode(id, "GlobalVariable");
+      facts.recordNode(module_id, id, "GlobalVariable");
       return id;
     }
     return globalVarIDs[&GV];
@@ -112,7 +106,7 @@ public:
       auto module_id = getModuleId(F);
 
       functionIDs[&F] = id;
-      facts.recordNode(id, "Function");
+      facts.recordNode(module_id, id, "Function");
       return id;
     }
     return functionIDs[&F];
@@ -125,7 +119,7 @@ public:
       auto module_id = getModuleId(A);
 
       argumentIDs[&A] = id;
-      facts.recordNode(id, "Argument");
+      facts.recordNode(module_id, id, "Argument");
       return id;
     }
     return argumentIDs[&A];
@@ -138,7 +132,7 @@ public:
       auto module_id = getModuleId(BB);
 
       basicBlockIDs[&BB] = id;
-      facts.recordNode(id, "BasicBlock");
+      facts.recordNode(module_id, id, "BasicBlock");
       return id;
     }
     return basicBlockIDs[&BB];
@@ -151,7 +145,7 @@ public:
       auto module_id = getModuleId(I);
 
       instructionIDs[&I] = id;
-      facts.recordNode(id, "Instruction");
+      facts.recordNode(module_id, id, "Instruction");
       return id;
     }
     return instructionIDs[&I];
@@ -159,27 +153,26 @@ public:
 
   template <typename S, typename D>
   void addEdge(std::string kind, S &src, D &dst) {
-    addEdge(kind, addNode(src), addNode(dst));
+    auto m1 = getModuleId(src);
+    auto m2 = getModuleId(dst);
+    assert(m1 == m2);
+
+    addEdge(m1, kind, addNode(src), addNode(dst));
   }
 
-  void addEdge(std::string kind, NodeId src, NodeId dst) {
-    facts.recordEdge(kind, src, dst);
+  void addEdge(NodeId module, std::string kind, NodeId src, NodeId dst) {
+    facts.recordEdge(module, kind, src, dst);
   }
 
   template <typename N>
   void addNodeProp(const N &node, const std::string &key,
                    const std::string &value) {
-    facts.recordNodeProp(addNode(node), key, value);
+    auto module_id = getModuleId(node);
+    facts.recordNodeProp(module_id, addNode(node), key, value);
   }
 
   const std::string serialize() const { 
-      auto nodes = facts.bf.node_types.size();
-      auto node_props = facts.bf.node_props.size();
-      auto edges = facts.bf.edge_kinds.size();
-
-      llvm::errs() << "Created " << nodes << " nodes, " << node_props << " node props, and " << edges << "edges\n";
-
-      return facts.bf.serialize();
+      return facts.pf.serialize();
   }
 
   /*

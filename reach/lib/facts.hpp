@@ -67,38 +67,63 @@ namespace ReachFacts {
   using NodeId = uint32_t;
 
   struct pair_hash : public std::function<std::size_t(std::pair<NodeId, NodeId>)> {
-    std::hash<NodeId> hasher;
+    std::hash<uint64_t> hasher;
     std::size_t operator()(const std::pair<NodeId, NodeId> &k) const {
-      return hasher(std::get<0>(k)) ^ hasher(std::get<1>(k));
+      // Hash as a single uint64_t because hashing as two individual uint32_t ended up being hilariously slow
+      // which could have also just been a side effect of being a poor hash combiner.
+      uint64_t s = ((uint64_t)k.first) << 32 | (uint64_t)k.second;
+      return hasher(s);
     }
 
     pair_hash() {}
   };
 
+  using json = nlohmann::json;
+
   struct ModuleFacts {
     std::unordered_map<NodeId, std::string> node_types;
+    // the values here could be more structured if desired, matching with the enums
     std::unordered_map<NodeId, std::unordered_map<std::string, std::string>> node_props;
+    // Likewise we only know about so many edge types and this could be more restrictive.
     std::unordered_map<std::pair<NodeId, NodeId>, std::vector<std::string>, pair_hash> edge_kinds;
-
-    using json = nlohmann::json;
 
     ModuleFacts() :
         node_types(), node_props(), edge_kinds()
     {}
 
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE(ModuleFacts, node_types, node_props, edge_kinds);
 
-    json as_json() {
-      json obj = json::object({});
-      obj["node_types"] = node_types;
-      obj["node_props"] = node_props;
-      obj["edge_kinds"] = edge_kinds;
-      return obj;
+    // Note: the library supports serializing as BSON/CBOR 
+    // if we want a minimal-friction binary format instead.
+    std::string serialize() {
+      json obj = *this;
+      
+      return obj.dump();
     }
 
-    std::string serialize() {
-      auto obj = as_json();
+    static ModuleFacts deserialize(std::istream& facts) {
+        json obj = json::parse(facts);
 
+        return obj.get<ModuleFacts>();
+    }
+  };
+
+
+  struct ProgramFacts {
+    std::unordered_map<NodeId, ModuleFacts> modules;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE(ProgramFacts, modules);
+
+    std::string serialize() {
+      json obj = *this;
+      
       return obj.dump();
+    }
+
+    static ProgramFacts deserialize(std::istream& facts) {
+        json obj = json::parse(facts);
+
+        return obj.get<ProgramFacts>();
     }
   };
 
@@ -124,9 +149,7 @@ namespace ReachFacts {
     std::vector<NamespacedNodeId> address_taken;
   };
 
-  database load(std::istream& nodes,
-                std::istream& nodeprops,
-                std::istream& edges,
+  database load(std::istream& facts,
                 LoadOptions options);
   database load(const std::filesystem::path& facts_dir, LoadOptions options);
 

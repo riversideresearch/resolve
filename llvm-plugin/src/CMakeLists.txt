@@ -8,9 +8,9 @@ set(CMAKE_COMPILE_WARNING_AS_ERROR ON)
 # Add LLVM headers to include search paths
 include_directories(SYSTEM ${LLVM_INCLUDE_DIRS})
 
-# Debug by default
+# Release with symbols by default
 if(NOT CMAKE_BUILD_TYPE)
-  set(CMAKE_BUILD_TYPE Debug)
+    set(CMAKE_BUILD_TYPE RelWithDebInfo)
 endif()
 
 set(CMAKE_CXX_STANDARD 20 STRING "")
