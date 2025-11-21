@@ -79,8 +79,8 @@ def group_by(items: Iterable[T], key_func: Callable[[T], K]):
     
     return result
 
-NodeID = str
-EdgeID = str
+NodeID = tuple[int, int]
+EdgeID = tuple[NodeID, NodeID]
 NodeKind = str
 EdgeKind = str
 
@@ -133,9 +133,9 @@ class Nodes:
 @dataclass
 class Edge:
     id: EdgeID
-    kind: EdgeKind
     src: NodeID
     dst: NodeID
+    kinds: list[EdgeKind]
     props: dict[str, Any] = field(default_factory=dict[str, Any])
 
     T = TypeVar('T')
@@ -152,14 +152,16 @@ class Edge:
 class Edges:
     def __init__(self, edges: Iterable[Edge] = []):
         self.ids = {edge.id: edge for edge in edges}
-        self.kinds = group_by(edges, attrgetter("kind"))
-        self.pairs = group_by(edges, attrgetter("src", "dst"))
+        self.kinds = {}
+        for e in edges:
+            for k in e.kinds:
+                self.kinds.setdefault(k, []).append(e)
+
         self.srcs = group_by(edges, attrgetter("src"))
         self.dsts = group_by(edges, attrgetter("dst"))
         
     ids: dict[EdgeID, Edge]
     kinds: dict[EdgeKind, list[Edge]]
-    pairs: dict[tuple[NodeID, NodeID], list[Edge]]
     srcs: dict[NodeID, list[Edge]]
     dsts: dict[NodeID, list[Edge]]
 
@@ -184,18 +186,30 @@ class FactParser:
     def __init__(self, facts_folder: Path):
         self.facts_folder = facts_folder
         # Load Nodes
-        with (facts_folder / "nodes.facts").open() as f:
-            self.nodes = Nodes([Node(id, kind) for id, kind in csv.reader(f)])
-        with (facts_folder / "nodeprops.facts").open() as f:
-            for id, key, value in csv.reader(f):
-                self.nodes.ids[id].props[key] = value
+        with (facts_folder / "facts.facts").open() as f:
 
-        # Load Edges
-        with (facts_folder / "edges.facts").open() as f:
-            self.edges = Edges([Edge(id, kind, src, dst, props={}) for id, kind, src, dst in csv.reader(f)])
-        with (facts_folder / "edgeprops.facts").open() as f:
-            for id, key, value in csv.reader(f):
-                self.edges[id].props[key] = value
+            all_nodes = []
+            all_edges = []
+            # When multiple modules are combined they will be separated by newlines.
+            for line in f:
+                facts = json.loads(line.strip('\n'))
+
+                for mid, m in facts["modules"]:
+                    m["node_props"] = {id: props for id,props in m["node_props"]}
+                    mnodes = [ Node((mid, id), kind, m["node_props"][id]) for id,kind in m["node_types"] ]
+                    all_nodes.extend(mnodes)
+
+                    medges = []
+                    for (src, dst), kinds in m["edge_kinds"]:
+                        sid = (mid, src)
+                        did = (mid, dst)
+                        e = Edge((sid, did), sid, did, kinds, {})
+                        medges.append(e)
+
+                    all_edges.extend(medges)
+
+            self.nodes = Nodes(all_nodes)
+            self.edges = Edges(all_edges)
 
     def demangle_names(self):
         with_names = [n for n in self.nodes if "name" in n.props]
@@ -204,16 +218,26 @@ class FactParser:
             if n["name"] != demangled_name:
                 n["demangled_name"] = demangled_name
 
-    def get_func_id(self, func_name: str):
+    def get_module_name_for_node(self, id: NodeID):
+        module_id = (id[0], id[0])
+        name = self.nodes[module_id].props["source_file"]
+        return name
+
+    def get_func_id(self, func_name: str, src_hint: NodeID | None = None):
         # First try true symbol names
+        id = None
         for f in self.nodes.kinds["Function"]:
             if func_name in f.get("name", ""):
-                return f.id
+                print(f"Found {func_name} in module {self.get_module_name_for_node(f.id)}")
+                id = f.id
 
         # Next try demangled C++ symbol names
         for f in self.nodes.kinds["Function"]:
             if func_name in f.props.get("demangled_name", ""):
-                return f.id
+                print(f"Found {func_name} in module {self.get_module_name_for_node(f.id)}")
+                id = f.id
+
+        return id
 
 @dataclass
 class ReachToolResult:
@@ -269,25 +293,28 @@ class ReachToolResult:
         return list(self._as_edges())
 
 # A mapping from dst_id to path list
-ReachToolResults = dict[str, list[ReachToolResult]]
+ReachToolResults = dict[NodeID, list[ReachToolResult]]
 
 @dataclass
 class ReachabilityResult:
     sink: Sink
     reachability: Reachability = Reachability.UNKNOWN
 
-    # found in nodeprops.facts
-    func_id: str | None = None
+    # found in facts.facts
+    func_id: NodeID | None = None
 
     # from reach tool
     paths: list[ReachToolResult] | None = None
 
-    def update_from_fact_parser(self, fact_parser: 'FactParser') -> None:
+    def update_from_fact_parser(self, fact_parser: 'FactParser', src_hint: NodeID) -> None:
         """
         Looks for the function signature of a sink in nodeprops.facts
         and updates it with its func_id
         """
-        func_id = fact_parser.get_func_id(self.sink.affected_function)
+        func_id = fact_parser.get_func_id(self.sink.affected_function, src_hint)
+
+        module_name = fact_parser.get_module_name_for_node(func_id) 
+        print(f"Found function '{self.sink.affected_function}' in module '{module_name}'")
 
         if func_id:
             self.func_id = func_id
@@ -399,11 +426,11 @@ class ReachToolManager:
             print(f"[RW]: Read {self.reach_output_path}")
         
         # Convert list of KV pairs to map
-        def parse_result_path(nodes: list[str], edges: list[str]):
+        def parse_result_path(nodes: list[NodeID], edges: list[str]):
             return ReachToolResult(nodes=[fact_parser.nodes[id] for id in nodes], edges=edges)
                 
         return {
-            result["dst"]: [parse_result_path(**r) for r in result["paths"]] for result in reach_file["query_results"]
+            tuple(result["dst"]): [parse_result_path(**r) for r in result["paths"]] for result in reach_file["query_results"]
         }
 
 class Orchestrator:
@@ -486,21 +513,27 @@ class Orchestrator:
         return [result for result in self.results if result.reachability == Reachability.UNKNOWN]
 
     def parse_facts(self):
-        "Update results from fact_parser to get func_id"
-        for result in self.results:
-            result.update_from_fact_parser(self.fact_parser)
-
-    def run_reach_tool(self):
-        "Run reach tool and update Results"
         # NOTE: we assume that we can always enter
         # the desired basic block from an 'fmain'
         src = self.fact_parser.get_func_id(self.entrypoint)
         assert src is not None, f"Could not find source function '{self.entrypoint}'"
+
+        module_name = self.fact_parser.get_module_name_for_node(src)
+
+        print(f"Found function '{self.entrypoint}' in module '{module_name}'")
+        self.src = src
+        "Update results from fact_parser to get func_id"
+        for result in self.results:
+            result.update_from_fact_parser(self.fact_parser, src)
+
+    def run_reach_tool(self):
+        "Run reach tool and update Results"
         # TODO (optional): implement flags to specify the intermediate file placements
 
         """
         https://stackoverflow.com/a/48710609
         """
+        src = self.src
         def is_docker():
             def text_in_file(text: str, filename: str):
                 try:

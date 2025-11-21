@@ -102,9 +102,9 @@ namespace ReachFacts {
     }
 
     static ModuleFacts deserialize(std::istream& facts) {
-        json obj = json::parse(facts);
+      json obj = json::parse(facts);
 
-        return obj.get<ModuleFacts>();
+      return obj.get<ModuleFacts>();
     }
   };
 
@@ -121,9 +121,22 @@ namespace ReachFacts {
     }
 
     static ProgramFacts deserialize(std::istream& facts) {
-        json obj = json::parse(facts);
+      // The stream might be multiple ProgramFacts concatenated together,
+      // but separated by a newline. Merge them together.
 
-        return obj.get<ProgramFacts>();
+      ProgramFacts pf;
+
+      std::string line;
+      while (std::getline(facts, line)) {
+        json obj = json::parse(line);
+        auto f = obj.get<ProgramFacts>();
+
+        for (const auto& [k,v]: f.modules) {
+          pf.modules.emplace(k, v);
+        }
+      }
+
+      return pf;
     }
   };
 
