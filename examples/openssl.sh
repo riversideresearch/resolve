@@ -36,7 +36,7 @@ mkdir openssl_facts
 
 # Extract the embedded info from the openssl binary
 
-python3 ../linker/AnalysisEngine_linkmap.py --in_bin=openssl/libcrypto.so --out_dir=openssl_facts
+python3 ../linker/extract_facts.py --in_bin=openssl/libcrypto.so --out_dir=openssl_facts
 
 # Run the reach-wrapper tool
 python3 ../reach-wrapper/reach-wrapper.py \
