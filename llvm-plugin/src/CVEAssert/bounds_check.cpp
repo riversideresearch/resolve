@@ -212,7 +212,7 @@ static Function *getOrCreateResolveGEP(Module *M, Type *ty, Vulnerability::Remed
     false
   );
 
-  Function resolveGEPFn = Function::Create(resolveGEPFnTy, Function::InternalLinkage, handlerName, M);
+  Function *resolveGEPFn = Function::Create(resolveGEPFnTy, Function::InternalLinkage, handlerName, M);
 
   BasicBlock *EntryBB = BasicBlock::Create(Ctx, "", resolveGEPFn);
   BasicBlock *GEPCalcBB = BasicBlock::Create(Ctx, "", resolveGEPFn);
@@ -696,7 +696,7 @@ void sanitizeMalloc(Function *F, Vulnerability::RemediationStrategies strategy) 
     //case Vulnerability::RemediationStrategies::CONTINUE-ZERO: /* TODO: Not yet supported. Implement this remediation strategy */
     case Vulnerability::RemediationStrategies::EXIT:
     case Vulnerability::RemediationStrategies::RECOVER:
-    case Vulnerability::Remediation::SAT:                     /* TODO: Not yet supported. Implement this remediation strategy */
+    case Vulnerability::RemediationStrategies::SAT:                     /* TODO: Not yet supported. Implement this remediation strategy */
       break;
 
     default:
