@@ -212,7 +212,7 @@ static Function *getOrCreateResolveGEP(Module *M, Type *ty, Vulnerability::Remed
     false
   );
 
-  FunctionCallee resolveGEPFn = Function::Create(resolveGEPFnTy, Function::InternalLinkage, handlerName, M);
+  Function resolveGEPFn = Function::Create(resolveGEPFnTy, Function::InternalLinkage, handlerName, M);
 
   BasicBlock *EntryBB = BasicBlock::Create(Ctx, "", resolveGEPFn);
   BasicBlock *GEPCalcBB = BasicBlock::Create(Ctx, "", resolveGEPFn);
@@ -228,7 +228,7 @@ static Function *getOrCreateResolveGEP(Module *M, Type *ty, Vulnerability::Remed
     false
   );
 
-  FunctioCallee resolveCheckBoundsFn = M->getOrInsertFunction(
+  FunctionCallee resolveCheckBoundsFn = M->getOrInsertFunction(
     "resolve_check_bounds",
     resolveCheckBoundsFnTy
   );
@@ -237,7 +237,7 @@ static Function *getOrCreateResolveGEP(Module *M, Type *ty, Vulnerability::Remed
   Value *derivedPtr = builder.CreateInBoundsGEP(i8_ty, basePtr, offset);
 
   Value* withinBounds = builder.CreateCall(resolveCheckBoundsFn, { basePtr, derivedPtr, offset });
-  builder.CreateCondBr(withinBounds, GEPCalcBB, SanitizeGEPBB);
+  builder.CreateCondBr(withinBounds, GEPCalcBB, TaintedGepBB);
 
   // GEPCalcBB: Compute derived pointer and return 
   builder.SetInsertPoint(GEPCalcBB);
@@ -692,8 +692,8 @@ void sanitizeMalloc(Function *F, Vulnerability::RemediationStrategies strategy) 
   std::vector<GetElementPtrInst *> gepList;
 
   switch(strategy) {
-    case Vulnerability::RemediationStrategies::CONTINUE-WRAP: /* TODO: Not yet supported. Implement this remediaion strategy */
-    case Vulnerability::RemediationStrategies::CONTINUE-ZERO: /* TODO: Not yet supported. Implement this remediation strategy */
+    //case Vulnerability::RemediationStrategies::CONTINUE-WRAP: /* TODO: Not yet supported. Implement this remediaion strategy */
+    //case Vulnerability::RemediationStrategies::CONTINUE-ZERO: /* TODO: Not yet supported. Implement this remediation strategy */
     case Vulnerability::RemediationStrategies::EXIT:
     case Vulnerability::RemediationStrategies::RECOVER:
     case Vulnerability::Remediation::SAT:                     /* TODO: Not yet supported. Implement this remediation strategy */
