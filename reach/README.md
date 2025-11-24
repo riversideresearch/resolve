@@ -34,9 +34,9 @@ will construct a control-flow graph from the facts in `facts_dir`, and
 attempt to find the shortest path from `src` to `dst` in it.
 
 The `src` and `dst` node IDs should match how they appear in the facts
-files, which is determined the RESOLVE LLVM pass that generates the
-facts (currently here:
-https://gitlab.ebossproject.com/riverside/resolve/-/blob/9fc1ec9774dab150d878ebaca37271677d81bb9b/services/resolve-build-base/llvm-ir/LLVMFacts.hpp).
+files, which is determined by the [RESOLVE LLVM
+pass](https://github.com/riversideresearch/resolve/blob/main/llvm-plugin/src/EnhancedFacts.cpp)
+that generates the facts.
 
 For example, if `nodeprops.facts` contains the following line:
 ```
