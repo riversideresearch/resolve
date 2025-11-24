@@ -1,3 +1,3 @@
-The RESOLVE software is distributed with KLEE (found in the `klee/`) subdirectory 
-which contains code goverened under a separate license. The corresponding license 
-for this software can be found in klee/LICENSE.TXT
+`resolve` is distributed with KLEE (found in the `klee/' subdirectory), 
+which contains code governed under a separate license. See klee/LICENSE.txt
+for details.
