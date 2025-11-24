@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.20)
 project(resolve-llvm-plugin)
 
-find_package(LLVM CONFIG)
+find_package(LLVM 18 CONFIG)
 
 set(CMAKE_COMPILE_WARNING_AS_ERROR ON)
 
