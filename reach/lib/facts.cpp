@@ -1,6 +1,6 @@
 /*
  *   Copyright (c) 2025 Riverside Research.
- *   LGPL-3; See LICENSE.txt: the repo root for details.
+ *   LGPL-3; See LICENSE.txt in the repo root for details.
  */
 
 #include <algorithm>
@@ -12,9 +12,13 @@
 #include "facts.hpp"
 #include "util.hpp"
 
+#define DB_ERR(id, m1, m2) \
+  std::cerr << "id " << ReachFacts::to_string(id) << " in " << #m1 << " not found in " << #m2 << std::endl
+
 using namespace ReachFacts;
 using namespace std;
 namespace fs = filesystem;
+
 
 inline NodeType parse_node_type(const string& s) {
   static unordered_map<string, NodeType> m = {
@@ -113,6 +117,10 @@ database ReachFacts::load(istream& facts,
   return db;
 }
 
+std::string ReachFacts::to_string(const NamespacedNodeId& id) {
+  return "(" + std::to_string(id.first) + "," + std::to_string(id.second) + ")";
+}
+
 database ReachFacts::load(const fs::path& facts_dir, LoadOptions options) {
   const string facts_path = facts_dir / "facts.facts";
   ifstream facts(facts_path);
@@ -126,7 +134,7 @@ database ReachFacts::load(const fs::path& facts_dir, LoadOptions options) {
 
 // These checks ensure that the hashmap lookups in
 // graph::build_call_graph and graph::build_cfg will succeed.
-bool facts::validate(const database& db) {
+bool ReachFacts::validate(const database& db) {
   // All nodes are assigned a type.
   if (!(KEYS_SUBSET(db.contains, db.node_type) &&
         KEYS_SUBSET(db.calls, db.node_type) &&
@@ -179,7 +187,7 @@ bool facts::validate(const database& db) {
   for (const auto& [id, node_type] : db.node_type) {
     if (node_type == NodeType::BasicBlock) {
       if (!db.contains.contains(id)) {
-        std::cerr << "Basic block with id " << id
+        std::cerr << "Basic block with id " << ReachFacts::to_string(id)
                   << " not found in db.contains" << std::endl;
         return false;
       }

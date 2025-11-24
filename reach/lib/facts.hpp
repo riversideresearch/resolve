@@ -143,6 +143,8 @@ namespace ReachFacts {
   // The full id would then be (ModuleId, NodeId)
   using NamespacedNodeId = std::pair<NodeId, NodeId>;
 
+  std::string to_string(const NamespacedNodeId& id);
+
   template<typename V>
   using NodeMap = std::unordered_map<NamespacedNodeId, V, pair_hash>;
 
