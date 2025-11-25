@@ -139,7 +139,7 @@ graph::build_simple_graph(const database& db,
     // edges for all address-taken functions with type signature
     // "ptr (ptr)".
     const auto& fn_name = db.name.at(fn);
-    if (fn_name.ends_with(":fpthread_create")) {
+    if (fn_name == "pthread_create") {
       for (const auto& fn : db.address_taken) {
         if (AT(db.fun_sig, fn) == "ptr (ptr)") {
           g.addEdge(hm.getHandle(fn), hm.getHandle(instr),
@@ -227,7 +227,7 @@ graph::build_call_graph(const database& db,
           // "ptr (ptr)".
           const auto& call_id = db.calls.at(instr);
           const auto& fn_name = db.name.at(call_id);
-          if (fn_name.ends_with(":fpthread_create")) {
+          if (fn_name == "pthread_create") {
             for (const auto& fn : db.address_taken) {
               if (db.fun_sig.at(fn) == "ptr (ptr)") {
                 g.addEdge(hm.getHandle(fn), hm.getHandle(f),
@@ -332,7 +332,7 @@ graph::build_cfg(const database& db,
         // "ptr (ptr)".
         const auto& call_id = db.calls.at(instr);
         const auto& fn_name = db.name.at(call_id);
-        if (fn_name.ends_with(":fpthread_create")) {
+        if (fn_name == "pthread_create") {
           for (const auto& fn : db.address_taken) {
             if (db.fun_sig.at(fn) == "ptr (ptr)") {
               g.addEdge(hm.getHandle(fn), hm.getHandle(bb),
@@ -445,7 +445,7 @@ graph::build_instr_cfg(const database& db,
         // "ptr (ptr)".
         const auto& call_id = db.calls.at(instr);
         const auto& fn_name = db.name.at(call_id);
-        if (fn_name.ends_with(":fpthread_create")) {
+        if (fn_name == "pthread_create") {
           for (const auto& fn : db.address_taken) {
             if (AT(db.fun_sig, fn) == "ptr (ptr)") {
               g.addEdge(hm.getHandle(fn), hm.getHandle(instr),
@@ -484,7 +484,7 @@ graph::build_instr_cfg(const database& db,
   unordered_map<string, vector<size_t>> name2handles;
   for (const auto& [id, linkage] : db.linkage) {
     if (linkage == Linkage::ExternalLinkage) {
-      name2handles[AT(db.name, id)].push_back(hm.getHandle(id));
+      name2handles[db.name.at(id)].push_back(hm.getHandle(id));
     }
   }
   for (const auto& [_, handles] : name2handles) {
