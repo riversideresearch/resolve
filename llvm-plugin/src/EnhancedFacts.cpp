@@ -3,9 +3,7 @@
  *   LGPL-3; See LICENSE.txt in the repo root for details.
  */
 
-#include "Facts.hpp"
-#include "LLVMFacts.hpp"
-#include "NodeID.hpp"
+#include "EnhancedFacts.hpp"
 
 #include <cstdlib> // For std::getenv
 #include <iomanip>
@@ -15,47 +13,22 @@
 #include <unordered_map>
 #include <vector>
 
-#include "llvm/ADT/SmallString.h"
-#include "llvm/ADT/SmallVector.h"
-#include "llvm/IR/BasicBlock.h"
-#include "llvm/IR/CFG.h"
-#include "llvm/IR/Constants.h"
-#include "llvm/IR/DebugInfoMetadata.h"
-#include "llvm/IR/Function.h"
-#include "llvm/IR/GlobalVariable.h"
-#include "llvm/IR/Instruction.h"
-#include "llvm/IR/Instructions.h"
-#include "llvm/IR/LLVMContext.h"
-#include "llvm/IR/Module.h"
-#include "llvm/IR/PassManager.h"
-#include "llvm/Passes/PassBuilder.h"
-#include "llvm/Passes/PassPlugin.h"
-#include "llvm/Support/Compression.h"
-#include "llvm/Support/FileSystem.h"
-#include "llvm/Support/Path.h"
-#include "llvm/Support/raw_ostream.h"
-#include "llvm/Transforms/Utils/ModuleUtils.h"
-
 using namespace llvm;
 
-static Facts all_facts;
-
-static LLVMFacts facts(all_facts);
-
-static std::string debugLocToString(DebugLoc dbgLoc) {
+std::string Resolve::debugLocToString(DebugLoc dbgLoc) {
   auto line = std::to_string(dbgLoc.getLine());
   auto col = std::to_string(dbgLoc.getCol());
   return line + ":" + col;
 }
 
-static std::string typeToString(const Type &type) {
+std::string Resolve::typeToString(const Type &type) {
   std::string str;
   llvm::raw_string_ostream out(str);
   type.print(out);
   return "\"" + str + "\"";
 }
 
-static void getGlobalFacts(GlobalVariable &G) {
+void Resolve::getGlobalFacts(GlobalVariable &G) {
   facts.addNode(G);
   facts.addNodeProp(G, "name", G.getName().str());
   facts.addNodeProp(G, "linkage",
@@ -78,7 +51,7 @@ static void getGlobalFacts(GlobalVariable &G) {
   // }
 }
 
-static void getFunctionFacts(Function &F) {
+void Resolve::getFunctionFacts(Function &F) {
   facts.addNode(F);
   facts.addNodeProp(F, "name", F.getName().str());
   facts.addNodeProp(F, "linkage",
@@ -147,7 +120,7 @@ static void getFunctionFacts(Function &F) {
   }
 }
 
-static void getModuleFacts(Module &M) {
+void Resolve::getModuleFacts(Module &M) {
   facts.addNodeProp(M, "source_file", M.getSourceFileName());
 
   for (GlobalVariable &G : M.globals()) {
@@ -164,7 +137,7 @@ static void getModuleFacts(Module &M) {
 }
 
 // Embed the accumulated facts into custom ELF sections.
-static void embedFacts(Module &M) {
+void Resolve::embedFacts(Module &M) {
   LLVMContext &C = M.getContext();
   auto embedFactsSection = [&](StringRef sectionName,
                                const std::string &facts) {
@@ -197,8 +170,8 @@ static void embedFacts(Module &M) {
 
 struct EnhancedFactsPass : public PassInfoMixin<EnhancedFactsPass> {
   PreservedAnalyses run(Module &M, ModuleAnalysisManager &) {
-    getModuleFacts(M);
-    embedFacts(M);
+    Resolve::getModuleFacts(M);
+    Resolve::embedFacts(M);
     return PreservedAnalyses::all();
   }
 };

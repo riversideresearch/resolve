@@ -13,7 +13,7 @@ if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE RelWithDebInfo)
 endif()
 
-set(CMAKE_CXX_STANDARD 20 STRING "")
+# set(CMAKE_CXX_STANDARD 17 STRING "")
 
 # LLVM is normally built without RTTI. Be consistent with that.
 if(NOT LLVM_ENABLE_RTTI)
@@ -39,7 +39,15 @@ add_custom_target(clangformat
 )
 
 add_library(EnhancedFacts SHARED EnhancedFacts.cpp)
-target_include_directories(EnhancedFacts PUBLIC "../../reach/lib")
+target_include_directories(EnhancedFacts PUBLIC "${CMAKE_SOURCE_DIR}/../../reach/lib")
+
+
+add_definitions(${LLVM_DEFINITIONS})
+llvm_map_components_to_libnames(llvm_libs core)
+
+add_library(EnhancedFactsStatic STATIC EnhancedFacts.cpp)
+target_include_directories(EnhancedFactsStatic PUBLIC "${CMAKE_SOURCE_DIR}/../../reach/lib")
+target_link_libraries(EnhancedFactsStatic ${llvm_libs})
 
 
 add_library(CVEAssert SHARED 

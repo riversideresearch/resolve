@@ -655,16 +655,25 @@ add_subdirectory(runtime)
 add_subdirectory(tools)
 
 ################################################################################
-# RESOLVE
-################################################################################
-add_subdirectory(resolve)
-
-################################################################################
 # REACH
 ################################################################################
 set(REACH_SOURCE_DIR "${CMAKE_SOURCE_DIR}/../reach")
 set(REACH_BUILD_DIR "${CMAKE_BINARY_DIR}/reach_build")
 add_subdirectory(${REACH_SOURCE_DIR} ${REACH_BUILD_DIR})
+
+
+################################################################################
+# RESOLVE
+################################################################################
+set(RESOLVE_SOURCE_DIR "${CMAKE_SOURCE_DIR}/../llvm-plugin/src")
+set(RESOLVE_BUILD_DIR "${CMAKE_SOURCE_DIR}/../llvm-plugin/build")
+#add_subdirectory(${RESOLVE_SOURCE_DIR} ${RESOLVE_BUILD_DIR})
+add_library(resolve INTERFACE)
+target_include_directories(resolve INTERFACE ${RESOLVE_SOURCE_DIR} "${REACH_SOURCE_DIR}/lib")
+
+add_library(EnhancedFacts SHARED IMPORTED)
+set_target_properties(EnhancedFacts PROPERTIES IMPORTED_LOCATION "${CMAKE_SOURCE_DIR}/../llvm-plugin/build/libEnhancedFacts.so")
+
 
 ################################################################################
 # Testing

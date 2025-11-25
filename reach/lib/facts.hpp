@@ -175,7 +175,9 @@ namespace dlsym {
   struct loaded_symbol {
     std::string symbol;
     std::string library;
-    bool operator==(const loaded_symbol& rhs) const = default;
+    bool operator==(const loaded_symbol& rhs) const {
+      return symbol == rhs.symbol && library == rhs.library;
+    };
   };
 
   struct log {
