@@ -56,7 +56,7 @@
 #include "klee/System/MemoryUsage.h"
 #include "klee/System/Time.h"
 
-#include "EnhancedFacts.hpp"
+#include "EnhancedFacts.cpp" // TODO: fix? might need to refactor llvm-plugin
 
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/StringExtras.h"

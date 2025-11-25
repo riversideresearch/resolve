@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.20)
 project(resolve-llvm-plugin)
 
-find_package(LLVM CONFIG)
+find_package(LLVM 18 CONFIG)
 
 set(CMAKE_COMPILE_WARNING_AS_ERROR ON)
 
@@ -38,17 +38,9 @@ add_custom_target(clangformat
     COMMENT "Formatting source files with clang-format..."
 )
 
-add_library(EnhancedFacts SHARED EnhancedFacts.cpp)
+add_library(EnhancedFacts EnhancedFacts.cpp)
+
 target_include_directories(EnhancedFacts PUBLIC "${CMAKE_SOURCE_DIR}/../../reach/lib")
-
-
-add_definitions(${LLVM_DEFINITIONS})
-llvm_map_components_to_libnames(llvm_libs core)
-
-add_library(EnhancedFactsStatic STATIC EnhancedFacts.cpp)
-target_include_directories(EnhancedFactsStatic PUBLIC "${CMAKE_SOURCE_DIR}/../../reach/lib")
-target_link_libraries(EnhancedFactsStatic ${llvm_libs})
-
 
 add_library(CVEAssert SHARED 
   CVEAssert/CVEAssert.cpp

@@ -5,8 +5,8 @@ add_subdirectory(lib)
 
 # set (CMAKE_CXX_STANDARD 23)
 set (CMAKE_BUILD_TYPE Release)
-set (CMAKE_CXX_COMPILER "clang++")
-set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fmax-errors=3 -fpass-plugin=${CMAKE_SOURCE_DIR}/../llvm-plugin/build/libEnhancedFacts.so")
+# set (CMAKE_CXX_COMPILER "clang++")
+set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fmax-errors=3")
 
 add_executable(reach src/main.cpp)
 
