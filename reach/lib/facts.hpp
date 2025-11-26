@@ -5,12 +5,14 @@
 
 #pragma once
 
+#include <iostream>
 #include <fstream>
 #include <string>
 #include <unordered_map>
 #include <vector>
 
 #include "json.hpp"
+#include "glaze/glaze.hpp"
 
 namespace ReachFacts {
 
@@ -79,7 +81,13 @@ namespace ReachFacts {
 
   using json = nlohmann::json;
 
+  struct Node {
+    NodeType kind;
+    std::unordered_map<std::string, std::string> props;
+  };
+
   struct ModuleFacts {
+    //std::unordered_map<NodeId, Node> nodes;
     std::unordered_map<NodeId, std::string> node_types;
     // the values here could be more structured if desired, matching with the enums
     std::unordered_map<NodeId, std::unordered_map<std::string, std::string>> node_props;
@@ -107,16 +115,21 @@ namespace ReachFacts {
     }
   };
 
-
   struct ProgramFacts {
     std::unordered_map<NodeId, ModuleFacts> modules;
 
     NLOHMANN_DEFINE_TYPE_INTRUSIVE(ProgramFacts, modules);
 
     std::string serialize() {
+
+      std::string json = glz::write_json(*this).value_or("error");
+      return json;
+
+      /*
       json obj = *this;
       
       return obj.dump();
+      */
     }
 
     static ProgramFacts deserialize(std::istream& facts) {
@@ -126,14 +139,41 @@ namespace ReachFacts {
       ProgramFacts pf;
 
       std::string line;
+      auto i = 0;
       while (std::getline(facts, line)) {
+        //std::cout << "Line size: " << line.size() << "\n";
+        i += line.size();
+        ProgramFacts f;
+        auto error = glz::read_json(f, line);
+        if (error) {
+          std::cout << glz::format_error(error, line);
+        }
+        /*
         json obj = json::parse(line);
-        auto f = obj.get<ProgramFacts>();
 
+        auto f = obj.get<ProgramFacts>();
+        */
+
+        pf.modules.merge(f.modules);
+
+        if (f.modules.size() > 0) {
+          for (const auto& [k,_]: f.modules) {
+            std::cerr << "Duplicate module id in facts: " << k << std::endl;
+          }
+        }
+        /*
         for (const auto& [k,v]: f.modules) {
+          if (pf.modules.contains(k)) {
+            std::cerr << "Duplicate module id in facts: " << k << std::endl;
+          }
+
+          //std::cout << "Found module " << k << std::endl;
           pf.modules.emplace(k, v);
         }
+        */
       }
+
+      std::cout << "Found " << pf.modules.size() << " modules with total size " << i << std::endl;
 
       return pf;
     }
@@ -168,6 +208,19 @@ namespace ReachFacts {
 
   bool validate(const database& db);
 }  // namespace facts
+
+
+template <>
+struct glz::meta<ReachFacts::ModuleFacts> {
+  using T = ReachFacts::ModuleFacts;
+  static constexpr auto value = object(
+      "node_types", &T::node_types,
+      "node_props", &T::node_props,
+      "edge_kinds", &T::edge_kinds
+  );
+};
+
+
 
 // Loaded symbol logs from dynamic analysis, for pruning
 // IndirectExtern edges that aren't seen at runtime.

@@ -194,15 +194,21 @@ class FactParser:
             for line in f:
                 facts = json.loads(line.strip('\n'))
 
-                for mid, m in facts["modules"]:
-                    m["node_props"] = {id: props for id,props in m["node_props"]}
-                    mnodes = [ Node((mid, id), kind, m["node_props"][id]) for id,kind in m["node_types"] ]
+                for mid, m in facts["modules"].items():
+                    mid = int(mid)
+                    m["node_props"] = {int(id): props for id,props in m["node_props"].items()}
+                    mnodes = [ Node((mid, int(id)), kind, m["node_props"][int(id)]) for id,kind in m["node_types"].items() ]
                     all_nodes.extend(mnodes)
 
                     medges = []
-                    for (src, dst), kinds in m["edge_kinds"]:
-                        sid = (mid, src)
-                        did = (mid, dst)
+                    #for (src, dst), kinds in m["edge_kinds"].items():
+                    for k, kinds in m["edge_kinds"].items():
+                        # glaze serializes pairs as {first:second}
+                        d = json.loads(k)
+                        src,dst = list(d.items())[0]
+
+                        sid = (mid, int(src))
+                        did = (mid, int(dst))
                         e = Edge((sid, did), sid, did, kinds, {})
                         medges.append(e)
 

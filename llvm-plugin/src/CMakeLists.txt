@@ -33,14 +33,27 @@ file(GLOB_RECURSE PROJECT_SOURCE_FILES
     "${CMAKE_SOURCE_DIR}/*.h"
 )
 
+include(FetchContent)
+
+FetchContent_Declare(
+  glaze
+  GIT_REPOSITORY https://github.com/stephenberry/glaze.git
+  GIT_TAG main
+  GIT_SHALLOW TRUE
+)
+
+FetchContent_MakeAvailable(glaze)
+
+
 add_custom_target(clangformat
     COMMAND ${CLANG_FORMAT_EXECUTABLE} -i ${PROJECT_SOURCE_FILES}
     COMMENT "Formatting source files with clang-format..."
 )
 
-add_library(EnhancedFacts EnhancedFacts.cpp)
+add_library(EnhancedFacts SHARED EnhancedFacts.cpp)
 
 target_include_directories(EnhancedFacts PUBLIC "${CMAKE_SOURCE_DIR}/../../reach/lib")
+target_link_libraries(EnhancedFacts PRIVATE glaze::glaze)
 
 add_library(CVEAssert SHARED 
   CVEAssert/CVEAssert.cpp

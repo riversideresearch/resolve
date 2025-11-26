@@ -643,6 +643,18 @@ message(STATUS "KLEE_COMPONENT_CXX_DEFINES: '${KLEE_COMPONENT_CXX_DEFINES}'")
 message(STATUS "KLEE_COMPONENT_CXX_FLAGS: '${KLEE_COMPONENT_CXX_FLAGS}'")
 message(STATUS "KLEE_SOLVER_LIBRARIES: '${KLEE_SOLVER_LIBRARIES}'")
 
+
+include(FetchContent)
+
+FetchContent_Declare(
+  glaze
+  GIT_REPOSITORY https://github.com/stephenberry/glaze.git
+  GIT_TAG main
+  GIT_SHALLOW TRUE
+)
+
+FetchContent_MakeAvailable(glaze)
+
 ################################################################################
 # KLEE components
 ################################################################################

@@ -30,7 +30,7 @@ cd ..
 
 # Ensure we build new facts
 if [ -d "openssl_facts" ]; then
-    rm openssl_facts
+    rm -r openssl_facts
 fi
 mkdir openssl_facts
 
@@ -43,5 +43,5 @@ python3 ../reach-wrapper/reach-wrapper.py \
         -i openssl_vulnerabilities.json \
         -o openssl_reach_out.json \
         -f openssl_facts \
-        -e "CMS_RecipientInfo_decrypt"
+        -e "CMS_RecipientInfo_decrypt" \
         -r ../reach/build/reach

@@ -36,6 +36,7 @@ target_link_libraries(kleeCore PRIVATE
   kleaverExpr
   kleeSupport
   reachlib
+  glaze::glaze
 )
 
 set(RESOLVE_LLVM_PLUGIN_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/../llvm-plugin/src")

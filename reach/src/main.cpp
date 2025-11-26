@@ -234,8 +234,7 @@ int main(int argc, char* argv[]) {
     const auto dst_handle_opt = hm.getHandleOpt(q.dst);
 
     auto print_missing = [&](auto node) {
-      const auto [m, n] = node;
-      cerr << "node '(" << m << ", " << n << ")' not found" << endl;
+      cerr << "node " << ReachFacts::to_string(node) << " not found" << endl;
     };
 
     if (!src_handle_opt.has_value()) {
