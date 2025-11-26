@@ -1,9 +1,12 @@
 SHELL := /bin/bash
 all: build
 
-build: build-llvm-plugin build-libresolve build-reach build-klee
+build: build-resolve-facts build-llvm-plugin build-libresolve build-reach build-klee
 
-build-llvm-plugin: llvm-plugin build-libresolve
+build-resolve-facts: resolve-facts
+	+$(MAKE) -C resolve-facts
+
+build-llvm-plugin: llvm-plugin build-libresolve build-resolve-facts
 	+$(MAKE) -C llvm-plugin
 
 build-libresolve: libresolve
@@ -14,13 +17,16 @@ test: test-llvm-plugin
 test-llvm-plugin:
 	+$(MAKE) -C llvm-plugin test
 
-build-reach: reach
+build-reach: reach build-resolve-facts
 	+$(MAKE) -C reach
 
-build-klee: klee
+build-klee: klee build-reach build-resolve-facts
 	+$(MAKE) -C klee
 
-clean: clean-llvm-plugin clean-libresolve clean-reach clean-klee
+clean: clean-resolve-facts clean-llvm-plugin clean-libresolve clean-reach clean-klee
+
+clean-resolve-facts:
+	cd resolve-facts && make clean
 
 clean-llvm-plugin:
 	cd llvm-plugin && make clean
