@@ -2115,7 +2115,7 @@ void Executor::transferToBasicBlock(BasicBlock *dst, BasicBlock *src,
 	goto cont;
       }
     }
-    const auto bb_id = Resolve::facts.addNode(*dst);
+    const auto bb_id = resolve::facts.addNode(*dst);
 
     klee_warning(("pruning state: " + std::to_string(bb_id)).c_str());
 

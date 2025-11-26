@@ -14,7 +14,7 @@
 #include "graph.hpp"
 #include "util.hpp"
 
-using namespace ReachFacts;
+using namespace reach_facts;
 using namespace graph;
 using namespace std;
 using symbol = dlsym::loaded_symbol;

@@ -12,9 +12,18 @@
 #include <vector>
 
 #include "json.hpp"
-#include "glaze/glaze.hpp"
+#include "resolve_facts.hpp"
 
-namespace ReachFacts {
+using NamespacedNodeId = resolve_facts::NamespacedNodeId;
+
+template<typename T>
+using NodeMap = resolve_facts::NodeMap<T>;
+
+using NodeType = resolve_facts::NodeType;
+using Linkage = resolve_facts::Linkage;
+using CallType = resolve_facts::CallType;
+
+namespace reach_facts {
 
   enum class LoadOptions : int {
     None         = 0,
@@ -45,149 +54,6 @@ namespace ReachFacts {
     return (value & flags) != LoadOptions::None;
   }
 
-  enum class NodeType {
-    Module,
-    GlobalVariable,
-    Function,
-    Argument,
-    BasicBlock,
-    Instruction,
-  };
-
-  enum class Linkage {
-    ExternalLinkage,
-    Other,
-  };
-
-  enum class CallType {
-    Direct,
-    Indirect,
-  };
-
-  // Type synonym for node NodeIds.
-  using NodeId = uint32_t;
-
-  struct pair_hash : public std::function<std::size_t(std::pair<NodeId, NodeId>)> {
-    std::hash<uint64_t> hasher;
-    std::size_t operator()(const std::pair<NodeId, NodeId> &k) const {
-      // Hash as a single uint64_t because hashing as two individual uint32_t ended up being hilariously slow
-      // which could have also just been a side effect of being a poor hash combiner.
-      uint64_t s = ((uint64_t)k.first) << 32 | (uint64_t)k.second;
-      return hasher(s);
-    }
-
-    pair_hash() {}
-  };
-
-  using json = nlohmann::json;
-
-  struct Node {
-    NodeType kind;
-    std::unordered_map<std::string, std::string> props;
-  };
-
-  struct ModuleFacts {
-    //std::unordered_map<NodeId, Node> nodes;
-    std::unordered_map<NodeId, std::string> node_types;
-    // the values here could be more structured if desired, matching with the enums
-    std::unordered_map<NodeId, std::unordered_map<std::string, std::string>> node_props;
-    // Likewise we only know about so many edge types and this could be more restrictive.
-    std::unordered_map<std::pair<NodeId, NodeId>, std::vector<std::string>, pair_hash> edge_kinds;
-
-    ModuleFacts() :
-        node_types(), node_props(), edge_kinds()
-    {}
-
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE(ModuleFacts, node_types, node_props, edge_kinds);
-
-    // Note: the library supports serializing as BSON/CBOR 
-    // if we want a minimal-friction binary format instead.
-    std::string serialize() {
-      json obj = *this;
-      
-      return obj.dump();
-    }
-
-    static ModuleFacts deserialize(std::istream& facts) {
-      json obj = json::parse(facts);
-
-      return obj.get<ModuleFacts>();
-    }
-  };
-
-  struct ProgramFacts {
-    std::unordered_map<NodeId, ModuleFacts> modules;
-
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE(ProgramFacts, modules);
-
-    std::string serialize() {
-
-      std::string json = glz::write_json(*this).value_or("error");
-      return json;
-
-      /*
-      json obj = *this;
-      
-      return obj.dump();
-      */
-    }
-
-    static ProgramFacts deserialize(std::istream& facts) {
-      // The stream might be multiple ProgramFacts concatenated together,
-      // but separated by a newline. Merge them together.
-
-      ProgramFacts pf;
-
-      std::string line;
-      auto i = 0;
-      while (std::getline(facts, line)) {
-        //std::cout << "Line size: " << line.size() << "\n";
-        i += line.size();
-        ProgramFacts f;
-        auto error = glz::read_json(f, line);
-        if (error) {
-          std::cout << glz::format_error(error, line);
-        }
-        /*
-        json obj = json::parse(line);
-
-        auto f = obj.get<ProgramFacts>();
-        */
-
-        pf.modules.merge(f.modules);
-
-        if (f.modules.size() > 0) {
-          for (const auto& [k,_]: f.modules) {
-            std::cerr << "Duplicate module id in facts: " << k << std::endl;
-          }
-        }
-        /*
-        for (const auto& [k,v]: f.modules) {
-          if (pf.modules.contains(k)) {
-            std::cerr << "Duplicate module id in facts: " << k << std::endl;
-          }
-
-          //std::cout << "Found module " << k << std::endl;
-          pf.modules.emplace(k, v);
-        }
-        */
-      }
-
-      std::cout << "Found " << pf.modules.size() << " modules with total size " << i << std::endl;
-
-      return pf;
-    }
-  };
-
-  // Basic node ids are only unique within the context of a compilation Module which has its own NodeId.
-  // The full id would then be (ModuleId, NodeId)
-  using NamespacedNodeId = std::pair<NodeId, NodeId>;
-
-  std::string to_string(const NamespacedNodeId& id);
-
-  template<typename V>
-  using NodeMap = std::unordered_map<NamespacedNodeId, V, pair_hash>;
-
   struct database {
     NodeMap<NodeType> node_type;
     NodeMap<std::vector<NamespacedNodeId>> contains;
@@ -208,19 +74,6 @@ namespace ReachFacts {
 
   bool validate(const database& db);
 }  // namespace facts
-
-
-template <>
-struct glz::meta<ReachFacts::ModuleFacts> {
-  using T = ReachFacts::ModuleFacts;
-  static constexpr auto value = object(
-      "node_types", &T::node_types,
-      "node_props", &T::node_props,
-      "edge_kinds", &T::edge_kinds
-  );
-};
-
-
 
 // Loaded symbol logs from dynamic analysis, for pruning
 // IndirectExtern edges that aren't seen at runtime.

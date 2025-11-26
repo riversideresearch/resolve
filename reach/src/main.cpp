@@ -162,7 +162,7 @@ int main(int argc, char* argv[]) {
   // Execute reachability queries.
   // First, build graph.
 
-  const unordered_map<string, ReachFacts::LoadOptions> load_options = {
+  const unordered_map<string, reach_facts::LoadOptions> load_options = {
     { "simple", graph::SIMPLE_LOAD_OPTIONS },
     { "cfg", graph::CFG_LOAD_OPTIONS },
     { "instr-cfg", graph::CFG_LOAD_OPTIONS },
@@ -170,7 +170,7 @@ int main(int argc, char* argv[]) {
   };
 
   typedef pair<graph::handle_map, graph::T>
-    (*graph_builder)(const ReachFacts::database&, bool,
+    (*graph_builder)(const reach_facts::database&, bool,
                      const optional<vector<dlsym::loaded_symbol>>&);
 
   const unordered_map<string, graph_builder> graph_builders = {
@@ -195,7 +195,7 @@ int main(int argc, char* argv[]) {
   }
   if (conf.validate_facts) {
     t0 = system_clock::now();
-    if (!ReachFacts::validate(db)) {
+    if (!reach_facts::validate(db)) {
       cerr << "WARNING: facts failed validation!" << endl;
     }
     if (conf.verbose) {
@@ -234,7 +234,7 @@ int main(int argc, char* argv[]) {
     const auto dst_handle_opt = hm.getHandleOpt(q.dst);
 
     auto print_missing = [&](auto node) {
-      cerr << "node " << ReachFacts::to_string(node) << " not found" << endl;
+      cerr << "node " << resolve_facts::to_string(node) << " not found" << endl;
     };
 
     if (!src_handle_opt.has_value()) {

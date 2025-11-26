@@ -12,43 +12,17 @@
 #include "facts.hpp"
 #include "util.hpp"
 
-#define DB_ERR(id, m1, m2) \
-  std::cerr << "id " << ReachFacts::to_string(id) << " in " << #m1 << " not found in " << #m2 << std::endl
-
-using namespace ReachFacts;
+using namespace resolve_facts;
+using namespace reach_facts;
 using namespace std;
+
+
+#define DB_ERR(id, m1, m2) \
+  std::cerr << "id " << resolve_facts::to_string(id) << " in " << #m1 << " not found in " << #m2 << std::endl
+
 namespace fs = filesystem;
 
-
-inline NodeType parse_node_type(const string& s) {
-  static unordered_map<string, NodeType> m = {
-    { "Module", NodeType::Module },
-    { "GlobalVariable", NodeType::GlobalVariable },
-    { "Function", NodeType::Function },
-    { "Argument", NodeType::Argument },
-    { "BasicBlock", NodeType::BasicBlock },
-    { "Instruction", NodeType::Instruction },
-  };
-  return m[s];
-}
-
-inline Linkage parse_linkage(const string& s) {
-  static unordered_map<string, Linkage> m = {
-    { "ExternalLinkage", Linkage::ExternalLinkage },
-    { "Other", Linkage::Other },
-  };
-  return m[s];
-}
-
-inline CallType parse_call_type(const string& s) {
-  static unordered_map<string, CallType> m = {
-    { "direct", CallType::Direct },
-    { "indirect", CallType::Indirect },
-  };
-  return m[s];
-}
-
-database ReachFacts::load(istream& facts,
+database reach_facts::load(istream& facts,
                      LoadOptions options) {
   database db;
   auto pf = ProgramFacts::deserialize(facts);
@@ -56,7 +30,7 @@ database ReachFacts::load(istream& facts,
 
   auto num_nodes = 0;
   for (const auto& [k,v]: pf.modules) {
-      num_nodes += v.node_types.size();
+      num_nodes += v.nodes.size();
   }
 
   db.node_type.reserve(num_nodes);
@@ -64,49 +38,46 @@ database ReachFacts::load(istream& facts,
 
   for (const auto& [mid, m]: pf.modules) {
 
-    if (is_set(options, LoadOptions::NodeType)) {
-      for (const auto& [n, ty]: m.node_types) {
-        auto id = std::make_pair(mid, n);
-        db.node_type.emplace(id, parse_node_type(ty));
+    for (const auto& [nid, n]: m.nodes) {
+      auto id = std::make_pair(mid, nid);
+      if (is_set(options, LoadOptions::NodeType)) {
+        db.node_type.emplace(id, n.type);
       }
-    }
 
-    if (is_set(options, LoadOptions::NodeProps)) {
-      for (const auto& [n, props]: m.node_props) {
-        auto id = std::make_pair(mid, n);
-        for (const auto& [prop, val]: props) {
-          if (is_set(options, LoadOptions::Name) && prop == "name") {
-            db.name.emplace(id, val);
-          } else if (is_set(options, LoadOptions::Linkage) && prop == "linkage") {
-            db.linkage.emplace(id, parse_linkage(val));
-          } else if (is_set(options, LoadOptions::CallType)
-                     && prop == "call_type") {
-            db.call_type.emplace(id, parse_call_type(val));
-          } else if (is_set(options, LoadOptions::AddressTaken) &&
-                    prop == "address_taken") {
-             db.address_taken.push_back(id);
-          } else if (is_set(options, LoadOptions::FunctionType) &&
-                     prop == "function_type") {
-            db.fun_sig.emplace(id, val.substr(1, val.length()-2));
-          }
+      if (is_set(options, LoadOptions::NodeProps)) {
+        if (is_set(options, LoadOptions::Name) && n.name.has_value()) {
+          db.name.emplace(id, *n.name);
+        }
+        if (is_set(options, LoadOptions::Linkage) && n.linkage.has_value()) {
+          db.linkage.emplace(id, *n.linkage);
+        }
+        if (is_set(options, LoadOptions::CallType) && n.call_type.has_value()) {
+          db.call_type.emplace(id, *n.call_type);
+        }
+        if (is_set(options, LoadOptions::AddressTaken) && n.address_taken == true) {
+           db.address_taken.push_back(id);
+        } 
+        if (is_set(options, LoadOptions::FunctionType) && n.function_type.has_value()) {
+          auto ft = *n.function_type;
+          db.fun_sig.emplace(id, ft.substr(1, ft.length()-2));
         }
       }
     }
 
     if (is_set(options, LoadOptions::Edges)) {
-      for (const auto& [e, kinds]: m.edge_kinds) {
-        const auto& [s, d] = e;
+      for (const auto& [eid, e]: m.edges) {
+        const auto& [s, d] = eid;
         auto sid = std::make_pair(mid, s);
         auto did = std::make_pair(mid, d);
-        for (const auto k: kinds) {
-          if (is_set(options, LoadOptions::Contains) && k == "contains") {
+        for (const auto k: e.kinds) {
+          if (is_set(options, LoadOptions::Contains) && k == EdgeKind::Contains) {
             db.contains[sid].push_back(did);
-          } else if (is_set(options, LoadOptions::Calls) && k == "calls") {
+          } else if (is_set(options, LoadOptions::Calls) && k == EdgeKind::Calls) {
             db.calls.emplace(sid, did);
           } else if (is_set(options, LoadOptions::ControlFlow) &&
-                     k == "controlFlowTo") {
+                     k == EdgeKind::ControlFlowTo) {
             db.control_flow[sid].push_back(did);
-          } else if (k == "entryPoint") {
+          } else if (k == EdgeKind::EntryPoint) {
             db.function_entrypoints[sid] = did;
           }
         }
@@ -117,11 +88,7 @@ database ReachFacts::load(istream& facts,
   return db;
 }
 
-std::string ReachFacts::to_string(const NamespacedNodeId& id) {
-  return "(" + std::to_string(id.first) + "," + std::to_string(id.second) + ")";
-}
-
-database ReachFacts::load(const fs::path& facts_dir, LoadOptions options) {
+database reach_facts::load(const fs::path& facts_dir, LoadOptions options) {
   const string facts_path = facts_dir / "facts.facts";
   ifstream facts(facts_path);
 
@@ -134,7 +101,7 @@ database ReachFacts::load(const fs::path& facts_dir, LoadOptions options) {
 
 // These checks ensure that the hashmap lookups in
 // graph::build_call_graph and graph::build_cfg will succeed.
-bool ReachFacts::validate(const database& db) {
+bool reach_facts::validate(const database& db) {
   // All nodes are assigned a type.
   if (!(KEYS_SUBSET(db.contains, db.node_type) &&
         KEYS_SUBSET(db.calls, db.node_type) &&
@@ -187,7 +154,7 @@ bool ReachFacts::validate(const database& db) {
   for (const auto& [id, node_type] : db.node_type) {
     if (node_type == NodeType::BasicBlock) {
       if (!db.contains.contains(id)) {
-        std::cerr << "Basic block with id " << ReachFacts::to_string(id)
+        std::cerr << "Basic block with id " << resolve_facts::to_string(id)
                   << " not found in db.contains" << std::endl;
         return false;
       }

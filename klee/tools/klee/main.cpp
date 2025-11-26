@@ -69,7 +69,7 @@ DISABLE_WARNING_POP
 
 using namespace llvm;
 using namespace klee;
-using NNodeId = ReachFacts::NamespacedNodeId;
+using NNodeId = resolve_facts::NamespacedNodeId;
 
 namespace {
   cl::opt<std::string>
@@ -650,16 +650,16 @@ void KleeHandler::loadPathFile(std::string name,
 }
 
 void build_distmap_blacklist_for_module
-(const ReachFacts::NodeMap<size_t> &dm,
- const std::unordered_set<ReachFacts::NamespacedNodeId, ReachFacts::pair_hash> &bl,
+(const resolve_facts::NodeMap<size_t> &dm,
+ const std::unordered_set<resolve_facts::NamespacedNodeId, resolve_facts::pair_hash> &bl,
  std::unordered_map<const llvm::Instruction*, size_t> &distMap,
  std::unordered_set<const llvm::Instruction*> &blackList,
  const llvm::Module &M) {
   for (const Function &F : M) {
     for (const BasicBlock &BB : F) {
       for (const Instruction &I : BB) {
-        const auto iid = Resolve::facts.addNode(I);
-        const auto mid = Resolve::facts.getModuleId(I);
+        const auto iid = resolve::facts.addNode(I);
+        const auto mid = resolve::facts.getModuleId(I);
         const auto id = std::make_pair(mid, iid);
 
         if (dm.find(id) != dm.end()) {
@@ -674,13 +674,13 @@ void build_distmap_blacklist_for_module
 }
 
 // Search for function node id that matches name
-std::optional<NNodeId> findMatchingFunctionNodeId(const ReachFacts::database &db,
+std::optional<NNodeId> findMatchingFunctionNodeId(const reach_facts::database &db,
 						      const std::string functionName) {
   //std::regex pattern(".*/__uClibc_main.c:f" + functionName);
   // "/challenge/app/src/libc/misc/internals/__uClibc_main.c:ftarget"
   std::vector<NNodeId> matches;
   for (const auto &[node_id, node_type] : db.node_type) {
-    if (node_type == ReachFacts::NodeType::Function && db.name.at(node_id).ends_with(functionName)) {
+    if (node_type == resolve_facts::NodeType::Function && db.name.at(node_id).ends_with(functionName)) {
       matches.push_back(node_id);
     }
   }
@@ -707,16 +707,16 @@ bool KleeHandler::buildDistMapAndBlackList
   }
 
   for (const auto &M : loadedModules) {
-    Resolve::getModuleFacts(*M);
+    resolve::getModuleFacts(*M);
   }
-  Resolve::getModuleFacts(*mainModule);
+  resolve::getModuleFacts(*mainModule);
 
-  const auto fcts = Resolve::facts;
+  const auto fcts = resolve::facts;
 
   auto json = fcts.serialize();
 
   auto facts = std::istringstream(json);
-  const ReachFacts::database db = ReachFacts::load(facts, graph::CFG_LOAD_OPTIONS);
+  const reach_facts::database db = reach_facts::load(facts, graph::CFG_LOAD_OPTIONS);
 
   // Map target name to node ID
   const auto targetNodeId_opt = findMatchingFunctionNodeId(db, targetFunctionName);

@@ -13,7 +13,7 @@
 
 #include "facts.hpp"
 
-using NNodeId = ReachFacts::NamespacedNodeId;
+using NNodeId = resolve_facts::NamespacedNodeId;
 
 namespace graph {
 
@@ -29,7 +29,7 @@ namespace graph {
     NNodeId getId(size_t handle) const;
    private:
     std::vector<NNodeId> handle2id;
-    ReachFacts::NodeMap<size_t> id2handle;
+    resolve_facts::NodeMap<size_t> id2handle;
     void build_id2handle();
   };
 
@@ -69,48 +69,48 @@ namespace graph {
   // no duplicate nodes in edge lists).
   bool wf(const E& g);
 
-  constexpr ReachFacts::LoadOptions SIMPLE_LOAD_OPTIONS  =
-    ReachFacts::LoadOptions::Contains | ReachFacts::LoadOptions::Calls
-    | ReachFacts::LoadOptions::Name | ReachFacts::LoadOptions::Linkage
-    | ReachFacts::LoadOptions::CallType | ReachFacts::LoadOptions::AddressTaken
-    | ReachFacts::LoadOptions::FunctionType;
+  constexpr reach_facts::LoadOptions SIMPLE_LOAD_OPTIONS  =
+    reach_facts::LoadOptions::Contains | reach_facts::LoadOptions::Calls
+    | reach_facts::LoadOptions::Name | reach_facts::LoadOptions::Linkage
+    | reach_facts::LoadOptions::CallType | reach_facts::LoadOptions::AddressTaken
+    | reach_facts::LoadOptions::FunctionType;
 
   // Reachability graph with functions, BBs, instructions, and
   // contains and calls edges, but no control flow edges. This is the
   // first thing we did.
   std::pair<handle_map, T>
-  build_simple_graph(const ReachFacts::database& db,
+  build_simple_graph(const reach_facts::database& db,
                      bool dynlink,
                      const std::optional<std::vector<dlsym::loaded_symbol>>& loaded_syms);
 
-  constexpr ReachFacts::LoadOptions CALL_LOAD_OPTIONS =
-    ReachFacts::LoadOptions::Contains | ReachFacts::LoadOptions::Calls
-    | ReachFacts::LoadOptions::Name | ReachFacts::LoadOptions::Linkage
-    | ReachFacts::LoadOptions::CallType | ReachFacts::LoadOptions::AddressTaken
-    | ReachFacts::LoadOptions::FunctionType | ReachFacts::LoadOptions::NodeType;
+  constexpr reach_facts::LoadOptions CALL_LOAD_OPTIONS =
+    reach_facts::LoadOptions::Contains | reach_facts::LoadOptions::Calls
+    | reach_facts::LoadOptions::Name | reach_facts::LoadOptions::Linkage
+    | reach_facts::LoadOptions::CallType | reach_facts::LoadOptions::AddressTaken
+    | reach_facts::LoadOptions::FunctionType | reach_facts::LoadOptions::NodeType;
 
   // Call graph with function nodes only.
   std::pair<handle_map, T>
-  build_call_graph(const ReachFacts::database& db,
+  build_call_graph(const reach_facts::database& db,
                    bool dynlink,
                    const std::optional<std::vector<dlsym::loaded_symbol>>& loaded_syms);
 
-  constexpr ReachFacts::LoadOptions CFG_LOAD_OPTIONS =
-    ReachFacts::LoadOptions::NodeType | ReachFacts::LoadOptions::Calls
-    | ReachFacts::LoadOptions::Contains | ReachFacts::LoadOptions::ControlFlow
-    | ReachFacts::LoadOptions::Name | ReachFacts::LoadOptions::Linkage
-    | ReachFacts::LoadOptions::CallType | ReachFacts::LoadOptions::AddressTaken
-    | ReachFacts::LoadOptions::FunctionType;
+  constexpr reach_facts::LoadOptions CFG_LOAD_OPTIONS =
+    reach_facts::LoadOptions::NodeType | reach_facts::LoadOptions::Calls
+    | reach_facts::LoadOptions::Contains | reach_facts::LoadOptions::ControlFlow
+    | reach_facts::LoadOptions::Name | reach_facts::LoadOptions::Linkage
+    | reach_facts::LoadOptions::CallType | reach_facts::LoadOptions::AddressTaken
+    | reach_facts::LoadOptions::FunctionType;
 
   // Interprocedural CFG with function and BB nodes.
   std::pair<handle_map, T>
-  build_cfg(const ReachFacts::database& db,
+  build_cfg(const reach_facts::database& db,
             bool dynlink = false,
             const std::optional<std::vector<dlsym::loaded_symbol>>& loaded_syms = {});
 
   // Instruction-level granularity CFG (rather than BBs).
   std::pair<handle_map, T>
-  build_instr_cfg(const ReachFacts::database& db,
+  build_instr_cfg(const reach_facts::database& db,
                   bool dynlink = false,
                   const std::optional<std::vector<dlsym::loaded_symbol>>& loaded_syms = {});
 }  // namespace graph

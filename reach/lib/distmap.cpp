@@ -15,7 +15,7 @@
 using namespace std;
 
 distmap_blacklist
-distmap::gen(const ReachFacts::database& db,
+distmap::gen(const reach_facts::database& db,
              const NNodeId& dst,
              bool dynlink,
              const optional<vector<dlsym::loaded_symbol>>& loaded_syms) {
@@ -32,7 +32,7 @@ distmap::gen(const ReachFacts::database& db,
   // destination.
   if (db.contains.contains(dst)) {
     for (const auto& bb : db.contains.at(dst)) {
-      if (db.node_type.at(bb) != ReachFacts::NodeType::BasicBlock) {
+      if (db.node_type.at(bb) != resolve_facts::NodeType::BasicBlock) {
         continue;
       }
       for (const auto& instr : db.contains.at(bb)) {
@@ -44,7 +44,7 @@ distmap::gen(const ReachFacts::database& db,
   // Do the same for all nodes with external linkage with the same name.
   const auto dst_name = db.name.at(dst);
   for (const auto& [id, linkage] : db.linkage) {
-    if (linkage != ReachFacts::Linkage::ExternalLinkage) {
+    if (linkage != resolve_facts::Linkage::ExternalLinkage) {
       continue;
     }
     const auto id_name = db.name.at(id);
@@ -53,7 +53,7 @@ distmap::gen(const ReachFacts::database& db,
     }
     if (db.contains.contains(id)) {
       for (const auto& bb : db.contains.at(id)) {
-        if (db.node_type.at(bb) != ReachFacts::NodeType::BasicBlock) {
+        if (db.node_type.at(bb) != resolve_facts::NodeType::BasicBlock) {
           continue;
         }
         for (const auto& instr : db.contains.at(bb)) {
@@ -64,18 +64,18 @@ distmap::gen(const ReachFacts::database& db,
   }
 
   // Build distmap with node id keys
-  ReachFacts::NodeMap<size_t> id_distmap;
+  resolve_facts::NodeMap<size_t> id_distmap;
   for (const auto& [h, d] : distmap) {
     const auto id = hm.getId(h);
-    if (AT(db.node_type, id) == ReachFacts::NodeType::Instruction) {
+    if (AT(db.node_type, id) == resolve_facts::NodeType::Instruction) {
       id_distmap.emplace(id, d);
     }
   }
 
   // Build blacklist of node ids
-  unordered_set<NNodeId, ReachFacts::pair_hash> blacklist;
+  unordered_set<NNodeId, resolve_facts::pair_hash> blacklist;
   for (const auto& [id, ty] : db.node_type) {
-    if (ty == ReachFacts::NodeType::Instruction && !id_distmap.contains(id)) {
+    if (ty == resolve_facts::NodeType::Instruction && !id_distmap.contains(id)) {
       blacklist.insert(id);
     }
   }

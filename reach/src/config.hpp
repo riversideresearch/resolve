@@ -13,7 +13,7 @@
 #include "json.hpp"
 #include "facts.hpp"
 
-using NNodeId = ReachFacts::NamespacedNodeId;
+using NNodeId = resolve_facts::NamespacedNodeId;
 
 namespace conf {
   struct query {

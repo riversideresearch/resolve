@@ -644,16 +644,25 @@ message(STATUS "KLEE_COMPONENT_CXX_FLAGS: '${KLEE_COMPONENT_CXX_FLAGS}'")
 message(STATUS "KLEE_SOLVER_LIBRARIES: '${KLEE_SOLVER_LIBRARIES}'")
 
 
-include(FetchContent)
+################################################################################
+# REACH
+################################################################################
+add_library(reachlib STATIC IMPORTED GLOBAL)
+set_target_properties(reachlib PROPERTIES IMPORTED_LOCATION "${CMAKE_SOURCE_DIR}/../reach/build/lib/libreachlib.a")
+set_target_properties(reachlib PROPERTIES INTERFACE_INCLUDE_DIRECTORIES "${CMAKE_SOURCE_DIR}/../reach/lib/")
 
-FetchContent_Declare(
-  glaze
-  GIT_REPOSITORY https://github.com/stephenberry/glaze.git
-  GIT_TAG main
-  GIT_SHALLOW TRUE
-)
+#set(REACH_SOURCE_DIR "${CMAKE_SOURCE_DIR}/../reach")
+#set(REACH_BUILD_DIR "${CMAKE_BINARY_DIR}/reach_build")
+#add_subdirectory(${REACH_SOURCE_DIR} ${REACH_BUILD_DIR})
+#set(REACHLIB_DIR "${REACH_SOURCE_DIR}/lib")
 
-FetchContent_MakeAvailable(glaze)
+################################################################################
+# RESOLVE LLVM-PLUGIN
+################################################################################
+
+add_library(ResolveFacts STATIC IMPORTED GLOBAL)
+set_target_properties(ResolveFacts PROPERTIES IMPORTED_LOCATION "${CMAKE_SOURCE_DIR}/../resolve-facts/build/libResolveFacts.a")
+set_target_properties(ResolveFacts PROPERTIES INTERFACE_INCLUDE_DIRECTORIES "${CMAKE_SOURCE_DIR}/../resolve-facts/src/")
 
 ################################################################################
 # KLEE components
@@ -665,36 +674,6 @@ add_subdirectory(runtime)
 # KLEE tools
 ################################################################################
 add_subdirectory(tools)
-
-################################################################################
-# REACH
-################################################################################
-set(REACH_SOURCE_DIR "${CMAKE_SOURCE_DIR}/../reach")
-set(REACH_BUILD_DIR "${CMAKE_BINARY_DIR}/reach_build")
-add_subdirectory(${REACH_SOURCE_DIR} ${REACH_BUILD_DIR})
-set(REACHLIB_DIR "${REACH_SOURCE_DIR}/lib")
-
-################################################################################
-# RESOLVE LLVM-PLUGIN
-################################################################################
-# set(RESOLVE_LLVM_PLUGIN_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/../llvm-plugin/src")
-# set(ENV{USE_LLVM_16}, "1")
-# set(RESOLVE_LLVM_PLUGIN_SOURCE_DIR "${CMAKE_SOURCE_DIR}/../llvm-plugin/src")
-# set(RESOLVE_LLVM_PLUGIN_BUILD_DIR "${CMAKE_BINARY_DIR}/resolve_llvm_plugin_build")
-# add_subdirectory(${RESOLVE_LLVM_PLUGIN_SOURCE_DIR} ${RESOLVE_LLVM_PLUGIN_BUILD_DIR})
-
-# set(RESOLVE_LLVM_PLUGIN_DIR "${CMAKE_SOURCE_DIR}/../llvm-plugin/build")
-# set(RESOLVE_LLVM_PLUGIN_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/../llvm-plugin/src")
-# add_library(EnhancedFacts STATIC IMPORTED)
-# # target_include_directories(EnhancedFacts PUBLIC "${RESOLVE_LLVM_PLUGIN_INCLUDE_DIR}") 
-# set_target_properties(EnhancedFacts PROPERTIES
-#   IMPORTED_LOCATION "${RESOLVE_LLVM_PLUGIN_DIR}"
-#   INTERFACE_INCLUDE_DIRECTORIES "${RESOLVE_LLVM_PLUGIN_INCLUDE_DIR}"
-# )
-
-# add_library(EnhancedFacts SHARED IMPORTED)
-# set_target_properties(EnhancedFacts PROPERTIES IMPORTED_LOCATION "${CMAKE_SOURCE_DIR}/../llvm-plugin/build/libEnhancedFacts.so")
-
 
 ################################################################################
 # Testing

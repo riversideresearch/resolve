@@ -4,7 +4,7 @@
  *   LGPL-3; See LICENSE.txt in the repo root for details.
  */
 
-#include "Facts.hpp"
+#include "resolve_facts.hpp"
 #include "LLVMFacts.hpp"
 
 #include "llvm/ADT/SmallString.h"
@@ -30,9 +30,9 @@
 
 using namespace llvm;
 
-namespace Resolve {
-  static Facts all_facts;
-  static LLVMFacts facts(Resolve::all_facts);
+namespace resolve {
+  static ProgramFacts all_facts;
+  static LLVMFacts facts(all_facts);
 
   std::string debugLocToString(DebugLoc dbgLoc);
 
