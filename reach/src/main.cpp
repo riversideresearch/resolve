@@ -169,7 +169,7 @@ int main(int argc, char* argv[]) {
     { "call", graph::CALL_LOAD_OPTIONS },
   };
 
-  typedef pair<graph::handle_map, graph::T>
+  typedef graph::T
     (*graph_builder)(const reach_facts::database&, bool,
                      const optional<vector<dlsym::loaded_symbol>>&);
 
@@ -206,7 +206,7 @@ int main(int argc, char* argv[]) {
   }
 
   t0 = system_clock::now();
-  const auto [hm, g] = graph_builders.at(conf.graph_type)
+  const auto g = graph_builders.at(conf.graph_type)
     (db, conf.dynlink, loaded_syms);
   duration<double> graph_build_time = system_clock::now() - t0;
 
@@ -230,34 +230,27 @@ int main(int argc, char* argv[]) {
     qres.src = q.src;
     qres.dst = q.dst;
 
-    const auto src_handle_opt = hm.getHandleOpt(q.src);
-    const auto dst_handle_opt = hm.getHandleOpt(q.dst);
-
     auto print_missing = [&](auto node) {
       cerr << "node " << resolve_facts::to_string(node) << " not found" << endl;
     };
 
-    if (!src_handle_opt.has_value()) {
+    // The graph may not have any edges from the src as all may be of the form (dst -> src)
+    // If the explicit edge does not exist at least check that the id is found in the total list of nodes
+    auto has_src = g.edges.contains(q.src) || db.node_type.contains(q.src);
+    auto has_dst = g.edges.contains(q.dst);
+
+    if (!has_src) {
       print_missing(q.src);
     }
-    if (!dst_handle_opt.has_value()) {
+    if (!has_dst) {
       print_missing(q.dst);
     }
 
     // If both src and dst exist, try to find path.
-    if (src_handle_opt.has_value() && dst_handle_opt.has_value()) {
-      const auto [src_handle, dst_handle] = pair { src_handle_opt.value(),
-                                                   dst_handle_opt.value() };
+    if (has_src && has_dst) {
 
-      // const auto p_opt = search::path_bfs(g.edges, dst_handle, src_handle);
-      // const auto p_opt = search::path_dijkstra(g.edges, dst_handle, src_handle);
-      // vector<vector<graph::edge>> paths;
-      // if (p_opt.has_value()) {
-      //   paths.push_back(p_opt.value());
-      // }
-
-      const auto paths = search::k_paths_yen(g.edges, dst_handle,
-                                             src_handle, conf.num_paths.value());
+      const auto paths = search::k_paths_yen(g.edges, q.dst,
+                                             q.src, conf.num_paths.value());
 
       duration<double> query_time = system_clock::now() - t0;
       qres.query_time = query_time.count();
@@ -274,7 +267,7 @@ int main(int argc, char* argv[]) {
         vector<NNodeId> p_ids;
         vector<string> edges;
         for (const auto& e : path) {
-          const auto id = hm.getId(e.node);
+          const auto id = e.node;
           p_ids.push_back(id);
           edges.push_back(EdgeType_to_string(e.type));
         }

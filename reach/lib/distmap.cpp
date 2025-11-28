@@ -19,14 +19,12 @@ distmap::gen(const reach_facts::database& db,
              const NNodeId& dst,
              bool dynlink,
              const optional<vector<dlsym::loaded_symbol>>& loaded_syms) {
-  const auto [hm, g] = graph::build_instr_cfg(db, dynlink, loaded_syms);
+  const auto g = graph::build_instr_cfg(db, dynlink, loaded_syms);
 
-  const auto dst_handle_opt = hm.getHandleOpt(dst);
-  if (!dst_handle_opt.has_value()) {
+  if (!g.edges.contains(dst)) {
     throw runtime_error("distmap::gen: node not found");
   }
-  const auto dst_handle = dst_handle_opt.value();
-  auto distmap = search::min_distances(g.edges, dst_handle);
+  auto distmap = search::min_distances(g.edges, dst);
 
   // Add zero-distance entries for all BBs contained within the
   // destination.
@@ -36,7 +34,7 @@ distmap::gen(const reach_facts::database& db,
         continue;
       }
       for (const auto& instr : db.contains.at(bb)) {
-        distmap[hm.getHandleConst(instr)] = 0;
+        distmap[instr] = 0;
       }
     }
   }
@@ -57,7 +55,7 @@ distmap::gen(const reach_facts::database& db,
           continue;
         }
         for (const auto& instr : db.contains.at(bb)) {
-          distmap[hm.getHandleConst(instr)] = 0;
+          distmap[instr] = 0;
         }
       }
     }
@@ -65,9 +63,8 @@ distmap::gen(const reach_facts::database& db,
 
   // Build distmap with node id keys
   resolve_facts::NodeMap<size_t> id_distmap;
-  for (const auto& [h, d] : distmap) {
-    const auto id = hm.getId(h);
-    if (AT(db.node_type, id) == resolve_facts::NodeType::Instruction) {
+  for (const auto& [id, d] : distmap) {
+    if (db.node_type.at(id) == resolve_facts::NodeType::Instruction) {
       id_distmap.emplace(id, d);
     }
   }
