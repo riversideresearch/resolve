@@ -57,6 +57,8 @@ namespace graph {
   // no duplicate nodes in edge lists).
   bool wf(const E& g);
 
+  T build_from_program_facts(const resolve_facts::ProgramFacts& pf, bool dynlink, const std::optional<std::vector<dlsym::loaded_symbol>>& loaded_syms);
+
   constexpr reach_facts::LoadOptions SIMPLE_LOAD_OPTIONS  =
     reach_facts::LoadOptions::Contains | reach_facts::LoadOptions::Calls
     | reach_facts::LoadOptions::Name | reach_facts::LoadOptions::Linkage

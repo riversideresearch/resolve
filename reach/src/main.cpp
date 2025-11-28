@@ -186,28 +186,29 @@ int main(int argc, char* argv[]) {
   }
 
   time_point<system_clock> t0 = system_clock::now();
-  const auto db = load(conf.facts_dir, load_options.at(conf.graph_type));
+  //const auto db = load(conf.facts_dir, load_options.at(conf.graph_type));
+  ifstream facts(conf.facts_dir / "facts.facts");
+  const auto pf = resolve_facts::ProgramFacts::deserialize(facts);
+  facts.close();
+
   duration<double> facts_load_time = system_clock::now() - t0;
 
   if (conf.verbose) {
+
+    auto nodes = 0;
+    for (const auto& [_, m]: pf.modules) {
+      nodes += m.nodes.size();
+    }
     cout << "Loaded facts in " << facts_load_time.count()
-         << " seconds. # nodes = " << db.node_type.size() << endl;
-  }
-  if (conf.validate_facts) {
-    t0 = system_clock::now();
-    if (!reach_facts::validate(db)) {
-      cerr << "WARNING: facts failed validation!" << endl;
-    }
-    if (conf.verbose) {
-      duration<double> facts_validate_time = system_clock::now() - t0;
-      cout << "Validated facts in "
-           << facts_validate_time.count() << " seconds" << endl;
-    }
+         << " seconds. # nodes = " << nodes << endl;
   }
 
   t0 = system_clock::now();
+  /*
   const auto g = graph_builders.at(conf.graph_type)
     (db, conf.dynlink, loaded_syms);
+  */
+  const auto g = graph::build_from_program_facts(pf, conf.dynlink, loaded_syms);
   duration<double> graph_build_time = system_clock::now() - t0;
 
   if (conf.verbose) {
@@ -236,7 +237,9 @@ int main(int argc, char* argv[]) {
 
     // The graph may not have any edges from the src as all may be of the form (dst -> src)
     // If the explicit edge does not exist at least check that the id is found in the total list of nodes
-    auto has_src = g.edges.contains(q.src) || db.node_type.contains(q.src);
+    const auto [mid, nid] = q.src;
+    //auto has_src = g.edges.contains(q.src) || db.node_type.contains(q.src);
+    auto has_src = g.edges.contains(q.src) || (pf.modules.contains(mid) && pf.modules.at(mid).nodes.contains(nid));
     auto has_dst = g.edges.contains(q.dst);
 
     if (!has_src) {

@@ -18,6 +18,9 @@ using namespace reach_facts;
 using namespace graph;
 using namespace std;
 using symbol = dlsym::loaded_symbol;
+using ProgramFacts = resolve_facts::ProgramFacts;
+using EdgeKind = resolve_facts::EdgeKind;
+using NodeType = resolve_facts::NodeType;
 
 std::string graph::EdgeType_to_string(EdgeType ety) {
   switch (ety) {
@@ -84,6 +87,145 @@ map_loaded_symbols_to_ids(const database& db,
     }
   }
   return loaded_ids;
+}
+
+T graph::build_from_program_facts(const ProgramFacts& pf, bool dynlink, const optional<vector<symbol>>& loaded_syms) {
+  
+  T g;
+
+  // adapted from build_cfg
+  // Need to be able to look up triple (bb -> instr -> call) 
+  NodeMap<NNodeId> calls;
+  NodeMap<std::vector<NNodeId>> bb_calls;
+
+  // For indirect calls we want to get all function that match a signature
+  std::unordered_map<string, std::vector<NNodeId>> address_taken_by_sig;
+
+  // We want to be able to link all externs of the same name together
+  // and also externs to dynamic symbols if applicable.
+  unordered_map<string, vector<NNodeId>> externs_by_name;
+
+  std::unordered_set<NNodeId, resolve_facts::pair_hash> loaded_ids;
+  std::vector<symbol> syms;
+  if (loaded_syms.has_value()) {
+    syms = *loaded_syms;
+  }
+
+  for (const auto& [mid, m]: pf.modules) {
+
+    for (const auto& [eid, e]: m.edges) {
+        const auto& [s, d] = eid;
+        auto sid = std::make_pair(mid, s);
+        auto did = std::make_pair(mid, d);
+
+        for (const auto& k: e.kinds) {
+          // fn to first block
+          if (k == EdgeKind::EntryPoint) {
+            g.addEdge(did, sid, EdgeType::Contains);
+          // BB control flow
+          } else if (k == EdgeKind::ControlFlowTo) {
+            g.addEdge(did, sid, EdgeType::Succ);
+          } else if (k == EdgeKind::Calls) {
+            calls.emplace(sid, did);
+          }
+
+          if (k == EdgeKind::Contains &&
+              m.nodes.at(s).type == NodeType::BasicBlock &&
+              m.nodes.at(d).call_type.has_value()) {
+            bb_calls[sid].push_back(did);
+          }
+        }
+    }
+
+    for (const auto& [nid, n]: m.nodes) {
+      auto id = std::make_pair(mid, nid);
+      if (n.linkage == Linkage::ExternalLinkage) {
+        externs_by_name[*n.name].push_back(id);
+      }
+
+      if (n.address_taken == true) {
+          auto sig = *n.function_type;
+          // TODO: this is currently quoted on the EnhancedFacts side but that probably isn't necessary anymore.
+          address_taken_by_sig[sig].push_back(id);
+      }
+
+      if (n.type == NodeType::Function && dynlink) {
+        for (const auto& sym: syms) {
+          if (sym.symbol == n.name) {
+            loaded_ids.emplace(id);
+            break;
+          }
+        }
+      }
+    }
+  }
+
+  // Calls
+  for (const auto& [bb, instrs] : bb_calls) {
+    const auto [mid, bbid] = bb;
+    const auto& module = pf.modules.at(mid);
+    for (const auto& instr : instrs) {
+      const auto [_, iid] = instr;
+      const auto& n = module.nodes.at(iid);
+      const auto& call_ty = n.call_type; 
+      // If direct, add one edge.
+      if (call_ty == CallType::Direct) {
+        const auto& call_id = calls.at(instr);
+        g.addEdge(call_id, bb, EdgeType::DirectCall);
+
+        // Special case for direct calls to [pthread_create]: add
+        // edges for all address-taken functions with type signature
+        // "ptr (ptr)".
+        const auto& [_, cid] = call_id;
+
+        const auto& fn_name = module.nodes.at(cid).name;
+        if (fn_name == "pthread_create") {
+          for (const auto& fn : address_taken_by_sig.at("\"ptr (ptr)\"")) {
+            g.addEdge(fn, bb, EdgeType::IndirectCall, INDIRECT_WEIGHT);
+          }
+        }
+
+        continue;
+      }
+
+      if (address_taken_by_sig.contains(*n.function_type)) {
+        // Else indirect. Add edges for all compatible address-taken functions.
+        for (const auto& fn : address_taken_by_sig.at(*n.function_type)) {
+          g.addEdge(fn, bb, EdgeType::IndirectCall, INDIRECT_WEIGHT);
+        }
+      }
+
+      // If dynlink flag is set, also take functions with external
+      // linkage as possible call targets.
+      // TODO: this
+      if (dynlink) {
+        for (const auto& [_, handles]: externs_by_name) {
+          for (const auto& h: handles) {
+            const auto [mid2, hid] = h; 
+            const auto& n2 = pf.modules.at(mid2).nodes.at(hid);
+            if (n2.type == NodeType::Function && 
+                n2.function_type == n.function_type &&
+                (!loaded_syms.has_value() || loaded_ids.contains(h))) {
+              g.addEdge(h, bb, EdgeType::ExternIndirectCall, INDIRECT_WEIGHT);
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // External linkage
+  for (const auto& [_, handles] : externs_by_name) {
+    for (size_t i = 0; i < handles.size(); i++) {
+      for (size_t j = i+1; j < handles.size(); j++) {
+        g.addEdge(handles[i], handles[j], EdgeType::Extern, INDIRECT_WEIGHT);
+        g.addEdge(handles[j], handles[i], EdgeType::Extern, INDIRECT_WEIGHT);
+      }
+    }
+  }
+
+  return g;
+
 }
 
 // loaded_syms is the set of symbols loaded with dlsym.
