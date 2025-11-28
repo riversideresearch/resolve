@@ -40,12 +40,15 @@ conf::config load_config(const argparse::ArgumentParser& program) {
     if (program.present<string>("facts_dir")) {
       conf.facts_dir = program.get<string>("facts_dir");
     }
+    // TODO: argument passing with new id format
+    /*
     if (program.present<string>("src") && program.present<string>("dst")) {
       conf.queries.push_back({
           program.get<string>("src"),
           program.get<string>("dst"),
         });
     }
+    */
     conf.dynlink = program.get<bool>("dynlink") || conf.dynlink;
     if (program.present<string>("output")) {
       conf.out_path = program.present<string>("output");
@@ -159,15 +162,15 @@ int main(int argc, char* argv[]) {
   // Execute reachability queries.
   // First, build graph.
 
-  const unordered_map<string, facts::LoadOptions> load_options = {
+  const unordered_map<string, reach_facts::LoadOptions> load_options = {
     { "simple", graph::SIMPLE_LOAD_OPTIONS },
     { "cfg", graph::CFG_LOAD_OPTIONS },
     { "instr-cfg", graph::CFG_LOAD_OPTIONS },
     { "call", graph::CALL_LOAD_OPTIONS },
   };
 
-  typedef pair<graph::handle_map, graph::T>
-    (*graph_builder)(const facts::database&, bool,
+  typedef graph::T
+    (*graph_builder)(const reach_facts::database&, bool,
                      const optional<vector<dlsym::loaded_symbol>>&);
 
   const unordered_map<string, graph_builder> graph_builders = {
@@ -183,28 +186,29 @@ int main(int argc, char* argv[]) {
   }
 
   time_point<system_clock> t0 = system_clock::now();
-  const auto db = load(conf.facts_dir, load_options.at(conf.graph_type));
+  //const auto db = load(conf.facts_dir, load_options.at(conf.graph_type));
+  ifstream facts(conf.facts_dir / "facts.facts");
+  const auto pf = resolve_facts::ProgramFacts::deserialize(facts);
+  facts.close();
+
   duration<double> facts_load_time = system_clock::now() - t0;
 
   if (conf.verbose) {
+
+    auto nodes = 0;
+    for (const auto& [_, m]: pf.modules) {
+      nodes += m.nodes.size();
+    }
     cout << "Loaded facts in " << facts_load_time.count()
-         << " seconds. # nodes = " << db.node_type.size() << endl;
-  }
-  if (conf.validate_facts) {
-    t0 = system_clock::now();
-    if (!facts::validate(db)) {
-      cerr << "WARNING: facts failed validation!" << endl;
-    }
-    if (conf.verbose) {
-      duration<double> facts_validate_time = system_clock::now() - t0;
-      cout << "Validated facts in "
-           << facts_validate_time.count() << " seconds" << endl;
-    }
+         << " seconds. # nodes = " << nodes << endl;
   }
 
   t0 = system_clock::now();
-  const auto [hm, g] = graph_builders.at(conf.graph_type)
+  /*
+  const auto g = graph_builders.at(conf.graph_type)
     (db, conf.dynlink, loaded_syms);
+  */
+  const auto g = graph::build_from_program_facts(pf, conf.dynlink, loaded_syms);
   duration<double> graph_build_time = system_clock::now() - t0;
 
   if (conf.verbose) {
@@ -227,30 +231,29 @@ int main(int argc, char* argv[]) {
     qres.src = q.src;
     qres.dst = q.dst;
 
-    const auto src_handle_opt = hm.getHandleOpt(q.src);
-    const auto dst_handle_opt = hm.getHandleOpt(q.dst);
+    auto print_missing = [&](auto node) {
+      cerr << "node " << resolve_facts::to_string(node) << " not found" << endl;
+    };
 
-    if (!src_handle_opt.has_value()) {
-      cerr << "node '" << q.src << "' not found" << endl;
+    // The graph may not have any edges from the src as all may be of the form (dst -> src)
+    // If the explicit edge does not exist at least check that the id is found in the total list of nodes
+    const auto [mid, nid] = q.src;
+    //auto has_src = g.edges.contains(q.src) || db.node_type.contains(q.src);
+    auto has_src = g.edges.contains(q.src) || (pf.modules.contains(mid) && pf.modules.at(mid).nodes.contains(nid));
+    auto has_dst = g.edges.contains(q.dst);
+
+    if (!has_src) {
+      print_missing(q.src);
     }
-    if (!dst_handle_opt.has_value()) {
-      cerr << "node '" << q.dst << "' not found" << endl;
+    if (!has_dst) {
+      print_missing(q.dst);
     }
 
     // If both src and dst exist, try to find path.
-    if (src_handle_opt.has_value() && dst_handle_opt.has_value()) {
-      const auto [src_handle, dst_handle] = pair { src_handle_opt.value(),
-                                                   dst_handle_opt.value() };
+    if (has_src && has_dst) {
 
-      // const auto p_opt = search::path_bfs(g.edges, dst_handle, src_handle);
-      // const auto p_opt = search::path_dijkstra(g.edges, dst_handle, src_handle);
-      // vector<vector<graph::edge>> paths;
-      // if (p_opt.has_value()) {
-      //   paths.push_back(p_opt.value());
-      // }
-
-      const auto paths = search::k_paths_yen(g.edges, dst_handle,
-                                             src_handle, conf.num_paths.value());
+      const auto paths = search::k_paths_yen(g.edges, q.dst,
+                                             q.src, conf.num_paths.value());
 
       duration<double> query_time = system_clock::now() - t0;
       qres.query_time = query_time.count();
@@ -264,10 +267,10 @@ int main(int argc, char* argv[]) {
       }
 
       for (const auto& path : paths) {
-        vector<string> p_ids;
+        vector<NNodeId> p_ids;
         vector<string> edges;
         for (const auto& e : path) {
-          const auto id = hm.getId(e.node);
+          const auto id = e.node;
           p_ids.push_back(id);
           edges.push_back(EdgeType_to_string(e.type));
         }

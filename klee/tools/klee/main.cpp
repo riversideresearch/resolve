@@ -69,6 +69,7 @@ DISABLE_WARNING_POP
 
 using namespace llvm;
 using namespace klee;
+using NNodeId = resolve_facts::NamespacedNodeId;
 
 namespace {
   cl::opt<std::string>
@@ -649,37 +650,37 @@ void KleeHandler::loadPathFile(std::string name,
 }
 
 void build_distmap_blacklist_for_module
-(const std::unordered_map<std::string, size_t> &dm,
- const std::unordered_set<std::string> &bl,
+(const resolve_facts::NodeMap<size_t> &dm,
+ const std::unordered_set<resolve_facts::NamespacedNodeId, resolve_facts::pair_hash> &bl,
  std::unordered_map<const llvm::Instruction*, size_t> &distMap,
  std::unordered_set<const llvm::Instruction*> &blackList,
  const llvm::Module &M) {
   for (const Function &F : M) {
     for (const BasicBlock &BB : F) {
       for (const Instruction &I : BB) {
-	const auto id = resolve::facts.addNode(I);
-	const auto id_str = static_cast<std::string>(id);
-	// std::cout << id << " " << id_str << std::endl;
-	if (dm.find(id_str) != dm.end()) {
-	  distMap[&I] = dm.at(id);
-	}
-	if (bl.find(id_str) != bl.end()) {
-	  blackList.insert(&I);
-	}
+        const auto iid = resolve::facts.addNode(I);
+        const auto mid = resolve::facts.getModuleId(I);
+        const auto id = std::make_pair(mid, iid);
+
+        if (dm.find(id) != dm.end()) {
+          distMap[&I] = dm.at(id);
+        }
+        if (bl.find(id) != bl.end()) {
+          blackList.insert(&I);
+        }
       }
     }
   }
 }
 
 // Search for function node id that matches name
-std::optional<std::string> findMatchingFunctionNodeId(const facts::database &db,
+std::optional<NNodeId> findMatchingFunctionNodeId(const reach_facts::database &db,
 						      const std::string functionName) {
-  std::regex pattern(".*/__uClibc_main.c:f" + functionName);
+  //std::regex pattern(".*/__uClibc_main.c:f" + functionName);
   // "/challenge/app/src/libc/misc/internals/__uClibc_main.c:ftarget"
-  std::vector<std::string> matches;
+  std::vector<NNodeId> matches;
   for (const auto &[node_id, node_type] : db.node_type) {
-    if (node_type == facts::NodeType::Function &&
-	std::regex_match(node_id, pattern)) {
+    if (node_type == resolve_facts::NodeType::Function && db.name.at(node_id).ends_with(functionName)) {
       matches.push_back(node_id);
     }
   }
@@ -710,13 +711,12 @@ bool KleeHandler::buildDistMapAndBlackList
   }
   resolve::getModuleFacts(*mainModule);
 
-  const auto fcts = resolve::all_facts;
+  const auto fcts = resolve::facts;
 
-  auto nodes = std::istringstream(fcts.nodes);
-  auto nodeprops = std::istringstream(fcts.nodeProps);
-  auto edges = std::istringstream(fcts.edges);
-  const facts::database db = facts::load(nodes, nodeprops, edges,
-					 graph::CFG_LOAD_OPTIONS);
+  auto json = fcts.serialize();
+
+  auto facts = std::istringstream(json);
+  const reach_facts::database db = reach_facts::load(facts, graph::CFG_LOAD_OPTIONS);
 
   // Map target name to node ID
   const auto targetNodeId_opt = findMatchingFunctionNodeId(db, targetFunctionName);

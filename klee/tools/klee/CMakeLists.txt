@@ -14,8 +14,10 @@ set(KLEE_LIBS
   kleeCore
 )
 
-target_link_libraries(klee ${KLEE_LIBS} reachlib resolve)
-target_include_directories(klee PRIVATE ${KLEE_INCLUDE_DIRS} ${LLVM_INCLUDE_DIRS})
+set(RESOLVE_LLVM_PLUGIN_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/../llvm-plugin/src")
+
+target_link_libraries(klee ${KLEE_LIBS} reachlib ResolveFacts)
+target_include_directories(klee PRIVATE ${KLEE_INCLUDE_DIRS} ${LLVM_INCLUDE_DIRS} ${RESOLVE_LLVM_PLUGIN_INCLUDE_DIR})
 target_compile_options(klee PRIVATE ${KLEE_COMPONENT_CXX_FLAGS})
 target_compile_definitions(klee PRIVATE ${KLEE_COMPONENT_CXX_DEFINES})
 
