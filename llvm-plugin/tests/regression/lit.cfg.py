@@ -16,7 +16,7 @@ config.test_exec_root = config.test_source_root
 config.test_format = lit.formats.ShTest(True)
 
 # Look up clang and FileCheck
-clang = lit.util.which("clang")
+clang = lit.util.which("clang-18")
 filecheck = lit.util.which("FileCheck-18")
 
 if not clang:
