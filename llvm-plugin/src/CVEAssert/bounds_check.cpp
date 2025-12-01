@@ -102,7 +102,7 @@ static Function *getOrCreateBoundsCheckStoreSanitizer(Module *M, LLVMContext &Ct
   if (auto handler = M->getFunction(handlerName.toStringRef(handlerNameStr)))
     return handler;
 
-  IRBuilder<> Builder(Ctx);
+  IRBuilder<> builder(Ctx);
   
   // TODO: handle address spaces other than 0
   auto ptr_ty = PointerType::get(Ctx, 0);
