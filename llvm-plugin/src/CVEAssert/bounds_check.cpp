@@ -568,7 +568,6 @@ void sanitizeMalloc(Function *F, Vulnerability::RemediationStrategies strategy) 
     Value * derivedPtr = GEPInst;
 
     auto resolveGEPCall = builder.CreateCall(resolveGEPFn, { basePtr, derivedPtr });
-    // GEPInst->replaceAllUsesWith(resolveGEPCall);
   }
 
   sanitizeLoadStore(F, strategy);
