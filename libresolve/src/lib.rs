@@ -611,7 +611,6 @@ pub extern "C" fn resolve_check_bounds(base_ptr: *mut c_void, derived_ptr: *mut 
     let base = base_ptr as Vaddr;
     let derived = derived_ptr as Vaddr;
 
-    // If not print "Object not found" and return false
     let sobj_table = ALIVE_OBJ_LIST.lock().expect("Mutex not poisoned");
 
     // Look up the shadow object corresponding to this access.
