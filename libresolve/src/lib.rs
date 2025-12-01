@@ -66,6 +66,15 @@ pub extern "C" fn resolve_malloc(size: usize) -> *mut c_void {
     ptr
 }
 
+/**
+ * @brief - Function call to replace llvm 'gep' instruction
+ * @input
+ *  - ptr: unique pointer root
+ *  - derived: pointer derived from unique root ptr
+ * @return valid pointer within bounds of allocation or 
+ * pointer 1-past limit of allocation
+ */
+
 #[unsafe(no_mangle)]
 pub extern "C" fn resolve_gep(ptr: *mut c_void, derived: *mut c_void) -> *mut c_void {
     let sobj_table = ALIVE_OBJ_LIST.lock().expect("Mutex not poisoned");
