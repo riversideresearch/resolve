@@ -561,7 +561,7 @@ void sanitizeMalloc(Function *F, Vulnerability::RemediationStrategies strategy) 
   }
 
   for (auto GEPInst: gepList) {
-    builder.SetInsertPoint(GEPInst);
+    builder.SetInsertPoint(GEPInst->nextNode());
 
     // Get the pointer operand and offset from GEP
     Value *basePtr = GEPInst->getPointerOperand();
