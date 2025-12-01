@@ -568,6 +568,20 @@ void sanitizeMalloc(Function *F, Vulnerability::RemediationStrategies strategy) 
     Value * derivedPtr = GEPInst;
 
     auto resolveGEPCall = builder.CreateCall(resolveGEPFn, { basePtr, derivedPtr });
+
+    // Collect users of gep instruction before mutation
+    SmallVector<Users*, 8> gep_users;
+    for (User *U : GEPInst->users()) {
+      gep_users.push_back(U);
+    }
+
+    // Iterate over all the users of the gep instruction and 
+    // replace there operands with resolve_gep result 
+    for (User *U : users) {
+      if (U != resolveGEPCall) {
+        U->replaceUsesOfWith(GEPInst, resolveGEPCall);
+      }
+    }
   }
 
   sanitizeLoadStore(F, strategy);
