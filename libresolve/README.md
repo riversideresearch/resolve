@@ -85,6 +85,3 @@ The ObjHook pass supports these memory allocations currently.
 - `realloc`
 - `strdup`
 - `strndup`
-
-## License
-[MIT](./LICENSE)
