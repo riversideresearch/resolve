@@ -111,7 +111,7 @@ static Function *getOrCreateBoundsCheckStoreSanitizer(Module *M, LLVMContext &Ct
 
   FunctionType *sanitizeStoreFnTy = FunctionType::get(
     void_ty,
-    { ty, ptr_ty },
+    { ptr_ty, ty },
     false
   );
 
