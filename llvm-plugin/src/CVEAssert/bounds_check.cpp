@@ -578,7 +578,7 @@ void sanitizeMemInstBounds(Function *F, ModuleAnalysisManager &MAM, Vulnerabilit
   // FIXME: bad alias analysis is causing compilation to fail
   // TBD: why does TBAA not work right
   // sanitizeLoadStore(f, MAM);
-  // sanitizeAlloca(f);
+  sanitizeAlloca(F);
   sanitizeMalloc(F, strategy);
   // sanitizeMemcpy(f, MAM);
 }
