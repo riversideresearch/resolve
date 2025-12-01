@@ -635,7 +635,6 @@ pub extern "C" fn flush_dlsym_log() {
 pub extern "C" fn resolve_check_bounds(base_ptr: *mut c_void, size: usize) -> bool {
     let base = base_ptr as Vaddr;
 
-    // If not print "Object not found" and return false
     let sobj_table = ALIVE_OBJ_LIST.lock().expect("Mutex not poisoned");
 
     // Look up the shadow object corresponding to this access.
