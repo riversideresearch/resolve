@@ -33,5 +33,9 @@ config.substitutions.append(("%FileCheck", filecheck))
 plugin = "../../build/libCVEAssert.so"
 config.substitutions.append(("%plugin", plugin))
 
+# Add path to libresolve rlib
+rlib = "../../../libresolve/target/debug"
+config.substitutions.append(("%rlib", rlib))
+
 # Add suffixes to test
 config.suffixes = ['.c']
