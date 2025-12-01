@@ -6,10 +6,10 @@ KLEE Symbolic Virtual Machine
 ## Changes for E-BOSS RESOLVE
 
 ## Added options
--- return-null-on-zero-malloc
+--return-null-on-zero-malloc
 > Returns NULL if malloc(0) is called (default=false)
 
--- allow-freeze
+--allow-freeze
 > Don't exit on FREEZE instructions and treat them as moves
 
 ## Directed KLEE via static instruction-level CFG reachability
