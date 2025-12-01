@@ -31,7 +31,6 @@ static Function *getOrCreateBoundsCheckLoadSanitizer(Module *M, LLVMContext &Ctx
     return handler;
   }
 
-  LLVMContext &Ctx = M->getContext();
   IRBuilder<> builder(Ctx);
 
   auto ptr_ty = PointerType::get(Ctx, 0);
@@ -75,7 +74,7 @@ static Function *getOrCreateBoundsCheckLoadSanitizer(Module *M, LLVMContext &Ctx
 
   // NormalLoadBB: Return the loaded value.
   builder.SetInsertPoint(NormalLoadBB);
-  LoadInst* load = builder.CreateLoad(ty, basePtr);
+  LoadInst *load = builder.CreateLoad(ty, basePtr);
   builder.CreateRet(load);
 
   // SanitizeLoadBB: Apply remediation strategy
@@ -96,86 +95,77 @@ static Function *getOrCreateBoundsCheckLoadSanitizer(Module *M, LLVMContext &Ctx
   return sanitizeLoadFn;
 }
 
-static Function *getOrCreateBoundsCheckStoreSanitizer(Module *M, LLVMContext &Ctx, Type *ty) {
-  Twine handlerName = "resolve_sanitize_bounds_st_" + getLLVMType(ty);
+static Function *getOrCreateBoundsCheckStoreSanitizer(Module *M, LLVMContext &Ctx, Type *ty, Value *storedVal, Vulnerability::RemediationStrategies strategy) {
+  Twine handlerName = "resolve_bounds_check_st_" + getLLVMType(ty);
   SmallVector<char> handlerNameStr;
 
   if (auto handler = M->getFunction(handlerName.toStringRef(handlerNameStr)))
     return handler;
 
   IRBuilder<> Builder(Ctx);
+  
   // TODO: handle address spaces other than 0
   auto ptr_ty = PointerType::get(Ctx, 0);
+  auto void_ty = Type::getVoidTy(Ctx);
   auto size_ty = Type::getInt64Ty(Ctx);
 
-  FunctionType *SanitizeStoreFuncType =
-      FunctionType::get(Type::getVoidTy(Ctx), {ptr_ty, ptr_ty, ty}, false);
-  Function *SanitizeStoreFunc = Function::Create(
-      SanitizeStoreFuncType, Function::InternalLinkage, handlerName, M);
+  FunctionType *sanitizeStoreFnTy = FunctionType::get(
+    void_ty,
+    { ty, ptr_ty },
+    false
+  );
 
-  BasicBlock *Entry = BasicBlock::Create(Ctx, "entry", SanitizeStoreFunc);
-  BasicBlock *SanitizeBlock =
-      BasicBlock::Create(Ctx, "sanitize_block", SanitizeStoreFunc);
-  BasicBlock *StoreBlock =
-      BasicBlock::Create(Ctx, "store_block", SanitizeStoreFunc);
-  BasicBlock *CheckDerivedPtrBlock =
-      BasicBlock::Create(Ctx, "check_derived_alloc", SanitizeStoreFunc);
-  BasicBlock *HeapBlock =
-      BasicBlock::Create(Ctx, "heap_alloc_case", SanitizeStoreFunc);
-  BasicBlock *StackBlock =
-      BasicBlock::Create(Ctx, "stack_alloc_case", SanitizeStoreFunc);
+  Function *sanitizeStoreFn = Function::Create(
+    sanitizeStoreFnTy,
+    Function::InternalLinkage,
+    handlerName,
+    M
+  );
 
-  Value *base_ptr = SanitizeStoreFunc->getArg(0);
-  Value *derived_ptr = SanitizeStoreFunc->getArg(1);
+  BasicBlock *EntryBB = BasicBlock::Create(Ctx, "", sanitizeStoreFn);
+  BasicBlock *NormalStoreBB = BasicBlock::Create(Ctx, "", sanitizeStoreFn);
+  BasicBlock *SanitizeStoreBB = BasicBlock::Create(Ctx, "", sanitizeStoreFn);
 
-  Builder.SetInsertPoint(Entry);
-  // Checking if the base ptr is a stack allocation
-  auto base_ptr_check =
-      Builder.CreateCall(getOrCreateIsHeap(M, Ctx), {base_ptr});
-  Builder.CreateCondBr(base_ptr_check, HeapBlock, CheckDerivedPtrBlock);
+  FunctionType *resolveCheckBoundsFnTy = FunctionType::get(
+    Type::getInt1Ty(Ctx),
+    { ptr_ty, size_ty },
+    false
+  );
 
-  Builder.SetInsertPoint(CheckDerivedPtrBlock);
+  FunctionCallee resolveCheckBoundsFn = M->getOrInsertFunction(
+    "resolve_check_bounds",
+    resolveCheckBoundsFnTy
+  );
 
-  auto derived_ptr_check =
-      Builder.CreateCall(getOrCreateIsHeap(M, Ctx), {derived_ptr});
-  Value *checkDerivedPtr = Builder.CreateAnd(base_ptr_check, derived_ptr_check);
-  Builder.CreateCondBr(checkDerivedPtr, HeapBlock, StackBlock);
+  Value *basePtr = sanitizeStoreFn->getArg(0);
+  builder.SetInsertPoint(EntryBB);
 
-  Builder.SetInsertPoint(HeapBlock);
-  // Insert libresolve function call
-  FunctionType *CheckBoundsFuncType =
-      FunctionType::get(Type::getInt1Ty(Ctx), {ptr_ty, ptr_ty, size_ty}, false);
-  FunctionCallee BoundsCheckFunc =
-      M->getOrInsertFunction("resolve_check_bounds", CheckBoundsFuncType);
-  Value *BoundsValue = Builder.CreateCall(
-      BoundsCheckFunc, {base_ptr, derived_ptr, ConstantExpr::getSizeOf(ty)});
+  Value *withinBounds = builder.CreateCall(resolveCheckBoundsFn,
+      { basePtr, ConstantExpr::getSizeOf(ty) });
+  
+  builder.CreateCondBr(withinBounds, NormalStoreBB, SanitizeStoreBB);
 
-  // Conditional branch instruction
-  Builder.CreateCondBr(BoundsValue, StoreBlock, SanitizeBlock);
+  // NormalStoreBB: Store value @ addr
+  builder.SetInsertPoint(NormalStoreBB);
+  StoreInst *store = builder.CreateStore(storedVal, basePtr);
+  builder.CreateRetVoid();
 
-  Builder.SetInsertPoint(StackBlock);
-  Builder.CreateBr(StoreBlock);
-
-  Builder.SetInsertPoint(SanitizeBlock);
-  FunctionType *LogSanitizeFuncType =
-      FunctionType::get(Type::getVoidTy(Ctx), {ptr_ty}, false);
-  FunctionCallee LogSanitizeFunc = M->getOrInsertFunction(
-      "resolve_report_sanitize_mem_inst_triggered", LogSanitizeFuncType);
-  Builder.CreateCall(LogSanitizeFunc, {base_ptr});
-  Builder.CreateRetVoid();
-
-  Builder.SetInsertPoint(StoreBlock);
-  Value *storeValue = SanitizeStoreFunc->getArg(2);
-  Builder.CreateStore(storeValue, derived_ptr);
-  Builder.CreateRetVoid();
-
+  // SanitizeStoreBB: Apply remediation strategy
+  builder.SetInsertPoint(SanitizeStoreBB);
+  switch(strategy) {
+    case Vulnerability::RemediationStrategies::EXIT:
+      builder.CreateCall(getOrCreateRemediationBehavior(M, strategy));
+      builder.CreateUnreachable();
+      break;
+  }
+  
   // DEBUGGING
   raw_ostream &out = errs();
-  out << *SanitizeStoreFunc;
-  if (verifyFunction(*SanitizeStoreFunc, &out)) {
+  out << *sanitizeStoreFn;
+  if (verifyFunction(*sanitizeStoreFn, &out)) {
   }
 
-  return SanitizeStoreFunc;
+  return sanitizeStoreFn;
 }
 
 
@@ -388,7 +378,7 @@ void sanitizeLoadStore(Function *F, Vulnerability::RemediationStrategies strateg
     }
 
     auto storeFn = getOrCreateBoundsCheckStoreSanitizer(
-      F->getParent(), F->getContext(), valueTy, strategy
+      F->getParent(), F->getContext(), valueTy, Inst->getValueOperand(), strategy
     );
 
     auto sanitizedStore = builder.CreateCall(storeFn, { ptr, Inst->getValueOperand() });
