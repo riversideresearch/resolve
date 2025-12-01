@@ -134,7 +134,7 @@ T graph::build_from_program_facts(const ProgramFacts& pf, bool dynlink, const op
               m.nodes.at(d).call_type.has_value()) {
             bb_calls[sid].push_back(did);
           }
-        }
+      }
     }
 
     for (const auto& [nid, n]: m.nodes) {
@@ -145,7 +145,6 @@ T graph::build_from_program_facts(const ProgramFacts& pf, bool dynlink, const op
 
       if (n.address_taken == true) {
           auto sig = *n.function_type;
-          // TODO: this is currently quoted on the EnhancedFacts side but that probably isn't necessary anymore.
           address_taken_by_sig[sig].push_back(id);
       }
 
@@ -180,7 +179,7 @@ T graph::build_from_program_facts(const ProgramFacts& pf, bool dynlink, const op
 
         const auto& fn_name = module.nodes.at(cid).name;
         if (fn_name == "pthread_create") {
-          for (const auto& fn : address_taken_by_sig.at("\"ptr (ptr)\"")) {
+          for (const auto& fn : address_taken_by_sig.at("ptr (ptr)")) {
             g.addEdge(fn, bb, EdgeType::IndirectCall, INDIRECT_WEIGHT);
           }
         }
@@ -201,8 +200,7 @@ T graph::build_from_program_facts(const ProgramFacts& pf, bool dynlink, const op
       if (dynlink) {
         for (const auto& [_, handles]: externs_by_name) {
           for (const auto& h: handles) {
-            const auto [mid2, hid] = h; 
-            const auto& n2 = pf.modules.at(mid2).nodes.at(hid);
+            const auto& n2 = pf.getNode(h); 
             if (n2.type == NodeType::Function && 
                 n2.function_type == n.function_type &&
                 (!loaded_syms.has_value() || loaded_ids.contains(h))) {
@@ -228,168 +226,14 @@ T graph::build_from_program_facts(const ProgramFacts& pf, bool dynlink, const op
 
 }
 
-// loaded_syms is the set of symbols loaded with dlsym.
-T graph::build_simple_graph(const database& db,
-                          bool dynlink,
-                          const optional<vector<symbol>>& loaded_syms) {
-  const auto loaded_ids = map_loaded_symbols_to_ids(db, loaded_syms);
+// Simple: edges (Contains(x -> y), DirectCall(instr -> fn), direct pthread(instr -> fn), indirect internal(instr -> fn), indirect extreanl(instr -> linked))
 
-  T g;
 
-  // Contains
-  for (const auto& [x, ys] : db.contains) {
-    for (const auto& y : ys) {
-      g.addEdge(y, x, EdgeType::Contains);
-    }
-  }
+// Call: edges (DirectCall(fn -> fn), direct pthread(fn -> fn), indirect internal(fn -> fn), indirect external(fn -> linked), externals)
 
-  // Direct calls
-  for (const auto& [instr, fn] : db.calls) {
-    g.addEdge(fn, instr, EdgeType::DirectCall);
 
-    // Special case for direct calls to [pthread_create]: add
-    // edges for all address-taken functions with type signature
-    // "ptr (ptr)".
-    const auto& fn_name = db.name.at(fn);
-    if (fn_name == "pthread_create") {
-      for (const auto& fn : db.address_taken) {
-        if (db.fun_sig.at(fn) == "ptr (ptr)") {
-          g.addEdge(fn, instr,
-                    EdgeType::IndirectCall, INDIRECT_WEIGHT);
-        }
-      }
-    }
-  }
-
-  // Indirect calls
-  for (const auto& [instr, call_type] : db.call_type) {
-    if (call_type == CallType::Indirect) {
-      for (const auto& fn : db.address_taken) {
-        if (db.fun_sig.at(instr) == db.fun_sig.at(fn)) {
-          g.addEdge(fn, instr, EdgeType::IndirectCall, INDIRECT_WEIGHT);
-        }
-      }
-
-      // If dynlink flag is set, also take functions with external
-      // linkage as possible call targets.
-      if (dynlink) {
-        for (const auto& [id, linkage] : db.linkage) {
-          if (linkage == Linkage::ExternalLinkage &&
-              db.node_type.at(id) == NodeType::Function &&
-              db.fun_sig.at(instr) == db.fun_sig.at(id) &&
-              (!loaded_syms.has_value() ||
-               find(loaded_ids.begin(), loaded_ids.end(), id) != loaded_ids.end())) {
-            g.addEdge(id, instr,
-                      EdgeType::ExternIndirectCall, INDIRECT_WEIGHT);
-          }
-        }
-      }
-    }
-  }
-
-  // External linkage
-  unordered_map<string, vector<NNodeId>> name2handles;
-  for (const auto& [id, linkage] : db.linkage) {
-    if (linkage == Linkage::ExternalLinkage) {
-      name2handles[db.name.at(id)].push_back(id);
-    }
-  }
-  for (const auto& [_, handles] : name2handles) {
-    for (size_t i = 0; i < handles.size(); i++) {
-      for (size_t j = i+1; j < handles.size(); j++) {
-        g.addEdge(handles[i], handles[j], EdgeType::Extern, INDIRECT_WEIGHT);
-        g.addEdge(handles[j], handles[i], EdgeType::Extern, INDIRECT_WEIGHT);
-      }
-    }
-  }
-
-  return g;
-}
-
-T graph::build_call_graph(const database& db,
-                        bool dynlink,
-                        const optional<vector<symbol>>& loaded_syms) {
-  const auto loaded_ids = map_loaded_symbols_to_ids(db, loaded_syms);
-
-  T g;
-
-  for (const auto& [f, bbs] : db.contains) {
-    if (db.node_type.at(f) != NodeType::Function) {
-      continue;
-    }
-    for (const auto& bb : bbs) {
-      if (db.node_type.at(bb) != NodeType::BasicBlock) {
-        continue;
-      }
-      for (const auto& instr : db.contains.at(bb)) {
-        if (!db.call_type.contains(instr)) {
-          continue;
-        }
-        const auto& call_ty = db.call_type.at(instr);
-        // If direct, add one edge.
-        if (call_ty == CallType::Direct) {
-          g.addEdge(db.calls.at(instr), f, EdgeType::DirectCall);
-
-          // Special case for direct calls to [pthread_create]: add
-          // edges for all address-taken functions with type signature
-          // "ptr (ptr)".
-          const auto& call_id = db.calls.at(instr);
-          const auto& fn_name = db.name.at(call_id);
-          if (fn_name == "pthread_create") {
-            for (const auto& fn : db.address_taken) {
-              if (db.fun_sig.at(fn) == "ptr (ptr)") {
-                g.addEdge(fn, f,
-                          EdgeType::IndirectCall, INDIRECT_WEIGHT);
-              }
-            }
-          }
-
-          continue;
-        }
-        // Else indirect. Add edges for all compatible address-taken functions.
-        for (const auto& fn : db.address_taken) {
-          if (db.fun_sig.at(fn) == db.fun_sig.at(instr)) {
-            g.addEdge(fn, f,
-                      EdgeType::IndirectCall, INDIRECT_WEIGHT);
-          }
-        }
-        // If dynlink flag is set, also consider functions with
-        // external linkage to be possible call targets.
-        if (!dynlink) {
-          continue;
-        }
-        for (const auto& [id, linkage] : db.linkage) {
-          if (linkage == Linkage::ExternalLinkage &&
-              db.node_type.at(id) == NodeType::Function &&
-              db.fun_sig.at(instr) == db.fun_sig.at(id) &&
-              (!loaded_syms.has_value() ||
-               find(loaded_ids.begin(), loaded_ids.end(), id) != loaded_ids.end())) {
-            g.addEdge(id, f,
-                      EdgeType::ExternIndirectCall, INDIRECT_WEIGHT);
-          }
-        }
-      }
-    }
-  }
-
-  // External linkage
-  unordered_map<string, vector<NNodeId>> name2handles;
-  for (const auto& [id, linkage] : db.linkage) {
-    if (linkage == Linkage::ExternalLinkage) {
-      name2handles[db.name.at(id)].push_back(id);
-    }
-  }
-  for (const auto& [_, handles] : name2handles) {
-    for (size_t i = 0; i < handles.size(); i++) {
-      for (size_t j = i+1; j < handles.size(); j++) {
-        g.addEdge(handles[i], handles[j], EdgeType::Extern, INDIRECT_WEIGHT);
-        g.addEdge(handles[j], handles[i], EdgeType::Extern, INDIRECT_WEIGHT);
-      }
-    }
-  }
-
-  return g;
-}
+// cfg (Contains(fn -> bb), Succ(bb -> instr), Direct(bb -> instr -> fn), direct pthread(bb -> fn), Indirect(bb -> fn)
+//      ExternIndirect(bb -> fn), Extern(sym -> sym)
 
 // Call edges aren't directly from calling BB to entry BB of called
 // function. Instead they go caller BB -> callee function -> entry
@@ -399,97 +243,10 @@ T graph::build_call_graph(const database& db,
 // weight 2, or 3 for externals because of ExternalLinkage edges) than
 // BB successor edges. Including the function nodes also makes it
 // possible to specify functions as targets for directed KLEE.
-T graph::build_cfg(const database& db,
-                 bool dynlink,
-                 const optional<vector<symbol>>& loaded_syms) {
-  const auto loaded_ids = map_loaded_symbols_to_ids(db, loaded_syms);
 
-  T g;
-
-  // function -> entry BB
-  for (const auto& [fn, bb] : db.function_entrypoints) {
-    g.addEdge(bb, fn, EdgeType::Contains);
-  }
-
-  // BB control flow
-  for (const auto& [bb, succs] : db.control_flow) {
-    for (const auto& succ : succs) {
-      g.addEdge(succ, bb, EdgeType::Succ);
-    }
-  }
-
-  // Calls
-  for (const auto& [bb, instrs] : db.contains) {
-    if (db.node_type.at(bb) != NodeType::BasicBlock) {
-      continue;
-    }
-    for (const auto& instr : instrs) {
-      if (!db.call_type.contains(instr)) {
-        continue;
-      }
-      const auto& call_ty = db.call_type.at(instr);
-      // If direct, add one edge.
-      if (call_ty == CallType::Direct) {
-        g.addEdge(db.calls.at(instr), bb, EdgeType::DirectCall);
-
-        // Special case for direct calls to [pthread_create]: add
-        // edges for all address-taken functions with type signature
-        // "ptr (ptr)".
-        const auto& call_id = db.calls.at(instr);
-        const auto& fn_name = db.name.at(call_id);
-        if (fn_name == "pthread_create") {
-          for (const auto& fn : db.address_taken) {
-            if (db.fun_sig.at(fn) == "ptr (ptr)") {
-              g.addEdge(fn, bb,
-                        EdgeType::IndirectCall, INDIRECT_WEIGHT);
-            }
-          }
-        }
-
-        continue;
-      }
-      // Else indirect. Add edges for all compatible address-taken functions.
-      for (const auto& fn : db.address_taken) {
-        if (db.fun_sig.at(fn) == db.fun_sig.at(instr)) {
-          g.addEdge(fn, bb,
-                    EdgeType::IndirectCall, INDIRECT_WEIGHT);
-        }
-      }
-      // If dynlink flag is set, also take functions with external
-      // linkage as possible call targets.
-      if (dynlink) {
-        for (const auto& [id, linkage] : db.linkage) {
-          if (linkage == Linkage::ExternalLinkage &&
-              db.node_type.at(id) == NodeType::Function &&
-              db.fun_sig.at(instr) == db.fun_sig.at(id) &&
-              (!loaded_syms.has_value() ||
-               find(loaded_ids.begin(), loaded_ids.end(), id) != loaded_ids.end())) {
-            g.addEdge(id, bb,
-                      EdgeType::ExternIndirectCall, INDIRECT_WEIGHT);
-          }
-        }
-      }
-    }
-  }
-
-  // External linkage
-  unordered_map<string, vector<NNodeId>> name2handles;
-  for (const auto& [id, linkage] : db.linkage) {
-    if (linkage == Linkage::ExternalLinkage) {
-      name2handles[db.name.at(id)].push_back(id);
-    }
-  }
-  for (const auto& [_, handles] : name2handles) {
-    for (size_t i = 0; i < handles.size(); i++) {
-      for (size_t j = i+1; j < handles.size(); j++) {
-        g.addEdge(handles[i], handles[j], EdgeType::Extern, INDIRECT_WEIGHT);
-        g.addEdge(handles[j], handles[i], EdgeType::Extern, INDIRECT_WEIGHT);
-      }
-    }
-  }
-
-  return g;
-}
+// instr_cfg (Contains(fn -> first_instr), Succ(instr -> instr), Succ(bb.last_instr -> bb.first_instr),
+//            DirectCall(instr -> fn), direct pthread(instr -> fn), IndirectCall(instr -> fn), IndirectExternal(instr -> fn),
+//            Extern(sym -> sym)
 
 // Same thing here as [build_cfg] (see above) wrt. Call edges going
 // through intermediate function nodes.

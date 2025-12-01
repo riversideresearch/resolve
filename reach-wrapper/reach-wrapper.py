@@ -189,7 +189,7 @@ class FactParser:
         with (facts_folder / "facts.facts").open() as f:
 
             all_nodes = []
-            all_edges = []
+            #all_edges = []
             # When multiple modules are combined they will be separated by newlines.
             for line in f:
                 facts = json.loads(line.strip('\n'))
@@ -199,12 +199,13 @@ class FactParser:
                     mnodes = [ Node((mid, int(id)), n["type"], n) for id,n in m["nodes"].items() ]
                     all_nodes.extend(mnodes)
 
+                    # don't require deserializing edges, but if we did this is what we could do
+                    """
                     medges = []
-                    #for (src, dst), kinds in m["edge_kinds"].items():
                     for k, e in m["edges"].items():
                         # glaze serializes pairs as {first:second}
                         d = json.loads(k)
-                        src,dst = list(d.items())[0]
+                        src,dst = d
 
                         sid = (mid, int(src))
                         did = (mid, int(dst))
@@ -212,9 +213,10 @@ class FactParser:
                         medges.append(e)
 
                     all_edges.extend(medges)
+                    """
 
             self.nodes = Nodes(all_nodes)
-            self.edges = Edges(all_edges)
+            #self.edges = Edges(all_edges)
 
     def demangle_names(self):
         with_names = [n for n in self.nodes if "name" in n.props]
@@ -314,6 +316,7 @@ class ReachabilityResult:
         and updates it with its func_id
         """
         func_id = fact_parser.get_func_id(self.sink.affected_function)
+        assert func_id is not None, f"Could not find affected function '{self.sink.affected_function}'"
 
         module_name = fact_parser.get_module_name_for_node(func_id) 
         print(f"Found function '{self.sink.affected_function}' in module '{module_name}'")

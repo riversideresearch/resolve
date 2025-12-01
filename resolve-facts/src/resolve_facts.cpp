@@ -5,16 +5,49 @@
 
 using namespace resolve_facts;
 
-/*
-// TODO: currently pairs as keys get serialized as "{\"first\": second}"
-// and it would be nice if it was a more standard representation like "[first, second]"
 template<>
-struct glz::meta<std::pair<NodeId, NodeId>> {
-  using T = std::pair<NodeId, NodeId>;
-  static constexpr auto value = arr({&T::first, &T::second});
+struct glz::meta<EdgeId> {
+  using T = EdgeId;
 };
-*/
 
+// Custom serialization to look like an array
+// When using a normal std::pair<int, int> glaze serializes as "{\"first\":second}".
+// Use a custom struct to represent the pair ids as overriding the serialization for std::pair
+// caused other compilation errors as glaze expected a "write_pair_contents" function of a particular form.
+namespace glz {
+  template <>
+  struct from<JSON, EdgeId>
+  {
+    template <auto Opts>
+    static void op(EdgeId& value, is_context auto&& ctx, auto&& it, auto&& end)
+    {
+
+      if (match_invalid_end<'[', Opts>(ctx, it, end)) {
+        return;
+      }
+      parse<JSON>::op<Opts>(value.first, ctx, it, end);
+      match<','>(ctx, it);
+      parse<JSON>::op<Opts>(value.second, ctx, it, end);
+      match<']'>(ctx, it);
+    }
+  };
+
+  template <>
+  struct to<JSON, EdgeId>
+  {
+    template <auto Opts>
+    static void op(const EdgeId& value, is_context auto&& ctx, auto&& b, auto&& ix) noexcept
+    {
+      dump<'['>(b, ix);
+      serialize<JSON>::op<Opts>(value.first, ctx, b, ix);
+      dump<','>(b, ix);
+      serialize<JSON>::op<Opts>(value.second, ctx, b, ix);
+      dump<']'>(b, ix);
+    }
+  };
+}
+
+// Serialize enums as their string names
 template <>
 struct glz::meta<NodeType> {
   using enum NodeType;
@@ -97,7 +130,7 @@ struct glz::meta<ProgramFacts> {
 };
 
 std::string ModuleFacts::serialize() const {
-  std::string json = glz::write_json(*this).value_or("error");
+  std::string json = glz::write_json(*this).value();
   return json;
 }
 
@@ -115,7 +148,7 @@ ModuleFacts ModuleFacts::deserialize(std::istream& facts) {
 }
 
 std::string ProgramFacts::serialize() const {
-  std::string json = glz::write_json(*this).value_or("error");
+  std::string json = glz::write_json(*this).value();
   return json;
 }
 
@@ -144,9 +177,27 @@ ProgramFacts ProgramFacts::deserialize(std::istream& facts) {
     }
   }
 
-  std::cout << "Found " << pf.modules.size() << " modules with total size " << i << std::endl;
+  //std::cout << "Found " << pf.modules.size() << " modules with total size " << i << std::endl;
 
   return pf;
+}
+
+const Node& ProgramFacts::getModuleOfNode(const NamespacedNodeId& nodeId) const {
+  const auto [mid, _] = nodeId;
+
+  return modules.at(mid).nodes.at(mid);
+}
+
+bool ProgramFacts::containsNode(const NamespacedNodeId& nodeId) const {
+  const auto [mid, nid] = nodeId;
+
+  return modules.contains(mid) && modules.at(mid).nodes.contains(nid);
+}
+
+const Node& ProgramFacts::getNode(const NamespacedNodeId& nodeId) const {
+  const auto [mid, nid] = nodeId;
+
+  return modules.at(mid).nodes.at(nid);
 }
 
 std::string resolve_facts::to_string(const NamespacedNodeId& id) {

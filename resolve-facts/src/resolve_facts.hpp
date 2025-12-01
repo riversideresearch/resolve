@@ -50,6 +50,7 @@ namespace resolve_facts {
     pair_hash() {}
   };
 
+
   struct Node {
     NodeType type;
     std::optional<std::string> name;
@@ -76,9 +77,31 @@ namespace resolve_facts {
     std::vector<EdgeKind> kinds;
   };
 
+  struct EdgeId {
+    NodeId first;
+    NodeId second;
+    EdgeId() = default;
+    EdgeId(NodeId first, NodeId second): first(first), second(second) {}
+    bool operator==(const EdgeId& o) const {
+      return first == o.first && second == o.second;
+    }
+  };
+
+  struct e_hash : public std::function<std::size_t(const EdgeId&)> {
+    std::hash<uint64_t> hasher;
+    std::size_t operator()(const EdgeId &e) const {
+      // Hash as a single uint64_t because hashing as two individual uint32_t ended up being hilariously slow
+      // which could have also just been a side effect of being a poor hash combiner.
+      uint64_t s = ((uint64_t)e.first) << 32 | (uint64_t)e.second;
+      return hasher(s);
+    }
+
+    e_hash() {}
+  };
+
   struct ModuleFacts {
     std::unordered_map<NodeId, Node> nodes;
-    std::unordered_map<std::pair<NodeId, NodeId>, Edge, pair_hash> edges;
+    std::unordered_map<EdgeId, Edge, e_hash> edges;
 
     ModuleFacts() :
       nodes(), edges()
@@ -101,6 +124,9 @@ namespace resolve_facts {
     std::string serialize() const;
     static ProgramFacts deserialize(std::istream& facts);
 
+    const Node& getModuleOfNode(const NamespacedNodeId& nodeId) const;
+    bool containsNode(const NamespacedNodeId& nodeId) const;
+    const Node& getNode(const NamespacedNodeId& nodeId) const;
   };
 
   template<typename V>

@@ -29,7 +29,7 @@ std::string resolve::typeToString(const Type &type) {
   std::string str;
   llvm::raw_string_ostream out(str);
   type.print(out);
-  return "\"" + str + "\"";
+  return str;
 }
 
 void resolve::getGlobalFacts(GlobalVariable &G) {
@@ -149,7 +149,7 @@ void resolve::embedFacts(Module &M) {
       compression::compress(params, inputData, compressedFacts);
     }
 
-    errs() << "Embedding facts for " << sectionName << " with original size " << facts.size() << " and compressed size " << compressedFacts.size() << "\n";
+    //errs() << "Embedding facts for " << sectionName << " with original size " << facts.size() << " and compressed size " << compressedFacts.size() << "\n";
 
     Constant *dataArr = ConstantDataArray::get(C, compressedFacts);
     GlobalVariable *gv =

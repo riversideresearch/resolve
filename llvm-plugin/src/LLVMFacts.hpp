@@ -23,6 +23,7 @@ using ModuleFacts = resolve_facts::ModuleFacts;
 using Node = resolve_facts::Node;
 using NodeId = resolve_facts::NodeId;
 using NodeType = resolve_facts::NodeType;
+using EdgeId = resolve_facts::EdgeId;
 
 class LLVMFacts {
   ProgramFacts &facts;
@@ -61,7 +62,7 @@ class LLVMFacts {
   template<typename F>
   void recordEdge(const NodeId& module, const NodeId &srcID, const NodeId &tgtID,
                   F&& update_func) {
-    auto pair = std::make_pair(srcID, tgtID);
+    auto pair = EdgeId(srcID, tgtID);
     auto& mf = facts.modules.at(module);
     auto [it, exists] = mf.edges.try_emplace(pair);
     update_func(it->second);
@@ -82,7 +83,7 @@ public:
       size_t hash = std::hash<std::string>{}(src);
       auto id = (NodeId) hash;
 
-      llvm::errs() << "Creating new module: " << id << "\n";
+      //llvm::errs() << "Creating new module: " << id << "\n";
 
       moduleIDs[&M] = id;
 

@@ -19,6 +19,7 @@
 #include "facts.hpp"
 #include "graph.hpp"
 #include "search.hpp"
+#include "util.hpp"
 
 using namespace std;
 using namespace chrono;
@@ -41,14 +42,17 @@ conf::config load_config(const argparse::ArgumentParser& program) {
       conf.facts_dir = program.get<string>("facts_dir");
     }
     // TODO: argument passing with new id format
-    /*
     if (program.present<string>("src") && program.present<string>("dst")) {
+      auto src_str = program.get<string>("src");
+      auto dst_str = program.get<string>("dst");
+      auto srcs = util::split(src_str, ',');
+      auto dsts = util::split(dst_str, ',');
+      
       conf.queries.push_back({
-          program.get<string>("src"),
-          program.get<string>("dst"),
+          { std::stoi(srcs[0]), std::stoi(srcs[1]) },
+          { std::stoi(dsts[0]), std::stoi(dsts[1]) }
         });
     }
-    */
     conf.dynlink = program.get<bool>("dynlink") || conf.dynlink;
     if (program.present<string>("output")) {
       conf.out_path = program.present<string>("output");
@@ -162,22 +166,12 @@ int main(int argc, char* argv[]) {
   // Execute reachability queries.
   // First, build graph.
 
-  const unordered_map<string, reach_facts::LoadOptions> load_options = {
-    { "simple", graph::SIMPLE_LOAD_OPTIONS },
-    { "cfg", graph::CFG_LOAD_OPTIONS },
-    { "instr-cfg", graph::CFG_LOAD_OPTIONS },
-    { "call", graph::CALL_LOAD_OPTIONS },
-  };
-
   typedef graph::T
-    (*graph_builder)(const reach_facts::database&, bool,
+    (*graph_builder)(const resolve_facts::ProgramFacts&, bool,
                      const optional<vector<dlsym::loaded_symbol>>&);
 
   const unordered_map<string, graph_builder> graph_builders = {
-    { "simple", graph::build_simple_graph },
-    { "cfg", graph::build_cfg },
-    { "instr-cfg", graph::build_instr_cfg },
-    { "call", graph::build_call_graph }
+    { "cfg", graph::build_from_program_facts },
   };
 
   if (!graph_builders.contains(conf.graph_type)) {
@@ -186,12 +180,12 @@ int main(int argc, char* argv[]) {
   }
 
   time_point<system_clock> t0 = system_clock::now();
-  //const auto db = load(conf.facts_dir, load_options.at(conf.graph_type));
   ifstream facts(conf.facts_dir / "facts.facts");
   const auto pf = resolve_facts::ProgramFacts::deserialize(facts);
   facts.close();
 
   duration<double> facts_load_time = system_clock::now() - t0;
+
 
   if (conf.verbose) {
 
@@ -204,11 +198,7 @@ int main(int argc, char* argv[]) {
   }
 
   t0 = system_clock::now();
-  /*
-  const auto g = graph_builders.at(conf.graph_type)
-    (db, conf.dynlink, loaded_syms);
-  */
-  const auto g = graph::build_from_program_facts(pf, conf.dynlink, loaded_syms);
+  const auto g = graph_builders.at(conf.graph_type)(pf, conf.dynlink, loaded_syms);
   duration<double> graph_build_time = system_clock::now() - t0;
 
   if (conf.verbose) {
@@ -231,22 +221,20 @@ int main(int argc, char* argv[]) {
     qres.src = q.src;
     qres.dst = q.dst;
 
-    auto print_missing = [&](auto node) {
-      cerr << "node " << resolve_facts::to_string(node) << " not found" << endl;
+    auto print_missing = [&](auto node, auto type) {
+      cerr << "node " << type << " " << resolve_facts::to_string(node) << " not found" << endl;
     };
 
     // The graph may not have any edges from the src as all may be of the form (dst -> src)
     // If the explicit edge does not exist at least check that the id is found in the total list of nodes
-    const auto [mid, nid] = q.src;
-    //auto has_src = g.edges.contains(q.src) || db.node_type.contains(q.src);
-    auto has_src = g.edges.contains(q.src) || (pf.modules.contains(mid) && pf.modules.at(mid).nodes.contains(nid));
+    auto has_src = g.edges.contains(q.src) || pf.containsNode(q.src);
     auto has_dst = g.edges.contains(q.dst);
 
     if (!has_src) {
-      print_missing(q.src);
+      print_missing(q.src, "src");
     }
     if (!has_dst) {
-      print_missing(q.dst);
+      print_missing(q.dst, "dst");
     }
 
     // If both src and dst exist, try to find path.
