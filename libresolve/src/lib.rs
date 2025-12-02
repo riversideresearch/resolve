@@ -676,7 +676,7 @@ pub extern "C" fn resolve_obj_type(base_ptr: *mut c_void) -> AllocType {
  * @return 
  */
 #[unsafe(no_mangle)]
-pub extern "C" fn resolve_report_sanitize_mem_inst_triggered(ptr: *mut c_void) {
+pub extern "C" fn resolve_log_sanitize_mem_inst(ptr: *mut c_void) {
     let mut buf = [0u8; 128];
     let mut writer = BufferWriter::new(&mut buf);
     let _ = writeln!(&mut writer, "[SANITIZE] Applying sanitizer to address 0x{:x}", ptr as Vaddr);
@@ -688,7 +688,7 @@ pub extern "C" fn resolve_report_sanitize_mem_inst_triggered(ptr: *mut c_void) {
  * @brief - Logs when program enters sanitization basic block for arithmetic operations
  */
 #[unsafe(no_mangle)]
-pub extern "C" fn resolve_report_sanitizer_triggered() -> () {
+pub extern "C" fn resolve_log_sanitizer_triggered() -> () {
     let mut buf = [0u8; 128];
     let mut writer = BufferWriter::new(&mut buf);
     let _ = writeln!(&mut writer, "[SANITIZE] Applying arithmetic sanitization in basic block");
