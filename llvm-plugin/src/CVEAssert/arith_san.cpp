@@ -32,6 +32,16 @@ void sanitizeBinShift(Function *F) {
   auto &Ctx = M->getContext();
   IRBuilder<> Builder(Ctx);
 
+  auto void_ty = Type::getVoidTy(Ctx);
+  auto ptr_ty = PointerType::get(Ctx, 0);
+
+  FunctionCallee resolvelogFn = M->getOrInsertFunction(
+    "resolve_log_sanitizer_triggered",
+    FunctionType::get(void_ty, {},
+    false)
+  );
+
+
   for (auto &BB : *F) {
     for (auto &instr : BB) {
       if (auto *BinOp = dyn_cast<BinaryOperator>(&instr)) {
@@ -76,7 +86,7 @@ void sanitizeBinShift(Function *F) {
 
     // remedShiftBB: Perform safe shift operation
     Builder.SetInsertPoint(remedShiftBB);
-    Builder.CreateCall(getOrCreateResolveReportSanitizerTriggered(M));
+    Builder.CreateCall(resolvelogFn);
     Value *safeShift = nullptr;
     Value *safeShiftAmt;
 
@@ -142,6 +152,12 @@ void sanitizeDivideByZero(Function *F,  Vulnerability::RemediationStrategies str
 
   auto void_ty = Type::getVoidTy(Ctx);
   auto ptr_ty = PointerType::get(Ctx, 0);
+
+  FunctionCallee resolvelogFn = M->getOrInsertFunction(
+    "resolve_log_sanitizer_triggered",
+    FunctionType::get(void_ty, {},
+    false)
+  );
 
   switch (strategy) {
     case Vulnerability::RemediationStrategies::EXIT:
@@ -220,7 +236,7 @@ void sanitizeDivideByZero(Function *F,  Vulnerability::RemediationStrategies str
 
     // remedDivBB: Perform safe division
     Builder.SetInsertPoint(remedDivBB);
-    Builder.CreateCall(getOrCreateResolveReportSanitizerTriggered(M));
+    Builder.CreateCall(resolvelogFn);
     Builder.CreateCall(getOrCreateRemediationBehavior(M, strategy));
     Value *safeDiv = nullptr;
     Value *safeIntDivisor;
@@ -428,11 +444,19 @@ Function *replaceUndesirableFunction(Function *F, CallInst *call) {
   LLVMContext &Ctx = M->getContext();
   IRBuilder<> Builder(Ctx);
 
+  auto void_ty = Type::getVoidTy(Ctx);
+  auto ptr_ty = PointerType::get(Ctx, 0);
+
+  FunctionCallee resolvelogFn = M->getOrInsertFunction(
+    "resolve_log_sanitizer_triggered",
+    FunctionType::get(void_ty, {},
+    false)
+  );
+
   Function *calledFunc = call->getCalledFunction();
   if (!calledFunc)
     return nullptr;
 
-  // 1. Create the function name and type.
   std::string sanitizedHandlerName = "resolve_sanitized_function";
   
   if (Function* existing = M->getFunction(sanitizedHandlerName)) {
@@ -445,9 +469,6 @@ Function *replaceUndesirableFunction(Function *F, CallInst *call) {
   Function *sanitizedHandlerFunc =
       Function::Create(sanitizedHandlerType, Function::InternalLinkage,
                        sanitizedHandlerName, M);
-
-  Function *resolve_report_func =
-      getOrCreateResolveReportSanitizerTriggered(M);
 
   Function::arg_iterator argIter = sanitizedHandlerFunc->arg_begin();
   Value *dividend = argIter++;
@@ -470,7 +491,7 @@ Function *replaceUndesirableFunction(Function *F, CallInst *call) {
   // SanitizedBB: Calls sanitized behavior for arithmetic sanitization
   // Returns dividend
   Builder.SetInsertPoint(SanitizedBB);
-  Builder.CreateCall(resolve_report_func);
+  Builder.CreateCall(resolvelogFn);
   Builder.CreateRet(dividend);
 
   // ContExec: Makes call to original call instruction and returns that instead.
@@ -547,6 +568,16 @@ void sanitizeIntOverflow(Function *F, Vulnerability::RemediationStrategies strat
   Module *M = F->getParent();
   auto &Ctx = M->getContext();
   IRBuilder<> Builder(Ctx);
+
+  auto void_ty = Type::getVoidTy(Ctx);
+  auto ptr_ty = PointerType::get(Ctx, 0);
+
+  FunctionCallee resolvelogFn = M->getOrInsertFunction(
+    "resolve_log_sanitizer_triggered",
+    FunctionType::get(void_ty, {},
+    false)
+  );
+
 
   switch(strategy) {
     case Vulnerability::RemediationStrategies::RECOVER:
@@ -646,7 +677,7 @@ void sanitizeIntOverflow(Function *F, Vulnerability::RemediationStrategies strat
 
     // remedOverflowBB: Construct saturated instructions
     Builder.SetInsertPoint(remedOverflowBB);
-    Builder.CreateCall(getOrCreateResolveReportSanitizerTriggered(M));
+    Builder.CreateCall(resolvelogFn);
     Builder.CreateCall(getOrCreateRemediationBehavior(M, strategy));
 
     auto insertSatOp = [&Builder, M](Instruction *binary_inst, Value *op1,

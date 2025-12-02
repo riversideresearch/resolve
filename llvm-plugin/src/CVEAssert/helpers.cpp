@@ -64,26 +64,26 @@ Function *getOrCreateIsHeap(Module *M, LLVMContext &Ctx) {
     return SanitizeFunc;
 }
 
-Function *getOrCreateResolveReportSanitizerTriggered(Module *M) {
-    auto &Ctx = M->getContext();
-    auto ptr_ty = PointerType::get(Ctx, 0);
-    auto void_ty = Type::getVoidTy(Ctx);
+// Function *getOrCreateResolveReportSanitizerTriggered(Module *M) {
+//     auto &Ctx = M->getContext();
+//     auto ptr_ty = PointerType::get(Ctx, 0);
+//     auto void_ty = Type::getVoidTy(Ctx);
 
-    FunctionType *resolve_report_func_ty = FunctionType::get(void_ty, {}, false);
+//     FunctionType *resolve_report_func_ty = FunctionType::get(void_ty, {}, false);
     
-    if (Function *F = M->getFunction("resolve_log_sanitizer_triggered"))
-        if (!F->isDeclaration()) 
-            return F;
+//     if (Function *F = M->getFunction("resolve_log_sanitizer_triggered"))
+//         if (!F->isDeclaration()) 
+//             return F;
 
-    Function *resolve_report_func = Function::Create(
-        resolve_report_func_ty,
-        Function::ExternalLinkage,
-        "resolve_log_sanitizer_triggered",
-        M
-    );
+//     Function *resolve_report_func = Function::Create(
+//         resolve_report_func_ty,
+//         Function::ExternalLinkage,
+//         "resolve_log_sanitizer_triggered",
+//         M
+//     );
 
-    return resolve_report_func;
-} 
+//     return resolve_report_func;
+// } 
 
 // Create a function getOrCreateRemediateBehavior function to handle do nothing or exit
 Function *getOrCreateRemediationBehavior(Module *M, Vulnerability::RemediationStrategies strategy) {
