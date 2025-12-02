@@ -85,6 +85,20 @@ static Function *getOrCreateBoundsCheckLoadSanitizer(Module *M, LLVMContext &Ctx
       builder.CreateUnreachable();
       break;
   }
+  // Set the arbitatry return value
+  Builder.SetInsertPoint(SanitizeBlock);
+  FunctionType *LogSanitizeFuncType =
+      FunctionType::get(Type::getVoidTy(Ctx), {ptr_ty}, false);
+  FunctionCallee LogSanitizeFunc = M->getOrInsertFunction(
+      "resolve_log_sanitize_mem_inst", LogSanitizeFuncType);
+  Builder.CreateCall(LogSanitizeFunc, {base_ptr});
+
+  Builder.CreateRet(Constant::getNullValue(ty));
+
+  // Return Block: returns pointer if non-null
+  Builder.SetInsertPoint(LoadBlock);
+  Value *ld = Builder.CreateLoad(ty, derived_ptr);
+  Builder.CreateRet(ld);
 
   // DEBUGGING
   raw_ostream &out = errs();

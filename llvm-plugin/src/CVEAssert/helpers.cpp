@@ -71,14 +71,14 @@ Function *getOrCreateResolveReportSanitizerTriggered(Module *M) {
 
     FunctionType *resolve_report_func_ty = FunctionType::get(void_ty, {}, false);
     
-    if (Function *F = M->getFunction("resolve_report_sanitizer_triggered"))
+    if (Function *F = M->getFunction("resolve_log_sanitizer_triggered"))
         if (!F->isDeclaration()) 
             return F;
 
     Function *resolve_report_func = Function::Create(
         resolve_report_func_ty,
         Function::ExternalLinkage,
-        "resolve_report_sanitizer_triggered",
+        "resolve_log_sanitizer_triggered",
         M
     );
 

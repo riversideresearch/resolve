@@ -57,7 +57,7 @@ static Function *getOrCreateNullPtrLoadSanitizer(Module *M, LLVMContext &Ctx, Ty
         { ptr_ty },
         false
     );
-    FunctionCallee LogMemInstFunc = M->getOrInsertFunction("resolve_report_sanitize_mem_inst_triggered", LogMemInstFuncTy);
+    FunctionCallee LogMemInstFunc = M->getOrInsertFunction("resolve_log_sanitize_mem_inst", LogMemInstFuncTy);
     Builder.CreateCall(LogMemInstFunc, { InputPtr });
 
     if (strategy == Vulnerability::RemediationStrategies::SAFE) {
@@ -122,7 +122,7 @@ static Function *getOrCreateNullPtrStoreSanitizer(Module *M, LLVMContext &Ctx, T
         { ptr_ty },
         false
     );
-    FunctionCallee LogMemInstFunc = M->getOrInsertFunction("resolve_report_sanitize_mem_inst_triggered", LogMemInstFuncTy);
+    FunctionCallee LogMemInstFunc = M->getOrInsertFunction("resolve_log_sanitize_mem_inst", LogMemInstFuncTy);
     Builder.CreateCall(LogMemInstFunc, { InputPtr });
     
     if (strategy == Vulnerability::RemediationStrategies::SAFE) {
