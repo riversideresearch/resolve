@@ -16,8 +16,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-void resolve_report_sanitizer_triggered() { printf("Changing this in the future!"); }
-
 int div_zero_main(int argc, const char* argv[]) {        
     int math = (int) (42.0 / (float)argc);
     return 42 % argc + math / argc;
