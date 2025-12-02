@@ -6,7 +6,9 @@
 
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Twine.h"
+#include "llvm/IR/Constants.h"
 #include "llvm/IR/Function.h"
+#include "llvm/IR/GlobalVariable.h"
 #include "llvm/IR/InlineAsm.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Module.h"
@@ -85,26 +87,27 @@ Function *getOrCreateResolveReportSanitizerTriggered(Module *M) {
     return resolve_report_func;
 } 
 
-// Create a function getOrCreateRemediateBehavior function to handle do nothing or exit
 Function *getOrCreateRemediationBehavior(Module *M, Vulnerability::RemediationStrategies strategy) {
     auto &Ctx = M->getContext();
     auto ptr_ty = PointerType::get(Ctx, 0);
     auto void_ty = Type::getVoidTy(Ctx);
+    auto i32_ty = Type::getInt32Ty(Ctx);
 
     FunctionType *resolve_remed_behavior_ty = FunctionType::get(void_ty, {}, false);
-    if (Function *F = M->getFunction("resolve_remed_behavior"))
+    if (Function *F = M->getFunction("resolve_remediation_behavior"))
         if (!F->isDeclaration())
             return F;
 
     Function *resolve_remed_behavior = Function::Create(
         resolve_remed_behavior_ty,
         GlobalValue::InternalLinkage,
-        "resolve_remed_behavior",
+        "resolve_remediation_behavior",
         M
     );
 
-    BasicBlock *BB = BasicBlock::Create(Ctx, "", resolve_remed_behavior);
-    IRBuilder<> Builder(BB);
+    BasicBlock *EntryBB = BasicBlock::Create(Ctx, "", resolve_remed_behavior);
+    IRBuilder<> Builder(Ctx);
+    Builder.SetInsertPoint(EntryBB);
 
     if (strategy == Vulnerability::RemediationStrategies::EXIT) {
         // void exit(i32)
@@ -119,12 +122,56 @@ Function *getOrCreateRemediationBehavior(Module *M, Vulnerability::RemediationSt
         Builder.CreateCall(exitFn, { exitCode });
     
     } else if (strategy == Vulnerability::RemediationStrategies::RECOVER) {
+        //Create a global jmp buffer 
+        ArrayType *jmpBufArrTy = ArrayType::get(Type::getInt8Ty(Ctx), 200);
+        auto *jmpBufArr = ConstantAggregateZero::get(jmpBufArrTy);
+
+        // Initialize the jmp_buf as gbl var
+        GlobalVariable *GV = new GlobalVariable(
+            *M,
+            jmpBufArrTy,
+            false, /* isConstant */
+            GlobalValue::InternalLinkage,
+            jmpBufArr,
+            "buffer"
+        );
+
+        FunctionCallee setjmpFn = M->getOrInsertFunction(
+            "setjmp",
+            FunctionType::get(i32_ty, { ptr_ty },
+            false)
+        );
+
         FunctionType *errorhandlerTy = FunctionType::get(
             void_ty,
             {},
             false
         );
 
+        BasicBlock *unreachableBB = BasicBlock::Create(Ctx, "", resolve_remed_behavior);
+        BasicBlock *errorHandleBB = BasicBlock::Create(Ctx, "", resolve_remed_behavior);
+
+        // Create a GEP instruction to get the first element of the buffer
+        auto *bufPtr = Builder.CreateInBoundsGEP(
+            jmpBufArrTy,
+            GV,
+            { Builder.getInt32(0), Builder.getInt32(0) },
+            ""
+        );
+
+        Value *setjmpVal = Builder.CreateCall(setjmpFn, { bufPtr });
+
+        // Handle exception
+        // NOTE: This should never branch to unreachableBB
+        Value *handleException = Builder.CreateICmpEQ(setjmpVal, ConstantInt::get(i32_ty, 0));
+
+        Builder.CreateCondBr(handleException, unreachableBB, errorHandleBB);
+
+        Builder.SetInsertPoint(unreachableBB);
+        Builder.CreateUnreachable();
+
+        // TODO: Talk to Jackson about this!
+        Builder.SetInsertPoint(errorHandleBB);
         FunctionCallee errorHandlerFn = M->getOrInsertFunction("error_handler", errorhandlerTy);
         Builder.CreateCall(errorHandlerFn);
     }
