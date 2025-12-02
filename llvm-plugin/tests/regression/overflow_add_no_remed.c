@@ -7,7 +7,7 @@
 // RUN: %s -o - | %FileCheck %s 
 // CHECK-LABEL: dso_local i32 @main
 // CHECK-NOT: call { i32, i1 } @llvm.sadd.with.overflow.i32
-// CHECK-NOT: call void @resolve_report_sanitizer_triggered
+// CHECK-NOT: call void @resolve_log_sanitizer_triggered
 
 #include <stdio.h>
 #include <limits.h>

@@ -6,7 +6,7 @@
 // RUN: %clang -S -emit-llvm %s -o - | %FileCheck %s
 // CHECK-LABEL: define dso_local i32 @div_zero_main
 // CHECK: sdiv i32 
-// CHECK-NOT: call void resolve_report_sanitizer_triggered
+// CHECK-NOT: call void resolve_log_sanitizer_triggered
 // CHECK-LABEL: define dso_local i32 @main
 // RUN: %clang %s -o %t.exe
 // RUN: ! %t.exe 1
