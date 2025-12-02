@@ -234,101 +234,6 @@ static Function *getOrCreateBoundsCheckMemcpySanitizer(Module *M) {
   return SanitizeMemcpyFunc;
 }
 
-static Value *findPtrBase(Function *F, Value *V, MemorySSA &MSSA,
-                          MemorySSAWalker *Walker) {
-  // Follow Def Use Chains through provenance preserving operations
-  // GetElementPtrInst, PHINodes, MemoryDefUse
-  std::vector<Value *> roots;
-  Worklist<Value *> wl{V};
-
-  auto FollowMemoryDef = [&](Instruction *I) {
-    assert(I != nullptr);
-    if (FIND_PTR_ROOT_DEBUG)
-      errs() << "[CVEAssert] [Find Roots] Following Mem Def " << *I << "\n";
-
-    if (auto Inst = dyn_cast<StoreInst>(I)) {
-      wl.push_unique(Inst->getValueOperand());
-      return true;
-    } else {
-      errs() << "[CVEAssert] Error: Unexpected Memory Def Instruction " << *I
-             << "\n";
-      errs() << "[CVEAssert]    ... when finding roots for " << *V << "\n";
-      return false;
-    }
-  };
-
-  auto FollowMemoryUse = [&](Instruction *I) {
-    if (FIND_PTR_ROOT_DEBUG)
-      errs() << "[CVEAssert] [Find Roots] Following Mem Use " << *I << "\n";
-
-    // Check if this is a known memory use in MSSA
-    if (!I->mayReadFromMemory())
-      return false;
-    // TODO: When does this condition not hold
-    if (!MSSA.getMemoryAccess(I))
-      return false;
-
-    auto *Clob = Walker->getClobberingMemoryAccess(I);
-    bool found_suitible_def = false;
-
-    if (auto Def = dyn_cast<MemoryDef>(Clob)) {
-      found_suitible_def = FollowMemoryDef(Def->getMemoryInst());
-    } else if (auto Phi = dyn_cast<MemoryPhi>(Clob)) {
-      // TODO Handle loops? Can we ignore blocks that are not dominating
-      for (auto &Op : Phi->incoming_values()) {
-        if (auto Def = dyn_cast<MemoryDef>(Op)) {
-          found_suitible_def |= FollowMemoryDef(Def->getMemoryInst());
-        } else {
-          llvm_unreachable("There should be no other options.");
-        }
-      }
-    } else {
-      llvm_unreachable("There should be no other options.");
-    }
-    return found_suitible_def;
-  };
-
-  while (!wl.empty()) {
-    auto top = wl.pop();
-    if (FIND_PTR_ROOT_DEBUG)
-      errs() << "[CVEAssert] [Find Roots] Tracing " << *top << "\n";
-    // Handle operations on pointers
-    if (auto Inst = dyn_cast<GetElementPtrInst>(top)) {
-      wl.push_unique(Inst->getPointerOperand());
-
-      // Handle PHI Nodes
-    } else if (auto Inst = dyn_cast<PHINode>(top)) {
-      // TODO Handle loops? Can we ignore blocks that are not dominating
-      wl.push_unique_range(Inst->incoming_values().begin(),
-                           Inst->incoming_values().end());
-
-    } else if (auto Inst = dyn_cast<CallInst>(top)) {
-      roots.push_back(top);
-      // Handle pointers loaded from memory
-    } else if (auto Inst = dyn_cast<Instruction>(top)) {
-      if (!FollowMemoryUse(Inst)) {
-        roots.push_back(top);
-      }
-    } else {
-      roots.push_back(top);
-    }
-  }
-
-  if (roots.size() > 1) {
-    errs() << "[CVEAssert] Cannot instrument " << *V << "\n";
-    errs() << "[CVEAssert] Multiple Potential allocations: \n";
-  } else {
-    if (FIND_PTR_ROOT_DEBUG)
-      errs() << "[CVEAssert] Found one root for " << *V << "\n";
-  }
-  for (auto root : roots) {
-    if (FIND_PTR_ROOT_DEBUG || roots.size() > 1)
-      errs() << "[CVEAssert]   " << *root << "\n";
-  }
-
-  return roots.front();
-}
-
 void sanitizeLoadStore(Function *F, Vulnerability::RemediationStrategies strategy) 
 {
   LLVMContext &Ctx = F->getContext();
@@ -389,12 +294,6 @@ void sanitizeLoadStore(Function *F, Vulnerability::RemediationStrategies strateg
 
 void sanitizeMemcpy(Function *F, ModuleAnalysisManager &MAM) {
   IRBuilder<> builder(F->getContext());
-  // Compute MSSA for this Function
-  auto &FAMProxy =
-      MAM.getResult<FunctionAnalysisManagerModuleProxy>(*F->getParent());
-  FunctionAnalysisManager &FAM = FAMProxy.getManager();
-  MemorySSA &MSSA = FAM.getResult<MemorySSAAnalysis>(*F).getMSSA();
-  MemorySSAWalker *Walker = MSSA.getWalker();
 
   std::vector<MemCpyInst *> memcpyList;
 
@@ -405,22 +304,6 @@ void sanitizeMemcpy(Function *F, ModuleAnalysisManager &MAM) {
       }
     }
   }
-
-  std::map<Value *, Value *> ptrBase;
-
-  // for (auto Inst : memcpyList) {
-  //     auto dst_ptr = Inst->getDest();
-  //     auto src_ptr = Inst->getSource();
-  //     if (ptrBase.find(dst_ptr) == ptrBase.end()) {
-  //         ptrBase[dst_ptr] = findPtrBase(f, dst_ptr, MSSA, Walker);
-  //     }
-
-  //     if (ptrBase.find(src_ptr) == ptrBase.end()) {
-  //         ptrBase[src_ptr] = findPtrBase(f, src_ptr, MSSA, Walker);
-  //     }
-  // }
-
-  errs() << "[CVEAssert] Found " << ptrBase.size() << " roots" << "\n";
 
   for (auto Inst : memcpyList) {
     builder.SetInsertPoint(Inst);
@@ -589,8 +472,7 @@ void sanitizeMalloc(Function *F, Vulnerability::RemediationStrategies strategy) 
 void sanitizeMemInstBounds(Function *F, ModuleAnalysisManager &MAM, Vulnerability::RemediationStrategies strategy) {
   // FIXME: bad alias analysis is causing compilation to fail
   // TBD: why does TBAA not work right
-  // sanitizeLoadStore(f, MAM);
   sanitizeAlloca(F);
   sanitizeMalloc(F, strategy);
-  // sanitizeMemcpy(f, MAM);
+  // sanitizeMemcpy(F, MAM);
 }
