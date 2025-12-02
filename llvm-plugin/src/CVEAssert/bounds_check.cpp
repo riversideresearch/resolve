@@ -79,12 +79,9 @@ static Function *getOrCreateBoundsCheckLoadSanitizer(Module *M, LLVMContext &Ctx
 
   // SanitizeLoadBB: Apply remediation strategy
   builder.SetInsertPoint(SanitizeLoadBB);
-  switch (strategy) {
-    case Vulnerability::RemediationStrategies::EXIT:
-      builder.CreateCall(getOrCreateRemediationBehavior(M, strategy));
-      builder.CreateUnreachable();
-      break;
-  }
+  builder.CreateCall(getOrCreateRemediationBehavior(M, strategy));
+  builder.CreateUnreachable();
+
 
   // DEBUGGING
   raw_ostream &out = errs();
@@ -152,12 +149,8 @@ static Function *getOrCreateBoundsCheckStoreSanitizer(Module *M, LLVMContext &Ct
 
   // SanitizeStoreBB: Apply remediation strategy
   builder.SetInsertPoint(SanitizeStoreBB);
-  switch(strategy) {
-    case Vulnerability::RemediationStrategies::EXIT:
-      builder.CreateCall(getOrCreateRemediationBehavior(M, strategy));
-      builder.CreateUnreachable();
-      break;
-  }
+  builder.CreateCall(getOrCreateRemediationBehavior(M, strategy));
+  builder.CreateUnreachable();
   
   // DEBUGGING
   raw_ostream &out = errs();
