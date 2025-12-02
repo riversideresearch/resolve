@@ -157,7 +157,7 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
     switch (vuln.WeaknessID) {
       case VulnID::OOB_READ:           /* NOTE: Found in stb-resize, lamartine challenge problems */
       case VulnID::INCORRECT_BUF_SIZE: /* NOTE: These IDs correspond to CWEs found in analyze-image */
-        sanitizeMemInstBounds(&F, MAM, vuln.Strategy);
+        sanitizeMemInstBounds(&F, vuln.Strategy);
         break;
 
       case VulnID::DIVIDE_BY_ZERO: /* NOTE: This ID corresponds to CWE description in ros2 challenge problem */
