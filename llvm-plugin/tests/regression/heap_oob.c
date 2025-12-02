@@ -2,6 +2,7 @@
 // RUN: -fpass-plugin=%plugin \
 // RUN: %s -o - | %FileCheck %s 
 // CHECK-LABEL: define dso_local i32 @main
+// CHECK: call ptr @resolve_malloc 
 // RUN: RESOLVE_LABEL_CVE=vulnerabilities/heap_oob.json %clang -fpass-plugin=%plugin \ 
 // RUN: -L%rlib -lresolve -Wl,-rpath=%rlib %s -o %t.exe
 // RUN: %t.exe; test $? -eq 3
