@@ -190,11 +190,14 @@ int main(int argc, char* argv[]) {
   if (conf.verbose) {
 
     auto nodes = 0;
+    auto edges = 0;
     for (const auto& [_, m]: pf.modules) {
       nodes += m.nodes.size();
+      edges += m.edges.size();
     }
     cout << "Loaded facts in " << facts_load_time.count()
-         << " seconds. # nodes = " << nodes << endl;
+         << " seconds. # nodes = " << nodes
+         << " # edges = " << edges << endl;
   }
 
   t0 = system_clock::now();
@@ -202,8 +205,13 @@ int main(int argc, char* argv[]) {
   duration<double> graph_build_time = system_clock::now() - t0;
 
   if (conf.verbose) {
+    auto edges = 0;
+    for (const auto& [_, e]: g.edges) {
+      edges += e.size();
+    }
+
     cout << "Loaded graph in " << graph_build_time.count()
-         << " seconds. # nodes = " << g.edges.size() << endl;
+         << " seconds. # edges = " << edges << endl;
   }
   if (!graph::wf(g.edges)) {
     cerr << "WARNING: graph not well-formed" << endl;
@@ -228,7 +236,7 @@ int main(int argc, char* argv[]) {
     // The graph may not have any edges from the src as all may be of the form (dst -> src)
     // If the explicit edge does not exist at least check that the id is found in the total list of nodes
     auto has_src = g.edges.contains(q.src) || pf.containsNode(q.src);
-    auto has_dst = g.edges.contains(q.dst);
+    auto has_dst = g.edges.contains(q.dst) || pf.containsNode(q.dst);
 
     if (!has_src) {
       print_missing(q.src, "src");
