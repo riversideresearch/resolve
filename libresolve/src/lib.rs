@@ -35,7 +35,7 @@ pub extern "C" fn resolve_stack_obj(ptr: *mut c_void, size: usize) -> () {
 
     let mut buf = [0u8; 128];
     let mut writer = BufferWriter::new(&mut buf);
-    let _ = writeln!(&mut writer, "[STACK] Logging stack allocated object: {}", ptr as Vaddr);
+    let _ = writeln!(&mut writer, "[STACK] Logging stack allocated object: 0x{:x}", ptr as Vaddr);
     let written = writer.as_bytes();
     unsafe {libc::write(*RESOLVE_LOG_FD, written.as_ptr() as *const _, written.len()) };
 }
@@ -611,7 +611,6 @@ pub extern "C" fn resolve_check_bounds(base_ptr: *mut c_void, derived_ptr: *mut 
     let base = base_ptr as Vaddr;
     let derived = derived_ptr as Vaddr;
 
-    // If not print "Object not found" and return false
     let sobj_table = ALIVE_OBJ_LIST.lock().expect("Mutex not poisoned");
 
     // Look up the shadow object corresponding to this access.
