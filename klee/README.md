@@ -3,7 +3,22 @@ KLEE Symbolic Virtual Machine
 
 # Directed KLEE for RESOLVE
 
-TODO: description
+## Changes for E-BOSS RESOLVE
+
+## Added options
+--return-null-on-zero-malloc
+> Returns NULL if malloc(0) is called (default=false)
+
+--allow-freeze
+> Don't exit on FREEZE instructions and treat them as moves
+
+## Directed KLEE via static instruction-level CFG reachability
+
+- [tools/klee/main.cpp](./tools/klee/main.cpp)
+  + uses EnhancedFacts from RESOLVE llvm-plugin to generate facts from the LLVM modules under test and passes them to [reachlib](../reach/lib) to generate an instruction blacklist for pruning (see `KleeHandler::buildDistMapAndBlackList`)
+- [lib/core/Executor.cpp](./lib/Core/Executor.cpp)
+  + pruning of states from which the target function isn't reachable (see `Executor::transferToBasicBlock`)
+  + when concretizing symbolic size argument to malloc, create additional fork with size=0 (see `Executor::executeAlloc`)
 
 ## Setup
 
