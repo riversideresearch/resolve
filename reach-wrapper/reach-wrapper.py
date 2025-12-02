@@ -431,7 +431,7 @@ class ReachToolManager:
             print(f"[RW]: Read {self.reach_output_path}")
         
         # Convert list of KV pairs to map
-        def parse_result_path(nodes: list[NodeID], edges: list[str]):
+        def parse_result_path(nodes: list[list[int]], edges: list[str]):
             return ReachToolResult(nodes=[fact_parser.nodes[tuple(id)] for id in nodes], edges=edges)
                 
         return {
