@@ -285,7 +285,7 @@ void sanitizeLoadStore(Function *F, Vulnerability::RemediationStrategies strateg
   }
 }
 
-void sanitizeMemcpy(Function *F, ModuleAnalysisManager &MAM) {
+void sanitizeMemcpy(Function *F) {
   IRBuilder<> builder(F->getContext());
 
   std::vector<MemCpyInst *> memcpyList;
@@ -462,7 +462,7 @@ void sanitizeMalloc(Function *F, Vulnerability::RemediationStrategies strategy) 
   sanitizeLoadStore(F, strategy);
 }
 
-void sanitizeMemInstBounds(Function *F, ModuleAnalysisManager &MAM, Vulnerability::RemediationStrategies strategy) {
+void sanitizeMemInstBounds(Function *F, Vulnerability::RemediationStrategies strategy) {
   // FIXME: bad alias analysis is causing compilation to fail
   // TBD: why does TBAA not work right
   sanitizeAlloca(F);
