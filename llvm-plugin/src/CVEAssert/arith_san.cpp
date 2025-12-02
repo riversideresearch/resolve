@@ -142,10 +142,8 @@ void sanitizeDivideByZero(Function *F,  Vulnerability::RemediationStrategies str
 
   switch (strategy) {
     case Vulnerability::RemediationStrategies::EXIT:
-      break;
     case Vulnerability::RemediationStrategies::RECOVER:
-      sanitizeDivideByZeroRecover(F, strategy);
-      return;
+      break;
     
     default:
       llvm::errs() << "[CVEAssert] Error: sanitizeDivideByZero does not support "
@@ -307,118 +305,6 @@ void sanitizeDivideByZero(Function *F,  Vulnerability::RemediationStrategies str
   }
 }
 
-void sanitizeDivideByZeroRecover(Function *F, Vulnerability::RemediationStrategies strategy) {
-  std::vector<Instruction *> worklist;
-  Module *M = F->getParent();
-  auto &Ctx = M->getContext();
-
-  auto void_ty = Type::getVoidTy(Ctx);
-  auto ptr_ty = PointerType::get(Ctx, 0);
-  auto i32_ty = Type::getInt32Ty(Ctx);
-
-  FunctionCallee setjmpFunc = M->getOrInsertFunction(
-      "setjmp", FunctionType::get(i32_ty, {ptr_ty}, false));
-
-  FunctionCallee longjmpFunc = M->getOrInsertFunction(
-      "longjmp", FunctionType::get(void_ty, {ptr_ty, i32_ty}, false));
-  // Insert the jmp_buf at the beginning of function
-  BasicBlock &originalEntry = F->getEntryBlock();
-
-  // Initialize basic block for setjmp longjmp
-  BasicBlock *sjljEntry = BasicBlock::Create(Ctx, "", F, &originalEntry);
-  IRBuilder<> entryBuilder(sjljEntry);
-
-  ArrayType *jmpBufArrTy = ArrayType::get(Type::getInt8Ty(Ctx), 200);
-  AllocaInst *jmpBufAlloca =
-      entryBuilder.CreateAlloca(jmpBufArrTy, nullptr, "jmpbuf");
-  Value *jmpBufPtr = entryBuilder.CreateBitCast(jmpBufAlloca, ptr_ty);
-
-  Value *setjmpVal = entryBuilder.CreateCall(setjmpFunc, {jmpBufPtr});
-  Value *isInitial =
-      entryBuilder.CreateICmpEQ(setjmpVal, ConstantInt::get(i32_ty, 0));
-
-  // recoverBB: calls error handling function when setjmp returns non-zero
-  BasicBlock *recoverBB = BasicBlock::Create(Ctx, "", F);
-  entryBuilder.CreateCondBr(isInitial, &originalEntry, recoverBB);
-
-  IRBuilder<> recoverBuilder(recoverBB);
-  recoverBuilder.CreateCall(getOrCreateRemediationBehavior(M, strategy));
-
-  Type *retTy = F->getReturnType();
-  if (retTy->isVoidTy()) {
-    recoverBuilder.CreateRetVoid();
-  } else if (retTy->isIntegerTy()) {
-    // return zero for integer return types
-    Constant *zero = Constant::getNullValue(retTy);
-    recoverBuilder.CreateRet(zero);
-  } else if (retTy->isPointerTy()) {
-    // return null for pointer return types
-    recoverBuilder.CreateRet(Constant::getNullValue(retTy));
-  } else {
-    // fallback: return undef (less ideal, but keeps verifier happy)
-    recoverBuilder.CreateRet(UndefValue::get(retTy));
-  }
-
-  for (auto &BB : *F) {
-    for (auto &instr : BB) {
-      if (auto *BinOp = dyn_cast<BinaryOperator>(&instr)) {
-        if (BinOp->getOpcode() == Instruction::SDiv ||
-            BinOp->getOpcode() == Instruction::UDiv ||
-            BinOp->getOpcode() == Instruction::FDiv ||
-            BinOp->getOpcode() == Instruction::SRem ||
-            BinOp->getOpcode() == Instruction::URem ||
-            BinOp->getOpcode() == Instruction::FRem) {
-          worklist.push_back(BinOp);
-        }
-      }
-    }
-  }
-
-  IRBuilder<> Builder(Ctx);
-  for (auto *binary_instr : worklist) {
-    Builder.SetInsertPoint(binary_instr);
-
-    // Extract divisor
-    Value *divisor = binary_instr->getOperand(1);
-
-    // Compare divisor == 0
-    Value *IsZero = nullptr;
-
-    // Check opcode of instruction
-    switch (binary_instr->getOpcode()) {
-    case Instruction::SDiv:
-    case Instruction::UDiv:
-    case Instruction::SRem:
-    case Instruction::URem: {
-      IsZero = Builder.CreateICmpEQ(divisor,
-                                    ConstantInt::get(divisor->getType(), 0));
-      break;
-    }
-    case Instruction::FDiv:
-    case Instruction::FRem: {
-      IsZero = Builder.CreateFCmpOEQ(divisor,
-                                     ConstantFP::get(divisor->getType(), 0.0));
-      break;
-    }
-    }
-
-    // Split the basic block to insert control flow for div checking.
-    BasicBlock *originalBB = binary_instr->getParent();
-    BasicBlock *contExeBB = originalBB->splitBasicBlock(binary_instr);
-    BasicBlock *remedDivBB = BasicBlock::Create(Ctx, "", F, contExeBB);
-
-    // originalBB: Branch if the divisor is zero
-    originalBB->getTerminator()->eraseFromParent();
-    Builder.SetInsertPoint(originalBB);
-    Builder.CreateCondBr(IsZero, remedDivBB, contExeBB);
-
-    // remedDivBB: Perform longjmp
-    Builder.SetInsertPoint(remedDivBB);
-    Value *longJmpRetVal = ConstantInt::get(Type::getInt32Ty(Ctx), 42);
-    Builder.CreateCall(longjmpFunc, {jmpBufPtr, longJmpRetVal});
-    Builder.CreateUnreachable();
-  }
-}
 
 Function *replaceUndesirableFunction(Function *F, CallInst *call) {
   Module *M = F->getParent();
@@ -548,7 +434,6 @@ void sanitizeIntOverflow(Function *F, Vulnerability::RemediationStrategies strat
   switch(strategy) {
     case Vulnerability::RemediationStrategies::RECOVER:
     case Vulnerability::RemediationStrategies::EXIT:
-      sanitizeIntOverflowRecover(F, strategy);
       return; 
 
     case Vulnerability::RemediationStrategies::SAFE:
@@ -709,138 +594,6 @@ void sanitizeIntOverflow(Function *F, Vulnerability::RemediationStrategies strat
     // Replace the instructions with phi instruction
     binary_inst->replaceAllUsesWith(phi);
 
-    binary_inst->eraseFromParent();
-  }
-}
-
-void sanitizeIntOverflowRecover(Function *F, Vulnerability::RemediationStrategies strategy) {
-  std::vector<Instruction *> worklist;
-  Module *M = F->getParent();
-  auto &Ctx = M->getContext();
-
-  auto void_ty = Type::getVoidTy(Ctx);
-  auto ptr_ty = PointerType::get(Ctx, 0);
-  auto i32_ty = Type::getInt32Ty(Ctx);
-
-  // Create function setjmp and longjmp constructs
-  FunctionCallee setjmpFunc = M->getOrInsertFunction(
-      "setjmp", FunctionType::get(i32_ty, {ptr_ty}, false));
-
-  FunctionCallee longjmpFunc = M->getOrInsertFunction(
-      "longjmp", FunctionType::get(void_ty, {ptr_ty, i32_ty}, false));
-
-  // Insert the jmp_buf at the beginning of the function
-  BasicBlock &originalEntry = F->getEntryBlock();
-
-  // setjmp longjmp basic block
-  BasicBlock *sjljEntry = BasicBlock::Create(Ctx, "", F, &originalEntry);
-  IRBuilder<> entryBuilder(sjljEntry);
-
-  ArrayType *jmpBufArrTy = ArrayType::get(Type::getInt8Ty(Ctx), 200);
-  AllocaInst *jmpBufAlloca = entryBuilder.CreateAlloca(jmpBufArrTy, nullptr);
-  Value *jmpBufPtr = entryBuilder.CreateBitCast(jmpBufAlloca, ptr_ty);
-
-  Value *setjmpVal = entryBuilder.CreateCall(setjmpFunc, {jmpBufPtr});
-  Value *isInitial =
-      entryBuilder.CreateICmpEQ(setjmpVal, ConstantInt::get(i32_ty, 0));
-
-  // create recoverBB (called when setjmp returns non-zero)
-  BasicBlock *recoverBB = BasicBlock::Create(Ctx, "", F);
-  entryBuilder.CreateCondBr(isInitial, &originalEntry, recoverBB);
-
-  IRBuilder<> recoverBuilder(recoverBB);
-  recoverBuilder.CreateCall(getOrCreateRemediationBehavior(M, strategy));
-  recoverBuilder.CreateUnreachable();
-
-  for (auto &BB : *F) {
-    for (auto &instr : BB) {
-      if (auto *BinOp = dyn_cast<BinaryOperator>(&instr)) {
-        switch (BinOp->getOpcode()) {
-        case Instruction::Add:
-        case Instruction::Sub:
-        case Instruction::Mul: {
-          worklist.push_back(BinOp);
-          break;
-        }
-        default:
-          break;
-        }
-      }
-    }
-  }
-
-  IRBuilder<> Builder(Ctx);
-
-  auto insertSafeOp = [&Builder, M](Instruction *binary_inst, Value *op1,
-                                    Value *op2) -> std::pair<Value *, Value *> {
-    Intrinsic::ID intrinsic_id;
-    Type *BinOpType = binary_inst->getType();
-    bool isUnsigned = false;
-
-    // Heuristic: If instruction has NUW but not NSW then, treat as unsigned
-    if (binary_inst->hasNoUnsignedWrap() && !binary_inst->hasNoSignedWrap()) {
-      isUnsigned = true;
-    }
-
-    switch (binary_inst->getOpcode()) {
-    case Instruction::Add:
-      intrinsic_id = isUnsigned ? Intrinsic::uadd_with_overflow
-                                : Intrinsic::sadd_with_overflow;
-      break;
-
-    case Instruction::Sub:
-      intrinsic_id = isUnsigned ? Intrinsic::usub_with_overflow
-                                : Intrinsic::ssub_with_overflow;
-      break;
-
-    case Instruction::Mul:
-      intrinsic_id = isUnsigned ? Intrinsic::umul_with_overflow
-                                : Intrinsic::smul_with_overflow;
-      break;
-
-    default:
-      return {nullptr, nullptr}; // Not a handled opcode
-    }
-
-    Function *safeOp = Intrinsic::getDeclaration(M, intrinsic_id, BinOpType);
-    Value *safeCall = Builder.CreateCall(safeOp, {op1, op2});
-    Value *result = Builder.CreateExtractValue(safeCall, 0);
-    Value *isOverflow = Builder.CreateExtractValue(safeCall, 1);
-    return {result, isOverflow};
-  };
-
-  for (auto *binary_inst : worklist) {
-    if (!binary_inst->hasNoSignedWrap() && !!binary_inst->hasNoUnsignedWrap()) {
-      continue;
-    }
-
-    Value *op1 = binary_inst->getOperand(0);
-    Value *op2 = binary_inst->getOperand(1);
-
-    Builder.SetInsertPoint(binary_inst);
-
-    auto [safeResult, isOverflow] = insertSafeOp(binary_inst, op1, op2);
-    if (!safeResult || !isOverflow)
-      continue;
-
-    BasicBlock *originalBB = binary_inst->getParent();
-    BasicBlock *contExeBB = originalBB->splitBasicBlock(binary_inst);
-    BasicBlock *remedOverflowBB = BasicBlock::Create(Ctx, "", F, contExeBB);
-
-    originalBB->getTerminator()->eraseFromParent();
-    Builder.SetInsertPoint(originalBB);
-    Builder.CreateCondBr(isOverflow, remedOverflowBB, contExeBB);
-
-    Builder.SetInsertPoint(remedOverflowBB);
-    Value *longJmpRetVal = ConstantInt::get(Type::getInt32Ty(Ctx), 42);
-    Builder.CreateCall(longjmpFunc, {jmpBufPtr, longJmpRetVal});
-    Builder.CreateUnreachable();
-
-    Builder.SetInsertPoint(&*contExeBB->getFirstInsertionPt());
-    PHINode *phi = Builder.CreatePHI(binary_inst->getType(), 1);
-    phi->addIncoming(safeResult, originalBB);
-
-    binary_inst->replaceAllUsesWith(phi);
     binary_inst->eraseFromParent();
   }
 }
