@@ -21,5 +21,4 @@ inline llvm::StringRef getLLVMType(llvm::Type *ty) {
     return "";
 }
 llvm::Function *getOrCreateIsHeap(llvm::Module *M, llvm::LLVMContext &Ctx);
-llvm::Function *getOrCreateResolveReportSanitizerTriggered(llvm::Module *M);
 llvm::Function *getOrCreateRemediationBehavior(llvm::Module *M, Vulnerability::RemediationStrategies strategy);
