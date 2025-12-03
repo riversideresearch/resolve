@@ -168,7 +168,7 @@ static Function *getOrCreateBoundsCheckStoreSanitizer(Module *M, LLVMContext &Ct
   return sanitizeStoreFn;
 }
 
-static Function *getOrCreateBoundsCheckMemcpySanitizer(Module *M) {
+static Function *getOrCreateBoundsCheckMemcpySanitizer(Module *M, Vulnerability::RemediationStrategies strategy) {
   Twine handlerName = "resolve_bounds_check_memcpy";
   SmallVector<char> handlerNameStr;
   LLVMContext &Ctx = M->getContext();
@@ -239,7 +239,8 @@ static Function *getOrCreateBoundsCheckMemcpySanitizer(Module *M) {
 
   // SanitizeMemcpyBB: Remediate memcpy returns null pointer.
   builder.SetInsertPoint(SanitizeMemcpyBB);
-  builder.CreateRet(ConstantPointerNull::get(ptr_ty));
+  builder.CreateCall(getOrCreateRemediationBehavior(M, strategy));
+  builder.CreateUnreachable();
 
   // DEBUGGING
   raw_ostream &out = errs();
@@ -389,6 +390,33 @@ void sanitizeGEP(Function *F) {
   }
 }
 
+void sanitizeMemcpy(Function *F, Vulnerability::RemediationStrategies strategy) {
+  LLVMContext &Ctx = F->getContext();
+  IRBuilder<> builder(Ctx);
+  std::vector<MemCpyInst *> memcpyList;
+
+  for (auto &BB : *F) {
+    for (auto &inst : BB) {
+      if (auto *memcpyInst = dyn_cast<MemCpyInst>(&inst)) {
+        memcpyList.push_back(memcpyInst);
+      }
+    }
+  }
+
+  for (auto Inst : memcpyList) {
+    builder.SetInsertPoint(Inst);
+    auto dst_ptr = Inst->getDest();
+    auto src_ptr = Inst->getSource();
+    auto size_arg = Inst->getLength();
+    auto memcpyFn = getOrCreateBoundsCheckMemcpySanitizer(F->getParent(), strategy);
+
+    auto sanitized_memcpy = builder.CreateCall(
+        memcpyFn, { dst_ptr, src_ptr, size_arg });
+    Inst->replaceAllUsesWith(sanitized_memcpy);
+    Inst->eraseFromParent();
+  }
+}
+
 void sanitizeLoadStore(Function *F, Vulnerability::RemediationStrategies strategy) 
 {
   LLVMContext &Ctx = F->getContext();
@@ -463,38 +491,10 @@ void sanitizeLoadStore(Function *F, Vulnerability::RemediationStrategies strateg
   }
 }
 
-void sanitizeMemcpy(Function *F) {
-  LLVMContext &Ctx = F->getContext();
-  IRBuilder<> builder(Ctx);
-  std::vector<MemCpyInst *> memcpyList;
-
-  for (auto &BB : *F) {
-    for (auto &inst : BB) {
-      if (auto *memcpyInst = dyn_cast<MemCpyInst>(&inst)) {
-        memcpyList.push_back(memcpyInst);
-      }
-    }
-  }
-
-  for (auto Inst : memcpyList) {
-    builder.SetInsertPoint(Inst);
-    // getOrCreateBoundsMemcpySanitizer call
-    auto dst_ptr = Inst->getDest();
-    auto src_ptr = Inst->getSource();
-    auto size_arg = Inst->getLength();
-    auto memcpyFn = getOrCreateBoundsCheckMemcpySanitizer(F->getParent());
-
-    auto sanitized_memcpy = builder.CreateCall(
-        memcpyFn, { dst_ptr, src_ptr, size_arg });
-    Inst->replaceAllUsesWith(sanitized_memcpy);
-    Inst->eraseFromParent();
-  }
-}
-
 void sanitizeMemInstBounds(Function *F, ModuleAnalysisManager &MAM, Vulnerability::RemediationStrategies strategy) {
   sanitizeAlloca(F);
   sanitizeMalloc(F);
   sanitizeGEP(F);
-  sanitizeMemcpy(F);
+  sanitizeMemcpy(F, strategy);
   sanitizeLoadStore(F, strategy);
 }
