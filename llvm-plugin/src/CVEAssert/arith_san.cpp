@@ -142,10 +142,8 @@ void sanitizeDivideByZero(Function *F,  Vulnerability::RemediationStrategies str
 
   switch (strategy) {
     case Vulnerability::RemediationStrategies::EXIT:
-      break;
     case Vulnerability::RemediationStrategies::RECOVER:
-      sanitizeDivideByZeroRecover(F, strategy);
-      return;
+      break;
     
     default:
       llvm::errs() << "[CVEAssert] Error: sanitizeDivideByZero does not support "
@@ -304,119 +302,6 @@ void sanitizeDivideByZero(Function *F,  Vulnerability::RemediationStrategies str
 
     // Erase old division
     binary_instr->eraseFromParent();
-  }
-}
-
-void sanitizeDivideByZeroRecover(Function *F, Vulnerability::RemediationStrategies strategy) {
-  std::vector<Instruction *> worklist;
-  Module *M = F->getParent();
-  auto &Ctx = M->getContext();
-
-  auto void_ty = Type::getVoidTy(Ctx);
-  auto ptr_ty = PointerType::get(Ctx, 0);
-  auto i32_ty = Type::getInt32Ty(Ctx);
-
-  FunctionCallee setjmpFunc = M->getOrInsertFunction(
-      "setjmp", FunctionType::get(i32_ty, {ptr_ty}, false));
-
-  FunctionCallee longjmpFunc = M->getOrInsertFunction(
-      "longjmp", FunctionType::get(void_ty, {ptr_ty, i32_ty}, false));
-  // Insert the jmp_buf at the beginning of function
-  BasicBlock &originalEntry = F->getEntryBlock();
-
-  // Initialize basic block for setjmp longjmp
-  BasicBlock *sjljEntry = BasicBlock::Create(Ctx, "", F, &originalEntry);
-  IRBuilder<> entryBuilder(sjljEntry);
-
-  ArrayType *jmpBufArrTy = ArrayType::get(Type::getInt8Ty(Ctx), 200);
-  AllocaInst *jmpBufAlloca =
-      entryBuilder.CreateAlloca(jmpBufArrTy, nullptr, "jmpbuf");
-  Value *jmpBufPtr = entryBuilder.CreateBitCast(jmpBufAlloca, ptr_ty);
-
-  Value *setjmpVal = entryBuilder.CreateCall(setjmpFunc, {jmpBufPtr});
-  Value *isInitial =
-      entryBuilder.CreateICmpEQ(setjmpVal, ConstantInt::get(i32_ty, 0));
-
-  // recoverBB: calls error handling function when setjmp returns non-zero
-  BasicBlock *recoverBB = BasicBlock::Create(Ctx, "", F);
-  entryBuilder.CreateCondBr(isInitial, &originalEntry, recoverBB);
-
-  IRBuilder<> recoverBuilder(recoverBB);
-  recoverBuilder.CreateCall(getOrCreateRemediationBehavior(M, strategy));
-
-  Type *retTy = F->getReturnType();
-  if (retTy->isVoidTy()) {
-    recoverBuilder.CreateRetVoid();
-  } else if (retTy->isIntegerTy()) {
-    // return zero for integer return types
-    Constant *zero = Constant::getNullValue(retTy);
-    recoverBuilder.CreateRet(zero);
-  } else if (retTy->isPointerTy()) {
-    // return null for pointer return types
-    recoverBuilder.CreateRet(Constant::getNullValue(retTy));
-  } else {
-    // fallback: return undef (less ideal, but keeps verifier happy)
-    recoverBuilder.CreateRet(UndefValue::get(retTy));
-  }
-
-  for (auto &BB : *F) {
-    for (auto &instr : BB) {
-      if (auto *BinOp = dyn_cast<BinaryOperator>(&instr)) {
-        if (BinOp->getOpcode() == Instruction::SDiv ||
-            BinOp->getOpcode() == Instruction::UDiv ||
-            BinOp->getOpcode() == Instruction::FDiv ||
-            BinOp->getOpcode() == Instruction::SRem ||
-            BinOp->getOpcode() == Instruction::URem ||
-            BinOp->getOpcode() == Instruction::FRem) {
-          worklist.push_back(BinOp);
-        }
-      }
-    }
-  }
-
-  IRBuilder<> Builder(Ctx);
-  for (auto *binary_instr : worklist) {
-    Builder.SetInsertPoint(binary_instr);
-
-    // Extract divisor
-    Value *divisor = binary_instr->getOperand(1);
-
-    // Compare divisor == 0
-    Value *IsZero = nullptr;
-
-    // Check opcode of instruction
-    switch (binary_instr->getOpcode()) {
-    case Instruction::SDiv:
-    case Instruction::UDiv:
-    case Instruction::SRem:
-    case Instruction::URem: {
-      IsZero = Builder.CreateICmpEQ(divisor,
-                                    ConstantInt::get(divisor->getType(), 0));
-      break;
-    }
-    case Instruction::FDiv:
-    case Instruction::FRem: {
-      IsZero = Builder.CreateFCmpOEQ(divisor,
-                                     ConstantFP::get(divisor->getType(), 0.0));
-      break;
-    }
-    }
-
-    // Split the basic block to insert control flow for div checking.
-    BasicBlock *originalBB = binary_instr->getParent();
-    BasicBlock *contExeBB = originalBB->splitBasicBlock(binary_instr);
-    BasicBlock *remedDivBB = BasicBlock::Create(Ctx, "", F, contExeBB);
-
-    // originalBB: Branch if the divisor is zero
-    originalBB->getTerminator()->eraseFromParent();
-    Builder.SetInsertPoint(originalBB);
-    Builder.CreateCondBr(IsZero, remedDivBB, contExeBB);
-
-    // remedDivBB: Perform longjmp
-    Builder.SetInsertPoint(remedDivBB);
-    Value *longJmpRetVal = ConstantInt::get(Type::getInt32Ty(Ctx), 42);
-    Builder.CreateCall(longjmpFunc, {jmpBufPtr, longJmpRetVal});
-    Builder.CreateUnreachable();
   }
 }
 
