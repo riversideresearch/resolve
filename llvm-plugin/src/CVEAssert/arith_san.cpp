@@ -140,9 +140,6 @@ void sanitizeDivideByZero(Function *F,  Vulnerability::RemediationStrategies str
   auto &Ctx = M->getContext();
   IRBuilder<> Builder(Ctx);
 
-  auto void_ty = Type::getVoidTy(Ctx);
-  auto ptr_ty = PointerType::get(Ctx, 0);
-
   switch (strategy) {
     case Vulnerability::RemediationStrategies::EXIT:
       break;
