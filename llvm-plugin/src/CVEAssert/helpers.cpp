@@ -90,6 +90,7 @@ Function *getOrCreateRemediationBehavior(Module *M, Vulnerability::RemediationSt
     auto &Ctx = M->getContext();
     auto ptr_ty = PointerType::get(Ctx, 0);
     auto void_ty = Type::getVoidTy(Ctx);
+    auto i32_ty = Type::getInt32Ty(Ctx);
 
     FunctionType *resolve_remed_behavior_ty = FunctionType::get(void_ty, {}, false);
     if (Function *F = M->getFunction("resolve_remediation_behavior"))
@@ -119,14 +120,30 @@ Function *getOrCreateRemediationBehavior(Module *M, Vulnerability::RemediationSt
         Builder.CreateCall(exitFn, { exitCode });
     
     } else if (strategy == Vulnerability::RemediationStrategies::RECOVER) {
-        FunctionType *errorhandlerTy = FunctionType::get(
+        // void longjmp(void *buf, int val)
+        FunctionType *longjmpFnTy = FunctionType::Get(
             void_ty,
-            {},
+            { ptr_ty, i32_ty },
             false
+        ); 
+
+        FunctionCallee longjmpFn = M->getOrInsertFunction(
+            "longjmp",
+            longjmpFnTy
         );
 
-        FunctionCallee errorHandlerFn = M->getOrInsertFunction("error_handler", errorhandlerTy);
-        Builder.CreateCall(errorHandlerFn);
+        // NOTE: Create resolve_recover_longjmp_buf in C source code
+        GlobalVariable *resolve_longjmp_buf = M->getGlobalVariable(
+            "resolve_recover_longjmp_buf"
+        );
+
+        if (!resolve_longjmp_buf) {
+            errs() << "[CVEAssert] Warning: 'resolve_recover_longjmp_buf not found in source code!\n";
+            /* Add exit or abort function here! */
+        }
+
+        Value *longjmpVal = ConstantInt::get(i32_ty, 42);
+        Builder.CreateCall(longjmpFn, { resolve_longjmp_buf, longjmpVal });
     }
     Builder.CreateRetVoid();
     return resolve_remed_behavior;
