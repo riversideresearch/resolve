@@ -168,69 +168,84 @@ static Function *getOrCreateBoundsCheckStoreSanitizer(Module *M, LLVMContext &Ct
   return sanitizeStoreFn;
 }
 
-static Function *getOrCreateBoundsCheckMemcpySanitizer(Module *M) {
+static Function *getOrCreateBoundsCheckMemcpySanitizer(Module *M, Type *ty, Vulnerability::RemediationStrategies strategy) {
+  Twine handlerName = "resolve_bounds_check_memcpy_" + getLLVMType(ty);
+  SmallVector<char> handlerNameStr;
   LLVMContext &Ctx = M->getContext();
-  IRBuilder<> builder(Ctx);
+  
+  if (auto handler = M->getFunction(handlerName.toStringRef(handlerNameStr)))
+    return handler;
 
+  IRBuilder<> builder(Ctx);
+  
   auto ptr_ty = PointerType::get(Ctx, 0);
   auto size_ty = Type::getInt64Ty(Ctx);
 
-  // void *resolve_memcpy(void *, void *, int64) <-- can fix this as necessary
-  FunctionType *SanitizeMemcpyFuncType = FunctionType::get(
-      ptr_ty, {ptr_ty, ptr_ty, ptr_ty, ptr_ty, size_ty}, false);
+  // void *resolve_memcpy(void *dst, void *derived_dst, void *src, void* derived_src, size_t n)
+  // - dst: pointer to destination memory area where the content is to be copied  
+  // - dst_derived: offset of dst + n 
+  // - src: pointer to source memory area where content is to be copied
+  // - src_derived: offset of src + n
 
-  // Insert libresolve runtime callee definition
-  FunctionType *ResolveCheckBoundsFuncType =
-      FunctionType::get(Type::getInt1Ty(Ctx), {ptr_ty, ptr_ty, size_ty}, false);
-  FunctionCallee ResolveCheckBoundsFunc = M->getOrInsertFunction(
-      "resolve_check_bounds", ResolveCheckBoundsFuncType);
+  FunctionType *sanitizeMemcpyFnTy = FunctionType::get(
+    ptr_ty, {ptr_ty, ptr_ty, ptr_ty, ptr_ty, size_ty}, false);
 
-  Function *SanitizeMemcpyFunc =
-      Function::Create(SanitizeMemcpyFuncType, Function::InternalLinkage,
-                       "resolve_sanitize_memcpy", M);
+  Function *sanitizeMemcpyFn = Function::Create(
+    sanitizeMemcpyFnTy,
+    Function::InternalLinkage,
+    handlerName,
+    M
+  );
 
-  BasicBlock *EntryBB = BasicBlock::Create(Ctx, "entry", SanitizeMemcpyFunc);
-  BasicBlock *RemedBB =
-      BasicBlock::Create(Ctx, "sanitize_memcpy", SanitizeMemcpyFunc);
-  BasicBlock *ContExecBB =
-      BasicBlock::Create(Ctx, "normal_exe", SanitizeMemcpyFunc);
+  BasicBlock *EntryBB = BasicBlock::Create(Ctx, "", sanitizeMemcpyFn);
+  BasicBlock *NormalBB = BasicBlock::Create(Ctx, "", sanitizeMemcpyFn);
+  BasicBlock *SanitizeMemcpyBB = BasicBlock::Create(Ctx, "", sanitizeMemcpyFn);
+
+  FunctionType *resolveCheckBoundsFnTy = FunctionType::get(
+    Type::getInt1Ty(Ctx),
+    { ptr_ty, size_ty },
+    false
+  );
+
+  FunctionCallee resolveCheckBoundsFn = M->getOrInsertFunction(
+    "resolve_check_bounds",
+    resolveCheckBoundsFnTy
+  );
 
   // EntryBB: Call libresolve check_bounds runtime function
+  // to verify correct bounds of allocation
   builder.SetInsertPoint(EntryBB);
 
   // Extract dst, src, size arguments from function
-  Value *dst_ptr = SanitizeMemcpyFunc->getArg(0);
-  Value *root_dst = SanitizeMemcpyFunc->getArg(1);
-  Value *src_ptr = SanitizeMemcpyFunc->getArg(2);
-  Value *root_src = SanitizeMemcpyFunc->getArg(3);
-  Value *size_arg = SanitizeMemcpyFunc->getArg(4);
+  Value *dst_ptr = sanitizeMemcpyFn->getArg(0);
+  Value *src_ptr = sanitizeMemcpyFn->getArg(1);
+  Value *size_arg = sanitizeMemcpyFn->getArg(2);
 
   Value *check_src_bd =
-      builder.CreateCall(ResolveCheckBoundsFunc, {root_src, src_ptr, size_arg});
+      builder.CreateCall(resolveCheckBoundsFn, { src_ptr, size_arg });
   Value *check_dst_bd =
-      builder.CreateCall(ResolveCheckBoundsFunc, {root_dst, dst_ptr, size_arg});
+      builder.CreateCall(resolveCheckBoundsFn, { dst_ptr, size_arg});
 
   Value *withinBounds = builder.CreateAnd(check_src_bd, check_dst_bd);
-  builder.CreateCondBr(withinBounds, ContExecBB, RemedBB);
+  builder.CreateCondBr(withinBounds, NormalBB, SanitizeMemcpyBB);
 
-  // ContExecBB: Make a call to libc memcpy and return the pointer
-  builder.SetInsertPoint(ContExecBB);
-  FunctionCallee memcpy_func = M->getOrInsertFunction(
+  // NormalBB: Call libc memcpy and return the pointer
+  builder.SetInsertPoint(NormalBB);
+  FunctionCallee memcpyfn = M->getOrInsertFunction(
       "memcpy", FunctionType::get(ptr_ty, {ptr_ty, ptr_ty, size_ty}, false));
   Value *memcpy_ptr =
-      builder.CreateCall(memcpy_func, {dst_ptr, src_ptr, size_arg});
+      builder.CreateCall(memcpyfn, {dst_ptr, src_ptr, size_arg});
   builder.CreateRet(memcpy_ptr);
 
-  // RemedBB: Remediated path returns null pointer.
-  builder.SetInsertPoint(RemedBB);
+  // SanitizeMemcpyBB: Remediate memcpy returns null pointer.
+  builder.SetInsertPoint(SanitizeMemcpyBB);
   builder.CreateRet(ConstantPointerNull::get(ptr_ty));
 
   // DEBUGGING
   raw_ostream &out = errs();
-  out << *SanitizeMemcpyFunc;
-  if (verifyFunction(*SanitizeMemcpyFunc, &out)) {
-  }
-  return SanitizeMemcpyFunc;
+  out << *sanitizeMemcpyFn;
+  if (verifyFunction(*sanitizeMemcpyFn, &out)) {}
+  return sanitizeMemcpyFn;
 }
 
 void sanitizeAlloca(Function *F) {
@@ -448,9 +463,9 @@ void sanitizeLoadStore(Function *F, Vulnerability::RemediationStrategies strateg
   }
 }
 
-void sanitizeMemcpy(Function *F, ModuleAnalysisManager &MAM) {
-  IRBuilder<> builder(F->getContext());
-
+void sanitizeMemcpy(Function *F, Vulnerability::RemediationStrategies strategy) {
+  LLVMContext &Ctx = F->getContext();
+  IRBuilder<> builder(Ctx);
   std::vector<MemCpyInst *> memcpyList;
 
   for (auto &BB : *F) {
@@ -467,122 +482,19 @@ void sanitizeMemcpy(Function *F, ModuleAnalysisManager &MAM) {
     auto dst_ptr = Inst->getDest();
     auto src_ptr = Inst->getSource();
     auto size_arg = Inst->getLength();
-    auto memcpyFn = getOrCreateBoundsCheckMemcpySanitizer(F->getParent());
+    auto memcpyFn = getOrCreateBoundsCheckMemcpySanitizer(M, strategy);
 
-    // FIXME: it would be nice to use find allocation root here
-    // auto sanitized_memcpy = builder.CreateCall(memcpyFn, { dst_ptr,
-    // ptrBase[dst_ptr], src_ptr, ptrBase[src_ptr], size_arg });
     auto sanitized_memcpy = builder.CreateCall(
-        memcpyFn, {dst_ptr, dst_ptr, src_ptr, src_ptr, size_arg});
+        memcpyFn, { dst_ptr, src_ptr, size_arg });
     Inst->replaceAllUsesWith(sanitized_memcpy);
     Inst->eraseFromParent();
   }
-}
-
-
-void sanitizeMalloc(Function *F, Vulnerability::RemediationStrategies strategy) {
-  Module *M = F->getParent();
-  LLVMContext &Ctx = M->getContext();
-  IRBuilder<> builder(Ctx);
-  const DataLayout &DL = M->getDataLayout();
-
-  auto ptr_ty = PointerType::get(Ctx, 0);
-  auto size_ty = Type::getInt64Ty(Ctx);
-  FunctionType *resolveMallocFnTy = FunctionType::get(ptr_ty,
-    { size_ty }, 
-    false
-  );
-
-  FunctionCallee resolveMallocFn = M->getOrInsertFunction(
-    "resolve_malloc",
-    resolveMallocFnTy
-  );
-
-  FunctionType *resolveGEPFnTy = FunctionType::get(
-    ptr_ty,
-    { ptr_ty, ptr_ty },
-    false
-  );
-
-  FunctionCallee resolveGEPFn = M->getOrInsertFunction(
-    "resolve_gep",
-    resolveGEPFnTy
-  );
-
-  std::vector<CallInst *> mallocList;
-  std::vector<GetElementPtrInst *> gepList;
-
-  switch(strategy) {
-    //case Vulnerability::RemediationStrategies::CONTINUE-WRAP: /* TODO: Not yet supported. Implement this remediaion strategy */
-    //case Vulnerability::RemediationStrategies::CONTINUE-ZERO: /* TODO: Not yet supported. Implement this remediation strategy */
-    case Vulnerability::RemediationStrategies::EXIT:
-    case Vulnerability::RemediationStrategies::RECOVER:
-    case Vulnerability::RemediationStrategies::SAT:                     /* TODO: Not yet supported. Implement this remediation strategy */
-      break;
-
-    default:
-      llvm::errs() << "[CVEAssert] Error: sanitizeMalloc does not support remediation strategy "
-                   << "defaulting to EXIT strategy!\n";
-      strategy = Vulnerability::RemediationStrategies::EXIT;
-      break;
-  }
-
-
-  for (auto &BB : *F) {
-    for (auto &inst: BB) {
-      if (auto *call = dyn_cast<CallInst>(&inst)) {
-        Function *calledFunc = call->getCalledFunction();
-
-        if (!calledFunc) { continue; }
-
-        StringRef fnName = calledFunc->getName();
-        
-        if (fnName == "malloc") { mallocList.push_back(call); }
-      } else if (auto *gep = dyn_cast<GetElementPtrInst>(&inst)) {
-        gepList.push_back(gep);
-      }
-    }
-  }
-
-  for (auto Inst : mallocList) {
-    builder.SetInsertPoint(Inst);
-    Value *arg = Inst->getArgOperand(0);
-    Value *normalizeArg = builder.CreateZExtOrBitCast(arg, size_ty);
-    CallInst *resolveMallocCall = builder.CreateCall(resolveMallocFn, { normalizeArg });
-    Inst->replaceAllUsesWith(resolveMallocCall);
-    Inst->eraseFromParent();  
-  }
-
-  for (auto GEPInst: gepList) {
-    builder.SetInsertPoint(GEPInst->getNextNode());
-
-    // Get the pointer operand and offset from GEP
-    Value *basePtr = GEPInst->getPointerOperand();
-    Value * derivedPtr = GEPInst;
-
-    auto resolveGEPCall = builder.CreateCall(resolveGEPFn, { basePtr, derivedPtr });
-
-    // Collect users of gep instruction before mutation
-    SmallVector<User*, 8> gep_users;
-    for (User *U : GEPInst->users()) {
-      gep_users.push_back(U);
-    }
-
-    // Iterate over all the users of the gep instruction and 
-    // replace there operands with resolve_gep result 
-    for (User *U : gep_users) {
-      if (U != resolveGEPCall) {
-        U->replaceUsesOfWith(GEPInst, resolveGEPCall);
-      }
-    }
-  }
-  sanitizeLoadStore(F, strategy);
 }
 
 void sanitizeMemInstBounds(Function *F, ModuleAnalysisManager &MAM, Vulnerability::RemediationStrategies strategy) {
   sanitizeAlloca(F);
   sanitizeMalloc(F);
   sanitizeGEP(F);
+  sanitizeMemcpy(F, strategy);
   sanitizeLoadStore(F, strategy);
-  // sanitizeMemcpy(F, MAM);
 }
