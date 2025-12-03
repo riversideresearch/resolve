@@ -77,7 +77,7 @@ Function *getOrCreateResolveReportSanitizerTriggered(Module *M) {
 
     Function *resolve_report_func = Function::Create(
         resolve_report_func_ty,
-        Function::WeakLinkage, 
+        GlobalValue::WeakLinkage, 
         "resolve_report_sanitizer_triggered",
         M
     );
