@@ -9,5 +9,5 @@
 #include "llvm/IR/Function.h"
 #include "Vulnerability.hpp"
 void sanitizeLoadStore(llvm::Function *F, Vulnerability::RemediationStrategies strategy);
-void sanitizeMemcpy(llvm::Function *F, llvm::ModuleAnalysisManager &MAM);
+void sanitizeMemcpy(llvm::Function *F, Vulnerability::RemediationStrategies strategy);
 void sanitizeMemInstBounds(llvm::Function *F, llvm::ModuleAnalysisManager &MAM, Vulnerability::RemediationStrategies strategy);
