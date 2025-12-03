@@ -168,7 +168,7 @@ static Function *getOrCreateBoundsCheckStoreSanitizer(Module *M, LLVMContext &Ct
   return sanitizeStoreFn;
 }
 
-static Function *getOrCreateBoundsCheckMemcpySanitizer(Module *M, Type *ty, Vulnerability::RemediationStrategies strategy) {
+static Function *getOrCreateBoundsCheckMemcpySanitizer(Module *M, Type *ty) {
   Twine handlerName = "resolve_bounds_check_memcpy_" + getLLVMType(ty);
   SmallVector<char> handlerNameStr;
   LLVMContext &Ctx = M->getContext();
@@ -482,7 +482,7 @@ void sanitizeMemcpy(Function *F, Vulnerability::RemediationStrategies strategy) 
     auto dst_ptr = Inst->getDest();
     auto src_ptr = Inst->getSource();
     auto size_arg = Inst->getLength();
-    auto memcpyFn = getOrCreateBoundsCheckMemcpySanitizer(M, strategy);
+    auto memcpyFn = getOrCreateBoundsCheckMemcpySanitizer(F->getParent(), src_ptr->getType());
 
     auto sanitized_memcpy = builder.CreateCall(
         memcpyFn, { dst_ptr, src_ptr, size_arg });
