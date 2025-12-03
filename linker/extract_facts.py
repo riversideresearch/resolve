@@ -16,10 +16,7 @@ else:
     COMPRESSION_SUFFIX = ""
 
 FACT_SECTION_MAP = [
-    (".fact_nodes", "nodes.facts"),
-    (".fact_node_props", "nodeprops.facts"),
-    (".fact_edges", "edges.facts"),
-    (".fact_edge_props", "edgeprops.facts"),
+    (".facts", "facts.facts"),
 ]
 
 # ------------------------------------------------------------------------------

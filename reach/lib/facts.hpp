@@ -5,14 +5,25 @@
 
 #pragma once
 
+#include <iostream>
 #include <fstream>
 #include <string>
 #include <unordered_map>
 #include <vector>
 
 #include "json.hpp"
+#include "resolve_facts.hpp"
 
-namespace facts {
+using NamespacedNodeId = resolve_facts::NamespacedNodeId;
+
+template<typename T>
+using NodeMap = resolve_facts::NodeMap<T>;
+
+using NodeType = resolve_facts::NodeType;
+using Linkage = resolve_facts::Linkage;
+using CallType = resolve_facts::CallType;
+
+namespace reach_facts {
 
   enum class LoadOptions : int {
     None         = 0,
@@ -43,46 +54,21 @@ namespace facts {
     return (value & flags) != LoadOptions::None;
   }
 
-  enum class NodeType {
-    Module,
-    GlobalVariable,
-    Function,
-    Argument,
-    BasicBlock,
-    Instruction,
-  };
-
-  enum class Linkage {
-    ExternalLinkage,
-    Other,
-  };
-
-  enum class CallType {
-    Direct,
-    Indirect,
-  };
-
-  // Type synonym for node IDs.
-  using ID = std::string;
-
   struct database {
-    std::unordered_map<ID, NodeType> node_type;
+    NodeMap<NodeType> node_type;
+    NodeMap<std::vector<NamespacedNodeId>> contains;
+    NodeMap<NamespacedNodeId> calls;
+    NodeMap<NamespacedNodeId> function_entrypoints;
+    NodeMap<std::vector<NamespacedNodeId>> control_flow;
 
-    std::unordered_map<ID, std::vector<ID>> contains;
-    std::unordered_map<ID, ID> calls;
-    std::unordered_map<ID, std::vector<ID>> control_flow;
-    // std::unordered_map<ID, ID> entry_point;
-
-    std::unordered_map<ID, std::string> name;
-    std::unordered_map<ID, Linkage> linkage;
-    std::unordered_map<ID, CallType> call_type;
-    std::vector<ID> address_taken;
-    std::unordered_map<ID, std::string> fun_sig;  // id -> type sig as string
+    NodeMap<std::string> name;
+    NodeMap<Linkage> linkage;
+    NodeMap<CallType> call_type;
+    NodeMap<std::string> fun_sig; // id -> type sig as string
+    std::vector<NamespacedNodeId> address_taken;
   };
 
-  database load(std::istream& nodes,
-                std::istream& nodeprops,
-                std::istream& edges,
+  database load(std::istream& facts,
                 LoadOptions options);
   database load(const std::filesystem::path& facts_dir, LoadOptions options);
 
@@ -95,7 +81,9 @@ namespace dlsym {
   struct loaded_symbol {
     std::string symbol;
     std::string library;
-    bool operator==(const loaded_symbol& rhs) const = default;
+    bool operator==(const loaded_symbol& rhs) const {
+      return symbol == rhs.symbol && library == rhs.library;
+    };
   };
 
   struct log {

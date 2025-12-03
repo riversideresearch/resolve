@@ -8,12 +8,12 @@ set(CMAKE_COMPILE_WARNING_AS_ERROR ON)
 # Add LLVM headers to include search paths
 include_directories(SYSTEM ${LLVM_INCLUDE_DIRS})
 
-# Debug by default
+# Release with symbols by default
 if(NOT CMAKE_BUILD_TYPE)
-  set(CMAKE_BUILD_TYPE Debug)
+    set(CMAKE_BUILD_TYPE RelWithDebInfo)
 endif()
 
-set(CMAKE_CXX_STANDARD 17 STRING "")
+# set(CMAKE_CXX_STANDARD 17 STRING "")
 
 # LLVM is normally built without RTTI. Be consistent with that.
 if(NOT LLVM_ENABLE_RTTI)
@@ -38,7 +38,13 @@ add_custom_target(clangformat
     COMMENT "Formatting source files with clang-format..."
 )
 
+add_library(ResolveFacts STATIC IMPORTED GLOBAL)
+set_target_properties(ResolveFacts PROPERTIES IMPORTED_LOCATION "${CMAKE_SOURCE_DIR}/../../resolve-facts/build/libResolveFacts.a")
+set_target_properties(ResolveFacts PROPERTIES INTERFACE_INCLUDE_DIRECTORIES "${CMAKE_SOURCE_DIR}/../../resolve-facts/src/")
+
 add_library(EnhancedFacts SHARED EnhancedFacts.cpp)
+target_link_libraries(EnhancedFacts PRIVATE ResolveFacts)
+
 add_library(CVEAssert SHARED 
   CVEAssert/CVEAssert.cpp
   CVEAssert/bounds_check.cpp

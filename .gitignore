@@ -1,13 +1,20 @@
 # no build files
 **/build/*
 __pycache__
-
-llvm-plugin/test/**/*.ll
-llvm-plugin/test/**/*.ll.mem
+CMakeFiles
+CMakeCache.txt
 
 # ignore repos/outputs from tests
+llvm-plugin/tests/**/*.ll
+llvm-plugin/tests/**/*.ll.mem
+llvm-plugin/tests/regression/Output
+llvm-plugin/tests/regression/.lit_test_times.txt
+
 examples/openssl/
 examples/openssl_facts/
 examples/openssl_reach_out.json
+
+reach_wrap_input.json
+reach_wrap_output.json
 
 

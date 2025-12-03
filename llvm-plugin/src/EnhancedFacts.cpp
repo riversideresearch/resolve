@@ -3,9 +3,7 @@
  *   LGPL-3; See LICENSE.txt in the repo root for details.
  */
 
-#include "Facts.hpp"
-#include "LLVMFacts.hpp"
-#include "NodeID.hpp"
+#include "EnhancedFacts.hpp"
 
 #include <cstdlib> // For std::getenv
 #include <iomanip>
@@ -15,156 +13,128 @@
 #include <unordered_map>
 #include <vector>
 
-#include "llvm/ADT/SmallString.h"
-#include "llvm/ADT/SmallVector.h"
-#include "llvm/IR/BasicBlock.h"
-#include "llvm/IR/CFG.h"
-#include "llvm/IR/Constants.h"
-#include "llvm/IR/DebugInfoMetadata.h"
-#include "llvm/IR/Function.h"
-#include "llvm/IR/GlobalVariable.h"
-#include "llvm/IR/Instruction.h"
-#include "llvm/IR/Instructions.h"
-#include "llvm/IR/LLVMContext.h"
-#include "llvm/IR/Module.h"
-#include "llvm/IR/PassManager.h"
-#include "llvm/Passes/PassBuilder.h"
-#include "llvm/Passes/PassPlugin.h"
-#include "llvm/Support/Compression.h"
-#include "llvm/Support/FileSystem.h"
-#include "llvm/Support/Path.h"
-#include "llvm/Support/raw_ostream.h"
-#include "llvm/Transforms/Utils/ModuleUtils.h"
-
 using namespace llvm;
 
-static Facts all_facts;
+using Linkage = resolve_facts::Linkage;
+using CallType = resolve_facts::CallType;
+using EdgeKind = resolve_facts::EdgeKind;
 
-static LLVMFacts facts(all_facts, std::getenv("GlobalContext") ?: "");
-
-static std::string debugLocToString(DebugLoc dbgLoc) {
+std::string resolve::debugLocToString(DebugLoc dbgLoc) {
   auto line = std::to_string(dbgLoc.getLine());
   auto col = std::to_string(dbgLoc.getCol());
   return line + ":" + col;
 }
 
-static std::string typeToString(const Type &type) {
+std::string resolve::typeToString(const Type &type) {
   std::string str;
   llvm::raw_string_ostream out(str);
   type.print(out);
-  return "\"" + str + "\"";
+  return str;
 }
 
-static void getGlobalFacts(GlobalVariable &G) {
+void resolve::getGlobalFacts(GlobalVariable &G) {
   facts.addNode(G);
-  facts.addNodeProp(G, "name", G.getName().str());
-  facts.addNodeProp(G, "linkage",
-                    (G.hasExternalLinkage() ? "ExternalLinkage" : "Other"));
-
-  // for (Value *op : G.operands()) {
-  //     if (Instruction *opI = dyn_cast<Instruction>(op)) {
-  //         std::string opID = getInstructionID(*opI, prefix);
-  //         std::string edgeID = make_edge_id(prefix);
-  //         recordEdge(edgeID, "dataFlowTo", opID, iID);
-  //     } else if (GlobalVariable *opG = dyn_cast<GlobalVariable>(op)) {
-  //         std::string opGID = getGlobalVarID(*opG, prefix);
-  //         std::string edgeID = make_edge_id(prefix);
-  //         recordEdge(edgeID, "references", iID, opGID);
-  //     } else if (Function *opF = dyn_cast<Function>(op)) {
-  //         std::string opFID = getFunctionID(*opF, prefix);
-  //         std::string edgeID = make_edge_id(prefix);
-  //         recordEdge(edgeID, "references", iID, opFID);
-  //     }
-  // }
+  facts.addNodeProp(G, [&](auto& node) {
+    node.name = G.getName().str();
+    node.linkage = (G.hasExternalLinkage() ? Linkage::ExternalLinkage : Linkage::Other);
+  });
 }
 
-static void getFunctionFacts(Function &F) {
+void resolve::getFunctionFacts(Function &F) {
   facts.addNode(F);
-  facts.addNodeProp(F, "name", F.getName().str());
-  facts.addNodeProp(F, "linkage",
-                    (F.hasExternalLinkage() ? "ExternalLinkage" : "Other"));
-  facts.addNodeProp(F, "function_type", typeToString(*F.getFunctionType()));
-
-  if (F.hasAddressTaken()) {
-    facts.addNodeProp(F, "address_taken", "");
-  }
+  facts.addNodeProp(F, [&](auto& node) {
+    node.name = F.getName().str();
+    node.linkage = (F.hasExternalLinkage() ? Linkage::ExternalLinkage : Linkage::Other);
+    node.function_type = typeToString(*F.getFunctionType());
+    if (F.hasAddressTaken()) {
+      node.address_taken = true;
+    }
+  });
 
   if (F.isDeclaration())
     return;
 
-  facts.addEdge("entryPoint", F, F.getEntryBlock());
+  facts.addEdge(F, F.getEntryBlock(), [](auto& edge) { edge.kinds.push_back(EdgeKind::EntryPoint); });
 
   for (Argument &A : F.args()) {
-    facts.addEdge("contains", F, A);
-    facts.addNodeProp(A, "idx", std::to_string(A.getArgNo()));
+    facts.addEdge(F, A, [&](auto& edge) { edge.kinds.push_back(EdgeKind::Contains); });
+    facts.addNodeProp(A, [&](auto& node) { node.idx = A.getArgNo(); });
   }
 
   for (BasicBlock &BB : F) {
-    facts.addEdge("contains", F, BB);
-    facts.addNodeProp(BB, "idx",
-                      std::to_string(LLVMFacts::getIndexInParent(BB)));
-    if (BB.hasName())
-      facts.addNodeProp(BB, "label", BB.getName().str());
+    facts.addEdge(F, BB, [&](auto& edge) { edge.kinds.push_back(EdgeKind::Contains); });
+    facts.addNodeProp(BB, [&](auto& node) { 
+      node.idx = LLVMFacts::getIndexInParent(BB);
+      if (BB.hasName()) {
+        node.name = BB.getName().str();
+      }
+    });
 
     // Control flow Edges
     for (BasicBlock *Succ : successors(&BB)) {
-      facts.addEdge("controlFlowTo", BB, *Succ);
+      facts.addEdge(BB, *Succ, [&](auto& edge) { edge.kinds.push_back(EdgeKind::ControlFlowTo); });
     }
 
     for (Instruction &I : BB) {
-      facts.addEdge("contains", BB, I);
-      facts.addNodeProp(I, "opcode", I.getOpcodeName());
-      if (auto dbgLoc = I.getDebugLoc()) {
-        facts.addNodeProp(I, "source_loc", debugLocToString(dbgLoc));
-      }
+      facts.addEdge(BB, I, [&](auto& edge) { edge.kinds.push_back(EdgeKind::Contains); });
+      facts.addNodeProp(I, [&](auto& node) {
+        node.opcode = I.getOpcodeName();
+        if (auto dbgLoc = I.getDebugLoc()) {
+           node.source_loc = debugLocToString(dbgLoc);
+        }
+      });
 
       // Data–flow edges: from each operand (if an instruction) to I.
       for (Value *op : I.operands()) {
         if (Instruction *opI = dyn_cast<Instruction>(op)) {
-          facts.addEdge("dataFlowTo", *opI, I);
+          facts.addEdge(*opI, I, [&](auto& edge) { edge.kinds.push_back(EdgeKind::DataFlowTo); });
         } else if (Argument *opA = dyn_cast<Argument>(op)) {
-          facts.addEdge("dataFlowTo", *opA, I);
+          facts.addEdge(*opA, I, [&](auto& edge) { edge.kinds.push_back(EdgeKind::DataFlowTo); });
         } else if (GlobalVariable *opG = dyn_cast<GlobalVariable>(op)) {
-          facts.addEdge("references", I, *opG);
+          facts.addEdge(I, *opG, [&](auto& edge) { edge.kinds.push_back(EdgeKind::References); });
         } else if (Function *opF = dyn_cast<Function>(op)) {
-          facts.addEdge("references", I, *opF);
+          facts.addEdge(I, *opF, [&](auto& edge) { edge.kinds.push_back(EdgeKind::References); });
         }
       }
 
       // Call edge: record call relationship at the instruction level only.
       if (auto *CB = dyn_cast<CallBase>(&I)) {
+        CallType ct;
         if (Function *Callee = CB->getCalledFunction()) {
-          facts.addEdge("calls", I, *Callee);
-          facts.addNodeProp(I, "call_type", "direct");
+          facts.addEdge(I, *Callee, [&](auto& edge) { edge.kinds.push_back(EdgeKind::Calls); });
+          ct = CallType::Direct;
         } else {
           // Indirect call
-          facts.addNodeProp(I, "call_type", "indirect");
+          ct = CallType::Indirect;
         }
-        facts.addNodeProp(I, "function_type",
-                          typeToString(*CB->getFunctionType()));
+
+        facts.addNodeProp(I, [&](auto& node) {
+            node.call_type = ct;
+            node.function_type = typeToString(*CB->getFunctionType());
+        });
       }
     }
   }
 }
 
-static void getModuleFacts(Module &M) {
-  facts.addNodeProp(M, "source_file", M.getSourceFileName());
+void resolve::getModuleFacts(Module &M) {
+  facts.addNodeProp(M, [&](auto& node) { node.source_file = M.getSourceFileName(); });
 
   for (GlobalVariable &G : M.globals()) {
-    facts.addEdge("contains", M, G);
+    facts.addEdge(M, G, [&](auto& edge) { edge.kinds.push_back(EdgeKind::Contains); });
 
     getGlobalFacts(G);
   }
 
   for (Function &F : M) {
-    facts.addEdge("contains", M, F);
+    facts.addEdge(M, F, [&](auto& edge) { edge.kinds.push_back(EdgeKind::Contains); });
 
     getFunctionFacts(F);
   }
 }
 
 // Embed the accumulated facts into custom ELF sections.
-static void embedFacts(Module &M) {
+void resolve::embedFacts(Module &M) {
   LLVMContext &C = M.getContext();
   auto embedFactsSection = [&](StringRef sectionName,
                                const std::string &facts) {
@@ -179,6 +149,8 @@ static void embedFacts(Module &M) {
       compression::compress(params, inputData, compressedFacts);
     }
 
+    //errs() << "Embedding facts for " << sectionName << " with original size " << facts.size() << " and compressed size " << compressedFacts.size() << "\n";
+
     Constant *dataArr = ConstantDataArray::get(C, compressedFacts);
     GlobalVariable *gv =
         new GlobalVariable(M, dataArr->getType(),
@@ -189,16 +161,14 @@ static void embedFacts(Module &M) {
     appendToCompilerUsed(M, {gv});
   };
 
-  embedFactsSection(".fact_nodes", facts.getNodes());
-  embedFactsSection(".fact_node_props", facts.getNodeProps());
-  embedFactsSection(".fact_edges", facts.getEdges());
-  embedFactsSection(".fact_edge_props", facts.getEdgeProps());
+  // add a newline afterwards to help-distinguish between combined modules
+  embedFactsSection(".facts", facts.serialize() + "\n");
 }
 
 struct EnhancedFactsPass : public PassInfoMixin<EnhancedFactsPass> {
   PreservedAnalyses run(Module &M, ModuleAnalysisManager &) {
-    getModuleFacts(M);
-    embedFacts(M);
+    resolve::getModuleFacts(M);
+    resolve::embedFacts(M);
     return PreservedAnalyses::all();
   }
 };

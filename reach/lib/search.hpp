@@ -11,7 +11,7 @@
 #include "graph.hpp"
 
 namespace search {
-  using K = size_t;
+  using K = NNodeId;
 
   // Returns path from src to tgt in reverse order
   std::optional<std::vector<graph::edge>>
@@ -32,5 +32,5 @@ namespace search {
   k_shortest_paths(const graph::E& g, const K& src, const K& tgt, size_t K);
 
   // Build distances map wrt. given graph and source node
-  std::unordered_map<size_t, size_t> min_distances(const graph::E& g, const K& src);
+  resolve_facts::NodeMap<size_t> min_distances(const graph::E& g, const K& src);
 }  // namespace search

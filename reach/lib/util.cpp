@@ -22,12 +22,4 @@ namespace util {
     }
     return result;
   }
-
-  optional<string> name_of_id(const string& id) {
-    const auto toks = util::split(id, ':');
-    if (!toks.size()) {
-      return {};
-    }
-    return toks.back();
-  }
 }  // namespace util
