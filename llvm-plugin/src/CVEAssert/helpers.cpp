@@ -121,7 +121,7 @@ Function *getOrCreateRemediationBehavior(Module *M, Vulnerability::RemediationSt
     
     } else if (strategy == Vulnerability::RemediationStrategies::RECOVER) {
         // void longjmp(void *buf, int val)
-        FunctionType *longjmpFnTy = FunctionType::Get(
+        FunctionType *longjmpFnTy = FunctionType::get(
             void_ty,
             { ptr_ty, i32_ty },
             false
