@@ -10,13 +10,13 @@
 // CHECK: call void @resolve_report_sanitizer_triggered
 // CHECK: icmp eq i32 
 // CHECK-LABEL: define dso_local i32 @main
-// RUN: RESOLVE_LABEL_CVE=vulnerabilities/div_zero_vuln.json %clang -fpass-plugin=%plugin %s -o %t.exe 
+// RUN: RESOLVE_LABEL_CVE=vulnerabilities/div_zero_vuln.json %clang -fpass-plugin=%plugin %s -o %t.exe
 // RUN: %t.exe 1; test $? -eq 3
 // RUN: %t.exe; test $? -eq 42
 #include <stdio.h>
 #include <stdlib.h>
 
-void resolve_report_sanitizer_triggered(void) { printf("Calling sanitizer!\n"); }
+void resolve_report_sanitizer_triggered() { printf("Changing this in the future!"); }
 
 int div_zero_main(int argc, const char* argv[]) {        
     int math = (int) (42.0 / (float)argc);

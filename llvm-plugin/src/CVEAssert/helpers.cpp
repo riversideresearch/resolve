@@ -77,7 +77,7 @@ Function *getOrCreateResolveReportSanitizerTriggered(Module *M) {
 
     Function *resolve_report_func = Function::Create(
         resolve_report_func_ty,
-        Function::ExternalLinkage,
+        GlobalValue::WeakAnyLinkage, 
         "resolve_report_sanitizer_triggered",
         M
     );
@@ -92,14 +92,14 @@ Function *getOrCreateRemediationBehavior(Module *M, Vulnerability::RemediationSt
     auto void_ty = Type::getVoidTy(Ctx);
 
     FunctionType *resolve_remed_behavior_ty = FunctionType::get(void_ty, {}, false);
-    if (Function *F = M->getFunction("resolve_remed_behavior"))
+    if (Function *F = M->getFunction("resolve_remediation_behavior"))
         if (!F->isDeclaration())
             return F;
 
     Function *resolve_remed_behavior = Function::Create(
         resolve_remed_behavior_ty,
         GlobalValue::InternalLinkage,
-        "resolve_remed_behavior",
+        "resolve_remediation_behavior",
         M
     );
 

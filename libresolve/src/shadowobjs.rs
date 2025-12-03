@@ -65,6 +65,10 @@ impl ShadowObject {
     pub fn limit(addr: Vaddr, size: usize) -> Vaddr {
         addr + size - 1
     }
+
+    pub fn past_limit(&self) -> Vaddr {
+        self.limit + 1
+    }
 }
 
 pub struct ShadowObjectTable {
