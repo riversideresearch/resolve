@@ -168,7 +168,6 @@ static Function *getOrCreateBoundsCheckStoreSanitizer(Module *M, LLVMContext &Ct
   return sanitizeStoreFn;
 }
 
-
 static Function *getOrCreateBoundsCheckMemcpySanitizer(Module *M) {
   LLVMContext &Ctx = M->getContext();
   IRBuilder<> builder(Ctx);
@@ -234,6 +233,147 @@ static Function *getOrCreateBoundsCheckMemcpySanitizer(Module *M) {
   return SanitizeMemcpyFunc;
 }
 
+void sanitizeAlloca(Function *F) {
+  Module *M = F->getParent();
+  LLVMContext &Ctx = M->getContext();
+  IRBuilder<> builder(Ctx);
+  const DataLayout &DL = M->getDataLayout();
+
+  // Initialize list to store pointers to alloca and instructions
+  std::vector<AllocaInst *> allocaList;
+  
+  auto void_ty = Type::getVoidTy(Ctx);
+  auto ptr_ty = PointerType::get(Ctx, 0);
+  auto int64_ty = Type::getInt64Ty(Ctx);
+
+  FunctionType *resolveStackObjFnTy = FunctionType::get(
+      void_ty,
+      { ptr_ty, int64_ty },
+      false
+  );
+  
+  /* Initialize function callee object for libresolve resolve_stack_obj runtime fn */
+  FunctionCallee resolveStackObjFn = M->getOrInsertFunction(
+      "resolve_stack_obj",
+      resolveStackObjFnTy   
+  );
+
+  for (auto &BB: *F) {
+      for (auto &instr: BB) {
+          if (auto *inst = dyn_cast<AllocaInst>(&instr)) {
+              allocaList.push_back(inst);
+          }
+      }
+  }
+
+  for (auto* allocaInst: allocaList) {
+      // Insert after the alloca instruction
+      builder.SetInsertPoint(allocaInst->getNextNode());
+      Value* allocatedPtr = allocaInst;
+
+      Value *sizeVal = nullptr;
+      Type *allocatedType = allocaInst->getAllocatedType();
+      uint64_t typeSize = DL.getTypeAllocSize(allocatedType); 
+      sizeVal = ConstantInt::get(int64_ty, typeSize);
+      builder.CreateCall(resolveStackObjFn, { allocatedPtr, sizeVal });
+      
+  }
+}
+
+void sanitizeMalloc(Function *F) {
+  Module *M = F->getParent();
+  LLVMContext &Ctx = M->getContext();
+  IRBuilder<> builder(Ctx);
+  std::vector<CallInst *> mallocList;
+
+  auto ptr_ty = PointerType::get(Ctx, 0);
+  auto size_ty = Type::getInt64Ty(Ctx);
+  FunctionType *resolveMallocFnTy = FunctionType::get(ptr_ty,
+    { size_ty }, 
+    false
+  );
+
+  FunctionCallee resolveMallocFn = M->getOrInsertFunction(
+    "resolve_malloc",
+    resolveMallocFnTy
+  );
+
+  for (auto &BB : *F) {
+    for (auto &inst: BB) {
+      if (auto *call = dyn_cast<CallInst>(&inst)) {
+        Function *calledFn = call->getCalledFunction();
+
+        if (!calledFn) { continue; }
+
+        StringRef fnName = calledFn->getName();
+        
+        if (fnName == "malloc") { mallocList.push_back(call); }
+      }
+    }
+  }
+
+  for (auto Inst : mallocList) {
+    builder.SetInsertPoint(Inst);
+    Value *arg = Inst->getArgOperand(0);
+    Value *normalizeArg = builder.CreateZExtOrBitCast(arg, size_ty);
+    CallInst *resolveMallocCall = builder.CreateCall(resolveMallocFn, { normalizeArg });
+    Inst->replaceAllUsesWith(resolveMallocCall);
+    Inst->eraseFromParent();  
+  }
+}
+
+void sanitizeGEP(Function *F) {
+  Module *M = F->getParent();
+  LLVMContext &Ctx = M->getContext();
+  IRBuilder<> builder(Ctx);
+  const DataLayout &DL = M->getDataLayout();
+  std::vector<GetElementPtrInst *> gepList;
+  auto ptr_ty = PointerType::get(Ctx, 0);
+
+  FunctionType *resolveGEPFnTy = FunctionType::get(
+    ptr_ty,
+    { ptr_ty, ptr_ty },
+    false
+  );
+
+  FunctionCallee resolveGEPFn = M->getOrInsertFunction(
+    "resolve_gep",
+    resolveGEPFnTy
+  );
+
+  for (auto &BB : *F) {
+    for (auto &inst: BB) {
+      if (auto *gep = dyn_cast<GetElementPtrInst>(&inst)) {
+        gepList.push_back(gep);
+      }
+    }
+  }
+
+  for (auto GEPInst: gepList) {
+    builder.SetInsertPoint(GEPInst->getNextNode());
+
+    // Get the pointer operand and offset from GEP
+    Value *basePtr = GEPInst->getPointerOperand();
+    Value * derivedPtr = GEPInst;
+
+    auto resolveGEPCall = builder.CreateCall(resolveGEPFn, { basePtr, derivedPtr });
+
+    // Collect users of gep instruction before mutation
+    SmallVector<User*, 8> gep_users;
+    for (User *U : GEPInst->users()) {
+      gep_users.push_back(U);
+    }
+
+    // Iterate over all the users of the gep instruction and 
+    // replace there operands with resolve_gep result 
+    for (User *U : gep_users) {
+      if (U != resolveGEPCall) {
+        U->replaceUsesOfWith(GEPInst, resolveGEPCall);
+      }
+    }
+  }
+}
+
 void sanitizeLoadStore(Function *F, Vulnerability::RemediationStrategies strategy) 
 {
   LLVMContext &Ctx = F->getContext();
@@ -241,6 +381,22 @@ void sanitizeLoadStore(Function *F, Vulnerability::RemediationStrategies strateg
 
   std::vector<LoadInst *> loadList;
   std::vector<StoreInst *> storeList;
+
+  switch(strategy) {
+    //case Vulnerability::RemediationStrategies::CONTINUE-WRAP: /* TODO: Not yet supported. Implement this remediaion strategy */
+    //case Vulnerability::RemediationStrategies::CONTINUE-ZERO: /* TODO: Not yet supported. Implement this remediation strategy */
+    case Vulnerability::RemediationStrategies::EXIT:
+    case Vulnerability::RemediationStrategies::RECOVER:
+    case Vulnerability::RemediationStrategies::SAT:                     /* TODO: Not yet supported. Implement this remediation strategy */
+      break;
+
+    default:
+      llvm::errs() << "[CVEAssert] Error: sanitizeLoadStore does not support remediation strategy "
+                   << "defaulting to EXIT strategy!\n";
+      strategy = Vulnerability::RemediationStrategies::EXIT;
+      break;
+  }
+
 
   for (auto &BB : *F) {
     for (auto &I : BB) {
@@ -323,52 +479,6 @@ void sanitizeMemcpy(Function *F, ModuleAnalysisManager &MAM) {
   }
 }
 
-void sanitizeAlloca(Function *F) {
-  Module *M = F->getParent();
-  LLVMContext &Ctx = M->getContext();
-  IRBuilder<> builder(Ctx);
-  const DataLayout &DL = M->getDataLayout();
-
-  // Initialize list to store pointers to alloca and instructions
-  std::vector<AllocaInst *> allocaList;
-  
-  auto void_ty = Type::getVoidTy(Ctx);
-  auto ptr_ty = PointerType::get(Ctx, 0);
-  auto int64_ty = Type::getInt64Ty(Ctx);
-
-  FunctionType *resolveStackObjFnTy = FunctionType::get(
-      void_ty,
-      { ptr_ty, int64_ty },
-      false
-  );
-  
-  /* Initialize function callee object for libresolve resolve_stack_obj runtime fn */
-  FunctionCallee resolveStackObjFn = M->getOrInsertFunction(
-      "resolve_stack_obj",
-      resolveStackObjFnTy   
-  );
-
-  for (auto &BB: *F) {
-      for (auto &instr: BB) {
-          if (auto *inst = dyn_cast<AllocaInst>(&instr)) {
-              allocaList.push_back(inst);
-          }
-      }
-  }
-
-  for (auto* allocaInst: allocaList) {
-      // Insert after the alloca instruction
-      builder.SetInsertPoint(allocaInst->getNextNode());
-      Value* allocatedPtr = allocaInst;
-
-      Value *sizeVal = nullptr;
-      Type *allocatedType = allocaInst->getAllocatedType();
-      uint64_t typeSize = DL.getTypeAllocSize(allocatedType); 
-      sizeVal = ConstantInt::get(int64_ty, typeSize);
-      builder.CreateCall(resolveStackObjFn, { allocatedPtr, sizeVal });
-      
-  }
-}
 
 void sanitizeMalloc(Function *F, Vulnerability::RemediationStrategies strategy) {
   Module *M = F->getParent();
@@ -470,9 +580,9 @@ void sanitizeMalloc(Function *F, Vulnerability::RemediationStrategies strategy) 
 }
 
 void sanitizeMemInstBounds(Function *F, ModuleAnalysisManager &MAM, Vulnerability::RemediationStrategies strategy) {
-  // FIXME: bad alias analysis is causing compilation to fail
-  // TBD: why does TBAA not work right
   sanitizeAlloca(F);
-  sanitizeMalloc(F, strategy);
+  sanitizeMalloc(F);
+  sanitizeGEP(F);
+  sanitizeLoadStore(F, strategy);
   // sanitizeMemcpy(F, MAM);
 }
