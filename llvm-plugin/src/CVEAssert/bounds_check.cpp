@@ -181,12 +181,6 @@ static Function *getOrCreateBoundsCheckMemcpySanitizer(Module *M, Vulnerability:
   auto ptr_ty = PointerType::get(Ctx, 0);
   auto size_ty = Type::getInt64Ty(Ctx);
 
-  // void *resolve_memcpy(void *dst, void *derived_dst, void *src, void* derived_src, size_t n)
-  // - dst: pointer to destination memory area where the content is to be copied  
-  // - dst_derived: offset of dst + n 
-  // - src: pointer to source memory area where content is to be copied
-  // - src_derived: offset of src + n
-
   FunctionType *sanitizeMemcpyFnTy = FunctionType::get(
     ptr_ty, {ptr_ty, ptr_ty, size_ty}, false);
 
@@ -249,7 +243,7 @@ static Function *getOrCreateBoundsCheckMemcpySanitizer(Module *M, Vulnerability:
   return sanitizeMemcpyFn;
 }
 
-void sanitizeAlloca(Function *F) {
+void instrumentAlloca(Function *F) {
   Module *M = F->getParent();
   LLVMContext &Ctx = M->getContext();
   IRBuilder<> builder(Ctx);
@@ -296,7 +290,7 @@ void sanitizeAlloca(Function *F) {
   }
 }
 
-void sanitizeMalloc(Function *F) {
+void instrumentMalloc(Function *F) {
   Module *M = F->getParent();
   LLVMContext &Ctx = M->getContext();
   IRBuilder<> builder(Ctx);
@@ -338,7 +332,7 @@ void sanitizeMalloc(Function *F) {
   }
 }
 
-void sanitizeGEP(Function *F) {
+void instrumentGEP(Function *F) {
   Module *M = F->getParent();
   LLVMContext &Ctx = M->getContext();
   IRBuilder<> builder(Ctx);
@@ -492,9 +486,9 @@ void sanitizeLoadStore(Function *F, Vulnerability::RemediationStrategies strateg
 }
 
 void sanitizeMemInstBounds(Function *F, ModuleAnalysisManager &MAM, Vulnerability::RemediationStrategies strategy) {
-  sanitizeAlloca(F);
-  sanitizeMalloc(F);
-  sanitizeGEP(F);
+  instrumentAlloca(F);
+  instrumentMalloc(F);
+  instrumentGEP(F);
   sanitizeMemcpy(F, strategy);
   sanitizeLoadStore(F, strategy);
 }
