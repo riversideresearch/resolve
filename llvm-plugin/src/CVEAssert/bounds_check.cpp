@@ -168,8 +168,8 @@ static Function *getOrCreateBoundsCheckStoreSanitizer(Module *M, LLVMContext &Ct
   return sanitizeStoreFn;
 }
 
-static Function *getOrCreateBoundsCheckMemcpySanitizer(Module *M, Type *ty) {
-  Twine handlerName = "resolve_bounds_check_memcpy_" + getLLVMType(ty);
+static Function *getOrCreateBoundsCheckMemcpySanitizer(Module *M) {
+  Twine handlerName = "resolve_bounds_check_memcpy";
   SmallVector<char> handlerNameStr;
   LLVMContext &Ctx = M->getContext();
   
@@ -188,7 +188,7 @@ static Function *getOrCreateBoundsCheckMemcpySanitizer(Module *M, Type *ty) {
   // - src_derived: offset of src + n
 
   FunctionType *sanitizeMemcpyFnTy = FunctionType::get(
-    ptr_ty, {ptr_ty, ptr_ty, ptr_ty, ptr_ty, size_ty}, false);
+    ptr_ty, {ptr_ty, ptr_ty, size_ty}, false);
 
   Function *sanitizeMemcpyFn = Function::Create(
     sanitizeMemcpyFnTy,
@@ -463,7 +463,7 @@ void sanitizeLoadStore(Function *F, Vulnerability::RemediationStrategies strateg
   }
 }
 
-void sanitizeMemcpy(Function *F, Vulnerability::RemediationStrategies strategy) {
+void sanitizeMemcpy(Function *F) {
   LLVMContext &Ctx = F->getContext();
   IRBuilder<> builder(Ctx);
   std::vector<MemCpyInst *> memcpyList;
@@ -482,7 +482,7 @@ void sanitizeMemcpy(Function *F, Vulnerability::RemediationStrategies strategy) 
     auto dst_ptr = Inst->getDest();
     auto src_ptr = Inst->getSource();
     auto size_arg = Inst->getLength();
-    auto memcpyFn = getOrCreateBoundsCheckMemcpySanitizer(F->getParent(), src_ptr->getType());
+    auto memcpyFn = getOrCreateBoundsCheckMemcpySanitizer(F->getParent());
 
     auto sanitized_memcpy = builder.CreateCall(
         memcpyFn, { dst_ptr, src_ptr, size_arg });
@@ -495,6 +495,6 @@ void sanitizeMemInstBounds(Function *F, ModuleAnalysisManager &MAM, Vulnerabilit
   sanitizeAlloca(F);
   sanitizeMalloc(F);
   sanitizeGEP(F);
-  sanitizeMemcpy(F, strategy);
+  sanitizeMemcpy(F);
   sanitizeLoadStore(F, strategy);
 }
