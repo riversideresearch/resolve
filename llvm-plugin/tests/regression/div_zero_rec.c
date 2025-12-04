@@ -18,7 +18,7 @@
 #include <setjmp.h>
 
 static jmp_buf recover_longjmp_buf;
- 
+
 jmp_buf* resolve_get_recover_longjmp_buf() {
     return &recover_longjmp_buf;
 }
