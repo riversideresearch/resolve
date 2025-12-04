@@ -477,7 +477,7 @@ void sanitizeLoadStore(Function *F, Vulnerability::RemediationStrategies strateg
     }
 
     auto storeFn = getOrCreateBoundsCheckStoreSanitizer(
-      F->getParent(), F->getContext(), valueTy, Inst->getValueOperand(), strategy
+      F->getParent(), F->getContext(), valueTy, strategy
     );
 
     auto sanitizedStore = builder.CreateCall(storeFn, { ptr, Inst->getValueOperand() });
