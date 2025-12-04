@@ -60,11 +60,14 @@ static Function *getOrCreateNullPtrLoadSanitizer(Module *M, LLVMContext &Ctx, Ty
     FunctionCallee LogMemInstFunc = M->getOrInsertFunction("resolve_report_sanitize_mem_inst_triggered", LogMemInstFuncTy);
     Builder.CreateCall(LogMemInstFunc, { InputPtr });
 
-    if (strategy == Vulnerability::RemediationStrategies::SAFE) {
-        Builder.CreateRet(Constant::getNullValue(ty));
-    } else {
-        Builder.CreateCall(getOrCreateRemediationBehavior(M, strategy));
-        Builder.CreateUnreachable();
+    switch(strategy) {
+        case Vulnerability::RemediationStrategies::SAFE: {
+            Builder.CreateRet(Constant::getNullValue(ty));
+        }
+
+        default:
+            Builder.CreateCall(getOrCreateRemediationBehavior(M, strategy));
+            Builder.CreateUnreachable();
     }
     
     // Return Block: returns pointer if non-null
@@ -125,11 +128,14 @@ static Function *getOrCreateNullPtrStoreSanitizer(Module *M, LLVMContext &Ctx, T
     FunctionCallee LogMemInstFunc = M->getOrInsertFunction("resolve_report_sanitize_mem_inst_triggered", LogMemInstFuncTy);
     Builder.CreateCall(LogMemInstFunc, { InputPtr });
     
-    if (strategy == Vulnerability::RemediationStrategies::SAFE) {
-        Builder.CreateRetVoid();
-    } else {
-        Builder.CreateCall(getOrCreateRemediationBehavior(M, strategy));
-        Builder.CreateUnreachable();
+    switch (strategy) {
+        case Vulnerability::RemediationStrategies::SAFE:{
+            Builder.CreateRetVoid();
+        }
+
+        default:
+            Builder.CreateCall(getOrCreateRemediationBehavior(M, strategy));
+            Builder.CreateUnreachable();
     }
 
     // Return Block: returns pointer if non-null

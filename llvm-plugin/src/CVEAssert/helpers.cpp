@@ -90,6 +90,7 @@ Function *getOrCreateRemediationBehavior(Module *M, Vulnerability::RemediationSt
     auto &Ctx = M->getContext();
     auto ptr_ty = PointerType::get(Ctx, 0);
     auto void_ty = Type::getVoidTy(Ctx);
+    auto i32_ty = Type::getInt32Ty(Ctx);
 
     FunctionType *resolve_remed_behavior_ty = FunctionType::get(void_ty, {}, false);
     if (Function *F = M->getFunction("resolve_remediation_behavior"))
@@ -119,15 +120,26 @@ Function *getOrCreateRemediationBehavior(Module *M, Vulnerability::RemediationSt
         Builder.CreateCall(exitFn, { exitCode });
     
     } else if (strategy == Vulnerability::RemediationStrategies::RECOVER) {
-        FunctionType *errorhandlerTy = FunctionType::get(
-            void_ty,
-            {},
-            false
+        // void longjmp(void buf[], int val)
+        FunctionCallee longjmpFn = M->getOrInsertFunction(
+            "longjmp",
+            FunctionType::get(void_ty, { ptr_ty, i32_ty }, false)
         );
 
-        FunctionCallee errorHandlerFn = M->getOrInsertFunction("error_handler", errorhandlerTy);
-        Builder.CreateCall(errorHandlerFn);
+        // NOTE: resolve_get_recover_longjmp_buf must exist in C source code
+        FunctionCallee resolve_recover_buf_fn = M->getOrInsertFunction(
+            "resolve_get_recover_longjmp_buf",
+            FunctionType::get(ptr_ty, {}, false)
+        ); 
+        
+        Value *resolve_longjmp_ptr = Builder.CreateCall(resolve_recover_buf_fn);
+        Value *longjmpVal = ConstantInt::get(i32_ty, 42);
+        Builder.CreateCall(longjmpFn, { resolve_longjmp_ptr, longjmpVal });
     }
     Builder.CreateRetVoid();
+
+    raw_ostream &out = errs();
+    out << *resolve_remed_behavior;
+    if (verifyFunction(*resolve_remed_behavior, &out)) {}
     return resolve_remed_behavior;
 } 
