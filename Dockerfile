@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1
 FROM ubuntu:24.04
 
 ENV DEBIAN_FRONTEND=noninteractive
@@ -11,10 +12,13 @@ COPY scripts /opt/resolve/scripts
 RUN /opt/resolve/scripts/install-deps.sh && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Copy in resolve tools
-COPY llvm-plugin /opt/resolve/llvm-plugin
-COPY libresolve /opt/resolve/libresolve
-COPY reach /opt/resolve/reach
+COPY --exclude=build/ klee /opt/resolve/klee
+COPY --exclude=target/ libresolve /opt/resolve/libresolve
+COPY --exclude=build/ llvm-plugin /opt/resolve/llvm-plugin
+COPY --exclude=build/ reach /opt/resolve/reach
+COPY --exclude=build/ resolve-facts /opt/resolve/resolve-facts
 COPY linker /opt/resolve/linker
+COPY mcp /opt/resolve/mcp
 COPY reach-wrapper /opt/resolve/reach-wrapper
 COPY Makefile /opt/resolve/Makefile
 
