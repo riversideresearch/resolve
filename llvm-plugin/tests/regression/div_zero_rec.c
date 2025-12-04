@@ -8,7 +8,7 @@
 // RUN: %s -o - | %FileCheck %s 
 // CHECK-LABEL: define dso_local i32 @div_zero_main 
 // CHECK: call void @resolve_report_sanitizer_triggered
-// CHECK: call @resolve_remediation_behavior 
+// CHECK: call void @resolve_remediation_behavior 
 // CHECK-LABEL: define dso_local i32 @main
 // CHECK: call i32 @_setjmp 
 // RUN: RESOLVE_LABEL_CVE=vulnerabilities/div_zero_rec_vuln.json %clang -fpass-plugin=%plugin %s -o %t.exe
