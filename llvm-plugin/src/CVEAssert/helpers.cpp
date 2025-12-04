@@ -120,33 +120,16 @@ Function *getOrCreateRemediationBehavior(Module *M, Vulnerability::RemediationSt
         Builder.CreateCall(exitFn, { exitCode });
     
     } else if (strategy == Vulnerability::RemediationStrategies::RECOVER) {
-        // void longjmp(void *buf, int val)
-        FunctionType *longjmpFnTy = FunctionType::get(
-            void_ty,
-            { ptr_ty, i32_ty },
-            false
-        ); 
-
+        // void longjmp(void buf[], int val)
         FunctionCallee longjmpFn = M->getOrInsertFunction(
             "longjmp",
-            longjmpFnTy
+            FunctionType::get(void_ty, { ptr_ty, i32_ty }, false)
         );
 
-        // NOTE: Create resolve_recover_longjmp_buf in C source code
-        GlobalVariable *resolve_longjmp_buf = M->getGlobalVariable(
-            "resolve_recover_longjmp_buf"
-        );
-
-        // NOTE: Create resolve_recover_longjmp_buf in C source code
-        FunctionType *resolve_recover_buf_fn_ty = FunctionType::get(
-            ptr_ty,
-            {},
-            false
-        );
-
+        // NOTE: resolve_get_recover_longjmp_buf must exist in C source code
         FunctionCallee resolve_recover_buf_fn = M->getOrInsertFunction(
             "resolve_get_recover_longjmp_buf",
-             resolve_recover_buf_fn_ty
+            FunctionType::get(ptr_ty, {}, false)
         ); 
         
         Value *resolve_longjmp_ptr = Builder.CreateCall(resolve_recover_buf_fn);
