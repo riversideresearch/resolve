@@ -309,16 +309,18 @@ void instrumentMalloc(Function *F) {
     resolveMallocFnTy
   );
 
-  for (auto &BB : *F) {
-    for (auto &inst: BB) {
-      if (auto *call = dyn_cast<CallInst>(&inst)) {
-        Function *calledFn = call->getCalledFunction();
+  for (auto &F : *M) {
+    for (auto &BB : F) {
+      for (auto &inst: BB) {
+        if (auto *call = dyn_cast<CallInst>(&inst)) {
+          Function *calledFn = call->getCalledFunction();
 
-        if (!calledFn) { continue; }
+          if (!calledFn) { continue; }
 
-        StringRef fnName = calledFn->getName();
+          StringRef fnName = calledFn->getName();
         
-        if (fnName == "malloc") { mallocList.push_back(call); }
+          if (fnName == "malloc") { mallocList.push_back(call); }
+        }
       }
     }
   }
