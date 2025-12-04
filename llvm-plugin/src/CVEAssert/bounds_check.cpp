@@ -138,7 +138,7 @@ static Function *getOrCreateBoundsCheckStoreSanitizer(Module *M, LLVMContext &Ct
   );
 
   Value *basePtr = sanitizeStoreFn->getArg(0);
-  Value *storedVal = sanitizerStoreFn->getArg(1);
+  Value *storedVal = sanitizeStoreFn->getArg(1);
   builder.SetInsertPoint(EntryBB);
 
   Value *withinBounds = builder.CreateCall(resolveCheckBoundsFn,
