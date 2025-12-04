@@ -36,7 +36,7 @@ void error_handler() {
 
 int main(int argc, const char* argv[]) {
     // NOTE: call with 1 arg to trigger div by zero
-    int x = setjmp(recover_longjmp_buf);
+    int x = setjmp(*resolve_get_recover_longjmp_buf());
     if (x > 0) {
         error_handler();
     } else {
