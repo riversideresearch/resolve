@@ -1,3 +1,8 @@
+/*
+ *   Copyright (c) 2025 Riverside Research.
+ *   LGPL-3; See LICENSE.txt in the repo root for details.
+ */
+
 // RUN: RESOLVE_LABEL_CVE=vulnerabilities/stack_oob.json %clang -S -emit-llvm \
 // RUN: -fpass-plugin=%plugin \
 // RUN: %s -o - | %FileCheck %s 
