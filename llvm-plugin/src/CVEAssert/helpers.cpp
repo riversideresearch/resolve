@@ -137,13 +137,21 @@ Function *getOrCreateRemediationBehavior(Module *M, Vulnerability::RemediationSt
             "resolve_recover_longjmp_buf"
         );
 
-        if (!resolve_longjmp_buf) {
-            errs() << "[CVEAssert] Warning: 'resolve_recover_longjmp_buf not found in source code!\n";
-            /* Add exit or abort function here! */
-        }
+        // NOTE: Create resolve_recover_longjmp_buf in C source code
+        FunctionType *resolve_recover_buf_fn_ty = FunctionType::get(
+            ptr_ty,
+            {},
+            false
+        );
 
+        FunctionCallee resolve_recover_buf_fn = M->getOrInsertFunction(
+            "resolve_get_recover_longjmp_buf",
+             resolve_recover_buf_fn_ty
+        ); 
+        
+        Value *resolve_longjmp_ptr = Builder.CreateCall(resolve_recover_buf_fn);
         Value *longjmpVal = ConstantInt::get(i32_ty, 42);
-        Builder.CreateCall(longjmpFn, { resolve_longjmp_buf, longjmpVal });
+        Builder.CreateCall(longjmpFn, { resolve_longjmp_ptr, longjmpVal });
     }
     Builder.CreateRetVoid();
     return resolve_remed_behavior;
