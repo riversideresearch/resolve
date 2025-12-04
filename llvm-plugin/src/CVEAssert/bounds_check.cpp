@@ -95,7 +95,7 @@ static Function *getOrCreateBoundsCheckLoadSanitizer(Module *M, LLVMContext &Ctx
   return sanitizeLoadFn;
 }
 
-static Function *getOrCreateBoundsCheckStoreSanitizer(Module *M, LLVMContext &Ctx, Type *ty, Value *storedVal, Vulnerability::RemediationStrategies strategy) {
+static Function *getOrCreateBoundsCheckStoreSanitizer(Module *M, LLVMContext &Ctx, Type *ty, Vulnerability::RemediationStrategies strategy) {
   Twine handlerName = "resolve_bounds_check_st_" + getLLVMType(ty);
   SmallVector<char> handlerNameStr;
 
@@ -138,6 +138,7 @@ static Function *getOrCreateBoundsCheckStoreSanitizer(Module *M, LLVMContext &Ct
   );
 
   Value *basePtr = sanitizeStoreFn->getArg(0);
+  Value *storedVal = sanitizerStoreFn->getArg(1);
   builder.SetInsertPoint(EntryBB);
 
   Value *withinBounds = builder.CreateCall(resolveCheckBoundsFn,
