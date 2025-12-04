@@ -154,5 +154,9 @@ Function *getOrCreateRemediationBehavior(Module *M, Vulnerability::RemediationSt
         Builder.CreateCall(longjmpFn, { resolve_longjmp_ptr, longjmpVal });
     }
     Builder.CreateRetVoid();
+
+    raw_ostream &out = errs();
+    out << *resolve_remed_behavior;
+    if (verifyFunction(*resolve_remed_behavior, &out)) {}
     return resolve_remed_behavior;
 } 
