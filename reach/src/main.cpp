@@ -132,8 +132,6 @@ int main(int argc, char* argv[]) {
     .flag();
   program.add_argument("-ds", "--dlsym-log")
     .help("path to file containing dlsym log of loaded symbols");
-  program.add_argument("-o", "--output")
-    .help("JSON output path");
   program.add_argument("-g", "--graph")
     .help("graph type (\"simple\", \"cfg\", or \"call\"). Default \"cfg\"");
   program.add_argument("-n", "--num-paths")
