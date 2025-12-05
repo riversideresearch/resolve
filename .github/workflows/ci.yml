@@ -21,16 +21,54 @@ jobs:
     steps:
       - name: Trigger GitLab pipeline
         env:
+          GITLAB_URL: ${{ secrets.GITLAB_URL }}
           GITLAB_TOKEN: ${{ secrets.GITLAB_PIPELINE_TRIGGER_TOKEN }}
           GITLAB_PROJECT_ID: "376" # numeric project ID
           GITLAB_REF: "main" # branch to trigger in GitLab
           GITHUB_REPO: "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}"
           GITHUB_REF: ${{ github.ref_name }}
+          POLL_INTERVAL: 10
         run: |
-          curl -X POST \
-            --fail \
+          # Create pipeline
+          create_resp=$(curl -sS --fail -X POST \
             -F token=$GITLAB_TOKEN \
             -F "ref=$GITLAB_REF" \
             -F "variables[RESOLVE_REPO]=$GITHUB_REPO" \
             -F "variables[RESOLVE_REPO_BRANCH]=$GITHUB_REF" \
-            https://gitlab.ebossproject.com/api/v4/projects/$GITLAB_PROJECT_ID/trigger/pipeline
+            "${GITLAB_URL}/api/v4/projects/$GITLAB_PROJECT_ID/trigger/pipeline")
+
+          pipeline_id=$(echo "$create_resp" | jq -r '.id // empty')
+          if [[ -z "$pipeline_id" ]]; then
+            echo "Failed to create pipeline. Response:"
+            echo "$create_resp"
+            exit 2
+          fi
+
+          echo "Started pipeline id=${pipeline_id} for ref=${GITLAB_REF}"
+
+          # Poll status
+          while true; do
+            status_resp=$(curl -sS --fail -F token=$GITLAB_TOKEN \
+              "${GITLAB_URL}/api/v4/projects/${GITLAB_PROJECT_ID}/pipelines/${pipeline_id}")
+
+            status=$(echo "$status_resp" | jq -r '.status // empty')
+            echo "pipeline=${pipeline_id} status=${status}"
+
+            case "$status" in
+              success)
+                echo "Pipeline succeeded"
+                exit 0
+                ;;
+              failed|canceled|skipped)
+                echo "Pipeline finished with status: $status"
+                exit 3
+                ;;
+              running|pending)
+                ;;
+              *)
+                echo "Unknown status: $status"
+                ;;
+            esac
+
+            sleep "$POLL_INTERVAL"
+          done
