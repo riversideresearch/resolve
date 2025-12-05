@@ -5,7 +5,7 @@
             "cve-description": "",
             "package-name": "resolve-test",
             "package-version": "1.4.5",
-            "cwe-id": "125",
+            "cwe-id": "121",
             "cwe-name": "Stack OOB access",
             "affected-function": "main",
             "affected-file": "stack_oob.c",
