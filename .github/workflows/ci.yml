@@ -26,16 +26,16 @@ jobs:
           GITLAB_API_TOKEN: ${{ secrets.GITLAB_PIPELINE_STATUS_TOKEN }}
           GITLAB_PROJECT_ID: "376" # numeric project ID
           GITLAB_REF: "main" # branch to trigger in GitLab
-          GITHUB_REPO: "${{ github.server_url }}/${{ github.repository }}"
-          GITHUB_REF: ${{ github.ref_name }}
+          RESOLVE_REPO: "${{ github.server_url }}/${{ github.repository }}"
+          RESOLVE_REPO_BRANCH: ${{ github.ref_name }}
           POLL_INTERVAL: 10
         run: |
           # Create pipeline
           create_resp=$(curl -sS --fail -X POST \
             -F token=$GITLAB_TRIGGER_TOKEN \
             -F "ref=$GITLAB_REF" \
-            -F "variables[RESOLVE_REPO]=$GITHUB_REPO" \
-            -F "variables[RESOLVE_REPO_BRANCH]=$GITHUB_REF" \
+            -F "variables[RESOLVE_REPO]=$RESOLVE_REPO" \
+            -F "variables[RESOLVE_REPO_BRANCH]=$RESOLVE_REPO_BRANCH" \
             "${GITLAB_URL}/api/v4/projects/$GITLAB_PROJECT_ID/trigger/pipeline")
 
           pipeline_id=$(echo "$create_resp" | jq -r '.id // empty')
