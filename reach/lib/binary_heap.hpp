@@ -8,6 +8,11 @@
 // Use this instead of std::priority_queue for fast 'contains' and
 // 'decrease_key' operations.
 
+// 0-indexed heap:
+//        0
+//    1       2
+//  3   4   5   6
+
 #pragma once
 
 #include <stdexcept>
