@@ -203,25 +203,20 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
 
   PreservedAnalyses run(Module &M, ModuleAnalysisManager &MAM) {
     auto result = PreservedAnalyses::all();
-    InstrumentMemInst instrument_mem_inst;
 
     for (auto &vuln : vulnerabilities) {
       switch(vuln.WeaknessID) {
         case VulnID::INCORRECT_BUF_SIZE:
         case VulnID::OOB_READ:
-          instrument_mem_inst.instrumentMalloc = true;
+          for (auto &F : M) {
+            instrumentMalloc(M);
+          }
           break;
 
         default:
           break;
       }
     }
-
-    if (instrument_mem_inst.instrumentMalloc) {
-      instrumentMalloc(M);
-    }
-
-
 
     for (auto &F: M) {
       for (auto &vuln : vulnerabilities) {
