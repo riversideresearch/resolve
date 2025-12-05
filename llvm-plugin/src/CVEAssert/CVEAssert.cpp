@@ -210,9 +210,10 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
         case VulnID::INCORRECT_BUF_SIZE:
         case VulnID::OOB_READ:
           instrument_mem_inst.instrumentMalloc = true;
+          break;
 
         default:
-         /* Not sure what to put here! */ 
+          break;
       }
     }
 
