@@ -218,7 +218,7 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
     }
 
     if (instrument_mem_inst.instrumentMalloc) {
-      instrumentMalloc(*M);
+      instrumentMalloc(M);
     }
 
 
