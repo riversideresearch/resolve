@@ -40,6 +40,10 @@ bool CVE_ASSERT_DEBUG;
 
 namespace {
 
+struct InstrumentMemInst {
+  bool instrumentMalloc = false;
+};
+
 struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
   std::vector<Vulnerability> vulnerabilities;
   
@@ -135,7 +139,7 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
 /// For each function, if it matches the target function name, insert calls to
 /// the vulnerability handlers as specified in the JSON. Each call receives the
 /// triggering argument parsed from the JSON.
-  PreservedAnalyses run(Function &F, ModuleAnalysisManager &MAM, Vulnerability &vuln) {
+  PreservedAnalyses runOnFunction(Function &F, ModuleAnalysisManager &MAM, Vulnerability &vuln) {
     char* demangledNamePtr = llvm::itaniumDemangle(F.getName().str(), false);
     std::string demangledName(demangledNamePtr ?: "");
 
@@ -199,12 +203,31 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
 
   PreservedAnalyses run(Module &M, ModuleAnalysisManager &MAM) {
     auto result = PreservedAnalyses::all();
-    for (auto &F: M) {
-      for (auto &vuln : vulnerabilities) {
-        result.intersect(run(F, MAM, vuln));
+    InstrumentMemInst instrument_mem_inst;
+
+    for (auto &vuln : vulnerabilities) {
+      switch(vuln.WeaknessID) {
+        case VulnID::INCORRECT_BUF_SIZE:
+        case VulnID::OOB_READ:
+          instrument_mem_inst.instrumentMalloc = true;
+
+        default:
+         /* Not sure what to put here! */ 
       }
     }
-    return PreservedAnalyses::all();
+
+    if (instrument_mem_inst.instrumentMalloc) {
+      instrumentMalloc(*M);
+    }
+
+
+
+    for (auto &F: M) {
+      for (auto &vuln : vulnerabilities) {
+        result.intersect(runOnFunction(F, MAM, vuln));
+      }
+    }
+    return result;
   }
 };
 
