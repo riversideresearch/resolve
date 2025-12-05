@@ -244,11 +244,10 @@ static Function *getOrCreateBoundsCheckMemcpySanitizer(Module *M, Vulnerability:
   return sanitizeMemcpyFn;
 }
 
-void instrumentAlloca(Function *F) {
-  Module *M = F->getParent();
-  LLVMContext &Ctx = M->getContext();
+void instrumentAlloca(Module &M) {
+  LLVMContext &Ctx = M.getContext();
   IRBuilder<> builder(Ctx);
-  const DataLayout &DL = M->getDataLayout();
+  const DataLayout &DL = M.getDataLayout();
 
   // Initialize list to store pointers to alloca and instructions
   std::vector<AllocaInst *> allocaList;
@@ -264,17 +263,19 @@ void instrumentAlloca(Function *F) {
   );
   
   /* Initialize function callee object for libresolve resolve_stack_obj runtime fn */
-  FunctionCallee resolveStackObjFn = M->getOrInsertFunction(
+  FunctionCallee resolveStackObjFn = M.getOrInsertFunction(
       "resolve_stack_obj",
       resolveStackObjFnTy   
   );
 
-  for (auto &BB: *F) {
+  for (auto &F : M) {
+    for (auto &BB: F) {
       for (auto &instr: BB) {
           if (auto *inst = dyn_cast<AllocaInst>(&instr)) {
               allocaList.push_back(inst);
           }
       }
+    }
   }
 
   for (auto* allocaInst: allocaList) {
@@ -291,9 +292,8 @@ void instrumentAlloca(Function *F) {
   }
 }
 
-void instrumentMalloc(Function *F) {
-  Module *M = F->getParent();
-  LLVMContext &Ctx = M->getContext();
+void instrumentMalloc(Module &M) {
+  LLVMContext &Ctx = M.getContext();
   IRBuilder<> builder(Ctx);
   std::vector<CallInst *> mallocList;
 
@@ -304,21 +304,23 @@ void instrumentMalloc(Function *F) {
     false
   );
 
-  FunctionCallee resolveMallocFn = M->getOrInsertFunction(
+  FunctionCallee resolveMallocFn = M.getOrInsertFunction(
     "resolve_malloc",
     resolveMallocFnTy
   );
 
-  for (auto &BB : *F) {
-    for (auto &inst: BB) {
-      if (auto *call = dyn_cast<CallInst>(&inst)) {
-        Function *calledFn = call->getCalledFunction();
+  for (auto &F : M) {
+    for (auto &BB : F) {
+      for (auto &inst: BB) {
+        if (auto *call = dyn_cast<CallInst>(&inst)) {
+          Function *calledFn = call->getCalledFunction();
 
-        if (!calledFn) { continue; }
+          if (!calledFn) { continue; }
 
-        StringRef fnName = calledFn->getName();
+          StringRef fnName = calledFn->getName();
         
-        if (fnName == "malloc") { mallocList.push_back(call); }
+          if (fnName == "malloc") { mallocList.push_back(call); }
+        }
       }
     }
   }
@@ -487,8 +489,6 @@ void sanitizeLoadStore(Function *F, Vulnerability::RemediationStrategies strateg
 }
 
 void sanitizeMemInstBounds(Function *F, ModuleAnalysisManager &MAM, Vulnerability::RemediationStrategies strategy) {
-  instrumentAlloca(F);
-  instrumentMalloc(F);
   instrumentGEP(F);
   sanitizeMemcpy(F, strategy);
   sanitizeLoadStore(F, strategy);
