@@ -14,3 +14,23 @@ jobs:
         run: make build
       - name: Test
         run: make test
+
+  trigger-gitlab:
+    runs-on: ubuntu-latest
+    needs: [build-and-test]
+    steps:
+      - name: Trigger GitLab pipeline
+        env:
+          GITLAB_TOKEN: ${{ secrets.GITLAB_PIPELINE_TRIGGER_TOKEN }}
+          GITLAB_PROJECT_ID: "376" # numeric project ID
+          GITLAB_REF: "main" # branch to trigger in GitLab
+          GITHUB_REPO: "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}"
+          GITHUB_REF: ${{ github.ref_name }}
+        run: |
+          curl -X POST \
+            --fail \
+            -F token=$GITLAB_TOKEN \
+            -F "ref=$GITLAB_REF" \
+            -F "variables[RESOLVE_REPO]=$GITHUB_REPO" \
+            -F "variables[RESOLVE_REPO_BRANCH]=$GITHUB_REF" \
+            https://gitlab.ebossproject.com/api/v4/projects/$GITLAB_PROJECT_ID/trigger/pipeline
