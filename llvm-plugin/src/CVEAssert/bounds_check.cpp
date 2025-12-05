@@ -263,7 +263,7 @@ void instrumentAlloca(Module &M) {
   );
   
   /* Initialize function callee object for libresolve resolve_stack_obj runtime fn */
-  FunctionCallee resolveStackObjFn = M->getOrInsertFunction(
+  FunctionCallee resolveStackObjFn = M.getOrInsertFunction(
       "resolve_stack_obj",
       resolveStackObjFnTy   
   );
@@ -489,7 +489,6 @@ void sanitizeLoadStore(Function *F, Vulnerability::RemediationStrategies strateg
 }
 
 void sanitizeMemInstBounds(Function *F, ModuleAnalysisManager &MAM, Vulnerability::RemediationStrategies strategy) {
-  instrumentAlloca(F);
   instrumentGEP(F);
   sanitizeMemcpy(F, strategy);
   sanitizeLoadStore(F, strategy);
