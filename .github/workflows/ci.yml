@@ -22,7 +22,8 @@ jobs:
       - name: Trigger GitLab pipeline
         env:
           GITLAB_URL: ${{ secrets.GITLAB_URL }}
-          GITLAB_TOKEN: ${{ secrets.GITLAB_PIPELINE_TRIGGER_TOKEN }}
+          GITLAB_TRIGGER_TOKEN: ${{ secrets.GITLAB_PIPELINE_TRIGGER_TOKEN }}
+          GITLAB_API_TOKEN: ${{ secrets.GITLAB_PIPELINE_STATUS_TOKEN }}
           GITLAB_PROJECT_ID: "376" # numeric project ID
           GITLAB_REF: "main" # branch to trigger in GitLab
           GITHUB_REPO: "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}"
@@ -48,7 +49,7 @@ jobs:
 
           # Poll status
           while true; do
-            status_resp=$(curl -sS --fail -F token=$GITLAB_TOKEN \
+            status_resp=$(curl -sS --fail -H "PRIVATE-TOKEN: ${GITLAB_API_TOKEN}" \
               "${GITLAB_URL}/api/v4/projects/${GITLAB_PROJECT_ID}/pipelines/${pipeline_id}")
 
             status=$(echo "$status_resp" | jq -r '.status // empty')
