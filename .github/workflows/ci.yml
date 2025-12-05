@@ -1,6 +1,10 @@
 name: resolve CI
 
-on: push
+on:
+  push: 
+    branches: [main]
+  pull_request:
+    types: [opened, reopened, synchronize]
 
 jobs:
   build-and-test:
@@ -18,6 +22,8 @@ jobs:
   trigger-gitlab:
     runs-on: ubuntu-latest
     needs: [build-and-test]
+    # Skip trigger gitlab on draft PRs
+    if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.draft == false)
     steps:
       - name: Trigger GitLab pipeline
         env:
