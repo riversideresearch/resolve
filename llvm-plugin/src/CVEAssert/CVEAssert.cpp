@@ -42,12 +42,16 @@ namespace {
 
 struct InstrumentMemInst {
   bool instrumentMalloc = false;
+  bool instrumentAlloca = false;
 };
 
 struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
   std::vector<Vulnerability> vulnerabilities;
   
   enum VulnID {
+    STACK_BASED_BUF_OVERFLOW = 121,
+    HEAP_BASED_BUF_OVERFLOW = 122,
+    OOB_WRITE = 787,
     OOB_READ = 125,                /* NOTE: This ID corresponds to CWE-ID description found in stb-resize, lamartine CPs */
     INCORRECT_BUF_SIZE = 131,      /* NOTE: This ID corresponds to the CWE-ID description found in analyze image CP*/
     DIVIDE_BY_ZERO = 369,          /* NOTE: This ID corresponds to CWE description in ros2 challenge problem */
@@ -159,12 +163,20 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
     out << F;
 
     switch (vuln.WeaknessID) {
-      case VulnID::OOB_READ:           /* NOTE: Found in stb-resize, lamartine challenge problems */
-      case VulnID::INCORRECT_BUF_SIZE: /* NOTE: These IDs correspond to CWEs found in analyze-image */
+      case VulnID::STACK_BASED_BUF_OVERFLOW: /* Stack-based buffer overflow */
+      case VulnID::HEAP_BASED_BUF_OVERFLOW: /* Heap-base buffer overflow */
+      case VulnID::OOB_WRITE:               /* OOB Write */
         sanitizeMemInstBounds(&F, MAM, vuln.Strategy);
         break;
 
-      case VulnID::DIVIDE_BY_ZERO: /* NOTE: This ID corresponds to CWE description in ros2 challenge problem */
+      
+      case VulnID::OOB_READ:             /* OOB Read; found in stb-resize, lamartine challenge problems */
+      case VulnID::INCORRECT_BUF_SIZE:   /* Incorrect buffer size calculation; found in analyze-image */
+        sanitizeMemInstBounds(&F, MAM, vuln.Strategy);
+        break;
+
+      case VulnID::DIVIDE_BY_ZERO: /* Divide by Zero; found in ros2 and analyze-image */
+        /* Workaround for ambiguous CWE description in analyze-image */
         if (vuln.UndesirableFunction.has_value()) {
           sanitizeDivideByZeroInFunction(&F, vuln.UndesirableFunction);
         } else {
@@ -172,16 +184,15 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
         }
         break;
 
-      case VulnID::INT_OVERFLOW: /* NOTE: This ID has not been found in any challenge problem,
-                                   implemented to for arithmetic sanitizer coverage   */
+      case VulnID::INT_OVERFLOW: /* Integer Overflow */
         sanitizeIntOverflow(&F, vuln.Strategy);
         break;
 
-      case VulnID::NULL_PTR_DEREF: /* NOTE: This ID has been found in OpenALPR, NASA CFS, stb-convert challenge problems */
+      case VulnID::NULL_PTR_DEREF: /* Null Pointer Dereference; Found in openalpr, nasa-cfs, stb-convert*/
         sanitizeNullPointers(&F, vuln.Strategy);
         break;
 
-      case VulnID::STACK_FREE: /* NOTE: This ID has been found in NASA CFS challenge problem */
+      case VulnID::STACK_FREE: /* Stack free;  Found in nasa-cfs */
         sanitizeFreeOfNonHeap(&F, vuln.Strategy);
         break;
 
@@ -207,16 +218,45 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
 
     for (auto &vuln : vulnerabilities) {
       switch(vuln.WeaknessID) {
-        case VulnID::INCORRECT_BUF_SIZE:
-        case VulnID::OOB_READ:
-          for (auto &F : M) {
-            instrumentMalloc(M);
-          }
+        // 121 stack-based
+        case VulnID::STACK_BASED_BUF_OVERFLOW:
+          instrument_mem_inst.instrumentAlloca = true;
           break;
 
-        default:
+        // 122 heap-based 
+        case VulnID::HEAP_BASED_BUF_OVERFLOW:
+          instrument_mem_inst.instrumentMalloc = true;
           break;
+
+        // default instrument both
+        case VulnID::OOB_READ:
+        case VulnID::OOB_WRITE:
+        case VulnID::INCORRECT_BUF_SIZE:
+          instrument_mem_inst.instrumentAlloca = true;
+          instrument_mem_inst.instrumentMalloc = true; 
+        
       }
+    }
+
+    if (instrument_mem_inst.instrumentMalloc &&
+        instrument_mem_inst.instrumentAlloca) {
+      for (auto &F : M) {
+        instrumentAlloca(M);
+        instrumentMalloc(M);
+      }
+      result = PreservedAnalyses::none();
+    
+    } else if (instrument_mem_inst.instrumentAlloca) {
+      for(auto &F : M) {
+        instrumentAlloca(M);
+      }
+      result = PreservedAnalyses::none();
+    
+    } else if (instrument_mem_inst.instrumentMalloc) {
+      for (auto &F : M) {
+        instrumentMalloc(M);
+      }
+      result = PreservedAnalyses::none();
     }
 
     for (auto &F: M) {
