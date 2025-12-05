@@ -291,8 +291,8 @@ void instrumentAlloca(Function *F) {
   }
 }
 
-void instrumentMalloc(Module *M) {
-  LLVMContext &Ctx = M->getContext();
+void instrumentMalloc(Module &M) {
+  LLVMContext &Ctx = M.getContext();
   IRBuilder<> builder(Ctx);
   std::vector<CallInst *> mallocList;
 
@@ -303,12 +303,12 @@ void instrumentMalloc(Module *M) {
     false
   );
 
-  FunctionCallee resolveMallocFn = M->getOrInsertFunction(
+  FunctionCallee resolveMallocFn = M.getOrInsertFunction(
     "resolve_malloc",
     resolveMallocFnTy
   );
 
-  for (auto &F : *M) {
+  for (auto &F : M) {
     for (auto &BB : F) {
       for (auto &inst: BB) {
         if (auto *call = dyn_cast<CallInst>(&inst)) {
