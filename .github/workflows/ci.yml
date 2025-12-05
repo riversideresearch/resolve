@@ -35,7 +35,7 @@ jobs:
           RESOLVE_REPO: "${{ github.server_url }}/${{ github.repository }}"
           RESOLVE_REPO_SHA: ${{ github.sha }}
           TRIGGERING_REF: ${{ github.ref }}
-          TRIGGERING_BRANCH: ${{ default(github.base_ref, github.ref_name) }}
+          TRIGGERING_BRANCH: ${{ github.event.pull_request && github.head_ref || github.ref_name }}
           TRIGGERING_ACTOR: ${{ github.triggering_actor }}
           POLL_INTERVAL: 10
         run: |
