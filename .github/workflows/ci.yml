@@ -26,7 +26,7 @@ jobs:
           GITLAB_API_TOKEN: ${{ secrets.GITLAB_PIPELINE_STATUS_TOKEN }}
           GITLAB_PROJECT_ID: "376" # numeric project ID
           GITLAB_REF: "main" # branch to trigger in GitLab
-          GITHUB_REPO: "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}"
+          GITHUB_REPO: "${{ github.server_url }}/${{ github.repositoryUrl }}"
           GITHUB_REF: ${{ github.ref_name }}
           POLL_INTERVAL: 10
         run: |
