@@ -203,6 +203,7 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
 
   PreservedAnalyses run(Module &M, ModuleAnalysisManager &MAM) {
     auto result = PreservedAnalyses::all();
+    InstrumentMemInst instrument_mem_inst;
 
     for (auto &vuln : vulnerabilities) {
       switch(vuln.WeaknessID) {
