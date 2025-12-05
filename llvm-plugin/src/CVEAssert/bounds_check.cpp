@@ -291,8 +291,7 @@ void instrumentAlloca(Function *F) {
   }
 }
 
-void instrumentMalloc(Function *F) {
-  Module *M = F->getParent();
+void instrumentMalloc(Module *M) {
   LLVMContext &Ctx = M->getContext();
   IRBuilder<> builder(Ctx);
   std::vector<CallInst *> mallocList;
@@ -490,7 +489,6 @@ void sanitizeLoadStore(Function *F, Vulnerability::RemediationStrategies strateg
 
 void sanitizeMemInstBounds(Function *F, ModuleAnalysisManager &MAM, Vulnerability::RemediationStrategies strategy) {
   instrumentAlloca(F);
-  instrumentMalloc(F);
   instrumentGEP(F);
   sanitizeMemcpy(F, strategy);
   sanitizeLoadStore(F, strategy);
