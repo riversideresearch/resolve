@@ -64,6 +64,10 @@ jobs:
                 echo "Pipeline finished with status: $status"
                 exit 3
                 ;;
+              manual)
+                echo "Pipeline waiting for manual action"
+                exit 0
+                ;;
               running|pending)
                 ;;
               *)
