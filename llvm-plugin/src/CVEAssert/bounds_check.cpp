@@ -244,11 +244,10 @@ static Function *getOrCreateBoundsCheckMemcpySanitizer(Module *M, Vulnerability:
   return sanitizeMemcpyFn;
 }
 
-void instrumentAlloca(Function *F) {
-  Module *M = F->getParent();
-  LLVMContext &Ctx = M->getContext();
+void instrumentAlloca(Module &M) {
+  LLVMContext &Ctx = M.getContext();
   IRBuilder<> builder(Ctx);
-  const DataLayout &DL = M->getDataLayout();
+  const DataLayout &DL = M.getDataLayout();
 
   // Initialize list to store pointers to alloca and instructions
   std::vector<AllocaInst *> allocaList;
@@ -269,12 +268,14 @@ void instrumentAlloca(Function *F) {
       resolveStackObjFnTy   
   );
 
-  for (auto &BB: *F) {
+  for (auto &F : M) {
+    for (auto &BB: F) {
       for (auto &instr: BB) {
           if (auto *inst = dyn_cast<AllocaInst>(&instr)) {
               allocaList.push_back(inst);
           }
       }
+    }
   }
 
   for (auto* allocaInst: allocaList) {
