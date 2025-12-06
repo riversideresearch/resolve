@@ -13,11 +13,22 @@
 // RUN: %t.exe; test $? -eq 3
  
 #include <stdio.h>
+#include <stdlib.h>
+int main(int argc, char *argv[]) {
+  int i;
+  int idx = atoi(argv[0]);
+  int buffer[10] = { 0 };
 
-int main() {
-  int arr[2] = { 0, 1 };
-  int x = arr[3];
+  if (idx >= 0) {
+    buffer[idx] = 1;
 
-  return x;
-
+    for (i = 0; i < 10; ++i) {
+      printf("%d ", buffer[i]);
+    }
+    return 0;
+  
+  } else {
+    printf("ERROR: Negative indexing results in OOB access: %d", idx);
+    return -1;
+  }
 }
