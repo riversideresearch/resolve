@@ -8,7 +8,7 @@
 
 LINKMAP=/opt/resolve/linker/AnalysisEngine_linkmap.py
 BUILD_DIR= # e.g., /shared-volume/ProgramAnalysis/nasa-cfs/Build
-FACT_FILES="edgeprops.facts edges.facts nodes.facts nodeprops.facts"
+FACT_FILES="facts.facts"
 
 HELP="Usage: ./link-facts.sh <build-dir> <object-file1> [<object-file2> ... <object-fileN>]"
 
