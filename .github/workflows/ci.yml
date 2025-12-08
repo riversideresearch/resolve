@@ -32,7 +32,7 @@ jobs:
           GITLAB_API_TOKEN: ${{ secrets.GITLAB_PIPELINE_STATUS_TOKEN }}
           GITLAB_PROJECT_ID: "376" # numeric project ID
           GITLAB_REF: "main" # branch to trigger in GitLab
-          RESOLVE_REPO: "${{ github.server_url }}/${{ github.repository }}"
+          RESOLVE_REPO: ${{ github.repository }}
           RESOLVE_REPO_SHA: ${{ github.sha }}
           TRIGGERING_REF: ${{ github.ref }}
           TRIGGERING_BRANCH: ${{ github.event.pull_request && github.head_ref || github.ref_name }}
