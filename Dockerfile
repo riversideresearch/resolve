@@ -28,7 +28,3 @@ RUN chmod -R 777 /opt/resolve/linker /opt/resolve/reach-wrapper
 # Build
 WORKDIR /opt/resolve/
 RUN PATH="$PATH:~/.cargo/bin" make
-
-# Mark Version
-RUN echo -n "resolve version: "
-RUN git log --pretty=format:'%h' -n 1 | tee /RESOLVE_VERSION
