@@ -178,7 +178,7 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
       case VulnID::DIVIDE_BY_ZERO: /* Divide by Zero; found in ros2 and analyze-image */
         /* Workaround for ambiguous CWE description in analyze-image */
         if (vuln.UndesirableFunction.has_value()) {
-          sanitizeDivideByZeroInFunction(&F, vuln.UndesirableFunction);
+          sanitizeDivideByZeroInFunction(&F, vuln.Strategy, vuln.UndesirableFunction);
         } else {
           sanitizeDivideByZero(&F, vuln.Strategy);
         }

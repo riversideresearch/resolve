@@ -11,6 +11,7 @@
 void sanitizeDivideByZero(llvm::Function *F, Vulnerability::RemediationStrategies strategy);
 void sanitizeIntOverflow(llvm::Function *F, Vulnerability::RemediationStrategies strategy);
 llvm::Function *replaceUndesirableFunction(llvm::Function *F,
+                                        Vulnerability::RemediationStrategies strategy,
                                            llvm::CallInst *call);
 void sanitizeDivideByZeroInFunction(llvm::Function *F,
                                     std::optional<std::string> funct_name);

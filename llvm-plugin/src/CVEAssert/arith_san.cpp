@@ -305,7 +305,8 @@ void sanitizeDivideByZero(Function *F,  Vulnerability::RemediationStrategies str
   }
 }
 
-Function *replaceUndesirableFunction(Function *F, CallInst *call) {
+Function *replaceUndesirableFunction(Function *F, Vulnerability::RemediationStrategies strategy,
+  CallInst *call) {
   Module *M = F->getParent();
   LLVMContext &Ctx = M->getContext();
   IRBuilder<> Builder(Ctx);
@@ -353,6 +354,7 @@ Function *replaceUndesirableFunction(Function *F, CallInst *call) {
   // Returns dividend
   Builder.SetInsertPoint(SanitizedBB);
   Builder.CreateCall(resolve_report_func);
+  Builder.CreateCall(getOrCreateResolveRemediationBehavior(M, strategy));
   Builder.CreateRet(dividend);
 
   // ContExec: Makes call to original call instruction and returns that instead.
