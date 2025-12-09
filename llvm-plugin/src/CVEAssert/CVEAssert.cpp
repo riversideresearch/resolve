@@ -241,11 +241,11 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
 
     for (auto &F : M) {
       if (instrument_mem_inst.instrumentAlloca) {
-        instrumentAlloca(F);
+        instrumentAlloca(&F);
       }
 
       if (instrument_mem_inst.instrumentMalloc) {
-        instrumentMalloc(F);
+        instrumentMalloc(&F);
       }
     }
 
