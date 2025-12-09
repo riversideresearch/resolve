@@ -21,9 +21,15 @@ namespace conf {
     NNodeId dst;
   };
 
+  struct candidate_node {
+    std::optional<std::string> file;
+    std::string function_name;
+  };
+
   struct config {
     std::filesystem::path facts_dir;
     std::vector<query> queries;
+    std::vector<candidate_node> candidate_path;
     bool dynlink = false;
     std::optional<std::filesystem::path> out_path = {};
     std::optional<std::filesystem::path> dlsym_log_path = {};
@@ -35,8 +41,9 @@ namespace conf {
 
   // Generate JSON deserializers for config
   NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(query, src, dst);
+  NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(candidate_node, file, function_name);
   NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT
-  (config, facts_dir, queries, dynlink, out_path,
+  (config, facts_dir, queries, candidate_path, dynlink, out_path,
    dlsym_log_path, graph_type, num_paths, validate_facts, verbose);
 
   // Load config from JSON file
