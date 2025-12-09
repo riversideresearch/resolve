@@ -88,8 +88,6 @@ conf::config load_config(const argparse::ArgumentParser& program) {
     }
 
     conf.verbose = program.get<bool>("verbose") || conf.verbose;
-
-
     return conf;
   }
   catch (exception &e) {
@@ -281,8 +279,6 @@ int main(int argc, char* argv[]) {
       conf.queries.emplace_back(candidate_ids[i], candidate_ids[i+1]);
     }
   }
-
-
 
   for (const auto &q : conf.queries) {
     t0 = system_clock::now();
