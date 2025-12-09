@@ -302,7 +302,7 @@ void instrumentMalloc(Function *F) {
   for (auto Inst : mallocList) {
     StringRef fnName = Inst->getFunction()->getName();
 
-    if (instrumentedFns.find(fnName.str) != instrumentedFns.end()) {
+    if (instrumentedFns.find(fnName.str()) != instrumentedFns.end()) {
       continue;
     }
 
