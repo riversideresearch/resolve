@@ -136,14 +136,13 @@ Function *getOrCreateRemediationBehavior(Module *M, Vulnerability::RemediationSt
         Value *longjmpVal = ConstantInt::get(i32_ty, 42);
         Builder.CreateCall(longjmpFn, { resolve_longjmp_ptr, longjmpVal });
     }
-    Builder.CreateRetVoid();
+    Builder.CreateUnreachable();
 
     raw_ostream &out = errs();
     out << *resolve_remed_behavior;
     if (verifyFunction(*resolve_remed_behavior, &out)) {}
     return resolve_remed_behavior;
 } 
-
 
 Function *getOrCreateWeakResolveMalloc(Module *M) {
     
@@ -157,36 +156,36 @@ Function *getOrCreateWeakResolveMalloc(Module *M) {
         if (!F->isDeclaration()) {
             return F;
         }
-    
-    } else {
-        FunctionType *weak_resolve_malloc_ty = FunctionType::get(
-            ptr_ty,
-            { size_ty },
-            false
-        );
-
-        Function *weak_resolve_malloc_fn = Function::Create(
-            weak_resolve_malloc_fn,
-            GlobalValue::WeakLinkage,
-            "resolve_malloc",
-            M
-        );
-
-        BasicBlock *EntryBB = BasicBlock::Create(Ctx, "", weak_resolve_malloc_fn);
-        builder.SetInsertPoint(EntryBB);
-
-        FunctionType *normal_malloc_ty = FunctionType::get(
-            ptr_ty,
-            { size_ty },
-            false
-        );
-
-        FunctionCallee regMallocFn = M->getOrInsertFunction("malloc", normal_malloc_ty);
-        Value *size_arg = weak_resolve_malloc_fn->getArg(0);
-        builder.CreateCall(regMallocFn, { size_arg });
-        
-        return weak_resolve_malloc_fn;
     }
+    
+    FunctionType *weak_resolve_malloc_fn_ty = FunctionType::get(
+        ptr_ty,
+        { size_ty },
+        false
+    );
+
+    Function *weak_resolve_malloc_fn = Function::Create(
+        weak_resolve_malloc_fn_ty,
+        GlobalValue::WeakAnyLinkage,
+        "resolve_malloc",
+        M
+    );
+
+    BasicBlock *EntryBB = BasicBlock::Create(Ctx, "", weak_resolve_malloc_fn);
+    builder.SetInsertPoint(EntryBB);
+
+    FunctionType *normal_malloc_ty = FunctionType::get(
+        ptr_ty,
+        { size_ty },
+        false
+    );
+
+    FunctionCallee regMallocFn = M->getOrInsertFunction("malloc", normal_malloc_ty);
+    Value *size_arg = weak_resolve_malloc_fn->getArg(0);
+    Value *mallocCall = builder.CreateCall(regMallocFn, { size_arg });
+    builder.CreateRet(mallocCall);
+
+    return weak_resolve_malloc_fn;
 }
 
 Function *getOrCreateWeakResolveStackObj(Module *M) {
@@ -202,25 +201,24 @@ Function *getOrCreateWeakResolveStackObj(Module *M) {
         if (!F->isDeclaration()) {
             return F;
         }
-    
-    } else {
-        FunctionType *weak_resolve_stack_obj_ty = FunctionType::get(
-            void_ty
-            { ptr_ty, size_ty },
-            false
-        );
-
-        Function *weak_resolve_stack_obj_fn = Function::Create(
-            weak_resolve_stack_obj_fn,
-            GlobalValue::WeakLinkage,
-            "resolve_stack_obj",
-            M
-        );
-
-        BasicBlock *EntryBB = BasicBlock::Create(Ctx, "", weak_resolve_stack_obj_fn);
-        builder.SetInsertPoint(EntryBB);
-        builder.CreateRetVoid();
-        
-        return weak_resolve_stack_obj_fn;
     }
+    
+    FunctionType *weak_resolve_stack_obj_fn_ty = FunctionType::get(
+        void_ty,
+        { ptr_ty, size_ty },
+        false
+    );
+
+    Function *weak_resolve_stack_obj_fn = Function::Create(
+        weak_resolve_stack_obj_fn_ty,
+        GlobalValue::WeakAnyLinkage,
+        "resolve_stack_obj",
+        M
+    );
+
+    BasicBlock *EntryBB = BasicBlock::Create(Ctx, "", weak_resolve_stack_obj_fn);
+    builder.SetInsertPoint(EntryBB);
+    builder.CreateRetVoid();
+
+    return weak_resolve_stack_obj_fn;
 }
