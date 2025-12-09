@@ -13,6 +13,7 @@
 #include <unordered_map>
 #include <utility>
 #include <vector>
+#include <cxxabi.h>
 
 #include "argparse.hpp"
 #include "config.hpp"
@@ -245,14 +246,35 @@ int main(int argc, char* argv[]) {
   std::vector<NNodeId> candidate_ids;
 
   auto find_node = [&](const auto& node) -> std::optional<NNodeId> {
+
     for (const auto& [mid, m]: pf.modules) {
-      if (node.file && m.nodes.at(mid).source_file != node.file) { 
+      if (node.file && !m.nodes.at(mid).source_file.value_or("").contains(*node.file)) { 
         continue;
       }
 
       for (const auto& [nid, n]: m.nodes) {
-        if (n.type == NodeType::Function && n.name == node.function_name) {
-          return std::optional{std::make_pair(mid, nid)};
+        if (n.type == NodeType::Function && n.name.has_value()) {
+          auto name = n.name.value();
+          // Try an exact match on the function name
+          if (name == node.function_name) {
+            return std::optional{std::make_pair(mid, nid)};
+          }
+
+          // If that doesn't work attempt to demangle the name
+          // Sadly __cxa_demangle either requires a malloced pointer as input, 
+          // or returns a (fresh) malloced pointer as a result.
+          // Calling free() in 2025 is sad. I tried to be fancy with a shared_ptr with a custom deallocator
+          // but was getting malloc corruption errors.
+          auto ret = abi::__cxa_demangle(name.c_str(), NULL, NULL, NULL);
+
+          if (ret) {
+            std::string demangled { ret };
+            free(ret);
+
+            if (demangled.contains(node.function_name)) {
+              return std::optional{std::make_pair(mid, nid)};
+            }
+          }
         }
       }
     }
