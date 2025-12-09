@@ -272,14 +272,14 @@ void instrumentAlloca(Function *F) {
       Value *sizeVal = nullptr;
       Type *allocatedType = allocaInst->getAllocatedType();
       uint64_t typeSize = DL.getTypeAllocSize(allocatedType); 
-      sizeVal = ConstantInt::get(int64_ty, typeSize);
+      sizeVal = ConstantInt::get(size_ty, typeSize);
       builder.CreateCall(getOrCreateWeakResolveStackObj(M), { allocatedPtr, sizeVal });
   }
 }
 
 void instrumentMalloc(Function *F) {
-  Module *M = F->getModule();
-  LLVMContext &Ctx = M.getContext();
+  Module *M = F->getParent();
+  LLVMContext &Ctx = M->getContext();
   IRBuilder<> builder(Ctx);
   auto size_ty = Type::getInt64Ty(Ctx);
   std::vector<CallInst *> mallocList;
@@ -300,7 +300,7 @@ void instrumentMalloc(Function *F) {
   }
 
   for (auto Inst : mallocList) {
-    StringRef parentFnName = Inst->getFunction()->getName();
+    StringRef fnName = Inst->getFunction()->getName();
 
     if (instrumentedFns.find(fnName.str) != instrumentedFns.end()) {
       continue;
