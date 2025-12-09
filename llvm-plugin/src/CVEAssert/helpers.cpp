@@ -30,13 +30,13 @@ Function *getOrCreateIsHeap(Module *M, LLVMContext &Ctx) {
 
     // TODO: write this in asm as some kind of sanitzer_rt?
     FunctionType *FuncType = FunctionType::get(Type::getIntNTy(Ctx, 1), {ptr_ty}, false);
-    Function *SanitizeFunc = Function::Create(FuncType, Function::InternalLinkage, handlerName, M);
+    Function *sanitizeFn = Function::Create(FuncType, Function::InternalLinkage, handlerName, M);
 
-    BasicBlock *Entry = BasicBlock::Create(Ctx, "entry", SanitizeFunc);
+    BasicBlock *Entry = BasicBlock::Create(Ctx, "entry", sanitizeFn);
     Builder.SetInsertPoint(Entry);
 
     // Get function argument
-    Argument *InputPtr = SanitizeFunc->getArg(0);
+    Argument *InputPtr = sanitizeFn->getArg(0);
 
     FunctionType *AsmType = FunctionType::get(ptr_ty, {});
     auto read_sp_asm = InlineAsm::get(AsmType, "mov %rsp, $0", "=r,~{dirflag},~{fpsr},~{flags}", true);
@@ -58,10 +58,10 @@ Function *getOrCreateIsHeap(Module *M, LLVMContext &Ctx) {
     Builder.CreateRet(result);
     
     raw_ostream &out = errs();
-    out << *SanitizeFunc;
-    if (verifyFunction(*SanitizeFunc, &out)) {}
+    out << *sanitizeFn;
+    if (verifyFunction(*sanitizeFn, &out)) {}
 
-    return SanitizeFunc;
+    return sanitizeFn;
 }
 
 Function *getOrCreateResolveReportSanitizerTriggered(Module *M) {
@@ -69,20 +69,20 @@ Function *getOrCreateResolveReportSanitizerTriggered(Module *M) {
     auto ptr_ty = PointerType::get(Ctx, 0);
     auto void_ty = Type::getVoidTy(Ctx);
 
-    FunctionType *resolve_report_func_ty = FunctionType::get(void_ty, {}, false);
+    FunctionType *resolve_report_fn_ty = FunctionType::get(void_ty, {}, false);
     
     if (Function *F = M->getFunction("resolve_report_sanitizer_triggered"))
         if (!F->isDeclaration()) 
             return F;
 
-    Function *resolve_report_func = Function::Create(
-        resolve_report_func_ty,
+    Function *resolve_report_fn = Function::Create(
+        resolve_report_fn_ty,
         GlobalValue::WeakAnyLinkage, 
         "resolve_report_sanitizer_triggered",
         M
     );
 
-    return resolve_report_func;
+    return resolve_report_fn;
 } 
 
 // Create a function getOrCreateRemediateBehavior function to handle do nothing or exit
@@ -185,6 +185,9 @@ Function *getOrCreateWeakResolveMalloc(Module *M) {
     Value *mallocCall = builder.CreateCall(regMallocFn, { size_arg });
     builder.CreateRet(mallocCall);
 
+    raw_ostream &out = errs();
+    out << *weak_resolve_malloc_fn;
+    if (verifyFunction(*weak_resolve_malloc_fn, &out)) {}
     return weak_resolve_malloc_fn;
 }
 
@@ -220,5 +223,8 @@ Function *getOrCreateWeakResolveStackObj(Module *M) {
     builder.SetInsertPoint(EntryBB);
     builder.CreateRetVoid();
 
+    raw_ostream &out = errs();
+    out << *weak_resolve_stack_obj_fn;
+    if (verifyFunction(*weak_resolve_stack_obj_fn, &out)) {}
     return weak_resolve_stack_obj_fn;
 }
