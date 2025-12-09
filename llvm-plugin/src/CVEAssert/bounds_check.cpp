@@ -252,21 +252,21 @@ void instrumentAlloca(Module &M) {
   // Initialize list to store pointers to alloca and instructions
   std::vector<AllocaInst *> allocaList;
   
-  auto void_ty = Type::getVoidTy(Ctx);
-  auto ptr_ty = PointerType::get(Ctx, 0);
-  auto int64_ty = Type::getInt64Ty(Ctx);
+  // auto void_ty = Type::getVoidTy(Ctx);
+  // auto ptr_ty = PointerType::get(Ctx, 0);
+  // auto int64_ty = Type::getInt64Ty(Ctx);
 
-  FunctionType *resolveStackObjFnTy = FunctionType::get(
-      void_ty,
-      { ptr_ty, int64_ty },
-      false
-  );
+  // FunctionType *resolveStackObjFnTy = FunctionType::get(
+  //     void_ty,
+  //     { ptr_ty, int64_ty },
+  //     false
+  // );
   
-  /* Initialize function callee object for libresolve resolve_stack_obj runtime fn */
-  FunctionCallee resolveStackObjFn = M.getOrInsertFunction(
-      "resolve_stack_obj",
-      resolveStackObjFnTy   
-  );
+  // /* Initialize function callee object for libresolve resolve_stack_obj runtime fn */
+  // FunctionCallee resolveStackObjFn = M.getOrInsertFunction(
+  //     "resolve_stack_obj",
+  //     resolveStackObjFnTy   
+  // );
 
   for (auto &F : M) {
     for (auto &BB: F) {
@@ -287,7 +287,7 @@ void instrumentAlloca(Module &M) {
       Type *allocatedType = allocaInst->getAllocatedType();
       uint64_t typeSize = DL.getTypeAllocSize(allocatedType); 
       sizeVal = ConstantInt::get(int64_ty, typeSize);
-      builder.CreateCall(resolveStackObjFn, { allocatedPtr, sizeVal });
+      builder.CreateCall(getOrCreateWeakResolveStackObj(&M), { allocatedPtr, sizeVal });
       
   }
 }
@@ -297,17 +297,17 @@ void instrumentMalloc(Module &M) {
   IRBuilder<> builder(Ctx);
   std::vector<CallInst *> mallocList;
 
-  auto ptr_ty = PointerType::get(Ctx, 0);
-  auto size_ty = Type::getInt64Ty(Ctx);
-  FunctionType *resolveMallocFnTy = FunctionType::get(ptr_ty,
-    { size_ty }, 
-    false
-  );
+  // auto ptr_ty = PointerType::get(Ctx, 0);
+  // auto size_ty = Type::getInt64Ty(Ctx);
+  // FunctionType *resolveMallocFnTy = FunctionType::get(ptr_ty,
+  //   { size_ty }, 
+  //   false
+  // );
 
-  FunctionCallee resolveMallocFn = M.getOrInsertFunction(
-    "resolve_malloc",
-    resolveMallocFnTy
-  );
+  // FunctionCallee resolveMallocFn = M.getOrInsertFunction(
+  //   "resolve_malloc",
+  //   resolveMallocFnTy
+  // );
 
   for (auto &F : M) {
     for (auto &BB : F) {
@@ -329,7 +329,7 @@ void instrumentMalloc(Module &M) {
     builder.SetInsertPoint(Inst);
     Value *arg = Inst->getArgOperand(0);
     Value *normalizeArg = builder.CreateZExtOrBitCast(arg, size_ty);
-    CallInst *resolveMallocCall = builder.CreateCall(resolveMallocFn, { normalizeArg });
+    CallInst *resolveMallocCall = builder.CreateCall(getOrCreateWeakResolveMalloc(&M), { normalizeArg });
     Inst->replaceAllUsesWith(resolveMallocCall);
     Inst->eraseFromParent();  
   }
