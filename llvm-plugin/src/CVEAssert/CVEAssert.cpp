@@ -234,30 +234,26 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
         case VulnID::INCORRECT_BUF_SIZE:
           instrument_mem_inst.instrumentAlloca = true;
           instrument_mem_inst.instrumentMalloc = true; 
+          break;
         
       }
     }
 
-    if (instrument_mem_inst.instrumentMalloc &&
-        instrument_mem_inst.instrumentAlloca) {
-      for (auto &F : M) {
-        instrumentAlloca(M);
-        instrumentMalloc(M);
+    for (auto &F : M) {
+      if (instrument_mem_inst.instrumentAlloca) {
+        instrumentAlloca(&F);
       }
-      result = PreservedAnalyses::none();
-    
-    } else if (instrument_mem_inst.instrumentAlloca) {
-      for(auto &F : M) {
-        instrumentAlloca(M);
+
+      if (instrument_mem_inst.instrumentMalloc) {
+        instrumentMalloc(&F);
       }
-      result = PreservedAnalyses::none();
-    
-    } else if (instrument_mem_inst.instrumentMalloc) {
-      for (auto &F : M) {
-        instrumentMalloc(M);
-      }
-      result = PreservedAnalyses::none();
     }
+
+    if (instrument_mem_inst.instrumentAlloca ||
+        instrument_mem_inst.instrumentMalloc) {
+          result = PreservedAnalyses::none();
+    }
+
 
     for (auto &F: M) {
       for (auto &vuln : vulnerabilities) {

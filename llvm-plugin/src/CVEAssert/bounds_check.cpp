@@ -20,8 +20,11 @@
 static const bool FIND_PTR_ROOT_DEBUG = true;
 
 #include <map>
+#include <unordered_set>
 
 using namespace llvm;
+
+static std::unordered_set<std::string> instrumentedFns = { "resolve_malloc" };
 
 static Function *getOrCreateBoundsCheckLoadSanitizer(Module *M, LLVMContext &Ctx, Type *ty, Vulnerability::RemediationStrategies strategy) {
   Twine handlerName = "resolve_bounds_check_ld_" + getLLVMType(ty);
@@ -224,10 +227,10 @@ static Function *getOrCreateBoundsCheckMemcpySanitizer(Module *M, Vulnerability:
   Value *withinBounds = builder.CreateAnd(check_src_bd, check_dst_bd);
   builder.CreateCondBr(withinBounds, NormalBB, SanitizeMemcpyBB);
 
-  // NormalBB: Call libc memcpy and return the pointer
+  // NormalBB: Call resolve_memcpy and return the ptr
   builder.SetInsertPoint(NormalBB);
   FunctionCallee memcpyfn = M->getOrInsertFunction(
-      "memcpy", FunctionType::get(ptr_ty, {ptr_ty, ptr_ty, size_ty}, false));
+      "resolve_memcpy", FunctionType::get(ptr_ty, {ptr_ty, ptr_ty, size_ty}, false));
   Value *memcpy_ptr =
       builder.CreateCall(memcpyfn, {dst_ptr, src_ptr, size_arg});
   builder.CreateRet(memcpy_ptr);
@@ -244,36 +247,20 @@ static Function *getOrCreateBoundsCheckMemcpySanitizer(Module *M, Vulnerability:
   return sanitizeMemcpyFn;
 }
 
-void instrumentAlloca(Module &M) {
-  LLVMContext &Ctx = M.getContext();
+void instrumentAlloca(Function *F) {
+  Module *M = F->getParent();
+  LLVMContext &Ctx = M->getContext();
   IRBuilder<> builder(Ctx);
-  const DataLayout &DL = M.getDataLayout();
+  const DataLayout &DL = M->getDataLayout();
 
+   auto size_ty = Type::getInt64Ty(Ctx);
   // Initialize list to store pointers to alloca and instructions
   std::vector<AllocaInst *> allocaList;
-  
-  auto void_ty = Type::getVoidTy(Ctx);
-  auto ptr_ty = PointerType::get(Ctx, 0);
-  auto int64_ty = Type::getInt64Ty(Ctx);
 
-  FunctionType *resolveStackObjFnTy = FunctionType::get(
-      void_ty,
-      { ptr_ty, int64_ty },
-      false
-  );
-  
-  /* Initialize function callee object for libresolve resolve_stack_obj runtime fn */
-  FunctionCallee resolveStackObjFn = M.getOrInsertFunction(
-      "resolve_stack_obj",
-      resolveStackObjFnTy   
-  );
-
-  for (auto &F : M) {
-    for (auto &BB: F) {
-      for (auto &instr: BB) {
-          if (auto *inst = dyn_cast<AllocaInst>(&instr)) {
-              allocaList.push_back(inst);
-          }
+  for (auto &BB: *F) {
+    for (auto &instr: BB) {
+      if (auto *inst = dyn_cast<AllocaInst>(&instr)) {
+          allocaList.push_back(inst);
       }
     }
   }
@@ -282,54 +269,47 @@ void instrumentAlloca(Module &M) {
       // Insert after the alloca instruction
       builder.SetInsertPoint(allocaInst->getNextNode());
       Value* allocatedPtr = allocaInst;
-
       Value *sizeVal = nullptr;
       Type *allocatedType = allocaInst->getAllocatedType();
       uint64_t typeSize = DL.getTypeAllocSize(allocatedType); 
-      sizeVal = ConstantInt::get(int64_ty, typeSize);
-      builder.CreateCall(resolveStackObjFn, { allocatedPtr, sizeVal });
-      
+      sizeVal = ConstantInt::get(size_ty, typeSize);
+      builder.CreateCall(getOrCreateWeakResolveStackObj(M), { allocatedPtr, sizeVal });
   }
 }
 
-void instrumentMalloc(Module &M) {
-  LLVMContext &Ctx = M.getContext();
+void instrumentMalloc(Function *F) {
+  Module *M = F->getParent();
+  LLVMContext &Ctx = M->getContext();
   IRBuilder<> builder(Ctx);
+  auto size_ty = Type::getInt64Ty(Ctx);
   std::vector<CallInst *> mallocList;
 
-  auto ptr_ty = PointerType::get(Ctx, 0);
-  auto size_ty = Type::getInt64Ty(Ctx);
-  FunctionType *resolveMallocFnTy = FunctionType::get(ptr_ty,
-    { size_ty }, 
-    false
-  );
 
-  FunctionCallee resolveMallocFn = M.getOrInsertFunction(
-    "resolve_malloc",
-    resolveMallocFnTy
-  );
+  for (auto &BB : *F) {
+    for (auto &inst: BB) {
+      if (auto *call = dyn_cast<CallInst>(&inst)) {
+        Function *calledFn = call->getCalledFunction();
 
-  for (auto &F : M) {
-    for (auto &BB : F) {
-      for (auto &inst: BB) {
-        if (auto *call = dyn_cast<CallInst>(&inst)) {
-          Function *calledFn = call->getCalledFunction();
+        if (!calledFn) { continue; }
 
-          if (!calledFn) { continue; }
-
-          StringRef fnName = calledFn->getName();
+        StringRef fnName = calledFn->getName();
         
-          if (fnName == "malloc") { mallocList.push_back(call); }
-        }
+        if (fnName == "malloc") { mallocList.push_back(call); }
       }
     }
   }
 
   for (auto Inst : mallocList) {
+    StringRef fnName = Inst->getFunction()->getName();
+
+    if (instrumentedFns.find(fnName.str()) != instrumentedFns.end()) {
+      continue;
+    }
+
     builder.SetInsertPoint(Inst);
     Value *arg = Inst->getArgOperand(0);
     Value *normalizeArg = builder.CreateZExtOrBitCast(arg, size_ty);
-    CallInst *resolveMallocCall = builder.CreateCall(resolveMallocFn, { normalizeArg });
+    CallInst *resolveMallocCall = builder.CreateCall(getOrCreateWeakResolveMalloc(M), { normalizeArg });
     Inst->replaceAllUsesWith(resolveMallocCall);
     Inst->eraseFromParent();  
   }

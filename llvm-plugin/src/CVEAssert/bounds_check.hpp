@@ -10,6 +10,6 @@
 #include "Vulnerability.hpp"
 void sanitizeLoadStore(llvm::Function *F, Vulnerability::RemediationStrategies strategy);
 void sanitizeMemcpy(llvm::Function *F, Vulnerability::RemediationStrategies strategy);
-void instrumentMalloc(llvm::Module &M);
-void instrumentAlloca(llvm::Module &M);
+void instrumentMalloc(llvm::Function *F);
+void instrumentAlloca(llvm::Function *F);
 void sanitizeMemInstBounds(llvm::Function *F, llvm::ModuleAnalysisManager &MAM, Vulnerability::RemediationStrategies strategy);
