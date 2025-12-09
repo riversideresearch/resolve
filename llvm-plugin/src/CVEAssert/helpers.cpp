@@ -136,7 +136,7 @@ Function *getOrCreateRemediationBehavior(Module *M, Vulnerability::RemediationSt
         Value *longjmpVal = ConstantInt::get(i32_ty, 42);
         Builder.CreateCall(longjmpFn, { resolve_longjmp_ptr, longjmpVal });
     }
-    Builder.CreateUnreachable();
+    Builder.CreateRetVoid();
 
     raw_ostream &out = errs();
     out << *resolve_remed_behavior;
