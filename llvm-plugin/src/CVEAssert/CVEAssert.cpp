@@ -249,6 +249,11 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
       }
     }
 
+    if (instrument_mem_inst.instrumentAlloca ||
+        instrument_mem_inst.instrumentMalloc) {
+          result = PreservedAnalyses::none();
+    }
+
 
     for (auto &F: M) {
       for (auto &vuln : vulnerabilities) {
