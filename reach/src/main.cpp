@@ -13,6 +13,7 @@
 #include <unordered_map>
 #include <utility>
 #include <vector>
+#include <cxxabi.h>
 
 #include "argparse.hpp"
 #include "config.hpp"
@@ -72,6 +73,21 @@ conf::config load_config(const argparse::ArgumentParser& program) {
     }
     conf.validate_facts =
       program.get<bool>("validate-facts") || conf.validate_facts;
+
+    if (program.present<string>("path")) {
+      auto path = program.get<string>("path");
+      auto path_split = util::split(path, ',');
+
+      for (const auto& p: path_split) {
+        const auto& node = util::split(p, ':');
+        if (node.size() == 1) {
+          conf.candidate_path.emplace_back(std::nullopt, node[0]);
+        } else {
+          conf.candidate_path.emplace_back(node[0], node[1]);
+        }
+      }
+    }
+
     conf.verbose = program.get<bool>("verbose") || conf.verbose;
     return conf;
   }
@@ -136,6 +152,8 @@ int main(int argc, char* argv[]) {
     .help("JSON output path");
   program.add_argument("-g", "--graph")
     .help("graph type (\"simple\", \"cfg\", or \"call\"). Default \"cfg\"");
+  program.add_argument("-p", "--path")
+    .help("candidate path of comma-separated function_name or file:function_name");
   program.add_argument("-n", "--num-paths")
     .help("number of paths to generate (n shortest)")
     .scan<'i', size_t>();
@@ -155,7 +173,7 @@ int main(int argc, char* argv[]) {
     exit(1);
   }
 
-  const conf::config conf = load_config(program);
+  conf::config conf = load_config(program);
   if (conf.verbose) {
     cout << "Loaded config:" << endl;
     print_config(conf);
@@ -200,6 +218,8 @@ int main(int argc, char* argv[]) {
          << " # edges = " << edges << endl;
   }
 
+
+
   t0 = system_clock::now();
   const auto g = graph_builders.at(conf.graph_type)(pf, conf.dynlink, loaded_syms);
   duration<double> graph_build_time = system_clock::now() - t0;
@@ -222,6 +242,65 @@ int main(int argc, char* argv[]) {
   output::results res;
   res.facts_load_time = facts_load_time.count();
   res.graph_build_time = graph_build_time.count();
+
+  std::vector<NNodeId> candidate_ids;
+
+  auto find_node = [&](const auto& node) -> std::optional<NNodeId> {
+
+    for (const auto& [mid, m]: pf.modules) {
+      if (node.file && !m.nodes.at(mid).source_file.value_or("").contains(*node.file)) { 
+        continue;
+      }
+
+      for (const auto& [nid, n]: m.nodes) {
+        if (n.type == NodeType::Function && n.name.has_value()) {
+          auto name = n.name.value();
+          // Try an exact match on the function name
+          if (name == node.function_name) {
+            return std::optional{std::make_pair(mid, nid)};
+          }
+
+          // If that doesn't work attempt to demangle the name
+          // Sadly __cxa_demangle either requires a malloced pointer as input, 
+          // or returns a (fresh) malloced pointer as a result.
+          // Calling free() in 2025 is sad. I tried to be fancy with a shared_ptr with a custom deallocator
+          // but was getting malloc corruption errors.
+          auto ret = abi::__cxa_demangle(name.c_str(), NULL, NULL, NULL);
+
+          if (ret) {
+            std::string demangled { ret };
+            free(ret);
+
+            if (demangled.contains(node.function_name)) {
+              return std::optional{std::make_pair(mid, nid)};
+            }
+          }
+        }
+      }
+    }
+    return std::nullopt;
+  };
+
+  for (const auto& p: conf.candidate_path) {
+    auto id = find_node(p);
+    if (!id.has_value()) {
+      cerr << "No matching node found for candidate path node (file: " << p.file.value_or("<none>") << ", function: " << p.function_name << ")\n";
+    } else {
+      candidate_ids.push_back(id.value());
+    }
+
+  }
+
+  if (conf.candidate_path.size() > 1 && candidate_ids.size() < 2) {
+    cerr << "Candidate path specified but not enough nodes found; path: \n";
+    for (const auto& p: conf.candidate_path) {
+      cerr << "\t file:" << p.file.value_or("<none>") << ", name: " << p.function_name << "\n";
+    }
+  } else if (candidate_ids.size() >= 2) {
+    for (auto i = 0; i < candidate_ids.size() -1; i += 1) {
+      conf.queries.emplace_back(candidate_ids[i], candidate_ids[i+1]);
+    }
+  }
 
   for (const auto &q : conf.queries) {
     t0 = system_clock::now();
