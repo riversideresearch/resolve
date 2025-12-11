@@ -43,6 +43,7 @@ namespace {
 
 struct InstrumentMemInst {
   bool instrumentMalloc = false;
+  bool instrumentFree = false;
   bool instrumentAlloca = false;
 };
 
@@ -254,6 +255,11 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
           instrument_mem_inst.instrumentAlloca = true;
           instrument_mem_inst.instrumentMalloc = true; 
           break;
+
+        case VulnID::USE_AFTER_FREE:
+          instrument_mem_inst.instrumentMalloc = true;
+          instrument_mem_inst.instrumentFree = true;
+          break;
         
       }
     }
@@ -266,10 +272,15 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
       if (instrument_mem_inst.instrumentMalloc) {
         instrumentMalloc(&F);
       }
+
+      if (instrument_mem_inst.instrumentFree) {
+        instrumentFree(&F);
+      }
     }
 
     if (instrument_mem_inst.instrumentAlloca ||
-        instrument_mem_inst.instrumentMalloc) {
+        instrument_mem_inst.instrumentMalloc ||
+        instrument_mem_inst.instrumentFree) {
           result = PreservedAnalyses::none();
     }
 
