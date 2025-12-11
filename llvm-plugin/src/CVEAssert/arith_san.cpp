@@ -134,21 +134,22 @@ void sanitizeBinShift(Function *F) {
   }
 }
 
-void sanitizeDivideByZero(Function *F,  Vulnerability::RemediationStrategies strategy) {
+void sanitizeDivideByZero(Function *F, Vulnerability::RemediationStrategies strategy) {
   std::vector<Instruction *> worklist;
   Module *M = F->getParent();
   auto &Ctx = M->getContext();
   IRBuilder<> Builder(Ctx);
 
   switch (strategy) {
+    case Vulnerability::RemediationStrategies::SAFE:
     case Vulnerability::RemediationStrategies::EXIT:
     case Vulnerability::RemediationStrategies::RECOVER:
       break;
-    
+
     default:
       llvm::errs() << "[CVEAssert] Error: sanitizeDivideByZero does not support "
-                   << " remediation strategy defaulting to EXIT strategy!\n";
-      strategy = Vulnerability::RemediationStrategies::EXIT;
+                   << " remediation strategy defaulting to SAFE strategy!\n";
+      strategy = Vulnerability::RemediationStrategies::SAFE;
       break; 
   }
 
@@ -305,7 +306,8 @@ void sanitizeDivideByZero(Function *F,  Vulnerability::RemediationStrategies str
   }
 }
 
-Function *replaceUndesirableFunction(Function *F, CallInst *call) {
+Function *replaceUndesirableFunction(Function *F, Vulnerability::RemediationStrategies strategy,
+  CallInst *call) {
   Module *M = F->getParent();
   LLVMContext &Ctx = M->getContext();
   IRBuilder<> Builder(Ctx);
@@ -353,6 +355,7 @@ Function *replaceUndesirableFunction(Function *F, CallInst *call) {
   // Returns dividend
   Builder.SetInsertPoint(SanitizedBB);
   Builder.CreateCall(resolve_report_func);
+  Builder.CreateCall(getOrCreateRemediationBehavior(M, strategy));
   Builder.CreateRet(dividend);
 
   // ContExec: Makes call to original call instruction and returns that instead.
@@ -369,7 +372,7 @@ Function *replaceUndesirableFunction(Function *F, CallInst *call) {
   return sanitizedHandlerFunc;
 }
 
-void sanitizeDivideByZeroInFunction(Function *F,
+void sanitizeDivideByZeroInFunction(Function *F, Vulnerability::RemediationStrategies strategy,
                                     std::optional<std::string> funct_name) {
   Module *M = F->getParent();
   LLVMContext &Ctx = M->getContext();
@@ -402,7 +405,7 @@ void sanitizeDivideByZeroInFunction(Function *F,
 
   // Construct the resolve_sanitize_func function
   Function *resolve_sanitized_func =
-      replaceUndesirableFunction(F, callsToReplace.front());
+      replaceUndesirableFunction(F, strategy, callsToReplace.front());
 
   // Handle calls at each point in module
   for (auto call : callsToReplace) {
