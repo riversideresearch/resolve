@@ -589,7 +589,7 @@ void sanitizeIntOverflow(Function *F, Vulnerability::RemediationStrategies strat
     Builder.SetInsertPoint(&*contExeBB->begin());
     if (strategy == Vulnerability::RemediationStrategies::SAT) {
       binary_inst->replaceAllUsesWith(satResult);
-    } else if (strategy == Vulnerability::RemediationStrategies::SAFE) {
+    } else {
       binary_inst->replaceAllUsesWith(safeResult);
     }
 
