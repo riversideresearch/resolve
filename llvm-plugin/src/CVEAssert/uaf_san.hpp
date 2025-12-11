@@ -8,4 +8,5 @@
 
 #include "llvm/IR/Function.h"
 #include "Vulnerability.hpp"
+void instrumentFree(llvm::Function *F);
 void sanitizeUseAfterFree(llvm::Function *F, Vulnerability::RemediationStrategies strategy);

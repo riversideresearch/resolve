@@ -20,34 +20,18 @@ using namespace llvm;
 
 static std::unordered_set<std::string> instrumentedFns = { "resolve_free" };
 
-static Function *getOrCreateUseAfterFreeSanitizer() {
-
-}
-
-void sanitizeUseAfterFree(Function *F, Vulnerability::RemediationStrategies strategy) {
+void instrumentFree(Function *F) {
     Module *M = F->getParent();
-    LLVMContext &Ctx = F->getContext();
+    LLVMContext &Ctx = M->getContext();
     IRBuilder<> builder(Ctx);
 
     auto ptr_ty = PointerType::get(Ctx, 0);
+    auto void_ty = Type::getVoidTy(Ctx);
 
     std::vector<CallInst *> freeList;
 
-    switch(strategy) {
-        case Vulnerability::RemediationStrategies::EXIT:
-        case Vulnerability::RemediationStrategies::RECOVER:
-        case Vulnerability::RemediationStrategies::SAFE:
-            break;
-
-        default:
-            llvm::errs() << "[CVEAssert] Error: sanitizeUseAfterFree does not support remediation strategy "
-                         << "defaulting to EXIT strategy!\n";
-            strategy = Vulnerability::RemediationStrategies::EXIT;
-            break;
-    }
-
     for (auto &BB : *F) {
-        for (auto &I : BB) {
+        for (auto &inst : BB) {
             if (auto *call = dyn_cast<CallInst>(&inst)) {
                 Function *calledFn = call->getCalledFunction();
 
@@ -60,11 +44,24 @@ void sanitizeUseAfterFree(Function *F, Vulnerability::RemediationStrategies stra
         }
     }
 
-    for (auto Inst : freeList) {
+    for (auto Inst: freeList) {
+        StringRef fnName = Inst->getFunction()->getName();
+
+        if (instrumentedFns.find(fnName.str()) != instrumentedFns.end()) {
+            continue;
+        }
+
         builder.SetInsertPoint(Inst);
         Value *ptr_arg = Inst->getArgOperand(0);
         CallInst *resolveFreeCall = builder.CreateCall(getOrCreateWeakResolveFree(M), { ptr_arg });
         Inst->replaceAllUsesWith(resolveFreeCall);
         Inst->eraseFromParent();
     }
+}
+
+static Function *getOrCreateUseAfterFreeSanitizer() {
+
+}
+
+void sanitizeUseAfterFree(Function *F, Vulnerability::RemediationStrategies strategy) {
 }
