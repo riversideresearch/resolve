@@ -134,21 +134,22 @@ void sanitizeBinShift(Function *F) {
   }
 }
 
-void sanitizeDivideByZero(Function *F,  Vulnerability::RemediationStrategies strategy) {
+void sanitizeDivideByZero(Function *F, Vulnerability::RemediationStrategies strategy) {
   std::vector<Instruction *> worklist;
   Module *M = F->getParent();
   auto &Ctx = M->getContext();
   IRBuilder<> Builder(Ctx);
 
   switch (strategy) {
+    case Vulnerability::RemediationStrategies::SAFE:
     case Vulnerability::RemediationStrategies::EXIT:
     case Vulnerability::RemediationStrategies::RECOVER:
       break;
-    
+
     default:
       llvm::errs() << "[CVEAssert] Error: sanitizeDivideByZero does not support "
-                   << " remediation strategy defaulting to EXIT strategy!\n";
-      strategy = Vulnerability::RemediationStrategies::EXIT;
+                   << " remediation strategy defaulting to SAFE strategy!\n";
+      strategy = Vulnerability::RemediationStrategies::SAFE;
       break; 
   }
 
