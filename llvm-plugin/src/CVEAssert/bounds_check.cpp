@@ -342,6 +342,9 @@ void instrumentGEP(Function *F) {
     // Get the pointer operand and offset from GEP
     Value *basePtr = GEPInst->getPointerOperand();
     Value * derivedPtr = GEPInst;
+    
+    // Don't assume gep is inbounds, otherwise our remdiation risks being optimized away
+    GEPInst->setIsInBounds(false);
 
     auto resolveGEPCall = builder.CreateCall(resolveGEPFn, { basePtr, derivedPtr });
 
