@@ -82,6 +82,13 @@ Function *getOrCreateResolveReportSanitizerTriggered(Module *M) {
         M
     );
 
+    BasicBlock *EntryBB = BasicBlock::Create(Ctx, "", resolve_report_fn);
+    IRBuilder<> builder(EntryBB);
+    builder.CreateRetVoid();
+
+    raw_ostream &out = errs();
+    out << *resolve_report_fn;
+    if (verifyFunction(*resolve_report_fn, &out)) {}
     return resolve_report_fn;
 } 
 
