@@ -9,7 +9,7 @@
             "cwe-name": "Stack OOB access",
             "affected-function": "main",
             "affected-file": "stack_oob.c",
-            "remediation-strategy": "exit" 
+            "remediation-strategy": "exit"
         }
     ]
 }
