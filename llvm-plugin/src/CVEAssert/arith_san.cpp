@@ -512,27 +512,8 @@ void sanitizeIntOverflow(Function *F, Vulnerability::RemediationStrategies strat
       return {result, isOverflow};
     };
 
-    auto [safeResult, isOverflow] = insertSafeOp(binary_inst, op1, op2);
-    if (!safeResult || !isOverflow) {
-      continue;
-    }
-
-    BasicBlock *originalBB = binary_inst->getParent();
-    BasicBlock *contExeBB = originalBB->splitBasicBlock(binary_inst);
-    BasicBlock *remedOverflowBB = BasicBlock::Create(Ctx, "", F, contExeBB);
-
-    // originalBB: Branch if overflow flag is set
-    originalBB->getTerminator()->eraseFromParent();
-    Builder.SetInsertPoint(originalBB);
-    Builder.CreateCondBr(isOverflow, remedOverflowBB, contExeBB);
-
-    // remedOverflowBB: Construct saturated instructions
-    Builder.SetInsertPoint(remedOverflowBB);
-    Builder.CreateCall(getOrCreateResolveReportSanitizerTriggered(M));
-    Builder.CreateCall(getOrCreateRemediationBehavior(M, strategy));
-
     auto insertSatOp = [&Builder, M](Instruction *binary_inst, Value *op1,
-                                      Value *op2) -> Value * {
+                                      Value *op2) -> Instruction * {
       Intrinsic::ID intrinsic_id;
       Type *BinOpType = binary_inst->getType();
       bool isUnsigned = false;
@@ -576,23 +557,41 @@ void sanitizeIntOverflow(Function *F, Vulnerability::RemediationStrategies strat
       }
     };
 
-    Value *satResult = insertSatOp(binary_inst, op1, op2);
+    auto [safeResult, isOverflow] = insertSafeOp(binary_inst, op1, op2);
+    if (!safeResult || !isOverflow) {
+      // FIXME: when does this branch happen and do we need warnings about it
+      continue;
+    }
+
+    auto satResult = insertSatOp(binary_inst, op1, op2);
+    if (!satResult) {
+      // FIXME: when does this branch happen and do we need warnings about it
+      continue;
+    }
+
+    BasicBlock *originalBB = binary_inst->getParent();
+    BasicBlock *contExeBB = originalBB->splitBasicBlock(satResult);
+    BasicBlock *remedOverflowBB = BasicBlock::Create(Ctx, "", F, contExeBB);
+
+    // originalBB: Branch if overflow flag is set
+    originalBB->getTerminator()->eraseFromParent();
+    Builder.SetInsertPoint(originalBB);
+    Builder.CreateCondBr(isOverflow, remedOverflowBB, contExeBB);
+
+    // remedOverflowBB: Construct saturated instructions
+    Builder.SetInsertPoint(remedOverflowBB);
+    Builder.CreateCall(getOrCreateResolveReportSanitizerTriggered(M));
+    Builder.CreateCall(getOrCreateRemediationBehavior(M, strategy));
+
     Builder.CreateBr(contExeBB);
 
     // contExeBB: resume control flow execution
     Builder.SetInsertPoint(&*contExeBB->begin());
-    PHINode *phi = Builder.CreatePHI(binary_inst->getType(), 2);
-    phi->addIncoming(safeResult, originalBB);
-
     if (strategy == Vulnerability::RemediationStrategies::SAT) {
-      phi->addIncoming(satResult, remedOverflowBB);
-
+      binary_inst->replaceAllUsesWith(satResult);
     } else if (strategy == Vulnerability::RemediationStrategies::SAFE) {
-      phi->addIncoming(safeResult, remedOverflowBB);
+      binary_inst->replaceAllUsesWith(safeResult);
     }
-
-    // Replace the instructions with phi instruction
-    binary_inst->replaceAllUsesWith(phi);
 
     binary_inst->eraseFromParent();
   }
