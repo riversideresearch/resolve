@@ -237,6 +237,53 @@ Function *getOrCreateWeakResolveMalloc(Module *M) {
     return weak_resolve_malloc_fn;
 }
 
+Function *getOrCreateWeakResolveFree(Module *M) {
+    
+    auto &Ctx = M->getContext();
+    auto void_ty = Type::getVoidTy(Ctx);
+    auto ptr_ty = PointerType::get(Ctx, 0);
+
+    IRBuilder<> builder(Ctx);
+    
+    if (Function *F = M->getFunction("resolve_free")) {
+        if (!F->isDeclaration()) {
+            return F;
+        }
+    }
+    
+    FunctionType *weak_resolve_free_fn_ty = FunctionType::get(
+        void_ty,
+        { ptr_ty },
+        false
+    );
+
+    Function *weak_resolve_free_fn = Function::Create(
+        weak_resolve_free_fn_ty,
+        GlobalValue::WeakAnyLinkage,
+        "resolve_free",
+        M
+    );
+
+    BasicBlock *EntryBB = BasicBlock::Create(Ctx, "", weak_resolve_free_fn);
+    builder.SetInsertPoint(EntryBB);
+
+    FunctionType *normal_free_ty = FunctionType::get(
+        void_ty,
+        { ptr_ty },
+        false
+    );
+
+    FunctionCallee regFreeFn = M->getOrInsertFunction("free", normal_free_ty);
+    Value *ptr_arg = weak_resolve_free_fn->getArg(0);
+    Value *freeCall = builder.CreateCall(regFreeFn, { ptr_arg });
+    builder.CreateRet(freeCall);
+
+    raw_ostream &out = errs();
+    out << *weak_resolve_free_fn;
+    if (verifyFunction(*weak_resolve_free_fn, &out)) {}
+    return weak_resolve_free_fn;
+}
+
 Function *getOrCreateWeakResolveStackObj(Module *M) {
     
     auto &Ctx = M->getContext();
