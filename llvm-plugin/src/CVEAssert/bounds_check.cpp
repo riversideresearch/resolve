@@ -82,12 +82,9 @@ static Function *getOrCreateBoundsCheckLoadSanitizer(Module *M, LLVMContext &Ctx
 
   // SanitizeLoadBB: Apply remediation strategy
   builder.SetInsertPoint(SanitizeLoadBB);
-  switch (strategy) {
-    case Vulnerability::RemediationStrategies::EXIT:
-      builder.CreateCall(getOrCreateRemediationBehavior(M, strategy));
-      builder.CreateUnreachable();
-      break;
-  }
+  builder.CreateCall(getOrCreateResolveReportSanitizerTriggered(M));
+  builder.CreateCall(getOrCreateRemediationBehavior(M, strategy));
+  builder.CreateRet(Constant::getNullValue(ty));
 
   // DEBUGGING
   raw_ostream &out = errs();
@@ -156,12 +153,9 @@ static Function *getOrCreateBoundsCheckStoreSanitizer(Module *M, LLVMContext &Ct
 
   // SanitizeStoreBB: Apply remediation strategy
   builder.SetInsertPoint(SanitizeStoreBB);
-  switch(strategy) {
-    case Vulnerability::RemediationStrategies::EXIT:
-      builder.CreateCall(getOrCreateRemediationBehavior(M, strategy));
-      builder.CreateUnreachable();
-      break;
-  }
+  builder.CreateCall(getOrCreateResolveReportSanitizerTriggered(M));
+  builder.CreateCall(getOrCreateRemediationBehavior(M, strategy));
+  builder.CreateRetVoid();
   
   // DEBUGGING
   raw_ostream &out = errs();
@@ -237,8 +231,9 @@ static Function *getOrCreateBoundsCheckMemcpySanitizer(Module *M, Vulnerability:
 
   // SanitizeMemcpyBB: Remediate memcpy returns null pointer.
   builder.SetInsertPoint(SanitizeMemcpyBB);
+  builder.CreateCall(getOrCreateResolveReportSanitizerTriggered(M));
   builder.CreateCall(getOrCreateRemediationBehavior(M, strategy));
-  builder.CreateUnreachable();
+  builder.CreateRet(dst_ptr);
 
   // DEBUGGING
   raw_ostream &out = errs();
@@ -403,17 +398,18 @@ void sanitizeLoadStore(Function *F, Vulnerability::RemediationStrategies strateg
   std::vector<StoreInst *> storeList;
 
   switch(strategy) {
-    //case Vulnerability::RemediationStrategies::CONTINUE-WRAP: /* TODO: Not yet supported. Implement this remediaion strategy */
-    //case Vulnerability::RemediationStrategies::CONTINUE-ZERO: /* TODO: Not yet supported. Implement this remediation strategy */
+    // case Vulnerability::RemediationStrategies::CONTINUE-WRAP: /* TODO: Not yet supported. Implement this remediaion strategy */
+    // case Vulnerability::RemediationStrategies::CONTINUE-ZERO: /* TODO: Not yet supported. Implement this remediation strategy */
+    // case Vulnerability::RemediationStrategies::SAT:          /* TODO: Not yet supported. Implement this remediation strategy */
+    case Vulnerability::RemediationStrategies::SAFE:
     case Vulnerability::RemediationStrategies::EXIT:
     case Vulnerability::RemediationStrategies::RECOVER:
-    case Vulnerability::RemediationStrategies::SAT:                     /* TODO: Not yet supported. Implement this remediation strategy */
       break;
 
     default:
       llvm::errs() << "[CVEAssert] Error: sanitizeLoadStore does not support remediation strategy "
-                   << "defaulting to EXIT strategy!\n";
-      strategy = Vulnerability::RemediationStrategies::EXIT;
+                   << "defaulting to SAFE strategy!\n";
+      strategy = Vulnerability::RemediationStrategies::SAFE;
       break;
   }
 
