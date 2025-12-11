@@ -245,6 +245,7 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
         case VulnID::OOB_READ:
         case VulnID::OOB_WRITE:
         case VulnID::INCORRECT_BUF_SIZE:
+        case VulnID::WRITE_WHAT_WHERE:
           instrument_mem_inst.instrumentAlloca = true;
           instrument_mem_inst.instrumentMalloc = true; 
           break;
