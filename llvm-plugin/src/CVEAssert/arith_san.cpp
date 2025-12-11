@@ -355,7 +355,7 @@ Function *replaceUndesirableFunction(Function *F, Vulnerability::RemediationStra
   // Returns dividend
   Builder.SetInsertPoint(SanitizedBB);
   Builder.CreateCall(resolve_report_func);
-  Builder.CreateCall(getOrCreateResolveRemediationBehavior(M, strategy));
+  Builder.CreateCall(getOrCreateRemediationBehavior(M, strategy));
   Builder.CreateRet(dividend);
 
   // ContExec: Makes call to original call instruction and returns that instead.
@@ -372,7 +372,7 @@ Function *replaceUndesirableFunction(Function *F, Vulnerability::RemediationStra
   return sanitizedHandlerFunc;
 }
 
-void sanitizeDivideByZeroInFunction(Function *F,
+void sanitizeDivideByZeroInFunction(Function *F, Vulnerability::RemediationStrategies strategy,
                                     std::optional<std::string> funct_name) {
   Module *M = F->getParent();
   LLVMContext &Ctx = M->getContext();
@@ -405,7 +405,7 @@ void sanitizeDivideByZeroInFunction(Function *F,
 
   // Construct the resolve_sanitize_func function
   Function *resolve_sanitized_func =
-      replaceUndesirableFunction(F, callsToReplace.front());
+      replaceUndesirableFunction(F, strategy, callsToReplace.front());
 
   // Handle calls at each point in module
   for (auto call : callsToReplace) {
