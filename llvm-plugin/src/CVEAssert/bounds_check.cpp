@@ -428,11 +428,6 @@ void sanitizeLoadStore(Function *F, Vulnerability::RemediationStrategies strateg
     builder.SetInsertPoint(Inst);
     auto ptr = Inst->getPointerOperand();
     auto valueTy = Inst->getType();
-    if (getLLVMType(valueTy) == "") {
-      errs() << "[CVEAssert] Warning: skipping unsupported type " << *valueTy
-             << "\n";
-      continue;
-    }
 
     auto loadFn = getOrCreateBoundsCheckLoadSanitizer(F->getParent(),
                                                       F->getContext(), valueTy, strategy);
@@ -447,12 +442,6 @@ void sanitizeLoadStore(Function *F, Vulnerability::RemediationStrategies strateg
     builder.SetInsertPoint(Inst);
     auto ptr = Inst->getPointerOperand();
     auto valueTy = Inst->getValueOperand()->getType();
-
-    if (getLLVMType(valueTy) == "") {
-      errs() << "[CVEAssert] Warning: skipping unsupported type " << *valueTy
-             << "\n";
-      continue;
-    }
 
     auto storeFn = getOrCreateBoundsCheckStoreSanitizer(
       F->getParent(), F->getContext(), valueTy, strategy
