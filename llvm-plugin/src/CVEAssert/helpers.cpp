@@ -145,7 +145,7 @@ Function *getOrCreateRemediationBehavior(Module *M, Vulnerability::RemediationSt
 
     Function *resolve_remed_behavior = Function::Create(
         resolve_remed_behavior_ty,
-        GlobalValue::InternalLinkage,
+        GlobalValue::ExternalLinkage,
         "resolve_remediation_behavior",
         M
     );
