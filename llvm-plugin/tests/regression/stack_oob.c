@@ -11,24 +11,34 @@
 // RUN: RESOLVE_LABEL_CVE=vulnerabilities/stack_oob.json %clang -fpass-plugin=%plugin \ 
 // RUN: -L%rlib -lresolve -Wl,-rpath=%rlib %s -o %t.exe
 // RUN: %t.exe; test $? -eq 3
- 
+// Test that that unremediated case crashes
+// RUN: %clang -fpass-plugin=%plugin %s -o %t.exe 
+// RUN: %t.exe 200; EXIT_CODE=$?; \
+// RUN: echo Unremedated exit: $EXIT_CODE; test $EXIT_CODE -ne 0
+//
+// Test that the remediation is successful
+// RUN: RESOLVE_LABEL_CVE=vulnerabilities/stack_oob.json %clang -fpass-plugin=%plugin \ 
+// RUN: -L%rlib -lresolve -Wl,-rpath=%rlib %s -o %t.exe
+// RUN: %t.exe 200; EXIT_CODE=$?; \
+// RUN: echo Remediated exit: $EXIT_CODE; test $EXIT_CODE -eq 3
+
 #include <stdio.h>
 #include <stdlib.h>
-int main(int argc, char *argv[]) {
+
+int use_stack(int buffer[], int idx) {
   int i;
-  int idx = atoi(argv[0]);
+  buffer[idx] = 1;
+
+  for (i = 0; i < 10; ++i) {
+    printf("%d ", buffer[i]);
+  }
+
+  return buffer[idx];
+}
+
+int main(int argc, char *argv[]) {
+  int idx = atoi(argv[1]);
   int buffer[10] = { 0 };
 
-  if (idx >= 0) {
-    buffer[idx] = 1;
-
-    for (i = 0; i < 10; ++i) {
-      printf("%d ", buffer[i]);
-    }
-    return 0;
-  
-  } else {
-    printf("ERROR: Negative indexing results in OOB access: %d", idx);
-    return -1;
-  }
+  return use_stack(buffer, idx);
 }
