@@ -32,6 +32,7 @@
 #include "null_ptr.hpp"
 #include "arith_san.hpp"
 #include "bounds_check.hpp"
+#include "uaf_san.hpp"
 
 using namespace llvm;
 
@@ -55,8 +56,9 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
     OOB_WRITE = 787,
     OOB_READ = 125,                /* NOTE: This ID corresponds to CWE-ID description found in stb-resize, lamartine CPs */
     INCORRECT_BUF_SIZE = 131,      /* NOTE: This ID corresponds to the CWE-ID description found in analyze image CP*/
-    DIVIDE_BY_ZERO = 369,          /* NOTE: This ID corresponds to CWE description in ros2 challenge problem */
-    INT_OVERFLOW = 190,            /* NOTE: This ID corresponds to CWE-ID description in redis  */
+    DIVIDE_BY_ZERO = 369,          /* NOTE: This ID corresponds to CWE description in ros2 CP */
+    INT_OVERFLOW = 190,            /* NOTE: This ID corresponds to CWE-ID description in redis CP */
+    USE_AFTER_FREE = 416,          /* NOTE: This ID corresponds to CWE-ID description in image-histogram CP*/
     NULL_PTR_DEREF = 476,          /* NOTE: This ID has been found in OpenALPR, NASA CFS, stb-convert CPs */
     STACK_FREE = 590               /* NOTE: This ID has been found in NASA CFS challenge problem */
   };
@@ -203,6 +205,9 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
       case VulnID::STACK_FREE: /* Stack free;  Found in nasa-cfs */
         sanitizeFreeOfNonHeap(&F, vuln.Strategy);
         break;
+
+      case VulnID::USE_AFTER_FREE: /* Use After Free; Found in nasa-cfs and image-histogram */
+        sanitizeUseAfterFree(&F, vuln.Strategy);
 
       default:
         errs() << "[CVEAssert] Error: CWE " << vuln.WeaknessID

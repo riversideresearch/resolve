@@ -19,3 +19,4 @@ llvm::Function *getOrCreateResolveReportSanitizerTriggered(llvm::Module *M);
 llvm::Function *getOrCreateRemediationBehavior(llvm::Module *M, Vulnerability::RemediationStrategies strategy);
 llvm::Function *getOrCreateWeakResolveMalloc(llvm::Module *M);
 llvm::Function *getOrCreateWeakResolveStackObj(llvm::Module *M);
+llvm::Function *getOrCreateWeakResolveFree(llvm::Module *M);
