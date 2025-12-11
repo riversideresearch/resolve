@@ -159,6 +159,12 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
       return PreservedAnalyses::all();
     }
 
+    if (vuln.Strategy == Vulnerability::RemediationStrategies::NONE) {
+      errs() << "[CVEAssert] NONE strategy selected for " << vuln.TargetFileName << ":" << vuln.TargetFunctionName << "...\n";
+      errs() << "[CVEAssert] Skipping remediation\n";
+      return PreservedAnalyses::all();
+    }
+
     out << "[CVEAssert] === Pre Instrumented IR === \n";
     out << F;
 
@@ -217,6 +223,11 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
     InstrumentMemInst instrument_mem_inst;
 
     for (auto &vuln : vulnerabilities) {
+      // Also skip instrumentation for skipped vulnerabilities
+      if (vuln.Strategy == Vulnerability::RemediationStrategies::NONE) {
+        continue;
+      }
+
       switch(vuln.WeaknessID) {
         // 121 stack-based
         case VulnID::STACK_BASED_BUF_OVERFLOW:
