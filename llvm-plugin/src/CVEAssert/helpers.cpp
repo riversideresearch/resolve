@@ -16,7 +16,46 @@
 #include "Vulnerability.hpp"
 #include "helpers.hpp"
 
+#include <sstream>
+#include <iomanip>
+#include <cctype>
+
 using namespace llvm;
+
+std::string getLLVMType(Type *ty) {
+    // TODO: This is going to be super slow, may want to cache the computed strings
+    // TODO: Add mitigations to prevent really large symbol lengths
+    auto escapeTypeToIdent = [](const std::string &s) {
+        auto isIdentChar = [](char c) {
+            return (c == '_') || std::isalnum(static_cast<unsigned char>(c));
+        };
+
+        std::string out;
+        out.reserve(s.size() * 3 + 3);
+        out += "ty_"; // safe prefix
+        for (unsigned char c : s) {
+            if (isIdentChar(c)) {
+                if (c == '_') {
+                    out += "_5f"; // escape underscore itself
+                } else {
+                    out += c;
+                }
+            } else {
+                std::ostringstream oss;
+                oss << '_' << std::hex << std::setw(2) << std::setfill('0')
+                    << static_cast<int>(c);
+                out += oss.str();
+            }
+        }
+        return out;
+    };
+    std::string canon;
+    llvm::raw_string_ostream rso(canon);
+    ty->print(rso);
+    rso.flush();
+
+    return escapeTypeToIdent(canon);
+}
 
 Function *getOrCreateIsHeap(Module *M, LLVMContext &Ctx) {
     std::string handlerName = "resolve_is_heap";

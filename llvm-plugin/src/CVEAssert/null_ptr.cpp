@@ -182,10 +182,6 @@ void sanitizeNullPointers(Function *f, Vulnerability::RemediationStrategies stra
     for (auto Inst : loadList) {
         builder.SetInsertPoint(Inst);
         auto valueTy = Inst->getType();
-        if (getLLVMType(valueTy) == "") {
-            errs() << "[CVEAssert] Warning: skipping unsupported type " << *valueTy << "\n";
-            continue;
-        }
 
         auto loadFn = getOrCreateNullPtrLoadSanitizer(f->getParent(), f->getContext(), valueTy, strategy);
 
@@ -198,11 +194,6 @@ void sanitizeNullPointers(Function *f, Vulnerability::RemediationStrategies stra
     for (auto Inst : storeList) {
         builder.SetInsertPoint(Inst);
         auto valueTy = Inst->getValueOperand()->getType();
-        if (getLLVMType(valueTy) == "") {
-            errs() << "[CVEAssert] Warning: skipping unsupported type " << *valueTy << "\n";
-            continue;
-        }
-
         auto storeFn = getOrCreateNullPtrStoreSanitizer(f->getParent(), f->getContext(), valueTy, strategy);
 
         auto sanitized_load = builder.CreateCall(storeFn, {Inst->getPointerOperand(), Inst->getValueOperand()});
