@@ -5,7 +5,7 @@
             "cve-description": "",
             "package-name": "libc",
             "package-version": "3.2.1",
-            "cwe-id": "455",
+            "cwe-id": "190",
             "cwe-name": "Integer Overflow",
             "affected-function": "main",
             "affected-file": "overflow_add.c",

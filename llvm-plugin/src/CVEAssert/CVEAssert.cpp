@@ -55,7 +55,7 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
     OOB_READ = 125,                /* NOTE: This ID corresponds to CWE-ID description found in stb-resize, lamartine CPs */
     INCORRECT_BUF_SIZE = 131,      /* NOTE: This ID corresponds to the CWE-ID description found in analyze image CP*/
     DIVIDE_BY_ZERO = 369,          /* NOTE: This ID corresponds to CWE description in ros2 challenge problem */
-    INT_OVERFLOW = 455,            /* NOTE: This ID does not have a corresponding CWE description in a CP, this was to test the integer overflow sanitizer */
+    INT_OVERFLOW = 190,          /* NOTE: This ID corresponds to CWE-ID description in redis  */
     NULL_PTR_DEREF = 476,          /* NOTE: This ID has been found in OpenALPR, NASA CFS, stb-convert CPs */
     STACK_FREE = 590               /* NOTE: This ID has been found in NASA CFS challenge problem */
   };
