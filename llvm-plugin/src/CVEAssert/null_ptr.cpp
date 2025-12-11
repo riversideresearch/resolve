@@ -17,10 +17,9 @@
 using namespace llvm;
 
 static Function *getOrCreateNullPtrLoadSanitizer(Module *M, LLVMContext &Ctx, Type *ty, Vulnerability::RemediationStrategies strategy) {
-    Twine handlerName = "resolve_sanitize_null_ptr_ld_" + getLLVMType(ty);
-    SmallVector<char> handlerNameStr;
+    std::string handlerName = "resolve_bounds_check_ld_" + getLLVMType(ty);
 
-    if (auto handler = M->getFunction(handlerName.toStringRef(handlerNameStr)))
+    if (auto handler = M->getFunction(handlerName))
         return handler;
 
     IRBuilder<> Builder(Ctx);
@@ -83,10 +82,9 @@ static Function *getOrCreateNullPtrLoadSanitizer(Module *M, LLVMContext &Ctx, Ty
 }
 
 static Function *getOrCreateNullPtrStoreSanitizer(Module *M, LLVMContext &Ctx, Type *ty, Vulnerability::RemediationStrategies strategy) {
-    Twine handlerName = "resolve_sanitize_null_ptr_st_" + getLLVMType(ty);
-    SmallVector<char> handlerNameStr;
+    std::string handlerName = "resolve_bounds_check_ld_" + getLLVMType(ty);
 
-    if (auto handler = M->getFunction(handlerName.toStringRef(handlerNameStr)))
+    if (auto handler = M->getFunction(handlerName))
         return handler;
 
     IRBuilder<> Builder(Ctx);

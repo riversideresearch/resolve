@@ -27,10 +27,9 @@ using namespace llvm;
 static std::unordered_set<std::string> instrumentedFns = { "resolve_malloc" };
 
 static Function *getOrCreateBoundsCheckLoadSanitizer(Module *M, LLVMContext &Ctx, Type *ty, Vulnerability::RemediationStrategies strategy) {
-  Twine handlerName = "resolve_bounds_check_ld_" + getLLVMType(ty);
-  SmallVector<char> handlerNameStr;
+  std::string handlerName = "resolve_bounds_check_ld_" + getLLVMType(ty);
 
-  if (auto handler = M->getFunction(handlerName.toStringRef(handlerNameStr))) {
+  if (auto handler = M->getFunction(handlerName)) {
     return handler;
   }
 
@@ -96,11 +95,11 @@ static Function *getOrCreateBoundsCheckLoadSanitizer(Module *M, LLVMContext &Ctx
 }
 
 static Function *getOrCreateBoundsCheckStoreSanitizer(Module *M, LLVMContext &Ctx, Type *ty, Vulnerability::RemediationStrategies strategy) {
-  Twine handlerName = "resolve_bounds_check_st_" + getLLVMType(ty);
-  SmallVector<char> handlerNameStr;
+  std::string handlerName = "resolve_bounds_check_st_" + getLLVMType(ty);
 
-  if (auto handler = M->getFunction(handlerName.toStringRef(handlerNameStr)))
+  if (auto handler = M->getFunction(handlerName)) {
     return handler;
+  }
 
   IRBuilder<> builder(Ctx);
   
