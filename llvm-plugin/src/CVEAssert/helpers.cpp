@@ -226,14 +226,14 @@ Function *getOrCreateWeakResolveMalloc(Module *M) {
         false
     );
 
-    FunctionCallee regMallocFn = M->getOrInsertFunction("malloc", normal_malloc_ty);
-    Value *size_arg = weak_resolve_malloc_fn->getArg(0);
-    Value *mallocCall = builder.CreateCall(regMallocFn, { size_arg });
-    builder.CreateRet(mallocCall);
+    // FunctionCallee regMallocFn = M->getOrInsertFunction("malloc", normal_malloc_ty);
+    // Value *size_arg = weak_resolve_malloc_fn->getArg(0);
+    // Value *mallocCall = builder.CreateCall(regMallocFn, { size_arg });
+    // builder.CreateRet(mallocCall);
 
-    raw_ostream &out = errs();
-    out << *weak_resolve_malloc_fn;
-    if (verifyFunction(*weak_resolve_malloc_fn, &out)) {}
+    // raw_ostream &out = errs();
+    // out << *weak_resolve_malloc_fn;
+    // if (verifyFunction(*weak_resolve_malloc_fn, &out)) {}
     return weak_resolve_malloc_fn;
 }
 
@@ -265,12 +265,12 @@ Function *getOrCreateWeakResolveStackObj(Module *M) {
         M
     );
 
-    BasicBlock *EntryBB = BasicBlock::Create(Ctx, "", weak_resolve_stack_obj_fn);
-    builder.SetInsertPoint(EntryBB);
-    builder.CreateRetVoid();
+    // BasicBlock *EntryBB = BasicBlock::Create(Ctx, "", weak_resolve_stack_obj_fn);
+    // builder.SetInsertPoint(EntryBB);
+    // builder.CreateRetVoid();
 
-    raw_ostream &out = errs();
-    out << *weak_resolve_stack_obj_fn;
-    if (verifyFunction(*weak_resolve_stack_obj_fn, &out)) {}
+    // raw_ostream &out = errs();
+    // out << *weak_resolve_stack_obj_fn;
+    // if (verifyFunction(*weak_resolve_stack_obj_fn, &out)) {}
     return weak_resolve_stack_obj_fn;
 }
