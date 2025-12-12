@@ -241,6 +241,29 @@ static Function *getOrCreateBoundsCheckMemcpySanitizer(Module *M, Vulnerability:
   return sanitizeMemcpyFn;
 }
 
+static FunctionCallee getResolveMalloc(Module *M) {
+    auto &Ctx = M->getContext();
+    auto ptr_ty = PointerType::get(Ctx, 0);
+    auto size_ty = Type::getInt64Ty(Ctx);
+    
+    return M->getOrInsertFunction(
+        "resolve_malloc",
+        FunctionType::get(ptr_ty, { size_ty }, false)
+    );
+}
+
+static FunctionCallee getResolveStackObj(Module *M) {
+    auto &Ctx = M->getContext();
+    auto void_ty = Type::getVoidTy(Ctx);
+    auto ptr_ty = PointerType::get(Ctx, 0);
+    auto size_ty = Type::getInt64Ty(Ctx);
+    
+    return M->getOrInsertFunction(
+        "resolve_stack_obj",
+        FunctionType::get(void_ty, { ptr_ty, size_ty }, false)
+    );
+}
+
 void instrumentAlloca(Function *F) {
   Module *M = F->getParent();
   LLVMContext &Ctx = M->getContext();
@@ -267,7 +290,7 @@ void instrumentAlloca(Function *F) {
       Type *allocatedType = allocaInst->getAllocatedType();
       uint64_t typeSize = DL.getTypeAllocSize(allocatedType); 
       sizeVal = ConstantInt::get(size_ty, typeSize);
-      builder.CreateCall(getOrCreateWeakResolveStackObj(M), { allocatedPtr, sizeVal });
+      builder.CreateCall(getResolveStackObj(M), { allocatedPtr, sizeVal });
   }
 }
 
@@ -303,7 +326,7 @@ void instrumentMalloc(Function *F) {
     builder.SetInsertPoint(Inst);
     Value *arg = Inst->getArgOperand(0);
     Value *normalizeArg = builder.CreateZExtOrBitCast(arg, size_ty);
-    CallInst *resolveMallocCall = builder.CreateCall(getOrCreateWeakResolveMalloc(M), { normalizeArg });
+    CallInst *resolveMallocCall = builder.CreateCall(getResolveMalloc(M), { normalizeArg });
     Inst->replaceAllUsesWith(resolveMallocCall);
     Inst->eraseFromParent();  
   }
