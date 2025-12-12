@@ -343,6 +343,14 @@ pub extern "C" fn resolve_check_bounds(base_ptr: *mut c_void, size: usize) -> bo
         // If shadow object exists then check if the access is within bounds
         if sobj.contains(ShadowObject::limit(base, size)) {
             // Access in Bounds
+            let _ = writeln!(
+                &mut RESOLVE_LOG_FILE.lock(),
+                "[BOUNDS] Access allowed {}@0x{:x} for allocation {}@{:x}",
+                size,
+                base,
+                sobj.size(),
+                sobj.base
+            );
             return true;
         } else {
             let _ = writeln!(
