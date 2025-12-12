@@ -3,18 +3,18 @@
 #![feature(sync_nonpoison)]
 #![feature(nonpoison_mutex)]
 
-mod shadowobjs;
 mod remediate;
+mod shadowobjs;
 mod trace;
 
-use libc::{atexit, c_void, dladdr, dlsym, Dl_info};
+use libc::{Dl_info, atexit, c_void, dladdr, dlsym};
+use std::ffi::CStr;
 use std::fmt::Display;
 use std::fs::File;
-use std::{env, process};
 use std::io::{Seek, Write};
-use std::ffi::CStr;
 use std::sync::nonpoison::Mutex;
 use std::sync::{LazyLock, Once};
+use std::{env, process};
 
 /// Appends id to base path, but before the first .suffix if any
 fn idify_file_path(path: &str, id: impl Display) -> String {
@@ -26,22 +26,22 @@ fn idify_file_path(path: &str, id: impl Display) -> String {
 }
 
 /// File for "resolve_dlsym.json"
-pub static DLSYM_LOG_FILE: LazyLock<Mutex<File>> = LazyLock::new(|| {    
+pub static DLSYM_LOG_FILE: LazyLock<Mutex<File>> = LazyLock::new(|| {
     let path = env::var("RESOLVE_DLSYM_LOG");
     let path = path.unwrap_or_else(|_| "resolve_dlsym.json".to_string());
-    
+
     let path = idify_file_path(&path, process::id());
-    
+
     Mutex::new(File::create(path).unwrap())
 });
 
 /// File for "resolve_log.out"
-pub static RESOLVE_LOG_FILE: LazyLock<Mutex<File>> = LazyLock::new(|| {    
+pub static RESOLVE_LOG_FILE: LazyLock<Mutex<File>> = LazyLock::new(|| {
     let path = env::var("RESOLVE_RUNTIME_LOG");
     let path = path.unwrap_or_else(|_| "resolve_log.out".to_string());
-    
+
     let path = idify_file_path(&path, process::id());
-    
+
     Mutex::new(File::create(path).unwrap())
 });
 
@@ -54,8 +54,8 @@ pub extern "C" fn flush_dlsym_log() {
 
     // Seek back 2 bytse to erase last ",\n"
     file.seek_relative(-2).unwrap();
-    
-    let _ = write!(&mut file, "\n  ]\n}}\n");    
+
+    let _ = write!(&mut file, "\n  ]\n}}\n");
 }
 
 /**
@@ -65,32 +65,31 @@ pub extern "C" fn flush_dlsym_log() {
  */
 #[unsafe(no_mangle)]
 pub extern "C" fn resolve_dlsym(handle: *mut c_void, symbol: *const u8) -> *mut c_void {
-    
     static REGISTER_EXIT: Once = Once::new();
     REGISTER_EXIT.call_once(|| {
         // SAFETY: flush_dlsym_log is extern "C" and takes no arguments.
         // TODO: is DLSYM_LOG_FILE still valid during the atexit callback?
         unsafe { atexit(flush_dlsym_log) };
     });
-    
+
     let addr = unsafe { dlsym(handle, symbol.cast()) };
-    
+
     let lib_name = unsafe {
         let mut info: Dl_info = std::mem::zeroed();
         if dladdr(addr, &mut info) != 0 && !info.dli_fname.is_null() {
             CStr::from_ptr(info.dli_fname)
-        } else  {
+        } else {
             c"<unknown>"
         }
     };
-    
+
     let symbol = if !symbol.is_null() {
         unsafe { CStr::from_ptr(symbol.cast::<i8>()) }
     } else {
         c"<null>"
     };
 
-    // Write JSON header only once 
+    // Write JSON header only once
     static WRITE_HEADER: Once = Once::new();
     WRITE_HEADER.call_once(|| {
         let _ = write!(&mut DLSYM_LOG_FILE.lock(), "{{\n \"loaded_symbols\": [\n");
@@ -104,11 +103,11 @@ pub extern "C" fn resolve_dlsym(handle: *mut c_void, symbol: *const u8) -> *mut 
     );
 
     addr
-} 
+}
 
 #[cfg(test)]
 mod tests {
-    use crate::shadowobjs::{ShadowObjectTable, AllocType};
+    use crate::shadowobjs::{AllocType, ShadowObjectTable};
 
     #[test]
     fn test_add_and_print_shadow_objects() {
@@ -118,15 +117,12 @@ mod tests {
 
         //table.print_shadow_obj();
     }
-    
+
     #[test]
     fn test_remove_shadow_objects() {
         let mut table = ShadowObjectTable::new();
         table.add_shadow_object(AllocType::Heap, 0x1000, 8);
         table.add_shadow_object(AllocType::Stack, 0x2000, 16);
-
-
-
     }
 
     #[test]
@@ -148,7 +144,6 @@ mod tests {
         assert!(result.is_none());
     }
 
-
     #[test]
     fn test_is_allocation() {
         let mut table = ShadowObjectTable::new();
@@ -167,14 +162,12 @@ mod tests {
 
         //let range = table.bounds(0x8004).unwrap();
         //assert_eq!(range, 0x8000..=0x8007);
-    
     }
 
     #[test]
-    #[should_panic] 
+    #[should_panic]
     fn test_bounds_invalid_address_panic() {
         // let table = ShadowObjectTable::new();
         //table.bounds(0xDEADBEEF).unwrap(); // should panic since there is no interesection
-
     }
 }
