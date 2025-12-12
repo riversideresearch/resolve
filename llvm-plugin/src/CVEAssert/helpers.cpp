@@ -131,7 +131,7 @@ Function *getOrCreateResolveReportSanitizerTriggered(Module *M) {
     return resolve_report_fn;
 } 
 
-// Create a function getOrCreateRemediateBehavior function to handle do nothing or exit
+// getOrCreateRemediateBehavior: helper function to apply remediation strategies
 Function *getOrCreateRemediationBehavior(Module *M, Vulnerability::RemediationStrategies strategy) {
     auto &Ctx = M->getContext();
     auto ptr_ty = PointerType::get(Ctx, 0);
@@ -145,7 +145,7 @@ Function *getOrCreateRemediationBehavior(Module *M, Vulnerability::RemediationSt
 
     Function *resolve_remed_behavior = Function::Create(
         resolve_remed_behavior_ty,
-        GlobalValue::ExternalLinkage,
+        GlobalValue::InternalLinkage,
         "resolve_remediation_behavior",
         M
     );
@@ -188,4 +188,4 @@ Function *getOrCreateRemediationBehavior(Module *M, Vulnerability::RemediationSt
     out << *resolve_remed_behavior;
     if (verifyFunction(*resolve_remed_behavior, &out)) {}
     return resolve_remed_behavior;
-} 
+}
