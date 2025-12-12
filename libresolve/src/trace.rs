@@ -6,7 +6,7 @@ use std::fmt::Display;
 
 use crate::buffer_writer::{BufferWriter};
 
-pub fn libresolve_arg<T: Display>(arg: T, funct_name: *const u8) {
+pub fn libresolve_arg(arg: impl Display, funct_name: *const u8) {
     let mut buf =[0u8; 128];
     let mut writer = BufferWriter::new(&mut buf);
 
@@ -26,7 +26,7 @@ pub fn libresolve_arg<T: Display>(arg: T, funct_name: *const u8) {
     unsafe { libc::write(*RESOLVE_LOG_FD, written.as_ptr() as *const _, written.len())};
 }
 
-pub fn libresolve_ret<T: Display>(ret: T, funct_name: *const u8) {
+pub fn libresolve_ret(ret: impl Display, funct_name: *const u8) {
     let mut buf =[0u8; 128];
     let mut writer = BufferWriter::new(&mut buf);
 
