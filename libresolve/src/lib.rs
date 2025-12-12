@@ -87,7 +87,15 @@ pub extern "C" fn resolve_gep(ptr: *mut c_void, derived: *mut c_void) -> *mut c_
         let _ = writeln!(&mut writer, "[GEP] Cannot find ptr 0x{:x} in shadow table", ptr as Vaddr);
         let written = writer.as_bytes();
         unsafe { libc::write(*RESOLVE_LOG_FD, written.as_ptr() as *const _, written.len()) };
-        return 0 as *mut c_void; 
+        
+        // NOTE: Not doing this right now
+        // In theory it could catch bugs where integers are forced to pointers...
+        // But there are too many allocation we don't know about, like those in libc
+        // or the argv pointer.
+        // return 0 as *mut c_void; 
+
+        // Assume unknown pointers are safe
+        return derived as *mut c_void
     };
 
     // If shadow object exists then check if the access is within bounds
