@@ -81,12 +81,30 @@ pub extern "C" fn resolve_gep(ptr: *mut c_void, derived: *mut c_void) -> *mut c_
 
     // Look up the shadow object corresponding to this access.
     // NOTE: Return 0 ('null') if shadow object cannot be found.
-    let Some(sobj) = sobj_table.search_intersection(ptr as Vaddr) else { return 0 as *mut c_void; };
+    let Some(sobj) = sobj_table.search_intersection(ptr as Vaddr) else { 
+        let mut buf = [0u8; 128];
+        let mut writer = BufferWriter::new(&mut buf);
+        let _ = writeln!(&mut writer, "[GEP] Cannot find ptr 0x{:x} in shadow table", ptr as Vaddr);
+        let written = writer.as_bytes();
+        unsafe { libc::write(*RESOLVE_LOG_FD, written.as_ptr() as *const _, written.len()) };
+        return 0 as *mut c_void; 
+    };
 
     // If shadow object exists then check if the access is within bounds
     if sobj.contains(derived as Vaddr) {
+        let mut buf = [0u8; 128];
+        let mut writer = BufferWriter::new(&mut buf);
+        let _ = writeln!(&mut writer, "[GEP] ptr 0x{:x} valid for base 0x{:x}, obj: {}@0x{:x}", derived as Vaddr, ptr as Vaddr, sobj.size(), sobj.base);
+        let written = writer.as_bytes();
+        unsafe { libc::write(*RESOLVE_LOG_FD, written.as_ptr() as *const _, written.len()) };
         return derived as *mut c_void
     } 
+
+    let mut buf = [0u8; 128];
+    let mut writer = BufferWriter::new(&mut buf);
+    let _ = writeln!(&mut writer, "[GEP] ptr 0x{:x} not valid for base 0x{:x}, obj: {}@0x{:x}", derived as Vaddr, ptr as Vaddr, sobj.size(), sobj.base);
+    let written = writer.as_bytes();
+    unsafe { libc::write(*RESOLVE_LOG_FD, written.as_ptr() as *const _, written.len()) };
 
     // Return 1-past limit of allocation @ ptr
     sobj.past_limit() as *mut c_void
