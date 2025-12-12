@@ -30,12 +30,13 @@ use crate::shadowobjs::{ShadowObject, AllocType, Vaddr, ALIVE_OBJ_LIST, FREED_OB
  */
 #[unsafe(no_mangle)]
 pub extern "C" fn resolve_stack_obj(ptr: *mut c_void, size: usize) -> () {
+    let base = ptr as Vaddr;
     let mut obj_list = ALIVE_OBJ_LIST.lock().expect("Mutex not poisoned");
-    obj_list.add_shadow_object(AllocType::Stack, ptr as Vaddr, size);
+    obj_list.add_shadow_object(AllocType::Stack, base, size);
 
     let mut buf = [0u8; 128];
     let mut writer = BufferWriter::new(&mut buf);
-    let _ = writeln!(&mut writer, "[STACK] Object allocated with size: {}, address: 0x{:x}", size, ptr as Vaddr);
+    let _ = writeln!(&mut writer, "[STACK] Object allocated with size: {}, address: 0x{:x}", size, base);
     let written = writer.as_bytes();
     unsafe {libc::write(*RESOLVE_LOG_FD, written.as_ptr() as *const _, written.len()) };
 }
@@ -77,14 +78,17 @@ pub extern "C" fn resolve_malloc(size: usize) -> *mut c_void {
 
 #[unsafe(no_mangle)]
 pub extern "C" fn resolve_gep(ptr: *mut c_void, derived: *mut c_void) -> *mut c_void {
+    let base = ptr as Vaddr;
+    let derived = derived as Vaddr;
+    
     let sobj_table = ALIVE_OBJ_LIST.lock().expect("Mutex not poisoned");
 
     // Look up the shadow object corresponding to this access.
     // NOTE: Return 0 ('null') if shadow object cannot be found.
-    let Some(sobj) = sobj_table.search_intersection(ptr as Vaddr) else { 
+    let Some(sobj) = sobj_table.search_intersection(base) else { 
         let mut buf = [0u8; 128];
         let mut writer = BufferWriter::new(&mut buf);
-        let _ = writeln!(&mut writer, "[GEP] Cannot find ptr 0x{:x} in shadow table", ptr as Vaddr);
+        let _ = writeln!(&mut writer, "[GEP] Cannot find ptr 0x{:x} in shadow table", base);
         let written = writer.as_bytes();
         unsafe { libc::write(*RESOLVE_LOG_FD, written.as_ptr() as *const _, written.len()) };
         
@@ -102,7 +106,7 @@ pub extern "C" fn resolve_gep(ptr: *mut c_void, derived: *mut c_void) -> *mut c_
     if sobj.contains(derived as Vaddr) {
         let mut buf = [0u8; 128];
         let mut writer = BufferWriter::new(&mut buf);
-        let _ = writeln!(&mut writer, "[GEP] ptr 0x{:x} valid for base 0x{:x}, obj: {}@0x{:x}", derived as Vaddr, ptr as Vaddr, sobj.size(), sobj.base);
+        let _ = writeln!(&mut writer, "[GEP] ptr 0x{:x} valid for base 0x{:x}, obj: {}@0x{:x}", derived, base, sobj.size(), sobj.base);
         let written = writer.as_bytes();
         unsafe { libc::write(*RESOLVE_LOG_FD, written.as_ptr() as *const _, written.len()) };
         return derived as *mut c_void
@@ -110,7 +114,7 @@ pub extern "C" fn resolve_gep(ptr: *mut c_void, derived: *mut c_void) -> *mut c_
 
     let mut buf = [0u8; 128];
     let mut writer = BufferWriter::new(&mut buf);
-    let _ = writeln!(&mut writer, "[GEP] ptr 0x{:x} not valid for base 0x{:x}, obj: {}@0x{:x}", derived as Vaddr, ptr as Vaddr, sobj.size(), sobj.base);
+    let _ = writeln!(&mut writer, "[GEP] ptr 0x{:x} not valid for base 0x{:x}, obj: {}@0x{:x}", derived, base, sobj.size(), sobj.base);
     let written = writer.as_bytes();
     unsafe { libc::write(*RESOLVE_LOG_FD, written.as_ptr() as *const _, written.len()) };
 
