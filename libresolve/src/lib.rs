@@ -11,7 +11,7 @@ use std::ffi::CStr;
 use std::sync::atomic::Ordering;
 use std::sync::Once;
 
-use crate::buffer_writer::{BufferWriter, DLSYM_FD, RESOLVE_LOG_FD, RESOLVE_ERR_LOG_FD, WRITTEN_JSON_HEADER};
+use crate::buffer_writer::{BufferWriter, DLSYM_FD, RESOLVE_LOG_FD, WRITTEN_JSON_HEADER};
 use crate::shadowobjs::{ShadowObject, AllocType, Vaddr, ALIVE_OBJ_LIST, FREED_OBJ_LIST};
 
 
@@ -676,7 +676,7 @@ pub extern "C" fn resolve_check_bounds(base_ptr: *mut c_void, size: usize) -> bo
     let mut writer = BufferWriter::new(&mut buf);
     let _ = writeln!(&mut writer, "[ERROR] OOB access at 0x{:x}\n", base as Vaddr);
     let written = writer.as_bytes();
-    unsafe { libc::write(*RESOLVE_ERR_LOG_FD, written.as_ptr() as *const _, written.len())};
+    unsafe { libc::write(*RESOLVE_LOG_FD, written.as_ptr() as *const _, written.len())};
 
     false
 }

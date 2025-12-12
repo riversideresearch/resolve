@@ -88,24 +88,3 @@ pub static RESOLVE_LOG_FD: LazyLock<c_int> = LazyLock::new(|| {
         )
     }
 });
-
-// FILE descriptor for "resolve_err_log.out"
-pub static RESOLVE_ERR_LOG_FD: LazyLock<c_int> = LazyLock::new(|| unsafe {
-    let pid = process::id();
-
-    let base_path = env::var("RESOLVE_RUNTIME_ERR")
-            .unwrap_or_else(|_| "resolve_err_log.out".to_string());
-    
-    let final_path = if let Some((stem, ext)) = base_path.rsplit_once('.') {
-        format!("{}_{}.{}", stem, pid, ext)
-    } else {
-        format!("{}_{}", base_path, pid)
-    };
-
-    let c_path_str = CString::new(final_path).expect("Failed to convert path to CString");
-
-    libc::open(
-        c_path_str.as_ptr() as *const c_char,
-        O_WRONLY | O_APPEND | O_CREAT,
-        S_IRUSR  | S_IWUSR)
-});
