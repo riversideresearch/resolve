@@ -35,6 +35,16 @@ pub extern "C" fn resolve_stack_obj(ptr: *mut c_void, size: usize) -> () {
     );
 }
 
+#[unsafe(no_mangle)]
+pub extern "C" fn resolve_invalidate_stack(base: *mut c_void, limit: *mut c_void) {
+    let base = base as Vaddr;
+    let limit = limit as Vaddr;
+
+    let mut obj_list = ALIVE_OBJ_LIST.lock();
+    // TODO: Add these to a free list?
+    obj_list.invalidate_region(base, limit);
+}
+
 /**
  * @brief - Allocator logging interface for malloc
  * @input - size of the allocation in bytes
@@ -161,7 +171,7 @@ pub extern "C" fn resolve_memcpy(dest: *mut c_void, src: *mut c_void, size: usiz
  */
 #[unsafe(no_mangle)]
 pub extern "C" fn resolve_free(ptr: *mut c_void) -> () {
-    let obj_list = ALIVE_OBJ_LIST.lock();
+    let mut obj_list = ALIVE_OBJ_LIST.lock();
 
     // Insert a function to find the object and return the pointer size
     // Do I need to handle if the sobj cannot be found?
@@ -197,6 +207,9 @@ pub extern "C" fn resolve_free(ptr: *mut c_void) -> () {
             );
         }
     }
+
+    // remove shadow obj from live list
+    obj_list.invalidate_at(ptr as Vaddr); 
 
     // release lock before taking another lock
     drop(obj_list);

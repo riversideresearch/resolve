@@ -16,7 +16,8 @@ pub enum AllocType {
     Unknown,
     Heap,
     Stack,
-    #[allow(dead_code)] Global,
+    #[allow(dead_code)]
+    Global,
 }
 
 impl AllocType {
@@ -95,6 +96,24 @@ impl ShadowObjectTable {
     }
 
     /**
+     * @brief - Removes OBJLIST allocations with base equal to `base`
+     * @input:  self, shadow object address  
+     * @return: None if shadow object does not exist otherwise optional reference to shadow object  
+     */
+    pub fn invalidate_at(&mut self, base: Vaddr) {
+        self.table.extract_if(base..=base, |_, _| true).for_each(|_| {})
+    }
+
+    /**
+     * @brief - Removes OBJLIST allocations that are within the region
+     * @input:  self, shadow object address  
+     * @return: None if shadow object does not exist otherwise optional reference to shadow object  
+     */
+    pub fn invalidate_region(&mut self, base: Vaddr, limit: Vaddr) {
+        self.table.extract_if(base..=limit, |_, _| true).for_each(|_| {})
+    }
+
+    /**
      * @brief - Looks through OBJLIST to find a shadow object that is within
      *          a given virtual address and limit
      * @input:  self, shadow object address  
@@ -103,7 +122,7 @@ impl ShadowObjectTable {
     pub fn search_intersection(&self, addr: Vaddr) -> Option<&ShadowObject> {
         self.table.values().find(|sobj| sobj.contains(addr))
     }
-    
+
     /**
      * @brief - Looks through OBJLIST to find a shadow object with a past_limit value matching the input
      * @input:  self, shadow object address  
