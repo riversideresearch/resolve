@@ -790,7 +790,7 @@ mod tests {
     #[test]
     #[should_panic] 
     fn test_bounds_invalid_address_panic() {
-        let table = ShadowObjectTable::new();
+        // let table = ShadowObjectTable::new();
         //table.bounds(0xDEADBEEF).unwrap(); // should panic since there is no interesection
 
     }

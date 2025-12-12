@@ -2,7 +2,7 @@
 // LGPL-3; See LICENSE.txt in the repo root for details.
 
 use core::fmt::Write;
-use libc::{c_int, c_char, open, O_APPEND, O_WRONLY, O_CREAT, S_IRUSR, S_IWUSR};
+use libc::{c_int, open, O_APPEND, O_WRONLY, O_CREAT, S_IRUSR, S_IWUSR};
 use std::sync::{atomic::AtomicBool, LazyLock};
 use std::env;
 use std::ffi::CString;
