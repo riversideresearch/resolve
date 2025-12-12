@@ -61,9 +61,9 @@ impl ShadowObject {
         self.limit - self.base + 1
     }
 
-    /// compute a limit from addr + size
-    pub fn limit(addr: Vaddr, size: usize) -> Vaddr {
-        addr + size - 1
+    /// compute a limit from base + size
+    pub fn limit(base: Vaddr, size: usize) -> Vaddr {
+        base + size - 1
     }
 
     pub fn past_limit(&self) -> Vaddr {
@@ -83,9 +83,9 @@ impl ShadowObjectTable {
     /**
      * @brief  - Adds a shadow object to the object list
      */
-    pub fn add_shadow_object(&mut self, alloc_type: AllocType, addr: Vaddr, size: usize)  {
-        let sobj = ShadowObject{ alloc_type, base: addr, limit: ShadowObject::limit(addr, size) };
-        self.table.insert(addr, sobj);
+    pub fn add_shadow_object(&mut self, alloc_type: AllocType, base: Vaddr, size: usize)  {
+        let sobj = ShadowObject{ alloc_type, base, limit: ShadowObject::limit(base, size) };
+        self.table.insert(base, sobj);
     }
 
     /**
