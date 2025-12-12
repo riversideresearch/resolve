@@ -131,7 +131,7 @@ Function *getOrCreateResolveReportSanitizerTriggered(Module *M) {
     return resolve_report_fn;
 } 
 
-// Create a function getOrCreateRemediateBehavior function to handle do nothing or exit
+// getOrCreateRemediateBehavior: helper function to apply remediation strategies
 Function *getOrCreateRemediationBehavior(Module *M, Vulnerability::RemediationStrategies strategy) {
     auto &Ctx = M->getContext();
     auto ptr_ty = PointerType::get(Ctx, 0);
@@ -188,89 +188,4 @@ Function *getOrCreateRemediationBehavior(Module *M, Vulnerability::RemediationSt
     out << *resolve_remed_behavior;
     if (verifyFunction(*resolve_remed_behavior, &out)) {}
     return resolve_remed_behavior;
-} 
-
-Function *getOrCreateWeakResolveMalloc(Module *M) {
-    
-    auto &Ctx = M->getContext();
-    auto ptr_ty = PointerType::get(Ctx, 0);
-    auto size_ty = Type::getInt64Ty(Ctx);
-
-    IRBuilder<> builder(Ctx);
-    
-    if (Function *F = M->getFunction("resolve_malloc")) {
-        if (!F->isDeclaration()) {
-            return F;
-        }
-    }
-    
-    FunctionType *weak_resolve_malloc_fn_ty = FunctionType::get(
-        ptr_ty,
-        { size_ty },
-        false
-    );
-
-    Function *weak_resolve_malloc_fn = Function::Create(
-        weak_resolve_malloc_fn_ty,
-        GlobalValue::WeakAnyLinkage,
-        "resolve_malloc",
-        M
-    );
-
-    BasicBlock *EntryBB = BasicBlock::Create(Ctx, "", weak_resolve_malloc_fn);
-    builder.SetInsertPoint(EntryBB);
-
-    FunctionType *normal_malloc_ty = FunctionType::get(
-        ptr_ty,
-        { size_ty },
-        false
-    );
-
-    FunctionCallee regMallocFn = M->getOrInsertFunction("malloc", normal_malloc_ty);
-    Value *size_arg = weak_resolve_malloc_fn->getArg(0);
-    Value *mallocCall = builder.CreateCall(regMallocFn, { size_arg });
-    builder.CreateRet(mallocCall);
-
-    raw_ostream &out = errs();
-    out << *weak_resolve_malloc_fn;
-    if (verifyFunction(*weak_resolve_malloc_fn, &out)) {}
-    return weak_resolve_malloc_fn;
-}
-
-Function *getOrCreateWeakResolveStackObj(Module *M) {
-    
-    auto &Ctx = M->getContext();
-    auto void_ty = Type::getVoidTy(Ctx);
-    auto ptr_ty = PointerType::get(Ctx, 0);
-    auto size_ty = Type::getInt64Ty(Ctx);
-
-    IRBuilder<> builder(Ctx);
-    
-    if (Function *F = M->getFunction("resolve_stack_obj")) {
-        if (!F->isDeclaration()) {
-            return F;
-        }
-    }
-    
-    FunctionType *weak_resolve_stack_obj_fn_ty = FunctionType::get(
-        void_ty,
-        { ptr_ty, size_ty },
-        false
-    );
-
-    Function *weak_resolve_stack_obj_fn = Function::Create(
-        weak_resolve_stack_obj_fn_ty,
-        GlobalValue::WeakAnyLinkage,
-        "resolve_stack_obj",
-        M
-    );
-
-    BasicBlock *EntryBB = BasicBlock::Create(Ctx, "", weak_resolve_stack_obj_fn);
-    builder.SetInsertPoint(EntryBB);
-    builder.CreateRetVoid();
-
-    raw_ostream &out = errs();
-    out << *weak_resolve_stack_obj_fn;
-    if (verifyFunction(*weak_resolve_stack_obj_fn, &out)) {}
-    return weak_resolve_stack_obj_fn;
 }

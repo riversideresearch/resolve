@@ -1,0 +1,3 @@
+# Use nightly for nonpoision mutex
+[toolchain]
+channel = "nightly"
