@@ -2,7 +2,7 @@
 // LGPL-3; See LICENSE.txt in the repo root for details.
 
 use std::collections::BTreeMap;
-use std::sync::{LazyLock, Mutex};
+use std::sync::{LazyLock, nonpoison::Mutex};
 use std::ops::RangeInclusive;
 
 //Declare alias for virtual address

@@ -1,17 +1,19 @@
 // Copyright (c) 2025 Riverside Research.
 // LGPL-3; See LICENSE.txt in the repo root for details.
+#![feature(sync_nonpoison)]
+#![feature(nonpoison_mutex)]
 
 mod shadowobjs;
 mod buffer_writer;
 
 use libc::{atexit, c_char, c_float, c_void, calloc, dladdr, dlsym, free, lseek, malloc, memcpy, realloc, strdup, strndup, strlen, write, Dl_info, SEEK_END};
-use core::fmt::Write;
+use std::io::Write;
 use std::fmt::Display;
 use std::ffi::CStr;
 use std::sync::atomic::Ordering;
 use std::sync::Once;
 
-use crate::buffer_writer::{BufferWriter, DLSYM_FD, RESOLVE_LOG_FD, WRITTEN_JSON_HEADER};
+use crate::buffer_writer::{BufferWriter, DLSYM_FD, RESOLVE_LOG_FILE, WRITTEN_JSON_HEADER};
 use crate::shadowobjs::{ShadowObject, AllocType, Vaddr, ALIVE_OBJ_LIST, FREED_OBJ_LIST};
 
 
@@ -31,7 +33,7 @@ use crate::shadowobjs::{ShadowObject, AllocType, Vaddr, ALIVE_OBJ_LIST, FREED_OB
 #[unsafe(no_mangle)]
 pub extern "C" fn resolve_stack_obj(ptr: *mut c_void, size: usize) -> () {
     let base = ptr as Vaddr;
-    let mut obj_list = ALIVE_OBJ_LIST.lock().expect("Mutex not poisoned");
+    let mut obj_list = ALIVE_OBJ_LIST.lock();
     obj_list.add_shadow_object(AllocType::Stack, base, size);
 
     let mut buf = [0u8; 128];
@@ -54,7 +56,7 @@ pub extern "C" fn resolve_malloc(size: usize) -> *mut c_void {
         return ptr
     }
 
-    let mut obj_list = ALIVE_OBJ_LIST.lock().expect("Mutex not poisoned");
+    let mut obj_list = ALIVE_OBJ_LIST.lock();
     obj_list.add_shadow_object(AllocType::Heap, ptr as Vaddr, size);
 
     let mut buf = [0u8; 128];
@@ -81,7 +83,7 @@ pub extern "C" fn resolve_gep(ptr: *mut c_void, derived: *mut c_void) -> *mut c_
     let base = ptr as Vaddr;
     let derived = derived as Vaddr;
     
-    let sobj_table = ALIVE_OBJ_LIST.lock().expect("Mutex not poisoned");
+    let sobj_table = ALIVE_OBJ_LIST.lock();
 
     // Look up the shadow object corresponding to this access.
     // NOTE: Return 0 ('null') if shadow object cannot be found.
@@ -138,7 +140,7 @@ pub extern "C" fn resolve_memcpy(dest: *mut c_void, src: *mut c_void, size: usiz
         return ptr
     }
 
-    let mut obj_list = ALIVE_OBJ_LIST.lock().expect("Mutex not poisoned");
+    let mut obj_list = ALIVE_OBJ_LIST.lock();
     obj_list.add_shadow_object(AllocType::Heap, ptr as Vaddr, size);
 
     let mut buf = [0u8; 128];
@@ -158,7 +160,7 @@ pub extern "C" fn resolve_memcpy(dest: *mut c_void, src: *mut c_void, size: usiz
  */
 #[unsafe(no_mangle)]
 pub extern "C" fn resolve_free(ptr: *mut c_void) -> () {
-    let obj_list = ALIVE_OBJ_LIST.lock().expect("Mutex not poisoned");
+    let obj_list = ALIVE_OBJ_LIST.lock();
     
     // // Insert a function to find the object and return the pointer size
     // // Do I need to handle if the sobj cannot be found? 
@@ -206,7 +208,7 @@ pub extern "C" fn resolve_free(ptr: *mut c_void) -> () {
     
     // TODO: Remove object from alive list?
     // Insert shadow object into freed object list
-    let mut freed_guard = FREED_OBJ_LIST.lock().expect("Mutex not poisoned");
+    let mut freed_guard = FREED_OBJ_LIST.lock();
     freed_guard.add_shadow_object(AllocType::Unallocated, ptr as Vaddr, ptr_size);
 
     let _ = unsafe { free(ptr) };
@@ -228,7 +230,7 @@ pub extern "C" fn resolve_realloc(ptr: *mut c_void, size: usize) -> *mut c_void 
         return realloc_ptr
     }
 
-    let mut obj_list = ALIVE_OBJ_LIST.lock().expect("Mutex not poisoned");
+    let mut obj_list = ALIVE_OBJ_LIST.lock();
     obj_list.add_shadow_object(AllocType::Heap, realloc_ptr as Vaddr, size);
 
     let mut buf = [0u8; 128];
@@ -257,7 +259,7 @@ pub extern "C" fn resolve_calloc(n_items: usize, size: usize) -> *mut c_void {
     }
 
 
-    let mut obj_list = ALIVE_OBJ_LIST.lock().expect("Mutex not poisoned");
+    let mut obj_list = ALIVE_OBJ_LIST.lock();
     obj_list.add_shadow_object(AllocType::Heap, ptr as Vaddr, size);
 
     let mut buf = [0u8; 128];
@@ -285,7 +287,7 @@ pub extern "C" fn resolve_strdup(ptr: *mut c_char) -> *mut c_char {
         return string_ptr
     }
 
-    let mut obj_list = ALIVE_OBJ_LIST.lock().expect("Mutex not poisoned");
+    let mut obj_list = ALIVE_OBJ_LIST.lock();
     let sizeofstr = unsafe { strlen(ptr) + 1}; // NOTE: +1 for null terminate byte string in C
     obj_list.add_shadow_object(AllocType::Heap, string_ptr as Vaddr, sizeofstr);
 
@@ -317,7 +319,7 @@ pub extern "C" fn resolve_strndup(ptr: *mut c_char, size: usize) -> *mut c_char 
         return string_ptr
     }
 
-    let mut obj_list = ALIVE_OBJ_LIST.lock().expect("Mutex not poisoned");
+    let mut obj_list = ALIVE_OBJ_LIST.lock();
     let sizeofstr = unsafe { strlen(ptr) + 1};
     obj_list.add_shadow_object(AllocType::Heap, string_ptr as Vaddr, sizeofstr);
 
@@ -665,7 +667,7 @@ pub extern "C" fn flush_dlsym_log() {
 pub extern "C" fn resolve_check_bounds(base_ptr: *mut c_void, size: usize) -> bool {
     let base = base_ptr as Vaddr;
 
-    let sobj_table = ALIVE_OBJ_LIST.lock().expect("Mutex not poisoned");
+    let sobj_table = ALIVE_OBJ_LIST.lock();
 
     // Look up the shadow object corresponding to this access.
     if let Some(sobj) = sobj_table.search_intersection(base) {
@@ -689,8 +691,8 @@ pub extern "C" fn resolve_check_bounds(base_ptr: *mut c_void, size: usize) -> bo
 pub extern "C" fn resolve_obj_type(base_ptr: *mut c_void) -> AllocType {
     let base = base_ptr as Vaddr;
 
-    let sobj_table = ALIVE_OBJ_LIST.lock().expect("Mutex not poisoned");
-    let free_table = FREED_OBJ_LIST.lock().expect("Mutex not poisoned");
+    let sobj_table = ALIVE_OBJ_LIST.lock();
+    let free_table = FREED_OBJ_LIST.lock();
 
     let obj = free_table
         .search_intersection(base)
