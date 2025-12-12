@@ -16,7 +16,7 @@ pub enum AllocType {
     Unknown,
     Heap,
     Stack,
-    Global,
+    #[allow(dead_code)] Global,
 }
 
 impl AllocType {
