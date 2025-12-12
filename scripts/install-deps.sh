@@ -14,6 +14,8 @@ INSTALL_CMD="sudo apt-get install -y --no-install-recommends"
 PKGS="build-essential \
     clang \
     clang-format \
+    lldb \
+    gdb \
     lld \
     cmake \
     ninja-build \
