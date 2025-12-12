@@ -3,26 +3,59 @@
 #![feature(sync_nonpoison)]
 #![feature(nonpoison_mutex)]
 
-mod buffer_writer;
 mod shadowobjs;
 mod remediate;
 mod trace;
 
-use libc::{atexit, c_void, dladdr, dlsym, lseek, write, Dl_info, SEEK_END};
-use std::io::Write;
+use libc::{atexit, c_void, dladdr, dlsym, Dl_info};
+use std::fmt::Display;
+use std::fs::File;
+use std::{env, process};
+use std::io::{Seek, Write};
 use std::ffi::CStr;
-use std::sync::atomic::Ordering;
-use std::sync::Once;
+use std::sync::nonpoison::Mutex;
+use std::sync::{LazyLock, Once};
 
-use crate::buffer_writer::{BufferWriter, DLSYM_FD, RESOLVE_LOG_FILE, WRITTEN_JSON_HEADER};
-
-static REGISTER: Once = Once::new();
-
-fn register_cleanup() {
-    unsafe {
-        // SAFETY: flush_dlsym_log is extern "C" and takes no arguments.
-        atexit(flush_dlsym_log);
+/// Appends id to base path, but before the first .suffix if any
+fn idify_file_path(path: &str, id: impl Display) -> String {
+    if let Some((stem, ext)) = path.rsplit_once('.') {
+        format!("{}_{}.{}", stem, id, ext)
+    } else {
+        format!("{}_{}", path, id)
     }
+}
+
+/// File for "resolve_dlsym.json"
+pub static DLSYM_LOG_FILE: LazyLock<Mutex<File>> = LazyLock::new(|| {    
+    let path = env::var("RESOLVE_DLSYM_LOG");
+    let path = path.unwrap_or_else(|_| "resolve_dlsym.json".to_string());
+    
+    let path = idify_file_path(&path, process::id());
+    
+    Mutex::new(File::create(path).unwrap())
+});
+
+/// File for "resolve_log.out"
+pub static RESOLVE_LOG_FILE: LazyLock<Mutex<File>> = LazyLock::new(|| {    
+    let path = env::var("RESOLVE_RUNTIME_LOG");
+    let path = path.unwrap_or_else(|_| "resolve_log.out".to_string());
+    
+    let path = idify_file_path(&path, process::id());
+    
+    Mutex::new(File::create(path).unwrap())
+});
+
+/**
+ * @brief - Writes JSON footer to the file descriptor
+ */
+#[unsafe(no_mangle)]
+pub extern "C" fn flush_dlsym_log() {
+    let mut file = DLSYM_LOG_FILE.lock();
+
+    // Seek back 2 bytse to erase last ",\n"
+    file.seek_relative(-2).unwrap();
+    
+    let _ = write!(&mut file, "\n  ]\n}}\n");    
 }
 
 /**
@@ -33,76 +66,45 @@ fn register_cleanup() {
 #[unsafe(no_mangle)]
 pub extern "C" fn resolve_dlsym(handle: *mut c_void, symbol: *const u8) -> *mut c_void {
     
-    REGISTER.call_once(|| {
-        register_cleanup();
+    static REGISTER_EXIT: Once = Once::new();
+    REGISTER_EXIT.call_once(|| {
+        // SAFETY: flush_dlsym_log is extern "C" and takes no arguments.
+        // TODO: is DLSYM_LOG_FILE still valid during the atexit callback?
+        unsafe { atexit(flush_dlsym_log) };
     });
     
     let addr = unsafe { dlsym(handle, symbol.cast()) };
     
-    let origin_lib = unsafe {
+    let lib_name = unsafe {
         let mut info: Dl_info = std::mem::zeroed();
-        let origin = if dladdr(addr, &mut info) != 0 && !info.dli_fname.is_null() {
-            info.dli_fname
+        if dladdr(addr, &mut info) != 0 && !info.dli_fname.is_null() {
+            CStr::from_ptr(info.dli_fname)
         } else  {
-            b"<unknown>\0".as_ptr().cast::<i8>()
-        };
-
-        origin
+            c"<unknown>"
+        }
     };
     
-    let symbol_str = if !symbol.is_null() {
-        unsafe { CStr::from_ptr(symbol.cast::<i8>()).to_bytes() }
+    let symbol = if !symbol.is_null() {
+        unsafe { CStr::from_ptr(symbol.cast::<i8>()) }
     } else {
-        b"<null>\0"
+        c"<null>"
     };
-
-    let lib_str = unsafe { CStr::from_ptr(origin_lib).to_bytes() }; 
 
     // Write JSON header only once 
-    if WRITTEN_JSON_HEADER
-        .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
-        .is_ok() 
-    {
-        let header = b"{\n \"loaded_symbols\": [\n";
-        let _ = unsafe{ write(*DLSYM_FD, header.as_ptr() as *const _, header.len()) };
-    }
-
-
-    let mut buf = [0u8; 128];
-    let mut writer = BufferWriter::new(&mut buf);
+    static WRITE_HEADER: Once = Once::new();
+    WRITE_HEADER.call_once(|| {
+        let _ = write!(&mut DLSYM_LOG_FILE.lock(), "{{\n \"loaded_symbols\": [\n");
+    });
 
     let _ = writeln!(
-        &mut writer,
+        &mut DLSYM_LOG_FILE.lock(),
         "    {{ \"symbol\": \"{}\", \"library\": \"{}\" }},",
-        core::str::from_utf8(symbol_str).unwrap_or("<invalid>"),
-        core::str::from_utf8(lib_str).unwrap_or("<invalid>")
+        symbol.to_str().unwrap_or("<invalid>"),
+        lib_name.to_str().unwrap_or("<invalid>")
     );
 
-
-    let json_bytes = writer.as_bytes();
-    let _ = unsafe { write(*DLSYM_FD, json_bytes.as_ptr() as *const _, json_bytes.len()) };
-    
     addr
-
 } 
-/**
- * @brief - Writes JSON footer to the file descriptor
- */
-#[unsafe(no_mangle)]
-pub extern "C" fn flush_dlsym_log() {
-    unsafe {
-        // Seek back 2 bytse to erase last ",\n"
-        if lseek(*DLSYM_FD, -2, SEEK_END) == -1 {
-            // 
-            let fallback = b"  ";
-            let _ = write(*DLSYM_FD, fallback.as_ptr() as *const _, fallback.len());
-            return;
-        }
-
-        let footer = b"\n  ]\n}\n";
-        let _ = write(*DLSYM_FD, footer.as_ptr() as *const _, footer.len());
-    }
-}
 
 #[cfg(test)]
 mod tests {

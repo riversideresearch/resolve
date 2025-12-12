@@ -1,10 +1,9 @@
 // Copyright (c) 2025 Riverside Research.
 // LGPL-3; See LICENSE.txt in the repo root for details.
-use libc::{c_char, c_void, calloc, free, malloc, memcpy, realloc, strdup, strndup, strlen, write};
+use libc::{c_char, c_void, calloc, free, malloc, memcpy, realloc, strdup, strndup, strlen};
 use std::io::Write;
 
-use crate::buffer_writer::{BufferWriter, RESOLVE_LOG_FD};
-use crate::shadowobjs::{ShadowObject, AllocType, Vaddr, ALIVE_OBJ_LIST, FREED_OBJ_LIST};
+use crate::{RESOLVE_LOG_FILE, shadowobjs::{ALIVE_OBJ_LIST, AllocType, FREED_OBJ_LIST, ShadowObject, Vaddr}};
 
 
 /**
@@ -26,11 +25,7 @@ pub extern "C" fn resolve_stack_obj(ptr: *mut c_void, size: usize) -> () {
     let mut obj_list = ALIVE_OBJ_LIST.lock();
     obj_list.add_shadow_object(AllocType::Stack, base, size);
 
-    let mut buf: [u8; 128] = [0u8; 128];
-    let mut writer = BufferWriter::new(&mut buf);
-    let _ = writeln!(&mut writer, "[STACK] Object allocated with size: {}, address: 0x{:x}", size, base);
-    let written = writer.as_bytes();
-    unsafe { libc::write(*RESOLVE_LOG_FD, written.as_ptr() as *const _, written.len()) };
+    let _ = writeln!(&mut RESOLVE_LOG_FILE.lock(), "[STACK] Object allocated with size: {}, address: 0x{:x}", size, base);
 }
 
 /**
@@ -49,11 +44,7 @@ pub extern "C" fn resolve_malloc(size: usize) -> *mut c_void {
     let mut obj_list = ALIVE_OBJ_LIST.lock();
     obj_list.add_shadow_object(AllocType::Heap, ptr as Vaddr, size);
 
-    let mut buf: [u8; 128] = [0u8; 128];
-    let mut writer = BufferWriter::new(&mut buf);
-    let _ = writeln!(&mut writer, "[HEAP] Object allocated with size: {}, address: 0x{:x}", size, ptr as Vaddr);
-    let written = writer.as_bytes();
-    unsafe { libc::write(*RESOLVE_LOG_FD, written.as_ptr() as *const _, written.len()) };
+    let _ = writeln!(&mut RESOLVE_LOG_FILE.lock(), "[HEAP] Object allocated with size: {}, address: 0x{:x}", size, ptr as Vaddr);
 
     // Return the pointer  
     ptr
@@ -78,12 +69,8 @@ pub extern "C" fn resolve_gep(ptr: *mut c_void, derived: *mut c_void) -> *mut c_
     // Look up the shadow object corresponding to this access.
     // NOTE: Return 0 ('null') if shadow object cannot be found.
     let Some(sobj) = sobj_table.search_intersection(base) else { 
-        let mut buf = [0u8; 128];
-        let mut writer = BufferWriter::new(&mut buf);
-        let _ = writeln!(&mut writer, "[GEP] Cannot find ptr 0x{:x} in shadow table", base);
-        let written = writer.as_bytes();
-        unsafe { libc::write(*RESOLVE_LOG_FD, written.as_ptr() as *const _, written.len()) };
-        
+        let _ = writeln!(&mut RESOLVE_LOG_FILE.lock(), "[GEP] Cannot find ptr 0x{:x} in shadow table", base);
+
         // NOTE: Not doing this right now
         // In theory it could catch bugs where integers are forced to pointers...
         // But there are too many allocation we don't know about, like those in libc
@@ -96,19 +83,11 @@ pub extern "C" fn resolve_gep(ptr: *mut c_void, derived: *mut c_void) -> *mut c_
 
     // If shadow object exists then check if the access is within bounds
     if sobj.contains(derived as Vaddr) {
-        let mut buf = [0u8; 128];
-        let mut writer = BufferWriter::new(&mut buf);
-        let _ = writeln!(&mut writer, "[GEP] ptr 0x{:x} valid for base 0x{:x}, obj: {}@0x{:x}", derived, base, sobj.size(), sobj.base);
-        let written = writer.as_bytes();
-        unsafe { libc::write(*RESOLVE_LOG_FD, written.as_ptr() as *const _, written.len()) };
+        let _ = writeln!(&mut RESOLVE_LOG_FILE.lock(), "[GEP] ptr 0x{:x} valid for base 0x{:x}, obj: {}@0x{:x}", derived, base, sobj.size(), sobj.base);
         return derived as *mut c_void
     } 
 
-    let mut buf = [0u8; 128];
-    let mut writer = BufferWriter::new(&mut buf);
-    let _ = writeln!(&mut writer, "[GEP] ptr 0x{:x} not valid for base 0x{:x}, obj: {}@0x{:x}", derived, base, sobj.size(), sobj.base);
-    let written = writer.as_bytes();
-    unsafe { libc::write(*RESOLVE_LOG_FD, written.as_ptr() as *const _, written.len()) };
+    let _ = writeln!(&mut RESOLVE_LOG_FILE.lock(), "[GEP] ptr 0x{:x} not valid for base 0x{:x}, obj: {}@0x{:x}", derived, base, sobj.size(), sobj.base);
 
     // Return 1-past limit of allocation @ ptr
     sobj.past_limit() as *mut c_void
@@ -133,12 +112,7 @@ pub extern "C" fn resolve_memcpy(dest: *mut c_void, src: *mut c_void, size: usiz
     let mut obj_list = ALIVE_OBJ_LIST.lock();
     obj_list.add_shadow_object(AllocType::Heap, ptr as Vaddr, size);
 
-    let mut buf = [0u8; 128];
-    let mut writer = BufferWriter::new(&mut buf);
-
-    let _ = writeln!(&mut writer, "[HEAP] Object copied to dst: {:?}, from src {:?}, with size: {}, ptr: 0x{:x}", dest, src, size, ptr as Vaddr);
-    let written = writer.as_bytes();
-    unsafe { libc::write(*RESOLVE_LOG_FD, written.as_ptr() as *const _, written.len()) };
+    let _ = writeln!(&mut RESOLVE_LOG_FILE.lock(), "[HEAP] Object copied to dst: {:?}, from src {:?}, with size: {}, ptr: 0x{:x}", dest, src, size, ptr as Vaddr);
 
     ptr
 }
@@ -152,14 +126,10 @@ pub extern "C" fn resolve_memcpy(dest: *mut c_void, src: *mut c_void, size: usiz
 pub extern "C" fn resolve_free(ptr: *mut c_void) -> () {
     let obj_list = ALIVE_OBJ_LIST.lock();
     
-    // // Insert a function to find the object and return the pointer size
-    // // Do I need to handle if the sobj cannot be found? 
-    let mut buf = [0u8; 128];
-    let mut writer = BufferWriter::new(&mut buf);
+    // Insert a function to find the object and return the pointer size
+    // Do I need to handle if the sobj cannot be found? 
 
-    let _ = writeln!(&mut writer, "[FREE] Allocated object freed at address: 0x{:x}", ptr as Vaddr);
-    let written = writer.as_bytes();
-    unsafe { libc::write(*RESOLVE_LOG_FD, written.as_ptr() as *const _, written.len()) };
+    let _ = writeln!(&mut RESOLVE_LOG_FILE.lock(), "[FREE] Allocated object freed at address: 0x{:x}", ptr as Vaddr);
 
     // Lookup shadow object
     let sobj_opt = obj_list.search_intersection(ptr as Vaddr);
@@ -170,26 +140,20 @@ pub extern "C" fn resolve_free(ptr: *mut c_void) -> () {
         Some(sobj) => {
             ptr_size = sobj.limit;
 
-            let mut writer = BufferWriter::new(&mut buf);
             let _ = writeln!(
-                &mut writer,
+                &mut RESOLVE_LOG_FILE.lock(),
                 "[INFO] Found shadow object for allocated object, 0x{:x}, size = {}",
                 ptr as Vaddr,
                 ptr_size
             );
-            let written = writer.as_bytes();
-            unsafe { libc::write(*RESOLVE_LOG_FD, written.as_ptr() as *const _, written.len())};
         }
         None => {
             ptr_size = 0;
-            let mut writer = BufferWriter::new(&mut buf);
             let _ = writeln!(
-                &mut writer,
+                &mut RESOLVE_LOG_FILE.lock(),
                 "[WARNING] No shadow object found for allocated object: 0x{:x}",
                 ptr as Vaddr
         );
-        let written = writer.as_bytes();
-        unsafe { libc::write(*RESOLVE_LOG_FD, written.as_ptr() as *const _, written.len())};
         }
     }
 
@@ -202,7 +166,6 @@ pub extern "C" fn resolve_free(ptr: *mut c_void) -> () {
     freed_guard.add_shadow_object(AllocType::Unallocated, ptr as Vaddr, ptr_size);
 
     let _ = unsafe { free(ptr) };
-    
 }
 
 /**
@@ -223,12 +186,7 @@ pub extern "C" fn resolve_realloc(ptr: *mut c_void, size: usize) -> *mut c_void 
     let mut obj_list = ALIVE_OBJ_LIST.lock();
     obj_list.add_shadow_object(AllocType::Heap, realloc_ptr as Vaddr, size);
 
-    let mut buf = [0u8; 128];
-    let mut writer = BufferWriter::new(&mut buf);
-
-    let _ = writeln!(&mut writer, "[HEAP] Allocated object reallocated mem from src: {:?}, size: {}, dst ptr: 0x{:x}", ptr, size, realloc_ptr as Vaddr);
-    let written = writer.as_bytes();
-    unsafe { libc::write(*RESOLVE_LOG_FD, written.as_ptr() as *const _, written.len()) };
+    let _ = writeln!(&mut RESOLVE_LOG_FILE.lock(), "[HEAP] Allocated object reallocated mem from src: {:?}, size: {}, dst ptr: 0x{:x}", ptr, size, realloc_ptr as Vaddr);
 
     realloc_ptr
 }
@@ -252,13 +210,7 @@ pub extern "C" fn resolve_calloc(n_items: usize, size: usize) -> *mut c_void {
     let mut obj_list = ALIVE_OBJ_LIST.lock();
     obj_list.add_shadow_object(AllocType::Heap, ptr as Vaddr, size);
 
-    let mut buf = [0u8; 128];
-    let mut writer = BufferWriter::new(&mut buf);
-
-    let _ = writeln!(&mut writer, "[HEAP] Logging allocation with {} items, size (bytes): {}, dst ptr: 0x{:x}", n_items, size, ptr as Vaddr);
-    let written = writer.as_bytes();
-    unsafe { libc::write(*RESOLVE_LOG_FD, written.as_ptr() as *const _, written.len()) };
-
+    let _ = writeln!(&mut RESOLVE_LOG_FILE.lock(), "[HEAP] Logging allocation with {} items, size (bytes): {}, dst ptr: 0x{:x}", n_items, size, ptr as Vaddr);
 
     ptr
 }
@@ -281,12 +233,7 @@ pub extern "C" fn resolve_strdup(ptr: *mut c_char) -> *mut c_char {
     let sizeofstr = unsafe { strlen(ptr) + 1}; // NOTE: +1 for null terminate byte string in C
     obj_list.add_shadow_object(AllocType::Heap, string_ptr as Vaddr, sizeofstr);
 
-     let mut buf = [0u8; 128];
-    let mut writer = BufferWriter::new(&mut buf);
-
-    let _ = writeln!(&mut writer, "[HEAP] Logging 'strdup' function call with dst ptr: 0x{:x}", string_ptr as Vaddr);
-    let written = writer.as_bytes();
-    unsafe { libc::write(*RESOLVE_LOG_FD, written.as_ptr() as *const _, written.len()) };
+    let _ = writeln!(&mut RESOLVE_LOG_FILE.lock(), "[HEAP] Logging 'strdup' function call with dst ptr: 0x{:x}", string_ptr as Vaddr);
 
     string_ptr
 }
@@ -313,12 +260,7 @@ pub extern "C" fn resolve_strndup(ptr: *mut c_char, size: usize) -> *mut c_char 
     let sizeofstr = unsafe { strlen(ptr) + 1};
     obj_list.add_shadow_object(AllocType::Heap, string_ptr as Vaddr, sizeofstr);
 
-     let mut buf = [0u8; 128];
-    let mut writer = BufferWriter::new(&mut buf);
-
-    let _ = writeln!(&mut writer, "[HEAP] Logging 'strndup' function call with size (bytes): {}, dst ptr: {:?}", size, string_ptr as Vaddr);
-    let written = writer.as_bytes();
-    unsafe { libc::write(*RESOLVE_LOG_FD, written.as_ptr() as *const _, written.len()) };
+    let _ = writeln!(&mut RESOLVE_LOG_FILE.lock(), "[HEAP] Logging 'strndup' function call with size (bytes): {}, dst ptr: {:?}", size, string_ptr as Vaddr);
 
     string_ptr
 }
@@ -344,12 +286,9 @@ pub extern "C" fn resolve_check_bounds(base_ptr: *mut c_void, size: usize) -> bo
             return true
         }
     }
+
     // Access _not_ in Bounds
-    let mut buf = [0u8; 128];
-    let mut writer = BufferWriter::new(&mut buf);
-    let _ = writeln!(&mut writer, "[ERROR] OOB access at 0x{:x}\n", base as Vaddr);
-    let written = writer.as_bytes();
-    unsafe { libc::write(*RESOLVE_LOG_FD, written.as_ptr() as *const _, written.len())};
+    let _ = writeln!(&mut RESOLVE_LOG_FILE.lock(), "[ERROR] OOB access at 0x{:x}\n", base as Vaddr);
 
     false
 }
@@ -376,11 +315,7 @@ pub extern "C" fn resolve_obj_type(base_ptr: *mut c_void) -> AllocType {
  */
 #[unsafe(no_mangle)]
 pub extern "C" fn resolve_report_sanitize_mem_inst_triggered(ptr: *mut c_void) {
-    let mut buf = [0u8; 128];
-    let mut writer = BufferWriter::new(&mut buf);
-    let _ = writeln!(&mut writer, "[SANITIZE] Applying sanitizer to address 0x{:x}", ptr as Vaddr);
-    let written = writer.as_bytes();
-    unsafe { libc::write(*RESOLVE_LOG_FD, written.as_ptr() as *const _, written.len())};
+    let _ = writeln!(&mut RESOLVE_LOG_FILE.lock(), "[SANITIZE] Applying sanitizer to address 0x{:x}", ptr as Vaddr);
 }
 
 /**
@@ -388,9 +323,5 @@ pub extern "C" fn resolve_report_sanitize_mem_inst_triggered(ptr: *mut c_void) {
  */
 #[unsafe(no_mangle)]
 pub extern "C" fn resolve_report_sanitizer_triggered() -> () {
-    let mut buf = [0u8; 128];
-    let mut writer = BufferWriter::new(&mut buf);
-    let _ = writeln!(&mut writer, "[SANITIZE] Applying arithmetic sanitization in basic block");
-    let written = writer.as_bytes();
-    unsafe { libc::write(*RESOLVE_LOG_FD, written.as_ptr() as *const _, written.len() )};
+    let _ = writeln!(&mut RESOLVE_LOG_FILE.lock(), "[SANITIZE] Applying arithmetic sanitization in basic block");
 }
