@@ -190,41 +190,46 @@ Function *getOrCreateRemediationBehavior(Module *M, Vulnerability::RemediationSt
     return resolve_remed_behavior;
 } 
 
-Function *getOrCreateWeakResolveMalloc(Module *M) {
+FunctionCallee getOrCreateWeakResolveMalloc(Module *M) {
     
     auto &Ctx = M->getContext();
     auto ptr_ty = PointerType::get(Ctx, 0);
     auto size_ty = Type::getInt64Ty(Ctx);
 
-    IRBuilder<> builder(Ctx);
+    // IRBuilder<> builder(Ctx);
     
-    if (Function *F = M->getFunction("resolve_malloc")) {
-        if (!F->isDeclaration()) {
-            return F;
-        }
-    }
-    
-    FunctionType *weak_resolve_malloc_fn_ty = FunctionType::get(
-        ptr_ty,
-        { size_ty },
-        false
-    );
-
-    Function *weak_resolve_malloc_fn = Function::Create(
-        weak_resolve_malloc_fn_ty,
-        GlobalValue::WeakAnyLinkage,
+    return M->getOrInsertFunction(
         "resolve_malloc",
-        M
+        FunctionType::get(ptr_ty, { size_ty }, false)
     );
 
-    BasicBlock *EntryBB = BasicBlock::Create(Ctx, "", weak_resolve_malloc_fn);
-    builder.SetInsertPoint(EntryBB);
+    // if (Function *F = M->getFunction("resolve_malloc")) {
+    //     if (!F->isDeclaration()) {
+    //         return F;
+    //     }
+    // }
+    
+    // FunctionType *weak_resolve_malloc_fn_ty = FunctionType::get(
+    //     ptr_ty,
+    //     { size_ty },
+    //     false
+    // );
 
-    FunctionType *normal_malloc_ty = FunctionType::get(
-        ptr_ty,
-        { size_ty },
-        false
-    );
+    // Function *weak_resolve_malloc_fn = Function::Create(
+    //     weak_resolve_malloc_fn_ty,
+    //     GlobalValue::WeakAnyLinkage,
+    //     "resolve_malloc",
+    //     M
+    // );
+
+    // BasicBlock *EntryBB = BasicBlock::Create(Ctx, "", weak_resolve_malloc_fn);
+    // builder.SetInsertPoint(EntryBB);
+
+    // FunctionType *normal_malloc_ty = FunctionType::get(
+    //     ptr_ty,
+    //     { size_ty },
+    //     false
+    // );
 
     // FunctionCallee regMallocFn = M->getOrInsertFunction("malloc", normal_malloc_ty);
     // Value *size_arg = weak_resolve_malloc_fn->getArg(0);
@@ -234,36 +239,37 @@ Function *getOrCreateWeakResolveMalloc(Module *M) {
     // raw_ostream &out = errs();
     // out << *weak_resolve_malloc_fn;
     // if (verifyFunction(*weak_resolve_malloc_fn, &out)) {}
-    return weak_resolve_malloc_fn;
+    // return weak_resolve_malloc_fn;
 }
 
-Function *getOrCreateWeakResolveStackObj(Module *M) {
+FunctionCallee getOrCreateWeakResolveStackObj(Module *M) {
     
     auto &Ctx = M->getContext();
     auto void_ty = Type::getVoidTy(Ctx);
     auto ptr_ty = PointerType::get(Ctx, 0);
     auto size_ty = Type::getInt64Ty(Ctx);
 
-    IRBuilder<> builder(Ctx);
+    // IRBuilder<> builder(Ctx);
     
-    if (Function *F = M->getFunction("resolve_stack_obj")) {
-        if (!F->isDeclaration()) {
-            return F;
-        }
-    }
-    
-    FunctionType *weak_resolve_stack_obj_fn_ty = FunctionType::get(
-        void_ty,
-        { ptr_ty, size_ty },
-        false
+    return M->getOrInsertFunction(
+        "resolve_stack_obj",
+        FunctionType::get(void_ty, { ptr_ty, size_ty }, false)
     );
 
-    Function *weak_resolve_stack_obj_fn = Function::Create(
-        weak_resolve_stack_obj_fn_ty,
-        GlobalValue::WeakAnyLinkage,
-        "resolve_stack_obj",
-        M
-    );
+    // if (Function *F = M->getFunction("resolve_stack_obj")) {
+    //     if (!F->isDeclaration()) {
+    //         return F;
+    //     }
+    // }
+    
+    // FunctionType *weak_resolve_stack_obj_fn_ty = ;
+
+    // Function *weak_resolve_stack_obj_fn = Function::Create(
+    //     weak_resolve_stack_obj_fn_ty,
+    //     GlobalValue::WeakAnyLinkage,
+    //     "resolve_stack_obj",
+    //     M
+    // );
 
     // BasicBlock *EntryBB = BasicBlock::Create(Ctx, "", weak_resolve_stack_obj_fn);
     // builder.SetInsertPoint(EntryBB);
@@ -272,5 +278,5 @@ Function *getOrCreateWeakResolveStackObj(Module *M) {
     // raw_ostream &out = errs();
     // out << *weak_resolve_stack_obj_fn;
     // if (verifyFunction(*weak_resolve_stack_obj_fn, &out)) {}
-    return weak_resolve_stack_obj_fn;
+    // return weak_resolve_stack_obj_fn;
 }

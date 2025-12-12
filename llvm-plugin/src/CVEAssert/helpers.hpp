@@ -17,5 +17,5 @@ std::string getLLVMType(llvm::Type *ty);
 llvm::Function *getOrCreateIsHeap(llvm::Module *M, llvm::LLVMContext &Ctx);
 llvm::Function *getOrCreateResolveReportSanitizerTriggered(llvm::Module *M);
 llvm::Function *getOrCreateRemediationBehavior(llvm::Module *M, Vulnerability::RemediationStrategies strategy);
-llvm::Function *getOrCreateWeakResolveMalloc(llvm::Module *M);
-llvm::Function *getOrCreateWeakResolveStackObj(llvm::Module *M);
+llvm::FunctionCallee getOrCreateWeakResolveMalloc(llvm::Module *M);
+llvm::FunctionCallee getOrCreateWeakResolveStackObj(llvm::Module *M);
