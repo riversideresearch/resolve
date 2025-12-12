@@ -103,6 +103,15 @@ impl ShadowObjectTable {
     pub fn search_intersection(&self, addr: Vaddr) -> Option<&ShadowObject> {
         self.table.values().find(|sobj| sobj.contains(addr))
     }
+    
+    /**
+     * @brief - Looks through OBJLIST to find a shadow object with a past_limit value matching the input
+     * @input:  self, shadow object address  
+     * @return: None if shadow object does not exist otherwise optional reference to shadow object  
+     */
+    pub fn search_invalid(&self, addr: Vaddr) -> Option<&ShadowObject> {
+        self.table.values().find(|sobj| sobj.past_limit() == addr)
+    }
 }
 
 // static object lists to store all objects

@@ -338,23 +338,38 @@ pub extern "C" fn resolve_check_bounds(base_ptr: *mut c_void, size: usize) -> bo
 
     let sobj_table = ALIVE_OBJ_LIST.lock();
 
-    // Look up the shadow object corresponding to this access.
+    // Look up the shadow object corresponding to this access
     if let Some(sobj) = sobj_table.search_intersection(base) {
         // If shadow object exists then check if the access is within bounds
         if sobj.contains(ShadowObject::limit(base, size)) {
             // Access in Bounds
             return true;
+        } else {
+            let _ = writeln!(
+                &mut RESOLVE_LOG_FILE.lock(),
+                "[ERROR] OOB access at 0x{:x}, size {} too big for allocation {}@{:x}",
+                base,
+                size,
+                sobj.size(),
+                sobj.base
+            );
+            return false;
         }
     }
 
-    // Access _not_ in Bounds
-    let _ = writeln!(
-        &mut RESOLVE_LOG_FILE.lock(),
-        "[ERROR] OOB access at 0x{:x}\n",
-        base as Vaddr
-    );
+    // Check if this is an invalid pointer for one of the known shadow objects
+    if let Some(sobj) = sobj_table.search_invalid(base) {
+        let _ = writeln!(
+            &mut RESOLVE_LOG_FILE.lock(),
+            "[ERROR] OOB access for {}@{:x}, invalid address computation",
+            sobj.size(),
+            sobj.base
+        );
+        return false;
+    }
 
-    false
+    // Not a tracked pointer, assume good to avoid false positives
+    true
 }
 
 #[unsafe(no_mangle)]
