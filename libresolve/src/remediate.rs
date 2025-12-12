@@ -345,7 +345,7 @@ pub extern "C" fn resolve_check_bounds(base_ptr: *mut c_void, size: usize) -> bo
             // Access in Bounds
             let _ = writeln!(
                 &mut RESOLVE_LOG_FILE.lock(),
-                "[BOUNDS] Access allowed {}@0x{:x} for allocation {}@{:x}",
+                "[BOUNDS] Access allowed {}@0x{:x} for allocation {}@0x{:x}",
                 size,
                 base,
                 sobj.size(),
@@ -355,9 +355,9 @@ pub extern "C" fn resolve_check_bounds(base_ptr: *mut c_void, size: usize) -> bo
         } else {
             let _ = writeln!(
                 &mut RESOLVE_LOG_FILE.lock(),
-                "[ERROR] OOB access at 0x{:x}, size {} too big for allocation {}@{:x}",
-                base,
+                "[ERROR] OOB access at {}@0x{:x} too big for allocation {}@0x{:x}",
                 size,
+                base,
                 sobj.size(),
                 sobj.base
             );
@@ -369,7 +369,7 @@ pub extern "C" fn resolve_check_bounds(base_ptr: *mut c_void, size: usize) -> bo
     if let Some(sobj) = sobj_table.search_invalid(base) {
         let _ = writeln!(
             &mut RESOLVE_LOG_FILE.lock(),
-            "[ERROR] OOB access for {}@{:x}, invalid address computation",
+            "[ERROR] OOB access for {}@0x{:x}, invalid address computation",
             sobj.size(),
             sobj.base
         );
