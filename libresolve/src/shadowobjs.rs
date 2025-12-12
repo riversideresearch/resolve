@@ -41,7 +41,7 @@ impl ShadowObject {
      * @note - Useful for querying contains
      */
     pub fn bounds(&self) -> RangeInclusive<Vaddr> {
-        self.base..=(self.base + self.limit)
+        self.base..=self.limit
     }
 
     pub fn contains(&self, addr: Vaddr) -> bool {
@@ -83,9 +83,9 @@ impl ShadowObjectTable {
     /**
      * @brief  - Adds a shadow object to the object list
      */
-    pub fn add_shadow_object(&mut self, alloc_type: AllocType, objaddr: Vaddr, offset: usize)  {
-        let sobj = ShadowObject{ alloc_type, base: objaddr, limit: offset };
-        self.table.insert(objaddr, sobj);
+    pub fn add_shadow_object(&mut self, alloc_type: AllocType, addr: Vaddr, size: usize)  {
+        let sobj = ShadowObject{ alloc_type, base: addr, limit: ShadowObject::limit(addr, size) };
+        self.table.insert(addr, sobj);
     }
 
     /**
