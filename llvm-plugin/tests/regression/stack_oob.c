@@ -23,13 +23,13 @@
 // RUN: RESOLVE_LABEL_CVE=vulnerabilities/stack_oob.json %clang -fpass-plugin=%plugin \ 
 // RUN: -L%rlib -lresolve -Wl,-rpath=%rlib %s -o %t.exe
 // RUN: %t.exe -2; EXIT_CODE=$?; \
-// RUN: echo Remediated exit: $EXIT_CODE; test $EXIT_CODE -eq 3
+// RUN: echo Remediated \(underflow\) exit: $EXIT_CODE; test $EXIT_CODE -eq 3
 // 
 // Test that the normal behavior is preserved
 // RUN: RESOLVE_LABEL_CVE=vulnerabilities/stack_oob.json %clang -O0 -g -fpass-plugin=%plugin \ 
 // RUN: -L%rlib -lresolve -Wl,-rpath=%rlib %s -o %t.exe
 // RUN: %t.exe 2; EXIT_CODE=$?; \
-// RUN: echo Normal exit: $EXIT_CODE; test $EXIT_CODE -eq 0
+// RUN: echo Normal exit: $EXIT_CODE; test $EXIT_CODE -eq 42
 
 #include <stdio.h>
 #include <stdlib.h>

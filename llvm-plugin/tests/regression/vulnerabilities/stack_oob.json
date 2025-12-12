@@ -10,6 +10,17 @@
             "affected-function": "main",
             "affected-file": "stack_oob.c",
             "remediation-strategy": "exit"
+        },
+                {
+            "cve-id": "CVE-resolve-oob-3",
+            "cve-description": "",
+            "package-name": "resolve-test",
+            "package-version": "1.4.5",
+            "cwe-id": "121",
+            "cwe-name": "Stack OOB access",
+            "affected-function": "use_stack",
+            "affected-file": "stack_oob.c",
+            "remediation-strategy": "exit"
         }
     ]
 }
