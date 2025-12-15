@@ -110,7 +110,7 @@ pub extern "C" fn resolve_gep(ptr: *mut c_void, derived: *mut c_void) -> *mut c_
     if sobj.contains(derived as Vaddr) {
         let _ = writeln!(
             &mut RESOLVE_LOG_FILE.lock(),
-            "[GEP] ptr 0x{:x} valid for base 0x{:x}, obj: {} @0x{:x}",
+            "[GEP] ptr 0x{:x} valid for base 0x{:x}, obj: {}@0x{:x}",
             derived,
             base,
             sobj.size(),
