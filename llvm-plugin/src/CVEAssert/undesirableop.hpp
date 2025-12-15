@@ -11,6 +11,5 @@
 // 1. Which arguments to return (or zero)
 // 2. Which arguments to test (if any)
 // 3. Condition to test (equality, <, etc..) NOTE: not needed right now delay
-llvm::Function *replaceUndesirableFunction(unsigned int arg, std::string cond);
-void sanitizeUndesirableOperationInFunction(llvm::Function *F, Vulnerability::RemediationStrategies strategy,
-                                    std::optional<std::string> funct_name);
+llvm::Function *replaceUndesirableFunction(Function *F, unsigned int arg, std::string cond, std::vector<Value *>& fnArgs);
+void sanitizeUndesirableOperationInFunction(llvm::Function *F, std::optional<std::string> funct_name);
