@@ -18,18 +18,29 @@
 
 using namespace llvm;
 
-Function *replaceUndesirableFunction(Function *F, unsigned int argNum, std::string cond, std::optional<std::string> fnName) {
+
+enum Cond { // Maybe adding an enum for all the possible conditions
+    EQ = 1,
+    GT = 2,
+    GT_EQ = 3,
+    LT = 4,
+    LT_EQ = 5
+};
+
+
+// We will continue generalizing this following eval-2
+Function *replaceUndesirableFunction(Function *F, unsigned int argNum) {
     Module *M = F->getParent();
     LLVMContext &Ctx = M->getContext();
     IRBuilder<> builder(Ctx);
 
-    std::string handlerName = "resolve_sanitized_fn_" + *fnName;
+    std::string handlerName = "resolve_sanitized_" + F->getName();
 
     if (Function *existingFn = M->getFunction(handlerName)) {
         return exisiting;
     }
 
-    FunctionType *resolveSanitizedFnTy = F->getType();
+    FunctionType *resolveSanitizedFnTy = F->getFunctionType();
 
     Function *resolveSanitizedFn = Function::Create(
         resolveSanitizedFnTy,
@@ -39,37 +50,20 @@ Function *replaceUndesirableFunction(Function *F, unsigned int argNum, std::stri
     );
 
     BasicBlock *EntryBB = BasicBlock::Create(Ctx, "", resolveSanitizedFn);
-    BasicBlock *NormalBB = BasicBlock::Create(Ctx, "", resolveSanitizedFn);
-    BasicBlock *SanitizedBB = BasicBlock::Create(Ctx, "", resolveSanitizedFn);
-    
+    // Insert a return instruction here.
     builder.SetInsertPoint(EntryBB);
-
-    // EntryBB: Contains condition instructions and branch 
-
-
-    // NormalBB: Make call to vulnerable function
-    
-    // Sanitized 
-
-
-
-
-
-
+    builder.CreateRet(F->getArg(0));
 }
 
-void sanitizeUndesirableOperationInFunction(Function *F, std::optional<std::string> fnName,
-    unsigned int argNum, std::string cond) {
+void sanitizeUndesirableOperationInFunction(Function *F, std::string fnName,
+    unsigned int argNum) {
   Module *M = F->getParent();
   LLVMContext &Ctx = M->getContext();
   IRBuilder<> builder(Ctx);
 
   // Container to store call insts
   std::vector<CallInst> callsToReplace;
-
-  // Container to store arguments
-  std::vector<Value *> fnArgs;
-  
+    
   // loop over each basic block in the vulnerable function
   for (auto &BB : *F) {
     // loop over each instruction
@@ -81,7 +75,7 @@ void sanitizeUndesirableOperationInFunction(Function *F, std::optional<std::stri
         }
 
         StringRef calledFnName = calledFunc->getName();
-        if (calledFuncName == *funct_name) {
+        if (calledFuncName == fnName) {
           callsToReplace.push_back(call);
         }
       }
@@ -91,18 +85,19 @@ void sanitizeUndesirableOperationInFunction(Function *F, std::optional<std::stri
   if (callsToReplace.size() == 0) {
     return;
   }
-
-  // Get the arguments for the vulnerable function
-  for (unsigned int i = 0; i <  ; ++i) {
-    fnArgs.push_back(F->getArg(i)); /* TODO: Figure out how to get function arguments */
-  }
   
   // Construct the resolve_sanitize_func function
-  Function *resolveSanitizedFn = replaceUndesirableFunction(argNum, cond, *fnName);
+  Function *resolveSanitizedFn = replaceUndesirableFunction(F, argNum);
 
   // Replace calls at all callsites in the module
   for (auto call : callsToReplace) {
     builder.SetInsertPoint(call);
+
+    // Get the arguments for the vulnerable function
+    SmallVector<Value *, 2> fnArgs;
+    for (unsigned int i = 0; i < call->arg_size(); ; ++i) {
+        fnArgs.push_back(call->getOperand(i));
+    } 
 
     auto sanitizedCall = builder.CreateCall(resolveSanitizedFn, fnArgs);
 
