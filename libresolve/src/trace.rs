@@ -1,10 +1,10 @@
 // Copyright (c) 2025 Riverside Research.
 // LGPL-3; See LICENSE.txt in the repo root for details.
 use libc::{c_char, c_float, c_void};
+use std::ffi::CStr;
 use std::fmt::Display;
-use std::{ffi::CStr, io::Write};
 
-use crate::RESOLVE_LOG_FILE;
+use log::info;
 
 pub fn libresolve_arg(arg: impl Display, funct_name: *const u8) {
     let funct_str = unsafe {
@@ -17,12 +17,7 @@ pub fn libresolve_arg(arg: impl Display, funct_name: *const u8) {
         }
     };
 
-    let _ = writeln!(
-        &mut RESOLVE_LOG_FILE.lock(),
-        "[ARG] Function name: {}, value: {}",
-        funct_str,
-        arg
-    );
+    info!("[ARG] Function name: {funct_str}, value: {arg}");
 }
 
 pub fn libresolve_ret(ret: impl Display, funct_name: *const u8) {
@@ -36,12 +31,7 @@ pub fn libresolve_ret(ret: impl Display, funct_name: *const u8) {
         }
     };
 
-    let _ = writeln!(
-        &mut RESOLVE_LOG_FILE.lock(),
-        "[RET] Function name: {}, value: {}",
-        funct_str,
-        ret
-    );
+    info!("[RET] Function name: {funct_str}, value: {ret}");
 }
 
 #[unsafe(no_mangle)]
@@ -81,12 +71,7 @@ pub extern "C" fn libresolve_arg_ptr(arg: *mut c_void, funct_name: *const u8) {
         }
     };
 
-    let _ = writeln!(
-        &mut RESOLVE_LOG_FILE.lock(),
-        "[ARG] Function name: {}, value(pointer): {:?}",
-        funct_str,
-        arg
-    );
+    info!("[ARG] Function name: {funct_str}, value(pointer): {arg:?}");
 }
 
 #[unsafe(no_mangle)]
@@ -101,10 +86,8 @@ pub extern "C" fn libresolve_arg_opaque(funct_name: *const u8) {
         }
     };
 
-    let _ = writeln!(
-        &mut RESOLVE_LOG_FILE.lock(),
-        "[ARG] Function {:?} has a runtime argument with opaque type, size: in progress",
-        funct_str
+    info!(
+        "[ARG] Function {funct_str:?} has a runtime argument with opaque type, size: in progress"
     );
 }
 
@@ -144,12 +127,7 @@ pub extern "C" fn libresolve_ret_ptr(ret: *mut c_void, funct_name: *const u8) {
             "[null]"
         }
     };
-    let _ = writeln!(
-        &mut RESOLVE_LOG_FILE.lock(),
-        "[RET] Function {} returned a pointer with address {:?}",
-        funct_str,
-        ret
-    );
+    info!("[RET] Function {funct_str} returned a pointer with address {ret:?}");
 }
 
 #[unsafe(no_mangle)]
@@ -164,11 +142,7 @@ pub extern "C" fn libresolve_ret_void(funct_name: *const u8) {
         }
     };
 
-    let _ = writeln!(
-        &mut RESOLVE_LOG_FILE.lock(),
-        "[RET] Function {} returned void",
-        funct_str
-    );
+    info!("[RET] Function {funct_str} returned void");
 }
 
 #[unsafe(no_mangle)]
@@ -183,12 +157,7 @@ pub extern "C" fn libresolve_bb(index: i64, funct_name: *const u8) {
         }
     };
 
-    let _ = writeln!(
-        &mut RESOLVE_LOG_FILE.lock(),
-        "[BB] Basic block index: {}, transition from {}",
-        index,
-        funct_str
-    );
+    info!("[BB] Basic block index: {index}, transition from {funct_str}");
 }
 
 #[unsafe(no_mangle)]
@@ -203,10 +172,5 @@ pub extern "C" fn libresolve_ret_opaque(ptr: *mut c_void, funct_name: *const u8)
         }
     };
 
-    let _ = writeln!(
-        &mut RESOLVE_LOG_FILE.lock(),
-        "[RET] Function {:?} returned: {:?}",
-        funct_str,
-        ptr
-    );
+    info!("[RET] Function {funct_str} returned: {ptr:?}");
 }

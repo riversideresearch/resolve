@@ -1,9 +1,9 @@
 // Copyright (c) 2025 Riverside Research.
 // LGPL-3; See LICENSE.txt in the repo root for details.
 
+use crate::MutexWrap;
 use std::collections::BTreeMap;
 use std::ops::RangeInclusive;
-use std::sync::{LazyLock, nonpoison::Mutex};
 
 /// An alias representing Virtual Address values
 pub type Vaddr = usize;
@@ -26,7 +26,8 @@ pub struct ShadowObject {
     // Base address of the allocated object mapped to u64
     pub base: Vaddr,
     /// Last address of the allocated object
-    pub limit: Vaddr,
+    limit: Vaddr,
+    size: usize,
 }
 
 impl ShadowObject {
@@ -47,14 +48,13 @@ impl ShadowObject {
     // }
 
     /// Computes the size of the shadow object from its base and limit
-    #[allow(dead_code)]
     pub fn size(&self) -> usize {
-        self.limit - self.base + 1
+        self.size
     }
 
     /// Compute a limit from base and size
     pub fn limit(base: Vaddr, size: usize) -> Vaddr {
-        base + size - 1
+        if size == 0 { base } else { base + size - 1 }
     }
 
     /// Compute the sentinel pointer value for this object, 1 past its limit
@@ -68,7 +68,7 @@ pub struct ShadowObjectTable {
 }
 
 impl ShadowObjectTable {
-    pub fn new() -> ShadowObjectTable {
+    pub const fn new() -> ShadowObjectTable {
         ShadowObjectTable {
             table: BTreeMap::new(),
         }
@@ -80,6 +80,7 @@ impl ShadowObjectTable {
             alloc_type,
             base,
             limit: ShadowObject::limit(base, size),
+            size,
         };
         self.table.insert(base, sobj);
     }
@@ -109,9 +110,75 @@ impl ShadowObjectTable {
     }
 }
 
-/// Global list of active shadow objects
-pub static ALIVE_OBJ_LIST: LazyLock<Mutex<ShadowObjectTable>> =
-    LazyLock::new(|| Mutex::new(ShadowObjectTable::new()));
-/// Global list of freed shadow objects
-pub static FREED_OBJ_LIST: LazyLock<Mutex<ShadowObjectTable>> =
-    LazyLock::new(|| Mutex::new(ShadowObjectTable::new()));
+// static object lists to store all objects
+pub static ALIVE_OBJ_LIST: MutexWrap<ShadowObjectTable> = MutexWrap::new(ShadowObjectTable::new());
+pub static FREED_OBJ_LIST: MutexWrap<ShadowObjectTable> = MutexWrap::new(ShadowObjectTable::new());
+
+#[cfg(test)]
+mod tests {
+    use crate::shadowobjs::{AllocType, ShadowObjectTable};
+
+    #[test]
+    fn test_add_and_print_shadow_objects() {
+        let mut table = ShadowObjectTable::new();
+        table.add_shadow_object(AllocType::Heap, 0x1000, 8);
+        table.add_shadow_object(AllocType::Stack, 0x2000, 16);
+
+        //table.print_shadow_obj();
+    }
+
+    #[test]
+    fn test_remove_shadow_objects() {
+        let mut table = ShadowObjectTable::new();
+        table.add_shadow_object(AllocType::Heap, 0x1000, 8);
+        table.add_shadow_object(AllocType::Stack, 0x2000, 16);
+    }
+
+    #[test]
+    fn test_search_intersection_found() {
+        let mut table = ShadowObjectTable::new();
+        table.add_shadow_object(AllocType::Global, 0x3000, 4);
+
+        let result = table.search_intersection(0x3002);
+        assert!(result.is_some());
+        assert_eq!(result.unwrap().alloc_type, AllocType::Global);
+    }
+
+    #[test]
+    fn test_search_intersection_not_found() {
+        let mut table = ShadowObjectTable::new();
+        table.add_shadow_object(AllocType::Heap, 0x4000, 4);
+
+        let result = table.search_intersection(0x5000);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_is_allocation() {
+        let mut table = ShadowObjectTable::new();
+        table.add_shadow_object(AllocType::Stack, 0x6000, 8);
+
+        let typ = table.search_intersection(0x6004).unwrap().alloc_type;
+        assert_eq!(typ, AllocType::Stack);
+    }
+    #[test]
+    fn bounds_testing() {
+        let mut table = ShadowObjectTable::new();
+        table.add_shadow_object(AllocType::Heap, 0x8000, 8);
+
+        for x in 0x8000..0x8008 {
+            assert!(table.search_intersection(x).is_some());
+        }
+
+        assert!(table.search_intersection(0x8009).is_none());
+        assert!(table.search_intersection(0x7FFF).is_none());
+    }
+
+    #[test]
+    #[should_panic]
+    #[ignore = "not implemented"]
+    fn test_bounds_invalid_address_panic() {
+        // let table = ShadowObjectTable::new();
+        //table.bounds(0xDEADBEEF).unwrap(); // should panic since there is no interesection
+    }
+}

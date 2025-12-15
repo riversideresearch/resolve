@@ -1,7 +1,5 @@
 // Copyright (c) 2025 Riverside Research.
 // LGPL-3; See LICENSE.txt in the repo root for details.
-#![feature(sync_nonpoison)]
-#![feature(nonpoison_mutex)]
 
 mod remediate;
 mod shadowobjs;
@@ -12,8 +10,7 @@ use std::ffi::CStr;
 use std::fmt::Display;
 use std::fs::File;
 use std::io::{Seek, Write};
-use std::sync::LazyLock;
-use std::sync::nonpoison::Mutex;
+use std::sync::{LazyLock, Mutex};
 use std::{env, process};
 
 /// Appends id to base path, but before the first .suffix if any
@@ -25,34 +22,65 @@ fn idify_file_path(path: &str, id: impl Display) -> String {
     }
 }
 
+pub struct MutexWrap<T> {
+    mutex: Mutex<T>,
+}
+
+impl<T> MutexWrap<T> {
+    pub const fn new(x: T) -> Self {
+        MutexWrap {
+            mutex: Mutex::new(x),
+        }
+    }
+
+    // Abort if the mutex is poisoned
+    pub fn lock(&self) -> std::sync::MutexGuard<'_, T> {
+        self.mutex.lock().expect("Not poisoned")
+    }
+}
+
 /// File for "resolve_dlsym.json"
-pub static DLSYM_LOG_FILE: LazyLock<Mutex<File>> = LazyLock::new(|| {
+pub static DLSYM_LOG_FILE: LazyLock<MutexWrap<File>> = LazyLock::new(|| {
     let path = env::var("RESOLVE_DLSYM_LOG");
     let path = path.unwrap_or_else(|_| "resolve_dlsym.json".to_string());
 
     let path = idify_file_path(&path, process::id());
 
-    let file = File::create(path).unwrap();
+    let mut file = File::create(path).unwrap();
 
     // Write JSON header only once, when the file is first opened
-    let _ = write!(&mut DLSYM_LOG_FILE.lock(), "{{\n \"loaded_symbols\": [\n");
+    let _ = write!(&mut file, "{{\n \"loaded_symbols\": [\n");
 
     // SAFETY: flush_dlsym_log is extern "C" and takes no arguments.
     // TODO: is DLSYM_LOG_FILE still valid during the atexit callback?
     unsafe { atexit(flush_dlsym_log) };
 
-    Mutex::new(file)
+    MutexWrap::new(file)
 });
 
-/// File for "resolve_log.out"
-pub static RESOLVE_LOG_FILE: LazyLock<Mutex<File>> = LazyLock::new(|| {
-    let path = env::var("RESOLVE_RUNTIME_LOG");
-    let path = path.unwrap_or_else(|_| "resolve_log.out".to_string());
+#[used]
+#[unsafe(link_section = ".init_array")]
+static INIT_CTOR: extern "C" fn() = resolve_init;
 
-    let path = idify_file_path(&path, process::id());
+#[unsafe(no_mangle)]
+pub extern "C" fn resolve_init() {
+    let mut builder = env_logger::builder();
 
-    Mutex::new(File::create(path).unwrap())
-});
+    if cfg!(test) {
+        builder.is_test(true);
+    } else {
+        let path = env::var("RESOLVE_RUNTIME_LOG");
+        let path = path.unwrap_or_else(|_| "resolve_log.out".to_string());
+
+        let path = idify_file_path(&path, process::id());
+
+        let file = File::create(path).unwrap();
+
+        builder.target(env_logger::Target::Pipe(Box::new(file)));
+    }
+
+    let _ = builder.try_init();
+}
 
 /**
  * @brief - Writes JSON footer to the file descriptor
@@ -99,71 +127,4 @@ pub extern "C" fn resolve_dlsym(handle: *mut c_void, symbol: *const u8) -> *mut 
     );
 
     addr
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::shadowobjs::{AllocType, ShadowObjectTable};
-
-    #[test]
-    fn test_add_and_print_shadow_objects() {
-        let mut table = ShadowObjectTable::new();
-        table.add_shadow_object(AllocType::Heap, 0x1000, 8);
-        table.add_shadow_object(AllocType::Stack, 0x2000, 16);
-
-        //table.print_shadow_obj();
-    }
-
-    #[test]
-    fn test_remove_shadow_objects() {
-        let mut table = ShadowObjectTable::new();
-        table.add_shadow_object(AllocType::Heap, 0x1000, 8);
-        table.add_shadow_object(AllocType::Stack, 0x2000, 16);
-    }
-
-    #[test]
-    fn test_search_intersection_found() {
-        let mut table = ShadowObjectTable::new();
-        table.add_shadow_object(AllocType::Global, 0x3000, 4);
-
-        let result = table.search_intersection(0x3002);
-        assert!(result.is_some());
-        assert_eq!(result.unwrap().alloc_type, AllocType::Global);
-    }
-
-    #[test]
-    fn test_search_intersection_not_found() {
-        let mut table = ShadowObjectTable::new();
-        table.add_shadow_object(AllocType::Heap, 0x4000, 4);
-
-        let result = table.search_intersection(0x5000);
-        assert!(result.is_none());
-    }
-
-    #[test]
-    fn test_is_allocation() {
-        let mut table = ShadowObjectTable::new();
-        table.add_shadow_object(AllocType::Stack, 0x6000, 8);
-
-        let typ = table.search_intersection(0x6004).unwrap().alloc_type;
-        assert_eq!(typ, AllocType::Stack);
-
-        let typ2 = table.search_intersection(0x7000).unwrap().alloc_type;
-        assert_eq!(typ2, AllocType::Unallocated);
-    }
-    #[test]
-    fn bounds_testing() {
-        let mut table = ShadowObjectTable::new();
-        table.add_shadow_object(AllocType::Heap, 0x8000, 8);
-
-        //let range = table.bounds(0x8004).unwrap();
-        //assert_eq!(range, 0x8000..=0x8007);
-    }
-
-    #[test]
-    #[should_panic]
-    fn test_bounds_invalid_address_panic() {
-        // let table = ShadowObjectTable::new();
-        //table.bounds(0xDEADBEEF).unwrap(); // should panic since there is no interesection
-    }
 }
