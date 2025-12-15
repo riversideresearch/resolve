@@ -12,7 +12,14 @@
 
 #include "Vulnerability.hpp"
 
+#include <vector>
+#include <string>
+
 using namespace llvm;
+
+Function *replaceUndesirableFunction(unsigned int arg, std::string cond) {
+
+}
 
 void sanitizeUndesirableOperationInFunction(Function *F, Vulnerability::RemediationStrategies strategy,
                                     std::optional<std::string> funct_name) {
@@ -21,7 +28,10 @@ void sanitizeUndesirableOperationInFunction(Function *F, Vulnerability::Remediat
   IRBuilder<> builder(Ctx);
 
   // Container to store call insts
-  SmallVector<CallInst *, 4> callsToReplace;
+  std::vector<CallInst> callsToReplace;
+  
+  // Container stores affected function args
+  std::vector<Value *> fnArgs;
 
   // loop over each basic block in the vulnerable function
   for (auto &BB : *F) {
@@ -46,14 +56,14 @@ void sanitizeUndesirableOperationInFunction(Function *F, Vulnerability::Remediat
   }
   
   // Construct the resolve_sanitize_func function
-  Function *resolve_sanitized_func = replaceUndesirableFunction(F, strategy, callsToReplace.front());
+  Function *resolveSanitizedFn = replaceUndesirableFunction(F, strategy, callsToReplace.front());
 
   // Replace calls at all callsites in the module
   for (auto call : callsToReplace) {
     builder.SetInsertPoint(call);
 
     // Recreate argument list
-    SmallVector<Value *, 2> fnArgs;
+    
 
     for (unsigned i = 0; i < call->arg_size(); ++i) {
         fnArgs.push_back(call->getOperand(i));
@@ -66,22 +76,3 @@ void sanitizeUndesirableOperationInFunction(Function *F, Vulnerability::Remediat
     call->eraseFromParent();
   }
 }
-
-
-  // Handle calls at each point in module
-//   for (auto call : callsToReplace) {
-//     // Set the insertion point befoore call instruction.
-//     Builder.SetInsertPoint(call);
-
-//     // Recreate argument list
-//     SmallVector<Value *, > func_args;
-//     for (unsigned i = 0; i < call->arg_size(); ++i) {
-//       func_args.push_back(call->getOperand(i));
-//     }
-
-//     auto sanitizedCall = Builder.CreateCall(resolve_sanitized_func, func_args);
-
-//     // replace old uses with new call
-//     call->replaceAllUsesWith(sanitizedCall);
-//     call->eraseFromParent();
-//   }
