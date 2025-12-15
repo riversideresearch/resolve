@@ -39,7 +39,6 @@ pub extern "C" fn resolve_stack_obj(ptr: *mut c_void, size: usize) -> () {
 pub extern "C" fn resolve_invalidate_stack(base: *mut c_void, limit: *mut c_void) {
     let base = base as Vaddr;
     let limit = limit as Vaddr;
-
     let mut obj_list = ALIVE_OBJ_LIST.lock();
     // TODO: Add these to a free list?
     obj_list.invalidate_region(base, limit);
@@ -111,7 +110,7 @@ pub extern "C" fn resolve_gep(ptr: *mut c_void, derived: *mut c_void) -> *mut c_
     if sobj.contains(derived as Vaddr) {
         let _ = writeln!(
             &mut RESOLVE_LOG_FILE.lock(),
-            "[GEP] ptr 0x{:x} valid for base 0x{:x}, obj: {}@0x{:x}",
+            "[GEP] ptr 0x{:x} valid for base 0x{:x}, obj: {} @0x{:x}",
             derived,
             base,
             sobj.size(),
