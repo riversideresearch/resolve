@@ -49,6 +49,10 @@ impl ShadowObject {
         self.bounds().contains(&addr)
     }
 
+    // pub fn contains_region(&self, base: Vaddr, limit: Vaddr) -> bool {
+    //     self.contains(base) && self.contains(limit)
+    // }
+
     #[allow(dead_code)]
     pub fn is_allocation(&self) -> bool {
         self.alloc_type.is_allocation()
@@ -110,7 +114,9 @@ impl ShadowObjectTable {
      * @return: None if shadow object does not exist otherwise optional reference to shadow object  
      */
     pub fn invalidate_region(&mut self, base: Vaddr, limit: Vaddr) {
-        self.table.extract_if(base..=limit, |_, _| true).for_each(|_| {})
+        self.table
+            .extract_if(base..=limit, |_, _| true)
+            .for_each(|_| {})
     }
 
     /**

@@ -208,7 +208,7 @@ pub extern "C" fn resolve_free(ptr: *mut c_void) -> () {
     }
 
     // remove shadow obj from live list
-    obj_list.invalidate_at(ptr as Vaddr); 
+    obj_list.invalidate_at(ptr as Vaddr);
 
     // release lock before taking another lock
     drop(obj_list);
