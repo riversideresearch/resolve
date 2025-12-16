@@ -1,6 +1,8 @@
 // Copyright (c) 2025 Riverside Research.
 // LGPL-3; See LICENSE.txt in the repo root for details.
-use libc::{c_char, c_void, calloc, free, malloc, memcpy, realloc, strdup, strlen, strndup};
+use libc::{
+    c_char, c_void, calloc, free, malloc, memcpy, realloc, strdup, strlen, strndup, strnlen,
+};
 use std::io::Write;
 
 use crate::{
@@ -295,7 +297,11 @@ pub extern "C" fn resolve_strdup(ptr: *mut c_char) -> *mut c_char {
     }
 
     let mut obj_list = ALIVE_OBJ_LIST.lock();
-    let sizeofstr = unsafe { strlen(ptr) + 1 }; // NOTE: +1 for null terminate byte string in C
+
+    // +1 to include null termination byte. We should allow program to read this value.
+    // Otherwise how would the program find the end of the string?
+    // Although writing it to something else is probably a bad idea, this too should be allowed.
+    let sizeofstr = unsafe { strlen(ptr) + 1 };
     obj_list.add_shadow_object(AllocType::Heap, string_ptr as Vaddr, sizeofstr);
 
     let _ = writeln!(
@@ -325,7 +331,12 @@ pub extern "C" fn resolve_strndup(ptr: *mut c_char, size: usize) -> *mut c_char 
     }
 
     let mut obj_list = ALIVE_OBJ_LIST.lock();
-    let sizeofstr = unsafe { strlen(ptr) + 1 };
+
+    // +1 to include null termination byte. We should allow program to read this value.
+    // We don't actually know how much memory the libc will allocate, but
+    // strnlen(ptr, size) + 1 is a safe lower bound.
+    // strlen(string_ptr) + 1 would also be valid I think.
+    let sizeofstr = unsafe { strnlen(ptr, size) + 1 };
     obj_list.add_shadow_object(AllocType::Heap, string_ptr as Vaddr, sizeofstr);
 
     let _ = writeln!(
