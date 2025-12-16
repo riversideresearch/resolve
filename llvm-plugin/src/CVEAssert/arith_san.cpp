@@ -15,6 +15,7 @@
 
 #include "CVEAssert.hpp"
 #include "Vulnerability.hpp"
+#include "undesirableop.hpp"
 #include "arith_san.hpp"
 #include "helpers.hpp"
 
@@ -306,127 +307,6 @@ void sanitizeDivideByZero(Function *F, Vulnerability::RemediationStrategies stra
   }
 }
 
-Function *replaceUndesirableFunction(Function *F, Vulnerability::RemediationStrategies strategy,
-  CallInst *call) {
-  Module *M = F->getParent();
-  LLVMContext &Ctx = M->getContext();
-  IRBuilder<> Builder(Ctx);
-
-  Function *calledFunc = call->getCalledFunction();
-  if (!calledFunc)
-    return nullptr;
-
-  // 1. Create the function name and type.
-  std::string sanitizedHandlerName = "resolve_sanitized_function";
-  
-  if (Function* existing = M->getFunction(sanitizedHandlerName)) {
-    return existing;
-  }
-
-  FunctionType *sanitizedHandlerType = calledFunc->getFunctionType();
-
-  // Create the function object.
-  Function *sanitizedHandlerFunc =
-      Function::Create(sanitizedHandlerType, Function::InternalLinkage,
-                       sanitizedHandlerName, M);
-
-  Function *resolve_report_func =
-      getOrCreateResolveReportSanitizerTriggered(M);
-
-  Function::arg_iterator argIter = sanitizedHandlerFunc->arg_begin();
-  Value *dividend = argIter++;
-  Value *divisor = argIter;
-
-  BasicBlock *EntryBB = BasicBlock::Create(Ctx, "entry", sanitizedHandlerFunc);
-  BasicBlock *SanitizedBB =
-      BasicBlock::Create(Ctx, "sanitized_behavior", sanitizedHandlerFunc);
-  BasicBlock *ContExeBB =
-      BasicBlock::Create(Ctx, "continue_exec", sanitizedHandlerFunc);
-
-  // EntryBB: contains condition instruction and branch
-  Builder.SetInsertPoint(EntryBB);
-
-  // Convert the condition into IR
-  auto *condition_code =
-      Builder.CreateICmpEQ(divisor, ConstantInt::get(divisor->getType(), 0));
-  Builder.CreateCondBr(condition_code, SanitizedBB, ContExeBB);
-
-  // SanitizedBB: Calls sanitized behavior for arithmetic sanitization
-  // Returns dividend
-  Builder.SetInsertPoint(SanitizedBB);
-  Builder.CreateCall(resolve_report_func);
-  Builder.CreateCall(getOrCreateRemediationBehavior(M, strategy));
-  Builder.CreateRet(dividend);
-
-  // ContExec: Makes call to original call instruction and returns that instead.
-  Builder.SetInsertPoint(ContExeBB);
-  Value *safeDiv = Builder.CreateCall(calledFunc, {dividend, divisor});
-  Builder.CreateRet(safeDiv);
-
-  // DEBUGGING
-  raw_ostream &out = errs();
-  out << *sanitizedHandlerFunc;
-  if (verifyFunction(*sanitizedHandlerFunc, &out)) {
-  }
-
-  return sanitizedHandlerFunc;
-}
-
-void sanitizeDivideByZeroInFunction(Function *F, Vulnerability::RemediationStrategies strategy,
-                                    std::optional<std::string> funct_name) {
-  Module *M = F->getParent();
-  LLVMContext &Ctx = M->getContext();
-  IRBuilder<> Builder(Ctx);
-
-  // Container to store call insts
-  SmallVector<CallInst *, 4> callsToReplace;
-
-  // loop over each basic block in the vulnerable function
-  for (auto &BB : *F) {
-    // loop over each instruction
-    for (auto &inst : BB) {
-      if (auto *call = dyn_cast<CallInst>(&inst)) {
-        Function *calledFunc = call->getCalledFunction();
-        if (!calledFunc) {
-          continue;
-        }
-
-        StringRef calledFuncName = calledFunc->getName();
-        if (calledFuncName == *funct_name) {
-          callsToReplace.push_back(call);
-        }
-      }
-    }
-  }
-
-  if (callsToReplace.size() == 0) {
-    return;
-  }
-
-  // Construct the resolve_sanitize_func function
-  Function *resolve_sanitized_func =
-      replaceUndesirableFunction(F, strategy, callsToReplace.front());
-
-  // Handle calls at each point in module
-  for (auto call : callsToReplace) {
-    // Set the insertion point befoore call instruction.
-    Builder.SetInsertPoint(call);
-
-    // Recreate argument list
-    SmallVector<Value *, 2> func_args;
-    for (unsigned i = 0; i < call->arg_size(); ++i) {
-      func_args.push_back(call->getOperand(i));
-    }
-
-    auto sanitizedCall = Builder.CreateCall(resolve_sanitized_func, func_args);
-
-    // replace old uses with new call
-    call->replaceAllUsesWith(sanitizedCall);
-    call->eraseFromParent();
-  }
-}
-
-// Driver function for integer overflow
 void sanitizeIntOverflow(Function *F, Vulnerability::RemediationStrategies strategy) {
   std::vector<Instruction *> worklist;
   Module *M = F->getParent();

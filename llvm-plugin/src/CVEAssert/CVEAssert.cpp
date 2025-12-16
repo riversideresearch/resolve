@@ -32,6 +32,7 @@
 #include "null_ptr.hpp"
 #include "arith_san.hpp"
 #include "bounds_check.hpp"
+#include "undesirableop.hpp"
 
 using namespace llvm;
 
@@ -147,6 +148,7 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
   PreservedAnalyses runOnFunction(Function &F, ModuleAnalysisManager &MAM, Vulnerability &vuln) {
     char* demangledNamePtr = llvm::itaniumDemangle(F.getName().str(), false);
     std::string demangledName(demangledNamePtr ?: "");
+    auto result = PreservedAnalyses::all();
 
     if (CVE_ASSERT_DEBUG) {
       errs() << "[CVEAssert] Trying fn " << F.getName() << " Demangled name: " << demangledName << "\n";
@@ -157,13 +159,19 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
     if (vuln.TargetFunctionName.empty() ||
       (demangledName.find(vuln.TargetFunctionName) == std::string::npos && 
         F.getName().str().find(vuln.TargetFunctionName) == std::string::npos)) {
-      return PreservedAnalyses::all();
+      return result;
+    }
+
+    if (vuln.UndesirableFunction.has_value()) {
+      /* NOTE: We are using '0' as a temporary this will be updated future PRs */
+      sanitizeUndesirableOperationInFunction(&F, *vuln.UndesirableFunction, 0);
+      result = PreservedAnalyses::none();
     }
 
     if (vuln.Strategy == Vulnerability::RemediationStrategies::NONE) {
       errs() << "[CVEAssert] NONE strategy selected for " << vuln.TargetFileName << ":" << vuln.TargetFunctionName << "...\n";
       errs() << "[CVEAssert] Skipping remediation\n";
-      return PreservedAnalyses::all();
+      return result;
     }
 
     out << "[CVEAssert] === Pre Instrumented IR === \n";
@@ -174,34 +182,36 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
       case VulnID::HEAP_BASED_BUF_OVERFLOW: /* Heap-base buffer overflow */
       case VulnID::OOB_WRITE:               /* OOB Write */
       case VulnID::WRITE_WHAT_WHERE:
-        sanitizeMemInstBounds(&F, MAM, vuln.Strategy);
+        sanitizeMemInstBounds(&F, vuln.Strategy);
+        result = PreservedAnalyses::none();
         break;
 
       
       case VulnID::OOB_READ:             /* OOB Read; found in stb-resize, lamartine challenge problems */
       case VulnID::INCORRECT_BUF_SIZE:   /* Incorrect buffer size calculation; found in analyze-image */
-        sanitizeMemInstBounds(&F, MAM, vuln.Strategy);
+        sanitizeMemInstBounds(&F, vuln.Strategy);
+        result = PreservedAnalyses::none();
         break;
 
       case VulnID::DIVIDE_BY_ZERO: /* Divide by Zero; found in ros2 and analyze-image */
         /* Workaround for ambiguous CWE description in analyze-image */
-        if (vuln.UndesirableFunction.has_value()) {
-          sanitizeDivideByZeroInFunction(&F, vuln.Strategy, vuln.UndesirableFunction);
-        } else {
-          sanitizeDivideByZero(&F, vuln.Strategy);
-        }
+        sanitizeDivideByZero(&F, vuln.Strategy);
+        result = PreservedAnalyses::none();
         break;
 
       case VulnID::INT_OVERFLOW: /* Integer Overflow */
         sanitizeIntOverflow(&F, vuln.Strategy);
+        result = PreservedAnalyses::none();
         break;
 
       case VulnID::NULL_PTR_DEREF: /* Null Pointer Dereference; Found in openalpr, nasa-cfs, stb-convert*/
         sanitizeNullPointers(&F, vuln.Strategy);
+        result = PreservedAnalyses::none();
         break;
 
       case VulnID::STACK_FREE: /* Stack free;  Found in nasa-cfs */
         sanitizeFreeOfNonHeap(&F, vuln.Strategy);
+        result = PreservedAnalyses::none();
         break;
 
       default:
@@ -217,7 +227,7 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
     }
 
     errs() << "[CVEAssert] Inserted vulnerability handler calls in function " << vuln.TargetFileName << ":" << vuln.TargetFunctionName << "\n";
-    return PreservedAnalyses::none();
+    return result;
   }
 
   PreservedAnalyses run(Module &M, ModuleAnalysisManager &MAM) {

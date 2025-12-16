@@ -497,7 +497,7 @@ void sanitizeLoadStore(Function *F, Vulnerability::RemediationStrategies strateg
   }
 }
 
-void sanitizeMemInstBounds(Function *F, ModuleAnalysisManager &MAM, Vulnerability::RemediationStrategies strategy) {
+void sanitizeMemInstBounds(Function *F, Vulnerability::RemediationStrategies strategy) {
   instrumentGEP(F);
   sanitizeMemcpy(F, strategy);
   sanitizeLoadStore(F, strategy);
