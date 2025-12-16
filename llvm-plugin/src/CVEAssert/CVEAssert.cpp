@@ -32,6 +32,7 @@
 #include "null_ptr.hpp"
 #include "arith_san.hpp"
 #include "bounds_check.hpp"
+#include "undesirableop.hpp"
 
 using namespace llvm;
 
@@ -174,7 +175,11 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
       case VulnID::HEAP_BASED_BUF_OVERFLOW: /* Heap-base buffer overflow */
       case VulnID::OOB_WRITE:               /* OOB Write */
       case VulnID::WRITE_WHAT_WHERE:
-        sanitizeMemInstBounds(&F, MAM, vuln.Strategy);
+        if (vuln.UndesirableFunction.has_value()) {
+          sanitizeUndesirableOperationInFunction(F, *vuln.UndesirableFunction, 0);
+        } else {
+          sanitizeMemInstBounds(&F, MAM, vuln.Strategy);
+        }
         break;
 
       
@@ -186,7 +191,7 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
       case VulnID::DIVIDE_BY_ZERO: /* Divide by Zero; found in ros2 and analyze-image */
         /* Workaround for ambiguous CWE description in analyze-image */
         if (vuln.UndesirableFunction.has_value()) {
-          sanitizeDivideByZeroInFunction(&F, vuln.Strategy, vuln.UndesirableFunction);
+          sanitizeUndesirableOperationInFunction(F, *vuln.UndesirableFunction, 0);
         } else {
           sanitizeDivideByZero(&F, vuln.Strategy);
         }
