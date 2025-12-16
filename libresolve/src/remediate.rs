@@ -338,11 +338,11 @@ pub extern "C" fn resolve_strndup(ptr: *mut c_char, size: usize) -> *mut c_char 
 }
 
 /**
- * @brief - Verifies if pointer access is within memory bounds  
+ * @brief - Returns true if pointer access is within bounds of a known allocation  
  * @input
- *  - base: Pointer to first allocation    
- *  - derived: Pointer used with load/store instruction
- * @return ptr  
+ *  - base_ptr: address to be dereferenced    
+ *  - size: size of dereference in bytes
+ * @return true if base_ptr..size is totally within a valid shadow object  
  */
 #[unsafe(no_mangle)]
 pub extern "C" fn resolve_check_bounds(base_ptr: *mut c_void, size: usize) -> bool {
