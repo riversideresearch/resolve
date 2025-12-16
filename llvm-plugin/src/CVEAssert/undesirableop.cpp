@@ -53,6 +53,12 @@ Function *replaceUndesirableFunction(Function *F, unsigned int argNum) {
     // Insert a return instruction here.
     builder.SetInsertPoint(EntryBB);
     builder.CreateRet(F->getArg(0));
+
+    // DEBUGGING
+    raw_ostream &out = errs();
+    out << *resolveSanitizedFn;
+    if (verifyFunction(*resolveSanitizedFn, &out)) {}
+    return resolveSanitizedFn;
 }
 
 void sanitizeUndesirableOperationInFunction(Function *F, std::string fnName,
