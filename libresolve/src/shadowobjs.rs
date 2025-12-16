@@ -101,7 +101,7 @@ impl ShadowObjectTable {
      * @return: None if shadow object does not exist otherwise optional reference to shadow object  
      */
     pub fn invalidate_at(&mut self, base: Vaddr) {
-        self.table.extract_if(base..=base, |_, _| true).for_each(|_| {})
+        let _ = self.table.remove(&base);
     }
 
     /**
