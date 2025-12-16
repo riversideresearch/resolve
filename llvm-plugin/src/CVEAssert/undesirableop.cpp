@@ -38,10 +38,10 @@ static Function *replaceUndesirableFunction(Function *F, unsigned int argNum) {
   LLVMContext &Ctx = M->getContext();
   IRBuilder<> builder(Ctx);
 
-  std::string handlerName = "resolve_sanitized_" + F->getName();
+  std::string handlerName = "resolve_sanitized_" + F->getName().str();
 
   if (Function *existingFn = M->getFunction(handlerName)) {
-    return exisiting;
+    return existingFn;
   }
 
   FunctionType *resolveSanitizedFnTy = F->getFunctionType();
@@ -72,7 +72,7 @@ void sanitizeUndesirableOperationInFunction(Function *F, std::string fnName,
   IRBuilder<> builder(Ctx);
 
   // Container to store call insts
-  std::vector<CallInst> callsToReplace;
+  std::vector<CallInst *> callsToReplace;
     
   // loop over each basic block in the vulnerable function
   for (auto &BB : *F) {
@@ -80,12 +80,12 @@ void sanitizeUndesirableOperationInFunction(Function *F, std::string fnName,
     for (auto &inst : BB) {
       if (auto *call = dyn_cast<CallInst>(&inst)) {
         Function *calledFn = call->getCalledFunction();
-        if (!calledFunc) {
+        if (!calledFn) {
           continue;
         }
 
-        StringRef calledFnName = calledFunc->getName();
-        if (calledFuncName == fnName) {
+        StringRef calledFnName = calledFn->getName();
+        if (calledFnName == fnName) {
           callsToReplace.push_back(call);
         }
       }
@@ -105,7 +105,7 @@ void sanitizeUndesirableOperationInFunction(Function *F, std::string fnName,
 
     // Get the arguments for the vulnerable function
     SmallVector<Value *, 2> fnArgs;
-    for (unsigned int i = 0; i < call->arg_size(); ; ++i) {
+    for (unsigned int i = 0; i < call->arg_size(); ++i) {
         fnArgs.push_back(call->getOperand(i));
     } 
 
