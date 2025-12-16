@@ -182,14 +182,14 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
       case VulnID::HEAP_BASED_BUF_OVERFLOW: /* Heap-base buffer overflow */
       case VulnID::OOB_WRITE:               /* OOB Write */
       case VulnID::WRITE_WHAT_WHERE:
-        sanitizeMemInstBounds(&F, MAM, vuln.Strategy);
+        sanitizeMemInstBounds(&F, vuln.Strategy);
         result = PreservedAnalyses::none();
         break;
 
       
       case VulnID::OOB_READ:             /* OOB Read; found in stb-resize, lamartine challenge problems */
       case VulnID::INCORRECT_BUF_SIZE:   /* Incorrect buffer size calculation; found in analyze-image */
-        sanitizeMemInstBounds(&F, MAM, vuln.Strategy);
+        sanitizeMemInstBounds(&F, vuln.Strategy);
         result = PreservedAnalyses::none();
         break;
 
