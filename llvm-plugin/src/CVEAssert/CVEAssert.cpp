@@ -176,7 +176,7 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
       case VulnID::OOB_WRITE:               /* OOB Write */
       case VulnID::WRITE_WHAT_WHERE:
         if (vuln.UndesirableFunction.has_value()) {
-          sanitizeUndesirableOperationInFunction(F, *vuln.UndesirableFunction, 0);
+          sanitizeUndesirableOperationInFunction(&F, *vuln.UndesirableFunction, 0);
         } else {
           sanitizeMemInstBounds(&F, MAM, vuln.Strategy);
         }
@@ -191,7 +191,7 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
       case VulnID::DIVIDE_BY_ZERO: /* Divide by Zero; found in ros2 and analyze-image */
         /* Workaround for ambiguous CWE description in analyze-image */
         if (vuln.UndesirableFunction.has_value()) {
-          sanitizeUndesirableOperationInFunction(F, *vuln.UndesirableFunction, 0);
+          sanitizeUndesirableOperationInFunction(&F, *vuln.UndesirableFunction, 0);
         } else {
           sanitizeDivideByZero(&F, vuln.Strategy);
         }
