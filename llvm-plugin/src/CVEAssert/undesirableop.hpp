@@ -6,6 +6,5 @@
 #pragma once 
 
 #include "llvm/IR/Function.h"
-#include "Vulnerability.hpp"
 #include <string>
 void sanitizeUndesirableOperationInFunction(llvm::Function *F, std::string fnName, unsigned int argNum);

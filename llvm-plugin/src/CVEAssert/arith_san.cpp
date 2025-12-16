@@ -15,7 +15,6 @@
 
 #include "CVEAssert.hpp"
 #include "Vulnerability.hpp"
-#include "undesirableop.hpp"
 #include "arith_san.hpp"
 #include "helpers.hpp"
 

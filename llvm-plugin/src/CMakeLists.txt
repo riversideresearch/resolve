@@ -51,6 +51,7 @@ add_library(CVEAssert SHARED
   CVEAssert/null_ptr.cpp
   CVEAssert/arith_san.cpp
   CVEAssert/helpers.cpp
+  CVEAssert/undesirableop.cpp
 )
 add_library(AnnotateFunctions SHARED AnnotateFunctions.cpp)
 add_library(ObjHook SHARED ObjHook.cpp)
