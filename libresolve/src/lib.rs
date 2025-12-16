@@ -12,8 +12,8 @@ use std::ffi::CStr;
 use std::fmt::Display;
 use std::fs::File;
 use std::io::{Seek, Write};
+use std::sync::LazyLock;
 use std::sync::nonpoison::Mutex;
-use std::sync::{LazyLock, Once};
 use std::{env, process};
 
 /// Appends id to base path, but before the first .suffix if any
@@ -32,7 +32,16 @@ pub static DLSYM_LOG_FILE: LazyLock<Mutex<File>> = LazyLock::new(|| {
 
     let path = idify_file_path(&path, process::id());
 
-    Mutex::new(File::create(path).unwrap())
+    let file = File::create(path).unwrap();
+
+    // Write JSON header only once, when the file is first opened
+    let _ = write!(&mut DLSYM_LOG_FILE.lock(), "{{\n \"loaded_symbols\": [\n");
+
+    // SAFETY: flush_dlsym_log is extern "C" and takes no arguments.
+    // TODO: is DLSYM_LOG_FILE still valid during the atexit callback?
+    unsafe { atexit(flush_dlsym_log) };
+
+    Mutex::new(file)
 });
 
 /// File for "resolve_log.out"
@@ -65,13 +74,6 @@ pub extern "C" fn flush_dlsym_log() {
  */
 #[unsafe(no_mangle)]
 pub extern "C" fn resolve_dlsym(handle: *mut c_void, symbol: *const u8) -> *mut c_void {
-    static REGISTER_EXIT: Once = Once::new();
-    REGISTER_EXIT.call_once(|| {
-        // SAFETY: flush_dlsym_log is extern "C" and takes no arguments.
-        // TODO: is DLSYM_LOG_FILE still valid during the atexit callback?
-        unsafe { atexit(flush_dlsym_log) };
-    });
-
     let addr = unsafe { dlsym(handle, symbol.cast()) };
 
     let lib_name = unsafe {
@@ -88,12 +90,6 @@ pub extern "C" fn resolve_dlsym(handle: *mut c_void, symbol: *const u8) -> *mut 
     } else {
         c"<null>"
     };
-
-    // Write JSON header only once
-    static WRITE_HEADER: Once = Once::new();
-    WRITE_HEADER.call_once(|| {
-        let _ = write!(&mut DLSYM_LOG_FILE.lock(), "{{\n \"loaded_symbols\": [\n");
-    });
 
     let _ = writeln!(
         &mut DLSYM_LOG_FILE.lock(),
