@@ -30,35 +30,35 @@ enum Cond { // Maybe adding an enum for all the possible conditions
 
 // We will continue generalizing this following eval-2
 Function *replaceUndesirableFunction(Function *F, unsigned int argNum) {
-    Module *M = F->getParent();
-    LLVMContext &Ctx = M->getContext();
-    IRBuilder<> builder(Ctx);
+  Module *M = F->getParent();
+  LLVMContext &Ctx = M->getContext();
+  IRBuilder<> builder(Ctx);
 
-    std::string handlerName = "resolve_sanitized_" + F->getName();
+  std::string handlerName = "resolve_sanitized_" + F->getName();
 
-    if (Function *existingFn = M->getFunction(handlerName)) {
-        return exisiting;
-    }
+  if (Function *existingFn = M->getFunction(handlerName)) {
+    return exisiting;
+  }
 
-    FunctionType *resolveSanitizedFnTy = F->getFunctionType();
+  FunctionType *resolveSanitizedFnTy = F->getFunctionType();
 
-    Function *resolveSanitizedFn = Function::Create(
-        resolveSanitizedFnTy,
-        Function::InternalLinkage,
-        handlerName,
-        M
-    );
+  Function *resolveSanitizedFn = Function::Create(
+      resolveSanitizedFnTy,
+      Function::InternalLinkage,
+      handlerName,
+      M
+  );
 
-    BasicBlock *EntryBB = BasicBlock::Create(Ctx, "", resolveSanitizedFn);
-    // Insert a return instruction here.
-    builder.SetInsertPoint(EntryBB);
-    builder.CreateRet(F->getArg(0));
+  BasicBlock *EntryBB = BasicBlock::Create(Ctx, "", resolveSanitizedFn);
+  // Insert a return instruction here.
+  builder.SetInsertPoint(EntryBB);
+  builder.CreateRet(F->getArg(0));
 
-    // DEBUGGING
-    raw_ostream &out = errs();
-    out << *resolveSanitizedFn;
-    if (verifyFunction(*resolveSanitizedFn, &out)) {}
-    return resolveSanitizedFn;
+  // DEBUGGING
+  raw_ostream &out = errs();
+  out << *resolveSanitizedFn;
+  if (verifyFunction(*resolveSanitizedFn, &out)) {}
+  return resolveSanitizedFn;
 }
 
 void sanitizeUndesirableOperationInFunction(Function *F, std::string fnName,
