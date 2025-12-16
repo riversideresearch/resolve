@@ -161,6 +161,10 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
       return PreservedAnalyses::all();
     }
 
+    if (vuln.UndesirableFunction.has_value()) {
+      sanitizeUndesirableOperationInFunction(&F, *vuln.UndesirableFunction, 0);
+    }
+
     if (vuln.Strategy == Vulnerability::RemediationStrategies::NONE) {
       errs() << "[CVEAssert] NONE strategy selected for " << vuln.TargetFileName << ":" << vuln.TargetFunctionName << "...\n";
       errs() << "[CVEAssert] Skipping remediation\n";
@@ -175,11 +179,7 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
       case VulnID::HEAP_BASED_BUF_OVERFLOW: /* Heap-base buffer overflow */
       case VulnID::OOB_WRITE:               /* OOB Write */
       case VulnID::WRITE_WHAT_WHERE:
-        if (vuln.UndesirableFunction.has_value()) {
-          sanitizeUndesirableOperationInFunction(&F, *vuln.UndesirableFunction, 0);
-        } else {
-          sanitizeMemInstBounds(&F, MAM, vuln.Strategy);
-        }
+        sanitizeMemInstBounds(&F, MAM, vuln.Strategy);
         break;
 
       
@@ -190,11 +190,7 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
 
       case VulnID::DIVIDE_BY_ZERO: /* Divide by Zero; found in ros2 and analyze-image */
         /* Workaround for ambiguous CWE description in analyze-image */
-        if (vuln.UndesirableFunction.has_value()) {
-          sanitizeUndesirableOperationInFunction(&F, *vuln.UndesirableFunction, 0);
-        } else {
-          sanitizeDivideByZero(&F, vuln.Strategy);
-        }
+        sanitizeDivideByZero(&F, vuln.Strategy);
         break;
 
       case VulnID::INT_OVERFLOW: /* Integer Overflow */
