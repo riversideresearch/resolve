@@ -45,7 +45,18 @@ int use_stack(int buffer[], int idx) {
   return buffer[idx];
 }
 
+void populate_stack(void) {
+  int buffer[100] = { 0 };
+
+  volatile int sink;
+  for (int i = 0; i < 100; ++i) {
+    sink = buffer[i];
+  }
+}
+
 int main(int argc, char *argv[]) {
+  populate_stack();
+
   int idx = atoi(argv[1]);
   int buffer[10] = { 0 };
 
