@@ -258,8 +258,9 @@ pub extern "C" fn resolve_realloc(ptr: *mut c_void, size: usize) -> *mut c_void 
  * @return - none
  */
 #[unsafe(no_mangle)]
-pub extern "C" fn resolve_calloc(n_items: usize, size: usize) -> *mut c_void {
-    let ptr = unsafe { calloc(n_items, size) };
+pub extern "C" fn resolve_calloc(n_items: usize, item_size: usize) -> *mut c_void {
+    let ptr = unsafe { calloc(n_items, item_size) };
+    let size = n_items * item_size;
 
     if ptr.is_null() {
         return ptr;
