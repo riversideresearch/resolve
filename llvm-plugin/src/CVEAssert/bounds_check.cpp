@@ -24,8 +24,6 @@ static const bool FIND_PTR_ROOT_DEBUG = true;
 
 using namespace llvm;
 
-static std::unordered_set<std::string> instrumentedFns = { "resolve_malloc" };
-
 static Function *getOrCreateBoundsCheckLoadSanitizer(Module *M, LLVMContext &Ctx, Type *ty, Vulnerability::RemediationStrategies strategy) {
   std::string handlerName = "resolve_bounds_check_ld_" + getLLVMType(ty);
 
@@ -241,13 +239,39 @@ static Function *getOrCreateBoundsCheckMemcpySanitizer(Module *M, Vulnerability:
   return sanitizeMemcpyFn;
 }
 
+static FunctionCallee getResolveMalloc(Module *M) {
+    auto &Ctx = M->getContext();
+    auto ptr_ty = PointerType::get(Ctx, 0);
+    auto size_ty = Type::getInt64Ty(Ctx);
+    
+    return M->getOrInsertFunction(
+        "resolve_malloc",
+        FunctionType::get(ptr_ty, { size_ty }, false)
+    );
+}
+
+static FunctionCallee getResolveStackObj(Module *M) {
+    auto &Ctx = M->getContext();
+    auto void_ty = Type::getVoidTy(Ctx);
+    auto ptr_ty = PointerType::get(Ctx, 0);
+    auto size_ty = Type::getInt64Ty(Ctx);
+    
+    return M->getOrInsertFunction(
+        "resolve_stack_obj",
+        FunctionType::get(void_ty, { ptr_ty, size_ty }, false)
+    );
+}
+
 void instrumentAlloca(Function *F) {
   Module *M = F->getParent();
   LLVMContext &Ctx = M->getContext();
   IRBuilder<> builder(Ctx);
   const DataLayout &DL = M->getDataLayout();
 
-   auto size_ty = Type::getInt64Ty(Ctx);
+  auto ptr_ty = PointerType::get(Ctx, 0);
+  auto size_ty = Type::getInt64Ty(Ctx);
+  auto void_ty = Type::getVoidTy(Ctx);
+
   // Initialize list to store pointers to alloca and instructions
   std::vector<AllocaInst *> allocaList;
 
@@ -267,7 +291,28 @@ void instrumentAlloca(Function *F) {
       Type *allocatedType = allocaInst->getAllocatedType();
       uint64_t typeSize = DL.getTypeAllocSize(allocatedType); 
       sizeVal = ConstantInt::get(size_ty, typeSize);
-      builder.CreateCall(getOrCreateWeakResolveStackObj(M), { allocatedPtr, sizeVal });
+      builder.CreateCall(getResolveStackObj(M), { allocatedPtr, sizeVal });
+  }
+
+  // Find low and high allocations and pass to resolve_invaliate_stack
+  if (allocaList.empty()) {
+    return;
+  }
+
+  auto invalidateFn = M->getOrInsertFunction(
+    "resolve_invalidate_stack",
+    FunctionType::get(void_ty, { ptr_ty, ptr_ty }, false)
+  );
+
+  auto low = allocaList.front();
+  auto high = allocaList.back();
+  for (auto &BB: *F) {
+    for (auto &instr: BB) {
+      if (auto *inst = dyn_cast<ReturnInst>(&instr)) {
+        builder.SetInsertPoint(inst);
+        builder.CreateCall(invalidateFn, { low, high });
+      }
+    }
   }
 }
 
@@ -277,7 +322,6 @@ void instrumentMalloc(Function *F) {
   IRBuilder<> builder(Ctx);
   auto size_ty = Type::getInt64Ty(Ctx);
   std::vector<CallInst *> mallocList;
-
 
   for (auto &BB : *F) {
     for (auto &inst: BB) {
@@ -296,17 +340,15 @@ void instrumentMalloc(Function *F) {
   for (auto Inst : mallocList) {
     StringRef fnName = Inst->getFunction()->getName();
 
-    if (instrumentedFns.find(fnName.str()) != instrumentedFns.end()) {
-      continue;
-    }
-
     builder.SetInsertPoint(Inst);
     Value *arg = Inst->getArgOperand(0);
     Value *normalizeArg = builder.CreateZExtOrBitCast(arg, size_ty);
-    CallInst *resolveMallocCall = builder.CreateCall(getOrCreateWeakResolveMalloc(M), { normalizeArg });
+    CallInst *resolveMallocCall = builder.CreateCall(getResolveMalloc(M), { normalizeArg });
     Inst->replaceAllUsesWith(resolveMallocCall);
     Inst->eraseFromParent();  
   }
+
+  // TODO: instrument free and other libc allocations
 }
 
 void instrumentGEP(Function *F) {
@@ -342,6 +384,9 @@ void instrumentGEP(Function *F) {
     // Get the pointer operand and offset from GEP
     Value *basePtr = GEPInst->getPointerOperand();
     Value * derivedPtr = GEPInst;
+    
+    // Don't assume gep is inbounds, otherwise our remdiation risks being optimized away
+    GEPInst->setIsInBounds(false);
 
     auto resolveGEPCall = builder.CreateCall(resolveGEPFn, { basePtr, derivedPtr });
 

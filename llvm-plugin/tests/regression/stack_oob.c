@@ -7,17 +7,58 @@
 // RUN: -fpass-plugin=%plugin \
 // RUN: %s -o - | %FileCheck %s 
 // CHECK-LABEL: define dso_local i32 @main
-// CHECK: call void @resolve_stack_obj
+// CHECK-LABEL: call void @resolve_stack_obj
+// Test that that unremediated case crashes
+// RUN: %clang -fpass-plugin=%plugin %s -o %t.exe 
+// RUN: %t.exe -2; EXIT_CODE=$?; \
+// RUN: echo Unremedated exit: $EXIT_CODE; test $EXIT_CODE -ne 0
+//
+// Test that the remediation is successful
 // RUN: RESOLVE_LABEL_CVE=vulnerabilities/stack_oob.json %clang -fpass-plugin=%plugin \ 
 // RUN: -L%rlib -lresolve -Wl,-rpath=%rlib %s -o %t.exe
-// RUN: %t.exe; test $? -eq 3
- 
+// RUN: %t.exe 11; EXIT_CODE=$?; \
+// RUN: echo Remediated exit: $EXIT_CODE; test $EXIT_CODE -eq 3
+// 
+// Test that the remediation is successful (underflow)
+// RUN: RESOLVE_LABEL_CVE=vulnerabilities/stack_oob.json %clang -fpass-plugin=%plugin \ 
+// RUN: -L%rlib -lresolve -Wl,-rpath=%rlib %s -o %t.exe
+// RUN: %t.exe -2; EXIT_CODE=$?; \
+// RUN: echo Remediated \(underflow\) exit: $EXIT_CODE; test $EXIT_CODE -eq 3
+// 
+// Test that the normal behavior is preserved
+// RUN: RESOLVE_LABEL_CVE=vulnerabilities/stack_oob.json %clang -O0 -g -fpass-plugin=%plugin \ 
+// RUN: -L%rlib -lresolve -Wl,-rpath=%rlib %s -o %t.exe
+// RUN: %t.exe 2; EXIT_CODE=$?; \
+// RUN: echo Normal exit: $EXIT_CODE; test $EXIT_CODE -eq 42
+
 #include <stdio.h>
+#include <stdlib.h>
 
-int main() {
-  int arr[2] = { 0, 1 };
-  int x = arr[3];
+int use_stack(int buffer[], int idx) {
+  int i;
+  buffer[idx] = 42;
 
-  return x;
+  for (i = 0; i < 10; ++i) {
+    printf("%d \n", buffer[i]);
+  }
 
+  return buffer[idx];
+}
+
+void populate_stack(void) {
+  int buffer[100] = { 0 };
+
+  volatile int sink;
+  for (int i = 0; i < 100; ++i) {
+    sink = buffer[i];
+  }
+}
+
+int main(int argc, char *argv[]) {
+  populate_stack();
+
+  int idx = atoi(argv[1]);
+  int buffer[10] = { 0 };
+
+  return use_stack(buffer, idx);
 }

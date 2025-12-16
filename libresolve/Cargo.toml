@@ -1,5 +1,3 @@
-cargo-features = ["edition2024"]
-
 [package]
 name = "resolve"
 version = "0.1.0"
@@ -10,3 +8,9 @@ crate-type = ["cdylib"]
 
 [dependencies]
 libc = "0.2.174"
+
+[profile.release]
+panic = "abort"
+
+[profile.dev]
+panic = "abort"
