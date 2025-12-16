@@ -10,7 +10,7 @@
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/raw_ostream.h"
 
-#include "Vulnerability.hpp"
+#include "undesirableop.hpp"
 
 #include <vector>
 #include <string>
@@ -28,8 +28,12 @@ enum Cond { // Maybe adding an enum for all the possible conditions
 };
 
 
+// Parameters
+// 1. Which arguments to return (or zero)
+// 2. Which arguments to test (if any)
+// 3. Condition to test (equality, <, etc..) NOTE: not needed right now delay
 // We will continue generalizing this following eval-2
-Function *replaceUndesirableFunction(Function *F, unsigned int argNum) {
+static Function *replaceUndesirableFunction(Function *F, unsigned int argNum) {
   Module *M = F->getParent();
   LLVMContext &Ctx = M->getContext();
   IRBuilder<> builder(Ctx);
