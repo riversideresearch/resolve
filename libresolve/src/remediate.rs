@@ -90,7 +90,6 @@ pub extern "C" fn resolve_gep(ptr: *mut c_void, derived: *mut c_void) -> *mut c_
     let sobj_table = ALIVE_OBJ_LIST.lock();
 
     // Look up the shadow object corresponding to this access.
-    // NOTE: Return 0 ('null') if shadow object cannot be found.
     let Some(sobj) = sobj_table.search_intersection(base) else {
         warn!("[GEP] Cannot find ptr 0x{base:x} in shadow table");
 
