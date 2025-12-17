@@ -34,8 +34,7 @@ enum Cond { // Maybe adding an enum for all the possible conditions
 // 3. Condition to test (equality, <, etc..) NOTE: not needed right now delay
 // We will continue generalizing this following eval-2
 // Change this function name to be "replaceUndesirableOperation" more generalized name
-static Function *replaceUndesirableFunction(Function *F, CallInst *call, unsigned int argNum) {
-  Module *M = F->getParent();
+static Function *replaceUndesirableFunction(Module *M, CallInst *call, unsigned int argNum) {
   LLVMContext &Ctx = M->getContext();
   IRBuilder<> builder(Ctx);
 
@@ -45,7 +44,7 @@ static Function *replaceUndesirableFunction(Function *F, CallInst *call, unsigne
     return existingFn;
   }
 
-  FunctionType *resolveSanitizedFnTy = F->getFunctionType();
+  FunctionType *resolveSanitizedFnTy = call->getCalledFunction()->getFunctionType();
 
   Function *resolveSanitizedFn = Function::Create(
       resolveSanitizedFnTy,
@@ -98,7 +97,7 @@ void sanitizeUndesirableOperationInFunction(Function *F, std::string fnName,
   }
   
   // Construct the resolve_sanitize_func function
-  Function *resolveSanitizedFn = replaceUndesirableFunction(F, callsToReplace.front(), 0);
+  Function *resolveSanitizedFn = replaceUndesirableFunction(M, callsToReplace.front(), 0);
 
   // Replace calls at all callsites in the module
   for (auto call : callsToReplace) {
