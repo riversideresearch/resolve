@@ -33,6 +33,7 @@ enum Cond { // Maybe adding an enum for all the possible conditions
 // 2. Which arguments to test (if any)
 // 3. Condition to test (equality, <, etc..) NOTE: not needed right now delay
 // We will continue generalizing this following eval-2
+// Change this function name to be "replaceUndesirableOperation" more generalized name
 static Function *replaceUndesirableFunction(Function *F, CallInst *call, unsigned int argNum) {
   Module *M = F->getParent();
   LLVMContext &Ctx = M->getContext();
