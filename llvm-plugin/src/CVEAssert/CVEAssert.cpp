@@ -156,6 +156,9 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
 
     raw_ostream &out = errs();
 
+    out << "[CVEAssert] === Pre Instrumented IR === \n";
+    out << F;
+
     if (vuln.TargetFunctionName.empty() ||
       (demangledName.find(vuln.TargetFunctionName) == std::string::npos && 
         F.getName().str().find(vuln.TargetFunctionName) == std::string::npos)) {
@@ -166,6 +169,8 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
       /* NOTE: We are using '0' as a temporary this will be updated future PRs */
       sanitizeUndesirableOperationInFunction(&F, *vuln.UndesirableFunction, 0);
       result = PreservedAnalyses::none();
+      out << "[CVEAssert] === Post Sanitization of Undesirable Operation IR === \n"; 
+      out << F;
     }
 
     if (vuln.Strategy == Vulnerability::RemediationStrategies::NONE) {
@@ -173,9 +178,6 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
       errs() << "[CVEAssert] Skipping remediation\n";
       return result;
     }
-
-    out << "[CVEAssert] === Pre Instrumented IR === \n";
-    out << F;
 
     switch (vuln.WeaknessID) {
       case VulnID::STACK_BASED_BUF_OVERFLOW: /* Stack-based buffer overflow */
