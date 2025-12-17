@@ -305,13 +305,18 @@ void instrumentAlloca(Function *F) {
   );
 
   // Stack grows down, so first allocation is high, last is low
-  auto low = allocaList.back();
-  auto high = allocaList.front();
+  // Hmm.. compiler seems to be reordering the allocas in ways 
+  // that break this assumption
+  // auto low = allocaList.back();
+  // auto high = allocaList.front();
   for (auto &BB: *F) {
     for (auto &instr: BB) {
       if (auto *inst = dyn_cast<ReturnInst>(&instr)) {
         builder.SetInsertPoint(inst);
-        builder.CreateCall(invalidateFn, { low, high });
+        // builder.CreateCall(invalidateFn, { low, high });
+        for (auto *alloca: allocaList) {
+          builder.CreateCall(invalidateFn, { alloca, alloca });
+        }
       }
     }
   }
