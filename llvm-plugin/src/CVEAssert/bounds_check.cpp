@@ -304,8 +304,9 @@ void instrumentAlloca(Function *F) {
     FunctionType::get(void_ty, { ptr_ty, ptr_ty }, false)
   );
 
-  auto low = allocaList.front();
-  auto high = allocaList.back();
+  // Stack grows down, so first allocation is high, last is low
+  auto low = allocaList.back();
+  auto high = allocaList.front();
   for (auto &BB: *F) {
     for (auto &instr: BB) {
       if (auto *inst = dyn_cast<ReturnInst>(&instr)) {

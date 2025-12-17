@@ -44,6 +44,11 @@ pub extern "C" fn resolve_invalidate_stack(base: *mut c_void, limit: *mut c_void
     let mut obj_list = ALIVE_OBJ_LIST.lock();
     // TODO: Add these to a free list?
     obj_list.invalidate_region(base, limit);
+
+    let _ = writeln!(
+        &mut RESOLVE_LOG_FILE.lock(),
+        "[STACK] Free range 0x{base:x}..=0x{limit:x}",
+    );
 }
 
 /**
