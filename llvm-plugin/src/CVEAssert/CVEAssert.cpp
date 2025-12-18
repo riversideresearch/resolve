@@ -156,14 +156,14 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
 
     raw_ostream &out = errs();
 
-    out << "[CVEAssert] === Pre Instrumented IR === \n";
-    out << F;
-
     if (vuln.TargetFunctionName.empty() ||
       (demangledName.find(vuln.TargetFunctionName) == std::string::npos && 
-        F.getName().str().find(vuln.TargetFunctionName) == std::string::npos)) {
+      F.getName().str().find(vuln.TargetFunctionName) == std::string::npos)) {
       return result;
     }
+
+    out << "[CVEAssert] === Pre Instrumented IR === \n";
+    out << F;
 
     if (vuln.UndesirableFunction.has_value()) {
       /* NOTE: We are using '0' as a temporary this will be updated future PRs */
