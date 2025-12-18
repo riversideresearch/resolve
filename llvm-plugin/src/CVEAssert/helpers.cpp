@@ -131,7 +131,11 @@ Function *getOrCreateResolveReportSanitizerTriggered(Module *M) {
     return resolve_report_fn;
 } 
 
-Function *_get_resolve_recover_buf_fn(Module *M){
+Function *getOrCreateRecoverBufferFunction(Module *M){
+    if (Function *F = M->getFunction("resolve_get_recover_longjmp_buf"))
+        if (!F->isDeclaration())
+            return F;
+
     auto ptr_ty = PointerType::get(M->getContext(), 0);
     FunctionType *resolve_recover_buf_fn_ty = FunctionType::get(ptr_ty, {}, false);
     
@@ -196,14 +200,7 @@ Function *getOrCreateRemediationBehavior(Module *M, Vulnerability::RemediationSt
         );
 
         // NOTE: resolve_get_recover_longjmp_buf must exist in C source code
-        Function *resolve_recover_buf_fn;
-        if (Function *F = M->getFunction("resolve_get_recover_longjmp_buf"))
-            if (!F->isDeclaration())
-                resolve_recover_buf_fn = F;
-            else
-                resolve_recover_buf_fn = _get_resolve_recover_buf_fn(M);
-        else
-            resolve_recover_buf_fn = _get_resolve_recover_buf_fn(M);
+        Function *resolve_recover_buf_fn = getOrCreateRecoverBufferFunction(M);
 
         Value *resolve_longjmp_ptr = Builder.CreateCall(resolve_recover_buf_fn);
         Value *longjmpVal = ConstantInt::get(i32_ty, 42);
