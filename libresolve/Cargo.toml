@@ -7,10 +7,13 @@ edition = "2024"
 crate-type = ["cdylib"]
 
 [dependencies]
+env_logger = "0.11.8"
 libc = "0.2.174"
+log = "0.4.29"
 
 [profile.release]
 panic = "abort"
 
 [profile.dev]
 panic = "abort"
+

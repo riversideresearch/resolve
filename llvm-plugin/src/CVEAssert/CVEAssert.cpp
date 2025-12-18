@@ -286,6 +286,7 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
         result.intersect(runOnFunction(F, MAM, vuln));
       }
     }
+    
     return result;
   }
 };
