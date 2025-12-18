@@ -12,7 +12,7 @@ use std::ffi::CStr;
 use std::fmt::Display;
 use std::fs::File;
 use std::io::{Seek, Write};
-use std::sync::{LazyLock, Mutex};
+use std::sync::{LazyLock, RwLock};
 use std::{env, process};
 
 /// Appends id to base path, but before the first .suffix if any
@@ -25,19 +25,23 @@ fn idify_file_path(path: &str, id: impl Display) -> String {
 }
 
 pub struct MutexWrap<T> {
-    mutex: Mutex<T>,
+    mutex: RwLock<T>,
 }
 
 impl<T> MutexWrap<T> {
     pub const fn new(x: T) -> Self {
         MutexWrap {
-            mutex: Mutex::new(x),
+            mutex: RwLock::new(x),
         }
     }
 
     // Abort if the mutex is poisoned
-    pub fn lock(&self) -> std::sync::MutexGuard<'_, T> {
-        self.mutex.lock().expect("Not poisoned")
+    pub fn lock(&self) -> std::sync::RwLockReadGuard<'_, T> {
+        self.mutex.read().expect("Not poisoned")
+    }
+
+    pub fn lock_write(&self) -> std::sync::RwLockWriteGuard<'_, T> {
+        self.mutex.write().expect("Not poisoned")
     }
 }
 
@@ -95,7 +99,7 @@ fn open_resolve_log_file() -> File {
  */
 #[unsafe(no_mangle)]
 pub extern "C" fn flush_dlsym_log() {
-    let mut file = DLSYM_LOG_FILE.lock();
+    let mut file = DLSYM_LOG_FILE.lock_write();
 
     // Seek back 2 bytse to erase last ",\n"
     file.seek_relative(-2).unwrap();
@@ -128,7 +132,7 @@ pub extern "C" fn resolve_dlsym(handle: *mut c_void, symbol: *const u8) -> *mut 
     };
 
     let _ = writeln!(
-        &mut DLSYM_LOG_FILE.lock(),
+        &mut DLSYM_LOG_FILE.lock_write(),
         "    {{ \"symbol\": \"{}\", \"library\": \"{}\" }},",
         symbol.to_str().unwrap_or("<invalid>"),
         lib_name.to_str().unwrap_or("<invalid>")

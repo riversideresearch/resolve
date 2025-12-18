@@ -25,7 +25,7 @@ use log::{error, info, trace, warn};
 pub extern "C" fn resolve_stack_obj(ptr: *mut c_void, size: usize) -> () {
     let base = ptr as Vaddr;
     {
-        let mut obj_list = ALIVE_OBJ_LIST.lock();
+        let mut obj_list = ALIVE_OBJ_LIST.lock_write();
         obj_list.add_shadow_object(AllocType::Stack, base, size);
     }
 
@@ -38,7 +38,7 @@ pub extern "C" fn resolve_invalidate_stack(base: *mut c_void, limit: *mut c_void
     let limit = limit as Vaddr;
 
     {
-        let mut obj_list = ALIVE_OBJ_LIST.lock();
+        let mut obj_list = ALIVE_OBJ_LIST.lock_write();
         // TODO: Add these to a free list?
         obj_list.invalidate_region(base, limit);
     }
@@ -60,7 +60,7 @@ pub extern "C" fn resolve_malloc(size: usize) -> *mut c_void {
     }
 
     {
-        let mut obj_list = ALIVE_OBJ_LIST.lock();
+        let mut obj_list = ALIVE_OBJ_LIST.lock_write();
         obj_list.add_shadow_object(AllocType::Heap, ptr as Vaddr, size);
     }
 
@@ -140,7 +140,7 @@ pub extern "C" fn resolve_memcpy(dest: *mut c_void, src: *mut c_void, size: usiz
     }
 
     {
-        let mut obj_list = ALIVE_OBJ_LIST.lock();
+        let mut obj_list = ALIVE_OBJ_LIST.lock_write();
         obj_list.add_shadow_object(AllocType::Heap, ptr as Vaddr, size);
     }
 
@@ -168,7 +168,7 @@ pub extern "C" fn resolve_free(ptr: *mut c_void) -> () {
     );
 
     let ptr_size = {
-        let mut obj_list = ALIVE_OBJ_LIST.lock();
+        let mut obj_list = ALIVE_OBJ_LIST.lock_write();
         // Lookup shadow object
         let sobj_opt = obj_list.search_intersection(ptr as Vaddr);
         let size = sobj_opt.map(|o| o.size());
@@ -195,7 +195,7 @@ pub extern "C" fn resolve_free(ptr: *mut c_void) -> () {
 
     {
         // Insert shadow object into freed object list
-        let mut freed_guard = FREED_OBJ_LIST.lock();
+        let mut freed_guard = FREED_OBJ_LIST.lock_write();
         freed_guard.add_shadow_object(AllocType::Unallocated, ptr as Vaddr, ptr_size.unwrap_or(0));
     }
 
@@ -218,7 +218,7 @@ pub extern "C" fn resolve_realloc(ptr: *mut c_void, size: usize) -> *mut c_void 
     }
 
     {
-        let mut obj_list = ALIVE_OBJ_LIST.lock();
+        let mut obj_list = ALIVE_OBJ_LIST.lock_write();
         obj_list.add_shadow_object(AllocType::Heap, realloc_ptr as Vaddr, size);
     }
 
@@ -247,7 +247,7 @@ pub extern "C" fn resolve_calloc(n_items: usize, item_size: usize) -> *mut c_voi
     }
 
     {
-        let mut obj_list = ALIVE_OBJ_LIST.lock();
+        let mut obj_list = ALIVE_OBJ_LIST.lock_write();
         obj_list.add_shadow_object(AllocType::Heap, ptr as Vaddr, size);
     }
 
@@ -278,7 +278,7 @@ pub extern "C" fn resolve_strdup(ptr: *mut c_char) -> *mut c_char {
     // Although writing it to something else is probably a bad idea, this too should be allowed.
     let sizeofstr = unsafe { strlen(ptr) + 1 };
     {
-        let mut obj_list = ALIVE_OBJ_LIST.lock();
+        let mut obj_list = ALIVE_OBJ_LIST.lock_write();
         obj_list.add_shadow_object(AllocType::Heap, string_ptr as Vaddr, sizeofstr);
     }
 
@@ -314,7 +314,7 @@ pub extern "C" fn resolve_strndup(ptr: *mut c_char, size: usize) -> *mut c_char 
     let sizeofstr = unsafe { strnlen(ptr, size) + 1 };
 
     {
-        let mut obj_list = ALIVE_OBJ_LIST.lock();
+        let mut obj_list = ALIVE_OBJ_LIST.lock_write();
         obj_list.add_shadow_object(AllocType::Heap, string_ptr as Vaddr, sizeofstr);
     }
 
