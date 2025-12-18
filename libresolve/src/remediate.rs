@@ -1,7 +1,7 @@
 // Copyright (c) 2025 Riverside Research.
 // LGPL-3; See LICENSE.txt in the repo root for details.
 use libc::{
-    c_char, c_void, calloc, free, malloc, memcpy, realloc, strdup, strlen, strndup, strnlen,
+    c_char, c_void, calloc, free, malloc, realloc, strdup, strlen, strndup, strnlen,
 };
 
 use crate::shadowobjs::{ALIVE_OBJ_LIST, AllocType, FREED_OBJ_LIST, ShadowObject, Vaddr};
@@ -123,34 +123,6 @@ pub extern "C" fn resolve_gep(ptr: *mut c_void, derived: *mut c_void) -> *mut c_
     sobj.past_limit() as *mut c_void
 }
 
-/**
- * @brief - Allocator logging interface for memcpy
- * @input
- *  - dest: pointer to be copied to
- *  - src: pointer to be copied from
- *  - size: size of the allocation in bytes  
- * @return - ptr to the allocation
- */
-#[unsafe(no_mangle)]
-pub extern "C" fn resolve_memcpy(dest: *mut c_void, src: *mut c_void, size: usize) -> *mut c_void {
-    let ptr = unsafe { memcpy(dest, src, size) };
-
-    if ptr.is_null() {
-        return ptr;
-    }
-
-    {
-        let mut obj_list = ALIVE_OBJ_LIST.lock();
-        obj_list.add_shadow_object(AllocType::Heap, ptr as Vaddr, size);
-    }
-
-    info!(
-        "[HEAP] Object copied to dst: {dest:?}, from src {src:?}, with size: {size}, ptr: 0x{:x}",
-        ptr as Vaddr
-    );
-
-    ptr
-}
 
 /**
  * @brief - Allocator logging interface for free
