@@ -19,7 +19,7 @@ export CC=clang
 export CXX=clang
 export CFLAGS="-fpass-plugin=../../llvm-plugin/build/libEnhancedFacts.so"
 export CXXFLAGS="$CFLAGS"
-export LDLIBS="../../libresolve/target/debug/libresolve.so"
+export LDLIBS="../../libresolve/target/release/libresolve.so"
 
 # Run OpenSSL's build
 ./Configure

@@ -34,7 +34,7 @@ plugin = "../../build/libCVEAssert.so"
 config.substitutions.append(("%plugin", plugin))
 
 # Add path to libresolve rlib
-rlib = "../../../libresolve/target/debug"
+rlib = "../../../libresolve/target/release"
 config.substitutions.append(("%rlib", rlib))
 
 # Add suffixes to test
