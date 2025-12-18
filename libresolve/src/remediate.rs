@@ -123,34 +123,6 @@ pub extern "C" fn resolve_gep(ptr: *mut c_void, derived: *mut c_void) -> *mut c_
     sobj.past_limit() as *mut c_void
 }
 
-/**
- * @brief - Allocator logging interface for memcpy
- * @input
- *  - dest: pointer to be copied to
- *  - src: pointer to be copied from
- *  - size: size of the allocation in bytes  
- * @return - ptr to the allocation
- */
-#[unsafe(no_mangle)]
-pub extern "C" fn resolve_memcpy(dest: *mut c_void, src: *mut c_void, size: usize) -> *mut c_void {
-    let ptr = unsafe { memcpy(dest, src, size) };
-
-    if ptr.is_null() {
-        return ptr;
-    }
-
-    {
-        let mut obj_list = ALIVE_OBJ_LIST.lock();
-        obj_list.add_shadow_object(AllocType::Heap, ptr as Vaddr, size);
-    }
-
-    info!(
-        "[HEAP] Object copied to dst: {dest:?}, from src {src:?}, with size: {size}, ptr: 0x{:x}",
-        ptr as Vaddr
-    );
-
-    ptr
-}
 
 /**
  * @brief - Allocator logging interface for free
