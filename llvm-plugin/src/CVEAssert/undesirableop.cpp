@@ -56,7 +56,7 @@ static Function *replaceUndesirableFunction(Module *M, CallInst *call, unsigned 
   BasicBlock *EntryBB = BasicBlock::Create(Ctx, "", resolveSanitizedFn);
   // Insert a return instruction here.
   builder.SetInsertPoint(EntryBB);
-  builder.CreateRet(resolveSanitizedFn->getArg(0));
+  builder.CreateRet(resolveSanitizedFn->getArg(argNum));
 
   // DEBUGGING
   raw_ostream &out = errs();
