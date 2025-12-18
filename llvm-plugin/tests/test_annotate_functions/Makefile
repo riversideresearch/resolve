@@ -2,7 +2,7 @@
 # NOTE: compiler pass works on -O0 has difficulty with higher optimization levels
 SRCS=$(wildcard *.c)
 EXES=$(SRCS:.c=)
-RUNTIME_LIB=../../../libresolve/target/debug
+RUNTIME_LIB=../../../libresolve/target/release
 BUILD=../../build
 
 bitcode: $(SRCS:.c=.ll) $(SRCS:.c=.ll.mem)
