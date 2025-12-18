@@ -18,6 +18,12 @@
 // RUN: -L%rlib -lresolve -Wl,-rpath=%rlib %s -o %t.exe
 // RUN: %t.exe 11; EXIT_CODE=$?; \
 // RUN: echo Remediated exit: $EXIT_CODE; test $EXIT_CODE -eq 3
+//
+// Test that the remediation is successful with optimizations
+// RUN: RESOLVE_LABEL_CVE=vulnerabilities/stack_oob.json %clang -O3 -fpass-plugin=%plugin \ 
+// RUN: -L%rlib -lresolve -Wl,-rpath=%rlib %s -o %t.exe
+// RUN: %t.exe 11; EXIT_CODE=$?; \
+// RUN: echo Remediated exit: $EXIT_CODE; test $EXIT_CODE -eq 3
 // 
 // Test that the remediation is successful (underflow)
 // RUN: RESOLVE_LABEL_CVE=vulnerabilities/stack_oob.json %clang -fpass-plugin=%plugin \ 
