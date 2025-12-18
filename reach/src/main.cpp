@@ -79,11 +79,16 @@ conf::config load_config(const argparse::ArgumentParser& program) {
       auto path_split = util::split(path, ',');
 
       for (const auto& p: path_split) {
-        const auto& node = util::split(p, ':');
-        if (node.size() == 1) {
-          conf.candidate_path.emplace_back(std::nullopt, node[0]);
+        // split on first ';' only to allow c++ namespaced names
+        // e.g. graph.cpp;graph::build_from_program_facts
+        auto idx = p.find(';');
+        // No file specified
+        if (idx == std::string::npos) {
+          conf.candidate_path.emplace_back(std::nullopt, p);
         } else {
-          conf.candidate_path.emplace_back(node[0], node[1]);
+          auto path = p.substr(0, idx);
+          auto node = p.substr(idx+1);
+          conf.candidate_path.emplace_back(path, node);
         }
       }
     }
@@ -153,7 +158,7 @@ int main(int argc, char* argv[]) {
   program.add_argument("-g", "--graph")
     .help("graph type (\"simple\", \"cfg\", or \"call\"). Default \"cfg\"");
   program.add_argument("-p", "--path")
-    .help("candidate path of comma-separated function_name or file:function_name");
+    .help("candidate path of comma-separated function_name or file;function_name");
   program.add_argument("-n", "--num-paths")
     .help("number of paths to generate (n shortest)")
     .scan<'i', size_t>();
