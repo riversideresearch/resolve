@@ -97,7 +97,7 @@ void sanitizeUndesirableOperationInFunction(Function *F, std::string fnName,
   }
   
   // Construct the resolve_sanitize_func function
-  Function *resolveSanitizedFn = replaceUndesirableFunction(M, callsToReplace.front(), 0);
+  Function *resolveSanitizedFn = replaceUndesirableFunction(M, callsToReplace.front(), argNum);
 
   // Replace calls at all callsites in the module
   for (auto call : callsToReplace) {
