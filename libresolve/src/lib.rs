@@ -69,17 +69,23 @@ pub extern "C" fn resolve_init() {
     if cfg!(test) {
         builder.is_test(true);
     } else {
-        let path = env::var("RESOLVE_RUNTIME_LOG");
-        let path = path.unwrap_or_else(|_| "resolve_log.out".to_string());
-
-        let path = idify_file_path(&path, process::id());
-
-        let file = File::create(path).unwrap();
+        let file = open_resolve_log_file();
 
         builder.target(env_logger::Target::Pipe(Box::new(file)));
     }
 
     let _ = builder.try_init();
+}
+
+fn open_resolve_log_file() -> File {
+    let path = env::var("RESOLVE_RUNTIME_LOG");
+    let path = path.unwrap_or_else(|_| "resolve_log.out".to_string());
+
+    let path = idify_file_path(&path, process::id());
+
+    let file = File::create(path).unwrap();
+
+    file
 }
 
 /**
