@@ -13,6 +13,7 @@ log = "0.4.29"
 
 [profile.release]
 panic = "abort"
+debug = true
 
 [profile.dev]
 panic = "abort"
