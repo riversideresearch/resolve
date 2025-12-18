@@ -1,7 +1,7 @@
 // Copyright (c) 2025 Riverside Research.
 // LGPL-3; See LICENSE.txt in the repo root for details.
 use libc::{
-    c_char, c_void, calloc, free, malloc, memcpy, realloc, strdup, strlen, strndup, strnlen,
+    c_char, c_void, calloc, free, malloc, realloc, strdup, strlen, strndup, strnlen,
 };
 
 use crate::shadowobjs::{ALIVE_OBJ_LIST, AllocType, FREED_OBJ_LIST, ShadowObject, Vaddr};
