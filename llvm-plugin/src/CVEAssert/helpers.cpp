@@ -131,6 +131,33 @@ Function *getOrCreateResolveReportSanitizerTriggered(Module *M) {
     return resolve_report_fn;
 } 
 
+Function *getOrCreateRecoverBufferFunction(Module *M){
+    if (Function *F = M->getFunction("resolve_get_recover_longjmp_buf"))
+        if (!F->isDeclaration())
+            return F;
+
+    auto ptr_ty = PointerType::get(M->getContext(), 0);
+    FunctionType *resolve_recover_buf_fn_ty = FunctionType::get(ptr_ty, {}, false);
+    
+    auto recover_buf_fn = Function::Create(
+        resolve_recover_buf_fn_ty,
+        GlobalValue::WeakAnyLinkage, 
+        "resolve_get_recover_longjmp_buf",
+        M
+    );
+
+    BasicBlock *EntryBB = BasicBlock::Create(M->getContext(), "", recover_buf_fn);
+    IRBuilder<> builder(EntryBB);
+    builder.SetInsertPoint(EntryBB);
+    builder.CreateRet(Constant::getNullValue(ptr_ty));
+    
+    raw_ostream &out = errs();
+    out << *recover_buf_fn;
+    if (verifyFunction(*recover_buf_fn, &out)) {}
+
+    return recover_buf_fn;
+}
+
 // getOrCreateRemediateBehavior: helper function to apply remediation strategies
 Function *getOrCreateRemediationBehavior(Module *M, Vulnerability::RemediationStrategies strategy) {
     auto &Ctx = M->getContext();
@@ -173,11 +200,8 @@ Function *getOrCreateRemediationBehavior(Module *M, Vulnerability::RemediationSt
         );
 
         // NOTE: resolve_get_recover_longjmp_buf must exist in C source code
-        FunctionCallee resolve_recover_buf_fn = M->getOrInsertFunction(
-            "resolve_get_recover_longjmp_buf",
-            FunctionType::get(ptr_ty, {}, false)
-        ); 
-        
+        Function *resolve_recover_buf_fn = getOrCreateRecoverBufferFunction(M);
+
         Value *resolve_longjmp_ptr = Builder.CreateCall(resolve_recover_buf_fn);
         Value *longjmpVal = ConstantInt::get(i32_ty, 42);
         Builder.CreateCall(longjmpFn, { resolve_longjmp_ptr, longjmpVal });
