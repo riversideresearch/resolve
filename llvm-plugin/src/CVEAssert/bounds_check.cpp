@@ -479,6 +479,12 @@ void sanitizeLoadStore(Function *F, Vulnerability::RemediationStrategies strateg
     auto ptr = Inst->getPointerOperand();
     auto valueTy = Inst->getType();
 
+    // Skip trivially correct accesses to stack values in this function (i.e., most automatic variables)
+    // Skip if ptr is an alloca and types are the same
+    if (auto *alloca = dyn_cast<AllocaInst>(ptr)) {
+      if (alloca->getAllocatedType() == valueTy) continue;
+    }
+
     auto loadFn = getOrCreateBoundsCheckLoadSanitizer(F->getParent(),
                                                       F->getContext(), valueTy, strategy);
 
@@ -492,6 +498,12 @@ void sanitizeLoadStore(Function *F, Vulnerability::RemediationStrategies strateg
     builder.SetInsertPoint(Inst);
     auto ptr = Inst->getPointerOperand();
     auto valueTy = Inst->getValueOperand()->getType();
+
+    // Skip trivially correct accesses to stack values in this function (i.e., most automatic variables)
+    // Skip if ptr is an alloca and types are the same
+    if (auto *alloca = dyn_cast<AllocaInst>(ptr)) {
+      if (alloca->getAllocatedType() == valueTy) continue;
+    }
 
     auto storeFn = getOrCreateBoundsCheckStoreSanitizer(
       F->getParent(), F->getContext(), valueTy, strategy
