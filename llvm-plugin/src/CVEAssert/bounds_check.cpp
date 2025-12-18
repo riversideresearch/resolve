@@ -218,10 +218,10 @@ static Function *getOrCreateBoundsCheckMemcpySanitizer(Module *M, Vulnerability:
   Value *withinBounds = builder.CreateAnd(check_src_bd, check_dst_bd);
   builder.CreateCondBr(withinBounds, NormalBB, SanitizeMemcpyBB);
 
-  // NormalBB: Call resolve_memcpy and return the ptr
+  // NormalBB: Call memcpy and return the ptr
   builder.SetInsertPoint(NormalBB);
   FunctionCallee memcpyfn = M->getOrInsertFunction(
-      "resolve_memcpy", FunctionType::get(ptr_ty, {ptr_ty, ptr_ty, size_ty}, false));
+      "memcpy", FunctionType::get(ptr_ty, {ptr_ty, ptr_ty, size_ty}, false));
   Value *memcpy_ptr =
       builder.CreateCall(memcpyfn, {dst_ptr, src_ptr, size_arg});
   builder.CreateRet(memcpy_ptr);
