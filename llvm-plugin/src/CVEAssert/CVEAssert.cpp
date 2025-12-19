@@ -44,6 +44,7 @@ namespace {
 struct InstrumentMemInst {
   bool instrumentMalloc = false;
   bool instrumentAlloca = false;
+  bool instrumentFree = false;
 };
 
 struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
