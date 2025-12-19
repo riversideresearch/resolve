@@ -284,7 +284,7 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
 
     if (instrument_mem_inst.instrumentAlloca ||
         instrument_mem_inst.instrumentMalloc ||
-        instrument_mem_inst.instrmentRealloc) {
+        instrument_mem_inst.instrumentRealloc) {
           result = PreservedAnalyses::none();
     }
 
