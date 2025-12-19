@@ -183,14 +183,24 @@ pub extern "C" fn resolve_free(ptr: *mut c_void) -> () {
  */
 #[unsafe(no_mangle)]
 pub extern "C" fn resolve_realloc(ptr: *mut c_void, size: usize) -> *mut c_void {
-    let realloc_ptr = unsafe { realloc(ptr, size) };
+    // Edge cases
+    // 1. returned memory may not be allocated 
+    // 2. pointer passed to realloc may be NULL
+    // 3. size fits within original allocation (returns the original ptr)
+    
+    // Consideration: Pointer passed in may be invalidated so we need a mechanism
+    // to remove the shadow object for the orignal allocation
+    let realloc_ptr = unsafe { realloc(ptr, size + 1) };
 
     if realloc_ptr.is_null() {
         return realloc_ptr;
     }
 
+
     {
         let mut obj_list = ALIVE_OBJ_LIST.lock();
+        // Remove shadow object for original pointer
+        obj_list.invalidate_at(ptr as Vaddr); // if ptr == NULL this does not do anything 
         obj_list.add_shadow_object(AllocType::Heap, realloc_ptr as Vaddr, size);
     }
 
