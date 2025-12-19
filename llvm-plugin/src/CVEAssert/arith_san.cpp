@@ -343,7 +343,8 @@ static void widenIntOverflow(Function *F) {
   //    // make a new op with the widen'd types
   //    // replace all uses of sext with the new widened op
   //    // add new sext to worklist
-  while (auto *cast = worklist.front()) {
+  while (worklist.size()) {
+    auto *cast = worklist.front();
     worklist.pop_front();
     // Is this a sign extension of an overflowing op?
     auto *arith = asArithOp(cast->getOperand(0));
@@ -352,20 +353,17 @@ static void widenIntOverflow(Function *F) {
 
     // Bubble up the sign extension and widen the operation...
     auto widenTy = cast->getDestTy();
-    auto widenedOp = arith->clone();
-    widenedOp->insertAfter(arith);
-    widenedOp->setName("widened");
-    size_t idx = 0;
-    for (Value *op : arith->operands()) {
-      // Sign extend each operand
-      auto *sext = CastInst::Create(CastInst::SExt, op, widenTy, "", widenedOp);
-      // Pass to new op
-      widenedOp->setOperand(idx, sext);
+    IRBuilder<> builder(arith->getNextNode());
+    CastInst *sextA = (CastInst *)builder.CreateCast(
+        cast->getOpcode(), arith->getOperand(0), widenTy);
+    CastInst *sextB = (CastInst *)builder.CreateCast(
+        cast->getOpcode(), arith->getOperand(1), widenTy);
+    auto widenedOp = builder.CreateBinOp(arith->getOpcode(), sextA, sextB);
 
-      // add new sext's to worklist
-      worklist.push_back(sext);
-      ++idx;
-    }
+    // add new sext's to worklist
+    // FIXME: Why doesn't this work?
+    // worklist.push_back((CastInst*)sextA);
+    // worklist.push_back((CastInst*)sextB);
 
     // replace this sext with the widened op
     cast->replaceAllUsesWith(widenedOp);
