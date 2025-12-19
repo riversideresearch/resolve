@@ -246,8 +246,23 @@ static FunctionCallee getResolveMalloc(Module *M) {
     
     return M->getOrInsertFunction(
         "resolve_malloc",
-        FunctionType::get(ptr_ty, { size_ty }, false)
+        FunctionType::get(ptr_ty, { size_ty },
+        false
+      )
     );
+}
+
+static FunctionCallee getResolveRealloc(Module *M) {
+  auto &Ctx = M->getContext();
+  auto ptr_ty = PointerType::get(Ctx, 0);
+  auto size_ty = Type::getInt64Ty(Ctx);
+
+  return M->getOrInsertFunction(
+    "resolve_realloc",
+    FunctionType::get(ptr_ty, { ptr_ty, size_ty },
+    false
+    )
+  );
 }
 
 static FunctionCallee getResolveStackObj(Module *M) {
@@ -258,7 +273,9 @@ static FunctionCallee getResolveStackObj(Module *M) {
     
     return M->getOrInsertFunction(
         "resolve_stack_obj",
-        FunctionType::get(void_ty, { ptr_ty, size_ty }, false)
+        FunctionType::get(void_ty, { ptr_ty, size_ty },
+        false
+      )
     );
 }
 
@@ -344,17 +361,45 @@ void instrumentMalloc(Function *F) {
   }
 
   for (auto Inst : mallocList) {
-    StringRef fnName = Inst->getFunction()->getName();
-
     builder.SetInsertPoint(Inst);
     Value *arg = Inst->getArgOperand(0);
-    Value *normalizeArg = builder.CreateZExtOrBitCast(arg, size_ty);
-    CallInst *resolveMallocCall = builder.CreateCall(getResolveMalloc(M), { normalizeArg });
+    CallInst *resolveMallocCall = builder.CreateCall(getResolveMalloc(M), { arg });
     Inst->replaceAllUsesWith(resolveMallocCall);
     Inst->eraseFromParent();  
   }
-
   // TODO: instrument free and other libc allocations
+}
+
+void instrumentRealloc(Function *F) {
+  Module *M = F->getParent();
+  LLVMContext &Ctx = M->getContext();
+  IRBuilder<> builder(Ctx);
+  auto size_ty = Type::getInt64Ty(Ctx);
+
+  std::vector<CallInst *> reallocList;
+
+  for (auto &BB : *F) {
+    for (auto &inst : BB) {
+      if (auto *call = dyn_cast<CallInst>(&inst)) {
+        Function *calledFn = call->getCalledFunction();
+
+        if (!calledFn) { continue; }
+
+        StringRef fnName = calledFn->getName();
+
+        if (fnName == "realloc") { reallocList.push_back(call); } 
+      }
+    }
+  }
+
+  for (auto Inst : reallocList) {
+    builder.SetInsertPoint(Inst);
+    Value *ptr_arg =Inst->getArgOperand(0);
+    Value *size_arg = Inst->getArgOperand(1);
+    CallInst *resolveReallocCall = builder.CreateCall(getResolveRealloc(M), { ptr_arg, size_arg });
+    Inst->replaceAllUsesWith(resolveReallocCall);
+    Inst->eraseFromParent();
+  }
 }
 
 void instrumentGEP(Function *F) {
