@@ -353,6 +353,7 @@ static void widenIntOverflow(Function *F) {
     // Bubble up the sign extension and widen the operation...
     auto widenTy = cast->getDestTy();
     auto widenedOp = arith->clone();
+    widenedOp->insertAfter(arith);
     widenedOp->setName("widened");
     size_t idx = 0;
     for (Value *op : arith->operands()) {
