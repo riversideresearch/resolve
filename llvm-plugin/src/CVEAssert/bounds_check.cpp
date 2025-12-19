@@ -292,6 +292,34 @@ static FunctionCallee getResolveStackObj(Module *M) {
     );
 }
 
+static FunctionCallee getResolveFree(Module *M) {
+  Module *M = F->getParent();
+  LLVMContext &Ctx = M->getContext();
+  auto ptr_ty = PointerType::get(Ctx, 0);
+  auto void_ty = Type::getVoidTy(Ctx);
+
+  return M->getOrInsertFunction(
+    "resolve_free",
+    FunctionType::get(void_ty, { ptr_ty },
+    false
+    )
+  );
+}
+
+static FunctionCallee getResolveFree(Module *M) {
+  Module *M = F->getParent();
+  LLVMContext &Ctx = M->getContext();
+  auto ptr_ty = PointerType::get(Ctx, 0);
+  auto void_ty = Type::getVoidTy(Ctx);
+
+  return M->getOrInsertFunction(
+    "resolve_free",
+    FunctionType::get(void_ty, { ptr_ty },
+    false
+    )
+  );
+}
+
 void instrumentAlloca(Function *F) {
   Module *M = F->getParent();
   LLVMContext &Ctx = M->getContext();
@@ -411,38 +439,6 @@ void instrumentRealloc(Function *F) {
     Value *size_arg = Inst->getArgOperand(1);
     CallInst *resolveReallocCall = builder.CreateCall(getResolveRealloc(M), { ptr_arg, size_arg });
     Inst->replaceAllUsesWith(resolveReallocCall);
-    Inst->eraseFromParent();
-  }
-}
-
-void instrumentCalloc(Function *F) {
-  Module *M = F->getParent();
-  LLVMContext &Ctx = M->getContext();
-  IRBuilder<> builder(Ctx);
-  auto size_ty = Type::getInt64Ty(Ctx);
-
-  std::vector<CallInst *> callocList;
-
-  for (auto &BB : *F) {
-    for (auto &inst : BB) {
-      if (auto *call = dyn_cast<CallInst>(&inst)) {
-        Function *calledFn = call->getCalledFunction();
-
-        if (!calledFn) { continue; }
-
-        StringRef fnName = calledFn->getName();
-
-        if (fnName == "calloc") { callocList.push_back(call); } 
-      }
-    }
-  }
-
-  for (auto Inst : callocList) {
-    builder.SetInsertPoint(Inst);
-    Value *num_arg = Inst->getArgOperand(0);
-    Value *size_arg = Inst->getArgOperand(1);
-    CallInst *resolveCallocCall = builder.CreateCall(getResolveCalloc(M), { num_arg, size_arg });
-    Inst->replaceAllUsesWith(resolveCallocCall);
     Inst->eraseFromParent();
   }
 }
