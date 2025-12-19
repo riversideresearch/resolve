@@ -265,6 +265,19 @@ static FunctionCallee getResolveRealloc(Module *M) {
   );
 }
 
+static FunctionCallee getResolveCalloc(Module *M) {
+  auto &Ctx = M->getContext();
+  auto ptr_ty = PointerType::get(Ctx, 0);
+  auto size_ty = Type::getInt64Ty(Ctx);
+
+  return M->getOrInsertFunction(
+    "resolve_calloc",
+    FunctionType::get(ptr_ty, { size_ty, size_ty },
+    false
+    )
+  );
+}
+
 static FunctionCallee getResolveStackObj(Module *M) {
     auto &Ctx = M->getContext();
     auto void_ty = Type::getVoidTy(Ctx);
@@ -398,6 +411,38 @@ void instrumentRealloc(Function *F) {
     Value *size_arg = Inst->getArgOperand(1);
     CallInst *resolveReallocCall = builder.CreateCall(getResolveRealloc(M), { ptr_arg, size_arg });
     Inst->replaceAllUsesWith(resolveReallocCall);
+    Inst->eraseFromParent();
+  }
+}
+
+void instrumentCalloc(Function *F) {
+  Module *M = F->getParent();
+  LLVMContext &Ctx = M->getContext();
+  IRBuilder<> builder(Ctx);
+  auto size_ty = Type::getInt64Ty(Ctx);
+
+  std::vector<CallInst *> callocList;
+
+  for (auto &BB : *F) {
+    for (auto &inst : BB) {
+      if (auto *call = dyn_cast<CallInst>(&inst)) {
+        Function *calledFn = call->getCalledFunction();
+
+        if (!calledFn) { continue; }
+
+        StringRef fnName = calledFn->getName();
+
+        if (fnName == "calloc") { callocList.push_back(call); } 
+      }
+    }
+  }
+
+  for (auto Inst : callocList) {
+    builder.SetInsertPoint(Inst);
+    Value *num_arg = Inst->getArgOperand(0);
+    Value *size_arg = Inst->getArgOperand(1);
+    CallInst *resolveCallocCall = builder.CreateCall(getResolveCalloc(M), { num_arg, size_arg });
+    Inst->replaceAllUsesWith(resolveCallocCall);
     Inst->eraseFromParent();
   }
 }
