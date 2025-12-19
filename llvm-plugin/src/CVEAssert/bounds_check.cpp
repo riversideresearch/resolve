@@ -361,16 +361,12 @@ void instrumentMalloc(Function *F) {
   }
 
   for (auto Inst : mallocList) {
-    StringRef fnName = Inst->getFunction()->getName();
-
     builder.SetInsertPoint(Inst);
     Value *arg = Inst->getArgOperand(0);
-    Value *normalizeArg = builder.CreateZExtOrBitCast(arg, size_ty);
-    CallInst *resolveMallocCall = builder.CreateCall(getResolveMalloc(M), { normalizeArg });
+    CallInst *resolveMallocCall = builder.CreateCall(getResolveMalloc(M), { arg });
     Inst->replaceAllUsesWith(resolveMallocCall);
     Inst->eraseFromParent();  
   }
-
   // TODO: instrument free and other libc allocations
 }
 
