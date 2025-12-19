@@ -42,9 +42,7 @@ bool CVE_ASSERT_DEBUG;
 namespace {
 
 struct InstrumentMemInst {
-  bool instrumentCalloc = false;
   bool instrumentMalloc = false;
-  bool instrumentRealloc = false;
   bool instrumentAlloca = false;
 };
 
@@ -253,8 +251,6 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
         // 122 heap-based 
         case VulnID::HEAP_BASED_BUF_OVERFLOW:
           instrument_mem_inst.instrumentMalloc = true;
-          instrument_mem_inst.instrumentRealloc = true;
-          instrument_mem_inst.instrumentCalloc = true;
           break;
 
         // default instrument both
@@ -264,8 +260,6 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
         case VulnID::WRITE_WHAT_WHERE:
           instrument_mem_inst.instrumentAlloca = true;
           instrument_mem_inst.instrumentMalloc = true;
-          instrument_mem_inst.instrumentRealloc = true;
-          instrument_mem_inst.instrumentCalloc = true;
           break;
         
       }
@@ -278,21 +272,14 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
 
       if (instrument_mem_inst.instrumentMalloc) {
         instrumentMalloc(&F);
-      }
-
-      if (instrument_mem_inst.instrumentRealloc) {
         instrumentRealloc(&F);
-      }
-
-      if (instrument_mem_inst.instrumentCalloc) {
         instrumentCalloc(&F);
       }
     }
 
+
     if (instrument_mem_inst.instrumentAlloca ||
-        instrument_mem_inst.instrumentMalloc ||
-        instrument_mem_inst.instrumentRealloc ||
-        instrument_mem_inst.instrumentCalloc) {
+        instrument_mem_inst.instrumentMalloc) {
           result = PreservedAnalyses::none();
     }
 
