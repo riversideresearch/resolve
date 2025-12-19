@@ -397,7 +397,6 @@ void instrumentRealloc(Function *F) {
   }
 
   for (auto Inst : reallocList) {
-    StringRef fnName = Inst->getFunction()->getName();
     builder.SetInsertPoint(Inst);
     Value *ptr_arg =Inst->getArgOperand(0);
     Value *size_arg = Inst->getArgOperand(1);
