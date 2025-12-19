@@ -18,7 +18,7 @@
 #include "arith_san.hpp"
 #include "helpers.hpp"
 
-
+#include <deque>
 #include <memory>
 #include <optional>
 #include <utility>
@@ -306,26 +306,96 @@ void sanitizeDivideByZero(Function *F, Vulnerability::RemediationStrategies stra
   }
 }
 
-void sanitizeIntOverflow(Function *F, Vulnerability::RemediationStrategies strategy) {
+static void widenIntOverflow(Function *F) {
+  // Basic algorithm:
+  // Find the pattern of overflowing op -> sext
+  // Replace with sext -> overflowing op
+  // Repeat until fixpoint
+
+  std::deque<CastInst *> worklist;
+
+  // initialize worklist with all sext's
+  for (auto &BB : *F) {
+    for (auto &instr : BB) {
+      if (auto *CastOp = dyn_cast<CastInst>(&instr)) {
+        if (CastOp->getOpcode() == Instruction::SExt) {
+          worklist.push_back(CastOp);
+        }
+      }
+    }
+  }
+
+  // Cast to BinOp if this is an overflowing arith operation.
+  auto asArithOp = [](Value *val) -> BinaryOperator * {
+    if (auto *BinOp = dyn_cast<BinaryOperator>(val)) {
+      if (BinOp->getOpcode() == Instruction::Add ||
+          BinOp->getOpcode() == Instruction::Sub ||
+          BinOp->getOpcode() == Instruction::Mul) {
+        return BinOp;
+      }
+    }
+    return nullptr;
+  };
+
+  // for sext in worklist.pop:
+  //    // if not sext.arg(0).'could_overflow': continue
+  //    // make a new sext for op's args
+  //    // make a new op with the widen'd types
+  //    // replace all uses of sext with the new widened op
+  //    // add new sext to worklist
+  while (auto *cast = worklist.front()) {
+    worklist.pop_front();
+    // Is this a sign extension of an overflowing op?
+    auto *arith = asArithOp(cast->getOperand(0));
+    if (arith == nullptr)
+      continue;
+
+    // Bubble up the sign extension and widen the operation...
+    auto widenTy = cast->getDestTy();
+    auto widenedOp = arith->clone();
+    widenedOp->setName("widened");
+    size_t idx = 0;
+    for (Value *op : arith->operands()) {
+      // Sign extend each operand
+      auto *sext = CastInst::Create(CastInst::SExt, op, widenTy, "", widenedOp);
+      // Pass to new op
+      widenedOp->setOperand(idx, sext);
+
+      // add new sext's to worklist
+      worklist.push_back(sext);
+      ++idx;
+    }
+
+    // replace this sext with the widened op
+    cast->replaceAllUsesWith(widenedOp);
+    cast->eraseFromParent();
+  }
+}
+
+void sanitizeIntOverflow(Function *F,
+                         Vulnerability::RemediationStrategies strategy) {
   std::vector<Instruction *> worklist;
   Module *M = F->getParent();
   auto &Ctx = M->getContext();
   IRBuilder<> Builder(Ctx);
 
-  switch(strategy) {
-    case Vulnerability::RemediationStrategies::RECOVER:
-    case Vulnerability::RemediationStrategies::EXIT:
-    case Vulnerability::RemediationStrategies::SAFE:
-    case Vulnerability::RemediationStrategies::SAT:
-      break;
-    
-    default: 
-      llvm::errs() << "[CVEAssert] Error: sanitizeIntOverflow does not support remediation strategy specified "
-                   << " defaulting to SAT strategy!\n";
-      strategy = Vulnerability::RemediationStrategies::SAT;
-      break;
+  switch (strategy) {
+  case Vulnerability::RemediationStrategies::CONTINUE_WIDEN:
+    return widenIntOverflow(F);
+
+  case Vulnerability::RemediationStrategies::RECOVER:
+  case Vulnerability::RemediationStrategies::EXIT:
+  case Vulnerability::RemediationStrategies::SAFE:
+  case Vulnerability::RemediationStrategies::SAT:
+    break;
+
+  default:
+    llvm::errs() << "[CVEAssert] Error: sanitizeIntOverflow does not support "
+                    "remediation strategy specified... defaulting to SAT strategy!\n";
+    strategy = Vulnerability::RemediationStrategies::SAT;
+    break;
   }
-  
+
   for (auto &BB : *F) {
     for (auto &instr : BB) {
       if (auto *BinOp = dyn_cast<BinaryOperator>(&instr)) {
