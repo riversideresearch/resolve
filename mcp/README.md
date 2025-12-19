@@ -22,30 +22,22 @@ The environment variables are as follows:
 
 ### Running
 
-Install [uv](https://docs.astral.sh/uv/getting-started/installation/) and run `uv run main.py` to install dependencies and start the server (in stdio mode).
+Install [uv](https://docs.astral.sh/uv/getting-started/installation/) and create a virtual environment, then run `uv pip install -e .` to install the dependencies.
 
-If you want to run it in http mode, you can start it with `fastmcp run main.py --transport http --port 8002`
+Start the server with `fastmcp run main.py --transport http --port 8002`
 
 If you want to run it using a MCP-to-OpenAPI proxy (for use with OpenWebUI) you can do so with `uvx mcpo --port 8002 --api-key "top-secret" -- uv run main.py`
 
 See the above list of required and inferred environment variables.
 
-## Development
-
-### Previewing the API
-
-1. Install `npx`
-2. Start the MCP server locally
-3. `npx @modelcontextprotocol/inspector`
-4. Connect to the MCP server through the inspector webUI
-
 ## Challenge Problem Integration
 
-To integrate challenge problems, you must create a `.resolve_meta` file.
+To integrate challenge problems with resolve's capabilities, you need:
+1. A `.resolve_meta` file describing the challenge
+2. A Dockerfile that uses the resolve base image
+3. A `vulnerabilities.json` file with remediation strategy
 
-### Resolve Metadata File
-
-TODO: document
+There are examples of these in `resolve/mcp/example`, and a `README.md` walking you through how to run the server on the example.
 
 ### Workspaces
 
@@ -58,3 +50,12 @@ app:
   build:
     context: workspaces/${WORKSPACE:-..}
 ```
+
+## Development
+
+### Previewing the API
+
+1. Install `npx`
+2. Start the MCP server locally
+3. `npx @modelcontextprotocol/inspector`
+4. Connect to the MCP server through the inspector webUI

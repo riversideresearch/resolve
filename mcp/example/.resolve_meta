@@ -1,0 +1,34 @@
+{
+    "name": "example",
+    "conops":{
+        "coredump": false,
+        "reachability": false,
+        "remediation": true,
+        "input synthesis": false
+    },
+    "facts targets": ["build/example_app"],
+    "workspace targets": ["src"],
+    "commands":{
+        "build":[
+            "DOCKER_BUILDKIT=0 docker compose build --no-cache"
+        ],
+        "build remediated":[
+            "DOCKER_BUILDKIT=0 docker compose build --build-arg RESOLVE_LABEL_CVE=/challenge/vulnerabilities.json --no-cache"
+        ],
+        "prepare facts targets": [
+            "mkdir -p build && docker compose run --rm app sh -c 'cat /challenge/build/example_app' > ./build/example_app && chmod +x ./build/example_app"
+        ],
+        "test":[
+            "docker compose up -d app",
+            "docker compose run --rm pov",
+            "docker compose down"
+        ]
+    },
+    "LLM information":[
+        "This is a minimal example demonstrating the resolve MCP server",
+        "It contains a stack-based buffer overflow vulnerability (CWE-121)",
+        "The vulnerable function is main() which accesses a stack buffer array without bounds checking",
+        "This example demonstrates automatic remediation capabilities",
+        "Pass an index >= 10 or < 0 as an argument to trigger the overflow (valid range: 0-9)"
+    ]
+}

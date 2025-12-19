@@ -1,0 +1,34 @@
+# Copyright (c) 2025 Riverside Research.
+# LGPL-3; See LICENSE.txt in the repo root for details.
+
+version: '3.8'
+
+services:
+  app:
+    build:
+      args:
+        WORKSPACE: ${WORKSPACE:-}
+      context: .
+      dockerfile: Dockerfile
+    container_name: example-app
+    init: true
+
+  test:
+    build:
+      args:
+        WORKSPACE: ${WORKSPACE:-}
+      context: .
+      dockerfile: Dockerfile
+    container_name: example-test
+    command: ["/challenge/build/example_app", "5"]
+    init: true
+
+  pov:
+    build:
+      args:
+        WORKSPACE: ${WORKSPACE:-}
+      context: .
+      dockerfile: Dockerfile
+    container_name: example-pov
+    command: ["/challenge/build/example_app", "15"]
+    init: true
