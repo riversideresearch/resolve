@@ -43,7 +43,7 @@ namespace {
 
 struct InstrumentMemInst {
   bool instrumentMalloc = false;
-  bool instrmentRealloc = false;
+  bool instrumentRealloc = false;
   bool instrumentAlloca = false;
 };
 
@@ -252,7 +252,7 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
         // 122 heap-based 
         case VulnID::HEAP_BASED_BUF_OVERFLOW:
           instrument_mem_inst.instrumentMalloc = true;
-          instrument_mem_inst.instrmentRealloc = true;
+          instrument_mem_inst.instrumentRealloc = true;
           break;
 
         // default instrument both
@@ -262,7 +262,7 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
         case VulnID::WRITE_WHAT_WHERE:
           instrument_mem_inst.instrumentAlloca = true;
           instrument_mem_inst.instrumentMalloc = true;
-          instrument_mem_inst.instrmentRealloc = true;
+          instrument_mem_inst.instrumentRealloc = true;
           break;
         
       }
