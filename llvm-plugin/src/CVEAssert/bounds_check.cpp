@@ -24,6 +24,77 @@ static const bool FIND_PTR_ROOT_DEBUG = true;
 
 using namespace llvm;
 
+static Function * getOrCreateResolveGepSanitizer(Module *M, LLVMContext &Ctx, Vulnerability::RemediationStrategies strategy) {
+  std::string handlerName = "resolve_gep_sanitized";
+
+  if (auto handler = M->getFunction(handlerName)) {
+    return handler;
+  }
+
+  IRBuilder<> builder(Ctx);
+
+  auto ptr_ty = PointerType::get(Ctx, 0);
+  auto size_ty = Type::getInt64Ty(Ctx);
+
+  FunctionType *sanitizeGepFnTy= FunctionType::get(
+    ptr_ty,
+    { ptr_ty, ptr_ty, size_ty },
+    false
+  );
+
+  Function *sanitizeGepFn = Function::Create(
+    sanitizeGepFnTy,
+    Function::InternalLinkage,
+    handlerName,
+    M
+  );
+
+  BasicBlock *EntryBB = BasicBlock::Create(Ctx, "", sanitizeGepFn);
+  BasicBlock *NormalGepBB = BasicBlock::Create(Ctx, "", sanitizeGepFn);
+  BasicBlock *SanitizeGepBB = BasicBlock::Create(Ctx, "", sanitizeGepFn);
+  
+  // Call simplified resolve-check-bounds on pointer if not in sobj table call remediation strategy 
+  FunctionType *resolveGepFnTy = FunctionType::get(
+    ptr_ty,
+    { ptr_ty, ptr_ty, size_ty },
+    false
+  );
+
+  FunctionCallee resolveGepFn = M->getOrInsertFunction(
+    "resolve_gep",
+    resolveGepFnTy
+  );
+
+  Value *basePtr = sanitizeGepFn->getArg(0); 
+  Value *derivedPtr = sanitizeGepFn->getArg(1); 
+  Value *elSize = sanitizeGepFn->getArg(2); 
+
+  builder.SetInsertPoint(EntryBB);
+  Value * gepResult = builder.CreateCall(resolveGepFn, { basePtr, derivedPtr, elSize });
+
+  // resolve_gep will return the derived pointer if it is allowed
+  Value * withinBounds = builder.CreateICmpEQ(derivedPtr, gepResult);
+  builder.CreateCondBr(withinBounds, NormalGepBB, SanitizeGepBB);
+
+  // NormalGepBB: Return the loaded value.
+  builder.SetInsertPoint(NormalGepBB);
+  builder.CreateRet(derivedPtr);
+
+  // SanitizeGepBB: Apply remediation strategy
+  builder.SetInsertPoint(SanitizeGepBB);
+  builder.CreateCall(getOrCreateResolveReportSanitizerTriggered(M));
+  builder.CreateCall(getOrCreateRemediationBehavior(M, strategy));
+  builder.CreateRet(Constant::getNullValue(ptr_ty));
+
+  // DEBUGGING
+  raw_ostream &out = errs();
+  out << *sanitizeGepFn;
+  if (verifyFunction(*sanitizeGepFn, &out)) {
+  }
+
+  return sanitizeGepFn;
+}
+
 static Function *getOrCreateBoundsCheckLoadSanitizer(Module *M, LLVMContext &Ctx, Type *ty, Vulnerability::RemediationStrategies strategy) {
   std::string handlerName = "resolve_bounds_check_ld_" + getLLVMType(ty);
 
@@ -300,15 +371,41 @@ void instrumentAlloca(Function *F) {
     }
   }
 
+  auto invalidateFn = M->getOrInsertFunction(
+    "resolve_invalidate_stack",
+    FunctionType::get(void_ty, { ptr_ty, ptr_ty }, false)
+  );
+
   for (auto* allocaInst: allocaList) {
-      // Insert after the alloca instruction
-      builder.SetInsertPoint(allocaInst->getNextNode());
-      Value* allocatedPtr = allocaInst;
-      Value *sizeVal = nullptr;
+      bool hasStart = false;
+      bool hasEnd = false;
+
       Type *allocatedType = allocaInst->getAllocatedType();
       uint64_t typeSize = DL.getTypeAllocSize(allocatedType); 
-      sizeVal = ConstantInt::get(size_ty, typeSize);
-      builder.CreateCall(getResolveStackObj(M), { allocatedPtr, sizeVal });
+
+      for (auto* user: allocaInst->users()) {
+        if( auto* call = dyn_cast<CallInst>(user)) {
+          auto called = call->getCalledFunction();
+          if (called && called->getName().starts_with("llvm.lifetime.start")) {
+            hasStart = true;
+            builder.SetInsertPoint(call->getNextNode());
+            builder.CreateCall(getResolveStackObj(M), { allocaInst, ConstantInt::get(size_ty, typeSize)});
+          }
+
+          if (called && called->getName().starts_with("llvm.lifetime.end")) {
+            hasEnd = true;
+            builder.SetInsertPoint(call->getNextNode());
+            builder.CreateCall(invalidateFn, { allocaInst, allocaInst });
+          }
+        }
+      }
+
+      // This is probably always true unless we are given malformed input.
+      assert(hasStart == hasEnd);
+      if (hasStart) { continue; }
+      // Otherwise Insert after the alloca instruction
+      builder.SetInsertPoint(allocaInst->getNextNode());
+      builder.CreateCall(getResolveStackObj(M), { allocaInst, ConstantInt::get(size_ty, typeSize)});
   }
 
   // Find low and high allocations and pass to resolve_invaliate_stack
@@ -316,10 +413,6 @@ void instrumentAlloca(Function *F) {
     return;
   }
 
-  auto invalidateFn = M->getOrInsertFunction(
-    "resolve_invalidate_stack",
-    FunctionType::get(void_ty, { ptr_ty, ptr_ty }, false)
-  );
 
   // Stack grows down, so first allocation is high, last is low
   // Hmm.. compiler seems to be reordering the allocas in ways 
@@ -402,24 +495,14 @@ void instrumentRealloc(Function *F) {
   }
 }
 
-void instrumentGEP(Function *F) {
+void instrumentGEP(Function *F, Vulnerability::RemediationStrategies strategy) {
   Module *M = F->getParent();
   LLVMContext &Ctx = M->getContext();
   IRBuilder<> builder(Ctx);
   const DataLayout &DL = M->getDataLayout();
   std::vector<GetElementPtrInst *> gepList;
   auto ptr_ty = PointerType::get(Ctx, 0);
-
-  FunctionType *resolveGEPFnTy = FunctionType::get(
-    ptr_ty,
-    { ptr_ty, ptr_ty },
-    false
-  );
-
-  FunctionCallee resolveGEPFn = M->getOrInsertFunction(
-    "resolve_gep",
-    resolveGEPFnTy
-  );
+  auto size_ty = Type::getInt64Ty(Ctx);
 
   for (auto &BB : *F) {
     for (auto &inst: BB) {
@@ -439,19 +522,22 @@ void instrumentGEP(Function *F) {
     // Don't assume gep is inbounds, otherwise our remdiation risks being optimized away
     GEPInst->setIsInBounds(false);
 
-    auto resolveGEPCall = builder.CreateCall(resolveGEPFn, { basePtr, derivedPtr });
-
-    // Collect users of gep instruction before mutation
     SmallVector<User*, 8> gep_users;
     for (User *U : GEPInst->users()) {
       gep_users.push_back(U);
     }
 
+    auto resolveGepFn = getOrCreateResolveGepSanitizer(M, Ctx, strategy);
+
+    auto resolveGepCall = builder.CreateCall(resolveGepFn, { basePtr, derivedPtr, ConstantExpr::getSizeOf(GEPInst->getResultElementType()) });
+
+    // Collect users of gep instruction before mutation
+
     // Iterate over all the users of the gep instruction and 
     // replace there operands with resolve_gep result 
     for (User *U : gep_users) {
-      if (U != resolveGEPCall) {
-        U->replaceUsesOfWith(GEPInst, resolveGEPCall);
+      if (U != resolveGepCall) {
+        U->replaceUsesOfWith(GEPInst, resolveGepCall);
       }
     }
   }
@@ -530,6 +616,12 @@ void sanitizeLoadStore(Function *F, Vulnerability::RemediationStrategies strateg
       if (alloca->getAllocatedType() == valueTy) continue;
     }
 
+    // If we already checked with `resolve_gep` the pointer will be valid.
+    if (auto *call= dyn_cast<CallInst>(ptr)) {
+      auto called = call->getCalledFunction();
+      if (called && called->getName() == "resolve_gep_sanitized") { continue; }
+    }
+
     auto loadFn = getOrCreateBoundsCheckLoadSanitizer(F->getParent(),
                                                       F->getContext(), valueTy, strategy);
 
@@ -550,6 +642,12 @@ void sanitizeLoadStore(Function *F, Vulnerability::RemediationStrategies strateg
       if (alloca->getAllocatedType() == valueTy) continue;
     }
 
+    // If we already checked with `resolve_gep` the pointer will be valid.
+    if (auto *call= dyn_cast<CallInst>(ptr)) {
+      auto called = call->getCalledFunction();
+      if (called && called->getName() == "resolve_gep_sanitized") { continue; }
+    }
+
     auto storeFn = getOrCreateBoundsCheckStoreSanitizer(
       F->getParent(), F->getContext(), valueTy, strategy
     );
@@ -561,7 +659,7 @@ void sanitizeLoadStore(Function *F, Vulnerability::RemediationStrategies strateg
 }
 
 void sanitizeMemInstBounds(Function *F, Vulnerability::RemediationStrategies strategy) {
-  instrumentGEP(F);
+  instrumentGEP(F, strategy);
   sanitizeMemcpy(F, strategy);
   sanitizeLoadStore(F, strategy);
 }

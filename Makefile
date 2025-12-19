@@ -3,14 +3,17 @@ all: build
 
 build: build-resolve-facts build-llvm-plugin build-libresolve build-reach build-klee
 
+lib-folder:
+	mkdir -p comp_libs
+
 build-resolve-facts: resolve-facts
 	+$(MAKE) -C resolve-facts
 
-build-llvm-plugin: llvm-plugin build-libresolve build-resolve-facts
-	+$(MAKE) -C llvm-plugin
+build-llvm-plugin: lib-folder llvm-plugin build-libresolve build-resolve-facts
+	+$(MAKE) -C llvm-plugin && cp llvm-plugin/build/lib*.so comp_libs/
 
-build-libresolve: libresolve
-	cd libresolve && RUSTFLAGS="-D warnings" cargo build --release 
+build-libresolve: lib-folder libresolve
+	cd libresolve && RUSTFLAGS="-D warnings" cargo build --release && cp target/release/libresolve.so ../comp_libs
 
 test: test-llvm-plugin test-libresolve
 

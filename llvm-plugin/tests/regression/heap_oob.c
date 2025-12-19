@@ -10,7 +10,7 @@
 // CHECK: call ptr @resolve_malloc 
 // RUN: RESOLVE_LABEL_CVE=vulnerabilities/heap_oob.json %clang -fpass-plugin=%plugin \ 
 // RUN: -L%rlib -lresolve -Wl,-rpath=%rlib %s -o %t.exe
-// RUN: %t.exe; test $? -eq 3
+// RUN: RUST_LOG=off %t.exe; test $? -eq 3
 
 #include <stdio.h>
 #include <stdlib.h>
