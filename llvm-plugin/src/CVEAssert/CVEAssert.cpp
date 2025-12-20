@@ -45,6 +45,7 @@ struct InstrumentMemInst {
   bool instrumentMalloc = false;
   bool instrumentRealloc = false;
   bool instrumentAlloca = false;
+  bool instrumentFree = false;
 };
 
 struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
