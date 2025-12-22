@@ -33,17 +33,16 @@ pub extern "C" fn resolve_stack_obj(ptr: *mut c_void, size: usize) -> () {
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn resolve_invalidate_stack(base: *mut c_void, limit: *mut c_void) {
+pub extern "C" fn resolve_invalidate_stack(base: *mut c_void) {
     let base = base as Vaddr;
-    let limit = limit as Vaddr;
 
     {
         let mut obj_list = ALIVE_OBJ_LIST.lock();
         // TODO: Add these to a free list?
-        obj_list.invalidate_region(base, limit);
+        obj_list.invalidate_at(base);
     }
 
-    info!("[STACK] Free range 0x{base:x}..=0x{limit:x}");
+    info!("[STACK] Free address 0x{base:x}");
 }
 
 /**
@@ -78,12 +77,13 @@ pub extern "C" fn resolve_malloc(size: usize) -> *mut c_void {
  * @input
  *  - ptr: unique pointer root
  *  - derived: pointer derived from unique root ptr
+ *  - max_access: the largest size of a load/store to the derived address.
  * @return valid pointer within bounds of allocation or
  * pointer 1-past limit of allocation
  */
 
 #[unsafe(no_mangle)]
-pub extern "C" fn resolve_gep(ptr: *mut c_void, derived: *mut c_void) -> *mut c_void {
+pub extern "C" fn resolve_gep(ptr: *mut c_void, derived: *mut c_void, max_access: usize) -> *mut c_void {
     let base = ptr as Vaddr;
     let derived = derived as Vaddr;
 
@@ -93,6 +93,20 @@ pub extern "C" fn resolve_gep(ptr: *mut c_void, derived: *mut c_void) -> *mut c_
     let Some(sobj) = sobj_table.search_intersection(base) else {
         warn!("[GEP] Cannot find ptr 0x{base:x} in shadow table");
 
+        // Optimally we shouldn't have to check this. 
+        // It seems like with the changes to stack lifetime tracking this is fine now
+        /*
+        if let Some(sobj) = sobj_table.search_invalid(derived) {
+            error!(
+                "[GEP] ptr {max_access}x{derived:x} not valid for base 0x{base:x}, obj: {}@0x{:x}",
+                sobj.size(),
+                sobj.base
+            );
+            // If the derived pointer is known-invalid return null
+            return 0 as *mut c_void;
+
+        }
+        */
         // NOTE: Not doing this right now
         // In theory it could catch bugs where integers are forced to pointers...
         // But there are too many allocation we don't know about, like those in libc
@@ -104,9 +118,9 @@ pub extern "C" fn resolve_gep(ptr: *mut c_void, derived: *mut c_void) -> *mut c_
     };
 
     // If shadow object exists then check if the access is within bounds
-    if sobj.contains(derived as Vaddr) {
+    if sobj.contains(ShadowObject::limit(derived, max_access)) {
         info!(
-            "[GEP] ptr 0x{derived:x} valid for base 0x{base:x}, obj: {}@0x{:x}",
+            "[GEP] ptr {max_access}x{derived:x} valid for base 0x{base:x}, obj: {}@0x{:x}",
             sobj.size(),
             sobj.base
         );
@@ -114,13 +128,13 @@ pub extern "C" fn resolve_gep(ptr: *mut c_void, derived: *mut c_void) -> *mut c_
     }
 
     error!(
-        "[GEP] ptr 0x{derived:x} not valid for base 0x{base:x}, obj: {}@0x{:x}",
+        "[GEP] ptr {max_access}x{derived:x} not valid for base 0x{base:x}, obj: {}@0x{:x}",
         sobj.size(),
         sobj.base
     );
 
-    // Return 1-past limit of allocation @ ptr
-    sobj.past_limit() as *mut c_void
+    // Pointer known-invalid, return NULL to indicate failure
+    0 as *mut c_void
 }
 
 

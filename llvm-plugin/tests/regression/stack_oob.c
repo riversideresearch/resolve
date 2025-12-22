@@ -16,25 +16,25 @@
 // Test that the remediation is successful
 // RUN: RESOLVE_LABEL_CVE=vulnerabilities/stack_oob.json %clang -fpass-plugin=%plugin \ 
 // RUN: -L%rlib -lresolve -Wl,-rpath=%rlib %s -o %t.exe
-// RUN: %t.exe 11; EXIT_CODE=$?; \
+// RUN: RUST_LOG=off %t.exe 11; EXIT_CODE=$?; \
 // RUN: echo Remediated exit: $EXIT_CODE; test $EXIT_CODE -eq 3
 //
 // Test that the remediation is successful with optimizations
 // RUN: RESOLVE_LABEL_CVE=vulnerabilities/stack_oob.json %clang -O3 -fpass-plugin=%plugin \ 
 // RUN: -L%rlib -lresolve -Wl,-rpath=%rlib %s -o %t.exe
-// RUN: %t.exe 11; EXIT_CODE=$?; \
-// RUN: echo Remediated exit: $EXIT_CODE; test $EXIT_CODE -eq 3
+// RUN: RUST_LOG=off %t.exe 11; EXIT_CODE=$?; \
+// RUN: echo Remediated exit with optimizations: $EXIT_CODE; test $EXIT_CODE -eq 3
 // 
 // Test that the remediation is successful (underflow)
 // RUN: RESOLVE_LABEL_CVE=vulnerabilities/stack_oob.json %clang -fpass-plugin=%plugin \ 
 // RUN: -L%rlib -lresolve -Wl,-rpath=%rlib %s -o %t.exe
-// RUN: %t.exe -2; EXIT_CODE=$?; \
+// RUN: RUST_LOG=off %t.exe -2; EXIT_CODE=$?; \
 // RUN: echo Remediated \(underflow\) exit: $EXIT_CODE; test $EXIT_CODE -eq 3
 // 
 // Test that the normal behavior is preserved
 // RUN: RESOLVE_LABEL_CVE=vulnerabilities/stack_oob.json %clang -O0 -g -fpass-plugin=%plugin \ 
 // RUN: -L%rlib -lresolve -Wl,-rpath=%rlib %s -o %t.exe
-// RUN: %t.exe 2; EXIT_CODE=$?; \
+// RUN: RUST_LOG=off %t.exe 2; EXIT_CODE=$?; \
 // RUN: echo Normal exit: $EXIT_CODE; test $EXIT_CODE -eq 42
 
 #include <stdio.h>

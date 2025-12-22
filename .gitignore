@@ -17,4 +17,7 @@ examples/openssl_reach_out.json
 reach_wrap_input.json
 reach_wrap_output.json
 
+resolve_log_*.out
 
+# compiled library folder
+comp_libs/

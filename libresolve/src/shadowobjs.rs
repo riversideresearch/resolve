@@ -94,6 +94,7 @@ impl ShadowObjectTable {
     }
 
     /// Removes any allocation with a base address within the supplied region
+    #[allow(dead_code)]
     pub fn invalidate_region(&mut self, base: Vaddr, limit: Vaddr) {
         self.table
             .extract_if(base..=limit, |_, _| true)
