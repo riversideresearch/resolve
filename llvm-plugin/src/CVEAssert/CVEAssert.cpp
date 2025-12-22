@@ -105,8 +105,13 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
 
       // Sanitize Block: Call getOrCreateRemediationBehavior 
       builder.SetInsertPoint(SanitizeBlock);
-      builder.CreateCall(getOrCreateRemediationBehavior(M, strategy), {});
-      builder.CreateRetVoid();
+
+      if (strategy == Vulnerability::RemediationStrategies::SAFE) {
+        builder.CreateRetVoid();
+      } else {
+        builder.CreateCall(getOrCreateRemediationBehavior(M, strategy), {});
+        builder.CreateRetVoid();
+      }
 
       // Free Block: call Free
       builder.SetInsertPoint(FreeBlock);
