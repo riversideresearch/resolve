@@ -44,6 +44,28 @@ The format is generally like so:
 def extract_facts_from_targets() -> dict:
     """Extracts the facts files, containing nodes and edges of a program graph for use with the reach tool, into {CHALLENGE_ROOT}/target/facts. Requires building the program at least once beforehand. If you want unremediated PCG you need to build without instrumentation."""
 
+    # Check if prepare facts targets command exists in .resolve_meta
+    if "prepare facts targets" not in CHALLENGE_META.get("commands", {}):
+        conops = CHALLENGE_META.get("conops", {})
+        reachability_enabled = conops.get("reachability", False)
+        return {
+            "success": False,
+            "error": "The 'prepare facts targets' command is not present in .resolve_meta commands section.",
+            "details": f"Reachability in conops: {reachability_enabled}. This operation may be disabled or not configured for this challenge. Current conops: {conops}",
+            "suggestion": "Check .resolve_meta file and add a 'prepare facts targets' command under the 'commands' section if reachability analysis should be supported."
+        }
+
+    # Check if facts targets exist in .resolve_meta
+    if "facts targets" not in CHALLENGE_META or not CHALLENGE_META["facts targets"]:
+        conops = CHALLENGE_META.get("conops", {})
+        reachability_enabled = conops.get("reachability", False)
+        return {
+            "success": False,
+            "error": "The 'facts targets' field is not present or empty in .resolve_meta.",
+            "details": f"Reachability in conops: {reachability_enabled}. This operation may be disabled or not configured for this challenge. Current conops: {conops}",
+            "suggestion": "Check .resolve_meta file and add a 'facts targets' array with binary paths if reachability analysis should be supported."
+        }
+
     run_commands_list_without_capture(CHALLENGE_FOLDER, CHALLENGE_META["commands"]["prepare facts targets"])
 
     results = {}
@@ -57,13 +79,13 @@ def extract_facts_from_targets() -> dict:
             "--in_bin", f"{CHALLENGE_FOLDER}/{object}",
             "--out_dir", facts_dir
         ], check=True)
-        
+
         results[target_name] = {
             "object_path": object,
             "facts_directory": facts_dir,
             "status": "extracted"
         }
-    
+
     return results
 
 @mcp.tool()

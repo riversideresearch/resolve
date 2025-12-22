@@ -1,0 +1,15 @@
+{
+    "vulnerabilities": [
+        {
+            "cve-id": "CVE-EXAMPLE-001",
+            "cve-description": "Stack-based buffer overflow in example application",
+            "package-name": "example-app",
+            "package-version": "1.0.0",
+            "cwe-id": "121",
+            "cwe-name": "Stack-based Buffer Overflow",
+            "affected-function": "main",
+            "affected-file": "main.c",
+            "remediation-strategy": "recover"
+        }
+    ]
+}
