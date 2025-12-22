@@ -128,7 +128,7 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
     for (auto &BB : *F) {
       for (auto &Inst : BB) {
         if (auto *call = dyn_cast<CallInst>(&Inst)) {
-          if (auto callee = Inst->getCalledFunction())
+          if (auto callee = call->getCalledFunction())
             if (callee->getName() == "free") {
               workList.push_back(call);
             }
