@@ -72,6 +72,7 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
 
   Function *getOrCreateFreeOfNonHeapSanitizer(Module *M, Vulnerability::RemediationStrategies strategy) {
       std::string handlerName = "resolve_sanitize_non_heap_free";
+      LLVMContext &Ctx = M->getContext();
 
       if (auto handler = M->getFunction(handlerName))
         return handler;
@@ -92,7 +93,7 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
       builder.SetInsertPoint(Entry);
       
       // Get function argument
-      Argument *InputPtr = SanitizeFunc->getArg(0);
+      Argument *InputPtr = SanitizeFn->getArg(0);
 
       // Call Is Heap Func
       // Branch if True
@@ -127,9 +128,9 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
     for (auto &BB : *F) {
       for (auto &Inst : BB) {
         if (auto *call = dyn_cast<CallInst>(&Inst)) {
-          if (auto* callee = Inst->getCalledFunction())
+          if (auto callee = Inst->getCalledFunction())
             if (callee->getName() == "free") {
-              workList.push_back(Inst);
+              workList.push_back(call);
             }
         }
       }
