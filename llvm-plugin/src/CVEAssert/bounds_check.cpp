@@ -373,7 +373,7 @@ void instrumentAlloca(Function *F) {
 
   auto invalidateFn = M->getOrInsertFunction(
     "resolve_invalidate_stack",
-    FunctionType::get(void_ty, { ptr_ty, ptr_ty }, false)
+    FunctionType::get(void_ty, { ptr_ty }, false)
   );
 
   for (auto* allocaInst: allocaList) {
@@ -395,7 +395,7 @@ void instrumentAlloca(Function *F) {
           if (called && called->getName().starts_with("llvm.lifetime.end")) {
             hasEnd = true;
             builder.SetInsertPoint(call->getNextNode());
-            builder.CreateCall(invalidateFn, { allocaInst, allocaInst });
+            builder.CreateCall(invalidateFn, { allocaInst});
           }
         }
       }
@@ -425,7 +425,7 @@ void instrumentAlloca(Function *F) {
         builder.SetInsertPoint(inst);
         // builder.CreateCall(invalidateFn, { low, high });
         for (auto *alloca: allocaList) {
-          builder.CreateCall(invalidateFn, { alloca, alloca });
+          builder.CreateCall(invalidateFn, { alloca});
         }
       }
     }
