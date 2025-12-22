@@ -8,6 +8,11 @@
 // Use this instead of std::priority_queue for fast 'contains' and
 // 'decrease_key' operations.
 
+// 0-indexed heap:
+//        0
+//    1       2
+//  3   4   5   6
+
 #pragma once
 
 #include <stdexcept>
@@ -31,11 +36,18 @@ class binary_heap {
 
   // Extract the minimum element from the heap.
   std::pair<K, V> extract() {
+    if (_heap.empty()) {
+      throw std::out_of_range("extract on empty heap");
+    }
     const auto root = this->_heap.front();
-    this->_heap[0] = this->_heap.back();
-    this->_heap.pop_back();
     this->_ixs.erase(root.first);
+    if (this->_heap.size() == 1) {
+      this->_heap.pop_back();
+      return root;
+    }
+    this->_heap[0] = this->_heap.back();
     this->_ixs[this->_heap[0].first] = 0;
+    this->_heap.pop_back();
     this->_heapify_down(0);
     return root;
   }
@@ -69,7 +81,7 @@ class binary_heap {
   // Heapify up at index [i].
   void _heapify_up(size_t i) {
     if (i > 0) {
-      size_t parent_i = i / 2;
+      size_t parent_i = (i - 1) / 2;
       if (this->_heap[i].second < this->_heap[parent_i].second) {
         this->_swap(i, parent_i);
         this->_heapify_up(parent_i);
@@ -79,8 +91,8 @@ class binary_heap {
 
   // Heapify down at index [i].
   void _heapify_down(size_t i) {
-    size_t left_i = 2 * i;
-    size_t right_i = 2 * i + 1;
+    size_t left_i = 2 * i + 1;
+    size_t right_i = 2 * i + 2;
 
     size_t smallest = i;
     if (left_i < this->_heap.size() &&
