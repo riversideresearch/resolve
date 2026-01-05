@@ -69,76 +69,80 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
     vulnerabilities = Vulnerability::parseVulnerabilityFile();
   }
 
-  Function *getOrCreateFreeOfNonHeapSanitizer(Module *M, LLVMContext &Ctx) {
+  Function *getOrCreateFreeOfNonHeapSanitizer(Module *M, Vulnerability::RemediationStrategies strategy) {
       std::string handlerName = "resolve_sanitize_non_heap_free";
+      LLVMContext &Ctx = M->getContext();
 
       if (auto handler = M->getFunction(handlerName))
         return handler;
 
-      IRBuilder<> Builder(Ctx);
+      IRBuilder<> builder(Ctx);
       // TODO: handle address spaces other than 0
       auto ptr_ty = PointerType::get(Ctx, 0);
 
       // TODO: write this in asm as some kind of sanitzer_rt?
-      FunctionType *FuncType = FunctionType::get(Type::getVoidTy(Ctx), {ptr_ty}, false);
-      Function *SanitizeFunc = Function::Create(FuncType, Function::InternalLinkage, handlerName, M);
+      FunctionType *SanitizeFnTy = FunctionType::get(Type::getVoidTy(Ctx), {ptr_ty}, false);
+      Function *SanitizeFn = Function::Create(SanitizeFnTy, Function::InternalLinkage, handlerName, M);
 
-      BasicBlock *Entry = BasicBlock::Create(Ctx, "entry", SanitizeFunc);
-      BasicBlock *SanitizeBlock = BasicBlock::Create(Ctx, "sanitize_block", SanitizeFunc);
-      BasicBlock *FreeBlock = BasicBlock::Create(Ctx, "free_block", SanitizeFunc);
+      BasicBlock *Entry = BasicBlock::Create(Ctx, "entry", SanitizeFn);
+      BasicBlock *SanitizeBlock = BasicBlock::Create(Ctx, "sanitize_block", SanitizeFn);
+      BasicBlock *FreeBlock = BasicBlock::Create(Ctx, "free_block", SanitizeFn);
 
       // Set insertion point to entry block
-      Builder.SetInsertPoint(Entry);
+      builder.SetInsertPoint(Entry);
       
       // Get function argument
-      Argument *InputPtr = SanitizeFunc->getArg(0);
+      Argument *InputPtr = SanitizeFn->getArg(0);
 
       // Call Is Heap Func
       // Branch if True
       Function *isHeapFunc = getOrCreateIsHeap(M, Ctx);
-      Value *IsHeap = Builder.CreateCall(isHeapFunc, {InputPtr});
+      Value *IsHeap = builder.CreateCall(isHeapFunc, {InputPtr});
 
       // Conditional branch
-      Builder.CreateCondBr(IsHeap, FreeBlock, SanitizeBlock);
+      builder.CreateCondBr(IsHeap, FreeBlock, SanitizeBlock);
 
-      // Sanitize Block: do Nothing
-      Builder.SetInsertPoint(SanitizeBlock);
-      Builder.CreateRetVoid();
+      // Sanitize Block: Call getOrCreateRemediationBehavior 
+      builder.SetInsertPoint(SanitizeBlock);
+
+        builder.CreateCall(getOrCreateRemediationBehavior(M, strategy), {});
+        builder.CreateRetVoid();
 
       // Free Block: call Free
-      Builder.SetInsertPoint(FreeBlock);
-      Builder.CreateCall(M->getFunction("free"), {InputPtr});
-      Builder.CreateRetVoid();
+      builder.SetInsertPoint(FreeBlock);
+      builder.CreateCall(M->getFunction("free"), {InputPtr});
+      builder.CreateRetVoid();
 
       raw_ostream &out = errs();
-      out << *SanitizeFunc;
-      if (verifyFunction(*SanitizeFunc, &out)) {}
+      out << *SanitizeFn;
+      if (verifyFunction(*SanitizeFn, &out)) {}
 
-      return SanitizeFunc;
+      return SanitizeFn;
   }
 
-  void sanitizeFreeOfNonHeap(Function *f, Vulnerability::RemediationStrategies strategy) {
-    IRBuilder<> builder(f->getContext());
+  void sanitizeFreeOfNonHeap(Function *F, Vulnerability::RemediationStrategies strategy) {
+    LLVMContext &Ctx = F->getContext();
+    IRBuilder<> builder(Ctx);
     std::vector<CallInst*> workList;
 
-    for (auto &BB : *f) {
-      for (auto &I : BB) {
-        if (auto Inst = dyn_cast<CallInst>(&I)) {
-          if (auto Callee = Inst->getCalledFunction())
-            if (Callee->getName() == "free") {
-              workList.push_back(Inst);
+    for (auto &BB : *F) {
+      for (auto &Inst : BB) {
+        if (auto *call = dyn_cast<CallInst>(&Inst)) {
+          if (auto callee = call->getCalledFunction())
+            if (callee->getName() == "free") {
+              workList.push_back(call);
             }
         }
       }
     }
 
-    for (auto Call : workList) {
-      builder.SetInsertPoint(Call);
-      auto sanitizerFn = getOrCreateFreeOfNonHeapSanitizer(f->getParent(), f->getContext());
+    for (auto call : workList) {
+      builder.SetInsertPoint(call);
+      auto sanitizerFn = getOrCreateFreeOfNonHeapSanitizer(F->getParent(), strategy);
 
-      auto sanitizedFree = builder.CreateCall(sanitizerFn, {Call->getArgOperand(0)});
-      Call->removeFromParent();
-      Call->deleteValue();
+      auto sanitizedFree = builder.CreateCall(sanitizerFn, { call->getArgOperand(0) });
+      call->removeFromParent();
+      call->deleteValue();
     }
   }
   
