@@ -693,6 +693,9 @@ void sanitizeLoadStore(Function *F, Vulnerability::RemediationStrategies strateg
 
   Module* M = F->getParent();
 
+  std::vector<LoadInst*> loadInsts;
+  std::vector<StoreInst*> storeInsts;
+
   auto handleLoadStore = [&](auto* inst) {
     builder.SetInsertPoint(inst);
     auto ptr = inst->getPointerOperand();
@@ -713,6 +716,10 @@ void sanitizeLoadStore(Function *F, Vulnerability::RemediationStrategies strateg
     // If we already checked with `resolve_gep` the pointer will be valid.
     if (auto *call = dyn_cast<CallInst>(ptr)) {
       auto called = call->getCalledFunction();
+      // TODO: in the SAFE strategy we want to elide the load/store instruction entirely.
+      // It should in theory be possible to coalesce the check and access into one call.
+      // This is somewhat complicated by a ptr being used for multiple loads/stores.
+      // e.g. %105 = load i8, ptr %104; ... store i8 %105, %104
       if (called && called->getName() == "resolve_gep_sanitized") { return; }
     }
 
@@ -737,11 +744,18 @@ void sanitizeLoadStore(Function *F, Vulnerability::RemediationStrategies strateg
   for (auto &BB : *F) {
     for (auto &I : BB) {
       if (auto *load = dyn_cast<LoadInst>(&I)) {
-        handleLoadStore(load);
+        loadInsts.push_back(load);
       } else if (auto *store = dyn_cast<StoreInst>(&I)) {
-        handleLoadStore(store);
+        storeInsts.push_back(store);
       }
     }
+  }
+
+  for (auto& inst: loadInsts) {
+    handleLoadStore(inst);
+  }
+  for (auto& inst: storeInsts) {
+    handleLoadStore(inst);
   }
 }
 
