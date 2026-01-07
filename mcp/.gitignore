@@ -1,3 +1,4 @@
 *pycache*
-*.json
 .env
+*workspaces
+build
