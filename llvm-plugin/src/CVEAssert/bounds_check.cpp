@@ -505,13 +505,24 @@ void instrumentGEP(Function *F) {
 void sanitizeMemcpy(Function *F, Vulnerability::RemediationStrategies strategy) {
   LLVMContext &Ctx = F->getContext();
   IRBuilder<> builder(Ctx);
-  std::vector<MemCpyInst *> memcpyList;
+  std::vector<Instruction *> memcpyList;
 
   for (auto &BB : *F) {
     for (auto &inst : BB) {
-      if (auto *memcpyInst = dyn_cast<MemCpyInst>(&inst)) {
-        memcpyList.push_back(memcpyInst);
+      if (isa<MemCpyInst>(&inst)) {
+        memcpyList.push_back(&inst);
+        continue;
       }
+
+      auto *call = dyn_cast<CallInst>(&inst);
+      if (!call) { continue; }
+
+      Function* calledFn = call->getCalledFunction();
+      if (!calledFn) { continue; }
+
+      StringRef fnName = calledFn->getName();
+
+      if (fnName == "memcpy") { memcpyList.push_back(call); }
     }
   }
 
