@@ -248,7 +248,6 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
       switch(vuln.WeaknessID) {
         // 121 stack-based
         case VulnID::STACK_BASED_BUF_OVERFLOW:
-        case VulnID::STACK_FREE:
           instrument_mem_inst.instrumentAlloca = true;
           break;
 
