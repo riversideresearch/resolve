@@ -239,6 +239,18 @@ static Function *getOrCreateBoundsCheckMemcpySanitizer(Module *M, Vulnerability:
   return sanitizeMemcpyFn;
 }
 
+static FunctionCallee getResolveGEP(Module *M) {
+  auto &Ctx = M->getContext();
+  auto ptr_ty = PointerType::get(Ctx, 0);
+  return M->getOrInsertFunction(
+    "resolve_gep",
+    FunctionType::get(ptr_ty,
+    {ptr_ty, ptr_ty },
+    false
+    )
+  );
+}
+
 static FunctionCallee getResolveMalloc(Module *M) {
     auto &Ctx = M->getContext();
     auto ptr_ty = PointerType::get(Ctx, 0);
@@ -491,18 +503,6 @@ void instrumentGEP(Function *F) {
   IRBuilder<> builder(Ctx);
   const DataLayout &DL = M->getDataLayout();
   std::vector<GetElementPtrInst *> gepList;
-  auto ptr_ty = PointerType::get(Ctx, 0);
-
-  FunctionType *resolveGEPFnTy = FunctionType::get(
-    ptr_ty,
-    { ptr_ty, ptr_ty },
-    false
-  );
-
-  FunctionCallee resolveGEPFn = M->getOrInsertFunction(
-    "resolve_gep",
-    resolveGEPFnTy
-  );
 
   for (auto &BB : *F) {
     for (auto &inst: BB) {
@@ -522,7 +522,7 @@ void instrumentGEP(Function *F) {
     // Don't assume gep is inbounds, otherwise our remdiation risks being optimized away
     GEPInst->setIsInBounds(false);
 
-    auto resolveGEPCall = builder.CreateCall(resolveGEPFn, { basePtr, derivedPtr });
+    auto resolveGEPCall = builder.CreateCall(getResolveGEP(M), { basePtr, derivedPtr });
 
     // Collect users of gep instruction before mutation
     SmallVector<User*, 8> gep_users;
