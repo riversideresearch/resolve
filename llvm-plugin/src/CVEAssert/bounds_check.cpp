@@ -428,6 +428,38 @@ void instrumentRealloc(Function *F) {
   }
 }
 
+void instrumentCalloc(Function *F) {
+  Module *M = F->getParent();
+  LLVMContext &Ctx = M->getContext();
+  IRBuilder<> builder(Ctx);
+  auto size_ty = Type::getInt64Ty(Ctx);
+  std::vector<CallInst *> callocList;
+
+  for (auto &BB : *F) {
+    for (auto &inst : BB) {
+      if (auto *call = dyn_cast<CallInst>(&inst)) {
+        Function *calledFn = call->getCalledFunction();
+
+        if (!calledFn) { continue; }
+
+        StringRef fnName = calledFn->getName();
+        if (fnName == "calloc") { callocList.push_back(call); }
+
+      }
+    }
+  }
+
+  for (auto Inst : callocList) {
+    builder.SetInsertPoint(Inst);
+    Value *numArg = Inst->getArgOperand(0);
+    Value *sizeArg = Inst->getArgOperand(1);
+    CallInst *resolveCallocCall = builder.CreateCall(getResolveCalloc(M), { numArg, sizeArg });
+    Inst->replaceAllUsesWith(resolveCallocCall);
+    Inst->eraseFromParent();
+  }
+
+}
+
 void instrumentGEP(Function *F) {
   Module *M = F->getParent();
   LLVMContext &Ctx = M->getContext();
