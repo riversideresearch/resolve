@@ -369,7 +369,6 @@ void instrumentMalloc(Function *F) {
   Module *M = F->getParent();
   LLVMContext &Ctx = M->getContext();
   IRBuilder<> builder(Ctx);
-  auto size_ty = Type::getInt64Ty(Ctx);
   std::vector<CallInst *> mallocList;
 
   for (auto &BB : *F) {
@@ -388,20 +387,17 @@ void instrumentMalloc(Function *F) {
 
   for (auto Inst : mallocList) {
     builder.SetInsertPoint(Inst);
-    Value *arg = Inst->getArgOperand(0);
-    CallInst *resolveMallocCall = builder.CreateCall(getResolveMalloc(M), { arg });
+    Value *sizeArg = Inst->getArgOperand(0);
+    CallInst *resolveMallocCall = builder.CreateCall(getResolveMalloc(M), { sizeArg });
     Inst->replaceAllUsesWith(resolveMallocCall);
     Inst->eraseFromParent();  
   }
-  // TODO: instrument free and other libc allocations
 }
 
 void instrumentRealloc(Function *F) {
   Module *M = F->getParent();
   LLVMContext &Ctx = M->getContext();
   IRBuilder<> builder(Ctx);
-  auto size_ty = Type::getInt64Ty(Ctx);
-
   std::vector<CallInst *> reallocList;
 
   for (auto &BB : *F) {
@@ -420,9 +416,9 @@ void instrumentRealloc(Function *F) {
 
   for (auto Inst : reallocList) {
     builder.SetInsertPoint(Inst);
-    Value *ptr_arg =Inst->getArgOperand(0);
-    Value *size_arg = Inst->getArgOperand(1);
-    CallInst *resolveReallocCall = builder.CreateCall(getResolveRealloc(M), { ptr_arg, size_arg });
+    Value *ptrArg =Inst->getArgOperand(0);
+    Value *sizeArg = Inst->getArgOperand(1);
+    CallInst *resolveReallocCall = builder.CreateCall(getResolveRealloc(M), { ptrArg, sizeArg });
     Inst->replaceAllUsesWith(resolveReallocCall);
     Inst->eraseFromParent();
   }
@@ -432,7 +428,6 @@ void instrumentCalloc(Function *F) {
   Module *M = F->getParent();
   LLVMContext &Ctx = M->getContext();
   IRBuilder<> builder(Ctx);
-  auto size_ty = Type::getInt64Ty(Ctx);
   std::vector<CallInst *> callocList;
 
   for (auto &BB : *F) {
@@ -455,6 +450,36 @@ void instrumentCalloc(Function *F) {
     Value *sizeArg = Inst->getArgOperand(1);
     CallInst *resolveCallocCall = builder.CreateCall(getResolveCalloc(M), { numArg, sizeArg });
     Inst->replaceAllUsesWith(resolveCallocCall);
+    Inst->eraseFromParent();
+  }
+
+}
+
+void instrumentFree(Function *F) {
+  Module *M = F->getParent();
+  LLVMContext &Ctx = M->getContext();
+  IRBuilder<> builder(Ctx);
+  std::vector<CallInst *> freeList;
+
+  for (auto &BB : *F) {
+    for (auto &inst : BB) {
+      if (auto *call = dyn_cast<CallInst>(&inst)) {
+        Function *calledFn = call->getCalledFunction();
+
+        if (!calledFn) { continue; }
+
+        StringRef fnName = calledFn->getName();
+        if (fnName == "free") { freeList.push_back(call); }
+
+      }
+    }
+  }
+
+  for (auto Inst : freeList) {
+    builder.SetInsertPoint(Inst);
+    Value *ptrArg = Inst->getArgOperand(0);
+    CallInst *resolveFreeCall = builder.CreateCall(getResolveFree(M), { ptrArg });
+    Inst->replaceAllUsesWith(resolveFreeCall);
     Inst->eraseFromParent();
   }
 
