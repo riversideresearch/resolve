@@ -528,14 +528,25 @@ void sanitizeMemcpy(Function *F, Vulnerability::RemediationStrategies strategy) 
 
   for (auto Inst : memcpyList) {
     builder.SetInsertPoint(Inst);
-    auto dst_ptr = Inst->getDest();
-    auto src_ptr = Inst->getSource();
-    auto size_arg = Inst->getLength();
-    auto memcpyFn = getOrCreateBoundsCheckMemcpySanitizer(F->getParent(), strategy);
 
-    auto sanitized_memcpy = builder.CreateCall(
-        memcpyFn, { dst_ptr, src_ptr, size_arg });
-    Inst->replaceAllUsesWith(sanitized_memcpy);
+    Value *dstPtr = nullptr;
+    Value *srcPtr = nullptr;
+    Value *sizeArg = nullptr;
+
+    if (auto *MI = dyn_cast<MemCpyInst>(&Inst)) {
+      dstPtr = MI->getDest();
+      srcPtr = MI->getSource();
+      sizeArg = MI->getLength();
+    } else if (auto *MC = dyn_cast<CallInst>(&Inst)) {
+      dstPtr = MC->getArgOperand(0);
+      srcPtr = MC->getArgOperand(1);
+      sizeArg = MC->getArgOperand(2);
+    }
+
+    auto memcpyFn = getOrCreateBoundsCheckMemcpySanitizer(F->getParent(), strategy);
+    auto memcpyCall = builder.CreateCall(
+        memcpyFn, { dstPtr, srcPtr, sizeArg });
+    Inst->replaceAllUsesWith(memcpyCall);
     Inst->eraseFromParent();
   }
 }
