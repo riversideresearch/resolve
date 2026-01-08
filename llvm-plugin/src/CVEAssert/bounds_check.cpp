@@ -533,11 +533,11 @@ void sanitizeMemcpy(Function *F, Vulnerability::RemediationStrategies strategy) 
     Value *srcPtr = nullptr;
     Value *sizeArg = nullptr;
 
-    if (auto *MI = dyn_cast<MemCpyInst>(&Inst)) {
+    if (auto *MI = dyn_cast<MemCpyInst>(Inst)) {
       dstPtr = MI->getDest();
       srcPtr = MI->getSource();
       sizeArg = MI->getLength();
-    } else if (auto *MC = dyn_cast<CallInst>(&Inst)) {
+    } else if (auto *MC = dyn_cast<CallInst>(Inst)) {
       dstPtr = MC->getArgOperand(0);
       srcPtr = MC->getArgOperand(1);
       sizeArg = MC->getArgOperand(2);
