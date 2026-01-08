@@ -11,7 +11,6 @@
 void sanitizeLoadStore(llvm::Function *F, Vulnerability::RemediationStrategies strategy);
 void sanitizeMemcpy(llvm::Function *F, Vulnerability::RemediationStrategies strategy);
 void instrumentAlloca(llvm::Function *F);
-<<<<<<< HEAD
 void instrumentMalloc(llvm::Function *F);
 void instrumentRealloc(llvm::Function *F);
 void instrumentCalloc(llvm::Function *F);
