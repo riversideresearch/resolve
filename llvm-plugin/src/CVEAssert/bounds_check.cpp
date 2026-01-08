@@ -305,20 +305,6 @@ static FunctionCallee getResolveFree(Module *M) {
   );
 }
 
-static FunctionCallee getResolveFree(Module *M) {
-  Module *M = F->getParent();
-  LLVMContext &Ctx = M->getContext();
-  auto ptr_ty = PointerType::get(Ctx, 0);
-  auto void_ty = Type::getVoidTy(Ctx);
-
-  return M->getOrInsertFunction(
-    "resolve_free",
-    FunctionType::get(void_ty, { ptr_ty },
-    false
-    )
-  );
-}
-
 void instrumentAlloca(Function *F) {
   Module *M = F->getParent();
   LLVMContext &Ctx = M->getContext();
