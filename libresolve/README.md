@@ -5,12 +5,12 @@
 
 # LIBRESOLVE
 
-Libresolve is a runtime library that tracks object allocations and other kernel interactions.
-It is primarily designed for the **EBOSS RESOLVE toolchain**.
+Libresolve is a runtime library that tracks object allocations using shadow memory objects.
+It is primarily designed for the **E-BOSS RESOLVE toolchain**.
 
 ## Build
 ```bash
-git clone https://gitlab.ebossproject.com/riverside/libresolve.git
+git clone https://github.com/riversideresearch/resolve.git
 cd libresolve/
 cargo build             # Debug build (default)
 ```
@@ -18,9 +18,7 @@ cargo build             # Debug build (default)
 ## Usage
 1. Build the rust library in `libresolve/`.
 2. Link the library with the binary using linker options.
-3. Set ENV variables accordingly.
-4. Execute the binary. 
-
+3. Execute the binary.
 
 ## Directory Structure
 ```bash
@@ -28,17 +26,18 @@ cargo build             # Debug build (default)
 ├── Cargo.lock
 ├── Cargo.toml
 ├── README.md
-└── src                     - libresolve source code 
-    ├── buffer_writer.rs    - minimal formatting into byte buffers
-    ├── lib.rs              - allocator and runtime logging interface 
-    └── shadowobjs.rs       - Shadow object tracking implementation 
+├── rust-toolchain.toml
+└── src
+    ├── lib.rs          
+    ├── remediate.rs  - Runtime instrumentation 
+    ├── shadowobjs.rs - Shadow object implementation 
+    └── trace.rs      - Function prototypes for recording function activation  
 ```
 
 ## Environment variables
 Libresolve uses environment variables to control where the runtime logs are written:
-- `RESOLVE_DLSYM_LOG`       - Path to the `dlsym` log file.
-- `RESOLVE_RUNTIME_LOG`     - Path to the main runtime log file. 
-- `RESOLVE_RUNTIME_ERR_LOG` - Path to the runtime error log file.
+- `RESOLVE_DLSYM_LOG`
+- `RESOLVE_RUNTIME_LOG`
 
 Each log file automatically appends the process ID before the extension. 
 For example, setting:
@@ -52,36 +51,24 @@ After linking and running the resulting file will have this format.
 ```
 
 ## LLVM Passes
-Libresolve is designed to used with the LLVM passes within the EBOSS RESOLVE toolchain.
-These are the passes that can be used with Libresolve.
-- `AnnotateFunctions`
-- `CVEAssert`
-- `DlsymHook`
-- `ObjHook`
+Libresolve is designed to used with the LLVM passes within the E-BOSS RESOLVE toolchain.
 
 | LLVM Passes | Intended behavior with Libresolve | 
 | --- | --- |
 | `AnnotateFunctions` | Logs function summaries in `resolve_log_<pid>.out` |
-| `CVEAssert` | Logs irregular memory accesses in `resolve_err_log_<pid>.out` |
+| `CVEAssert` | Logs irregular memory accesses in `resolve_log_<pid>.out` |
 | `DlsymHook` | Logs calls to `dlsym` in `resolve_dlsym.json` | 
-| `ObjHook` | Logs memory allocators in `resolve_log_<pid>.out` | 
 
 # AnnotateFunctions
-The `AnnotateFunctions` pass collects function summaries for each function definition. Function summaries contain a function's runtime arguments and their types, and their return values and their types. When Libresolve is used with `AnnotateFunctions`, the resulting behavior is the `resolve_log_<pid>.out` is produced containing the function summary runtime information.
+`AnnotateFunctions` collects function summaries for each function definition. Function summaries contain a function's runtime arguments and their types, and their return values and their types. 
+
+When the instrumented function is linked with libresolve, it records the function summaries of all function definitions in the C/C++ project in `resolve_log_<pid>out`. Furthermore it records basic block transitions to be used in offline analysis.
 
 # CVEAssert
-The `CVEAssert` pass applies a sanitizer to an affected function when a CVE description is given. The CVE description is formatted using a json and is passed to `CVEAssert` via an env variable called `RESOLVE_LABEL_CVE`. When Libresolve is used with `CVEAssert` the resulting behavior is Libresolve performing bounds checking at runtime. If an OOB (Out-Of-Bounds) access occurs then Libresolve will open and write to `resolve_err_log_<pid>.out` to log the irregular memory access.
+`CVEAssert` applies a sanitizer to vulnerable functions in a C/C++ project based
+on a supplied CVE description. The CVE is provided as a JSON document via the `RESOLVE_LABEL_CVE` environment variable, which tells CVEAssert which code regions and sanitizer needs to be used.
+
+When the instrumented program is linked with libresolve, it tracks stack and heap allocations using shadow metadata. If an invalid or security-relevant memory access occurs, libresolve records the event in `resolve_log_<pid>.out`.
 
 # DlsymHook
-The `DlsymHook` pass instruments `dlsym` function calls and wrapping them with the `resolve_` prefix. When Libresolve is used with `DlsymHook`, the resulting behavior the file, `resolve_dlsym.json` is produced which contains information about which dynamically linked libraries are used in a program. 
-
-# ObjHook
-The `ObjHook` pass instruments memory allocators by wrapping them with the `resolve_` prefix. When Libresolve is used with `ObjHook`, the resulting behavior is Libresolve creating shadow objects per each memory allocation logged and logs each allocation in `resolve_log_<pid>.out`.
-
-The ObjHook pass supports these memory allocations currently.
-- `malloc`
-- `calloc`
-- `free`
-- `realloc`
-- `strdup`
-- `strndup`
+`DlsymHook` pass instruments `dlsym` function calls and wrapping them with the `resolve_` prefix. When libresolve is linked with `DlsymHook`, the resulting binary will open `resolve_dlsym.json` and record dynamic symbol information used in the program.
