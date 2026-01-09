@@ -31,7 +31,7 @@ cargo build             # Debug build (default)
     ├── lib.rs          
     ├── remediate.rs  - Runtime instrumentation 
     ├── shadowobjs.rs - Shadow object implementation 
-    └── trace.rs      - Function prototypes for recording function activation  
+    └── trace.rs      - Function prototypes for recording function activations  
 ```
 
 ## Environment variables
