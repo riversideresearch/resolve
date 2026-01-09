@@ -1,10 +1,11 @@
-all: build test
 
-.PHONY: clangformat test
+.PHONY: all build clangformat test
+
+all: build test
 
 build: src
 	mkdir -p build
-	cd build && cmake ../src && make -j4
+	cmake -S ./src -B ./build && cd build && make -j4
 
 clangformat: src
 	cd build && make clangformat
