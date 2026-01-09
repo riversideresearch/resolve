@@ -6,7 +6,7 @@
 # LIBRESOLVE
 
 Libresolve is a runtime library that tracks object allocations using shadow memory objects.
-It is primarily designed for the **E-BOSS RESOLVE toolchain**.
+It is primarily designed for the **RESOLVE toolchain**.
 
 ## Build
 ```bash
@@ -51,7 +51,7 @@ After linking and running the resulting file will have this format.
 ```
 
 ## LLVM Passes
-Libresolve is designed to used with the LLVM passes within the E-BOSS RESOLVE toolchain.
+Libresolve is designed to used with the LLVM passes within the RESOLVE toolchain.
 
 | LLVM Passes | Intended behavior with Libresolve | 
 | --- | --- |
