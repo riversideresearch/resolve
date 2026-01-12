@@ -46,7 +46,7 @@ fn idify_file_path(path: &mut PathBuf, id: impl Display) {
 
 /// File for "resolve_dlsym.json"
 pub static DLSYM_LOG_FILE: LazyLock<MutexWrap<File>> = LazyLock::new(|| {
-    let log_dir = env::var("RESOLVE_DLSYM_LOG")
+    let log_dir = env::var("RESOLVE_DLSYM_LOG_DIR")
         .unwrap_or_else(|_| ".".to_string());
 
     let mut path = PathBuf::from(log_dir);
