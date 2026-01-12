@@ -224,7 +224,7 @@ void sanitizeDivideByZero(Function *F, Vulnerability::RemediationStrategies stra
     // originalBB: Branch if the divisor is zero
     originalBB->getTerminator()->eraseFromParent();
     Builder.SetInsertPoint(originalBB);
-    Builder.CreateCondBr(IsZero, remedDivBB, preserveDivBB);
+    Builder.CreateCondBr(isZero, remedDivBB, preserveDivBB);
 
     // remedDivBB: Perform safe division
     Builder.SetInsertPoint(remedDivBB);
