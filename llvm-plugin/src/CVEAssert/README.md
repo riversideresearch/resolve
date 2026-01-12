@@ -5,7 +5,7 @@
 
 # CVEAssert
 CVEAssert is an LLVM compiler pass that instruments source code
-by applying a sanitizer to an affected function. CVEAssert takes a CVE description formatted using a json. 
+by applying a sanitizer to an affected function. CVEAssert takes a CVE description formatted using a json. CVEAssert instruments programs that exhibit arithmetic and memory vulnerabilities. 
 
 # Types of Sanitizers
 | Type | Sanitizer |
@@ -17,3 +17,27 @@ by applying a sanitizer to an affected function. CVEAssert takes a CVE descripti
 | Memory | Null Pointer Deref |
 | Other | Operation Masking | 
 
+## Directory Structure
+```bash
+.
+├── arith_san.cpp     - Source code for arithmetic sanitizers (i.e. divide by zero, integer overflow)
+├── bounds_check.cpp  - Source code for OOB-access memory sanitizers 
+├── CVEAssert.cpp     - Driver code 
+├── helpers.cpp       - Helper functions 
+├── null_ptr.cpp      - Source code for null pointer sanitizers
+├── undesirableop.cpp - Source code for operation masking sanitizer
+├── Vulnerability.hpp - Source code for internal data structure to parse CVE description
+└── Worklist.hpp      - Source code for internal data structure
+```
+
+ Testing LLVM-IR rendering
+```llvm
+define dso_local i32 @square(i32 noundef %0) #0 {
+  %2 = alloca i32, align 4
+  store i32 %0, ptr %2, align 4
+  %3 = load i32, ptr %2, align 4
+  %4 = load i32, ptr %2, align 4
+  %5 = mul nsw i32 %3, %4
+  ret i32 %5
+}
+```
