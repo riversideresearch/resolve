@@ -304,57 +304,91 @@ void instrumentAlloca(Function *F) {
   // Initialize list to store pointers to alloca and instructions
   std::vector<AllocaInst *> toFreeList;
 
-  auto invalidateFn = M->getOrInsertFunction(
-    "resolve_invalidate_stack",
-    FunctionType::get(void_ty, { ptr_ty }, false)
-  );
-
-  auto handle_alloca = [&](auto* allocaInst) {
-      bool hasStart = false;
-      bool hasEnd = false;
-
-      Type *allocatedType = allocaInst->getAllocatedType();
-      uint64_t typeSize = DL.getTypeAllocSize(allocatedType); 
-
-      for (auto* user: allocaInst->users()) {
-        if( auto* call = dyn_cast<CallInst>(user)) {
-          auto called = call->getCalledFunction();
-          if (called && called->getName().starts_with("llvm.lifetime.start")) {
-            hasStart = true;
-            builder.SetInsertPoint(call->getNextNode());
-            builder.CreateCall(getResolveStackObj(M), { allocaInst, ConstantInt::get(size_ty, typeSize)});
-          }
-
-          if (called && called->getName().starts_with("llvm.lifetime.end")) {
-            hasEnd = true;
-            builder.SetInsertPoint(call->getNextNode());
-            builder.CreateCall(invalidateFn, { allocaInst});
-          }
-        }
-      }
-
-      // This is probably always true unless we are given malformed input.
-      assert(hasStart == hasEnd);
-      if (hasStart) { return; }
-      // Otherwise Insert after the alloca instruction
-      builder.SetInsertPoint(allocaInst->getNextNode());
-      builder.CreateCall(getResolveStackObj(M), { allocaInst, ConstantInt::get(size_ty, typeSize)});
-      // If we have not added an invalidate call already make sure we do so later.
-      toFreeList.push_back(allocaInst);
-  };
-
   for (auto &BB: *F) {
     for (auto &instr: BB) {
       if (auto *inst = dyn_cast<AllocaInst>(&instr)) {
-          handle_alloca(inst);
+          toFreeList.push_back(inst);
       }
     }
+  }
+
+  for (auto* allocaInst: toFreeList) {
+      // Insert after the alloca instruction
+      builder.SetInsertPoint(allocaInst->getNextNode());
+      Value* allocatedPtr = allocaInst;
+      Value *sizeVal = nullptr;
+      Type *allocatedType = allocaInst->getAllocatedType();
+      uint64_t typeSize = DL.getTypeAllocSize(allocatedType); 
+      sizeVal = ConstantInt::get(size_ty, typeSize);
+      builder.CreateCall(getResolveStackObj(M), { allocatedPtr, sizeVal });
   }
 
   // Find low and high allocations and pass to resolve_invaliate_stack
   if (toFreeList.empty()) {
     return;
   }
+
+  auto invalidateFn = M->getOrInsertFunction(
+    "resolve_invalidate_stack",
+    FunctionType::get(void_ty, { ptr_ty }, false)
+  );
+
+
+  auto invalidateFn2 = M->getOrInsertFunction(
+    "resolve_invalidate_stack_2",
+    FunctionType::get(void_ty, { ptr_ty, ptr_ty }, false)
+  );
+
+  auto invalidateFn3 = M->getOrInsertFunction(
+    "resolve_invalidate_stack_3",
+    FunctionType::get(void_ty, { ptr_ty, ptr_ty, ptr_ty }, false)
+  );
+
+  auto invalidateFn4 = M->getOrInsertFunction(
+    "resolve_invalidate_stack_4",
+    FunctionType::get(void_ty, { ptr_ty, ptr_ty, ptr_ty, ptr_ty }, false)
+  );
+
+  auto invalidateFn5 = M->getOrInsertFunction(
+    "resolve_invalidate_stack_5",
+    FunctionType::get(void_ty, { ptr_ty, ptr_ty, ptr_ty, ptr_ty, ptr_ty }, false)
+  );
+
+  auto invalidateFn6 = M->getOrInsertFunction(
+    "resolve_invalidate_stack_6",
+    FunctionType::get(void_ty, { ptr_ty, ptr_ty, ptr_ty, ptr_ty, ptr_ty, ptr_ty }, false)
+  );
+
+
+  // Try to reduce the number of calls to invalidate each of the stack addrs.
+  // the x64 ABI allows us to pass up to 6 arguments in registers, so libresolve provides functions with up to arity 6.
+  auto invalidate_all_at = [&](auto* inst) {
+    builder.SetInsertPoint(inst);
+    auto size = toFreeList.size();
+    for (auto i = 0; i < toFreeList.size(); i += 6) {
+      switch ((size - i) % 6) {
+        case 1:
+          builder.CreateCall(invalidateFn, { toFreeList[i] });
+          break;
+        case 2:
+          builder.CreateCall(invalidateFn2, { toFreeList[i], toFreeList[i+1] });
+          break;
+        case 3:
+          builder.CreateCall(invalidateFn3, { toFreeList[i], toFreeList[i+1], toFreeList[i+2] });
+          break;
+        case 4:
+          builder.CreateCall(invalidateFn4, { toFreeList[i], toFreeList[i+1], toFreeList[i+2], toFreeList[i+3] });
+          break;
+        case 5:
+          builder.CreateCall(invalidateFn5, { toFreeList[i], toFreeList[i+1], toFreeList[i+2], toFreeList[i+3], toFreeList[i+4] });
+          break;
+        // 6
+        case 0:
+          builder.CreateCall(invalidateFn6, { toFreeList[i], toFreeList[i+1], toFreeList[i+2], toFreeList[i+3], toFreeList[i+4], toFreeList[i+5] });
+          break;
+      }
+    }
+  };
 
   // Stack grows down, so first allocation is high, last is low
   // Hmm.. compiler seems to be reordering the allocas in ways 
@@ -364,11 +398,7 @@ void instrumentAlloca(Function *F) {
   for (auto &BB: *F) {
     for (auto &instr: BB) {
       if (auto *inst = dyn_cast<ReturnInst>(&instr)) {
-        builder.SetInsertPoint(inst);
-        // builder.CreateCall(invalidateFn, { low, high });
-        for (auto *alloca: toFreeList) {
-          builder.CreateCall(invalidateFn, { alloca });
-        }
+        invalidate_all_at(inst);
       }
     }
   }
@@ -476,49 +506,67 @@ void instrumentGEP(Function *F) {
   const DataLayout &DL = M->getDataLayout();
   std::vector<GetElementPtrInst *> gepList;
   auto ptr_ty = PointerType::get(Ctx, 0);
+  auto size_ty = Type::getInt64Ty(Ctx);
 
   FunctionType *resolveGEPFnTy = FunctionType::get(
     ptr_ty,
-    { ptr_ty, ptr_ty },
+    { ptr_ty, ptr_ty, size_ty },
     false
   );
 
-  FunctionCallee resolveGEPFn = M->getOrInsertFunction(
+  FunctionCallee resolveGepFn = M->getOrInsertFunction(
     "resolve_gep",
     resolveGEPFnTy
   );
 
-  for (auto &BB : *F) {
-    for (auto &inst: BB) {
-      if (auto *gep = dyn_cast<GetElementPtrInst>(&inst)) {
-        gepList.push_back(gep);
+  std::unordered_set<GetElementPtrInst *> visitedGep;
+
+  //auto resolveGepFn = getOrCreateResolveGepSanitizer(M, Ctx, strategy);
+
+  auto handle_gep = [&](auto* gep) {
+
+    if (visitedGep.contains(gep)) {
+      return;
+    }
+
+    Value* basePtr = gep->getPointerOperand();
+    GetElementPtrInst* derivedPtr = gep;
+    gep->setIsInBounds(false);
+
+    // If we are chaining geps we don't need to check each individually, only the total range in the end.
+    while (derivedPtr->hasOneUser()) {
+      if (auto* gep2 = dyn_cast<GetElementPtrInst>(derivedPtr->user_back())) {
+        gep2->setIsInBounds(false);
+        visitedGep.insert(gep2);
+        derivedPtr = gep2;
+      } else {
+        break;
       }
     }
-  }
 
-  for (auto GEPInst: gepList) {
-    builder.SetInsertPoint(GEPInst->getNextNode());
-
-    // Get the pointer operand and offset from GEP
-    Value *basePtr = GEPInst->getPointerOperand();
-    Value * derivedPtr = GEPInst;
-    
-    // Don't assume gep is inbounds, otherwise our remdiation risks being optimized away
-    GEPInst->setIsInBounds(false);
-
-    auto resolveGEPCall = builder.CreateCall(resolveGEPFn, { basePtr, derivedPtr });
-
-    // Collect users of gep instruction before mutation
     SmallVector<User*, 8> gep_users;
-    for (User *U : GEPInst->users()) {
+    for (User *U : derivedPtr->users()) {
       gep_users.push_back(U);
     }
 
+    builder.SetInsertPoint(derivedPtr->getNextNode());
+    auto resolveGepCall = builder.CreateCall(resolveGepFn, { basePtr, derivedPtr, ConstantExpr::getSizeOf(derivedPtr->getResultElementType()) });
+
     // Iterate over all the users of the gep instruction and 
-    // replace there operands with resolve_gep result 
+    // replace their operands with resolve_gep result 
     for (User *U : gep_users) {
-      if (U != resolveGEPCall) {
-        U->replaceUsesOfWith(GEPInst, resolveGEPCall);
+      if (U != resolveGepCall) {
+        U->replaceUsesOfWith(derivedPtr, resolveGepCall);
+      }
+    }
+
+    visitedGep.insert(gep);
+  };
+
+  for (auto &BB : *F) {
+    for (auto &inst: BB) {
+      if (auto *gep = dyn_cast<GetElementPtrInst>(&inst)) {
+        handle_gep(gep);
       }
     }
   }

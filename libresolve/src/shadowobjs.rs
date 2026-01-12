@@ -2,6 +2,7 @@
 // LGPL-3; See LICENSE.txt in the repo root for details.
 
 use crate::MutexWrap;
+use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::ops::RangeInclusive;
 use std::ops::Bound::Included;
@@ -131,6 +132,9 @@ impl ShadowObjectTable {
 }
 
 // static object lists to store all objects
+thread_local! {
+    pub static STACK_OBJ_LIST: RefCell<ShadowObjectTable> = RefCell::new(ShadowObjectTable::new());
+}
 pub static ALIVE_OBJ_LIST: MutexWrap<ShadowObjectTable> = MutexWrap::new(ShadowObjectTable::new());
 pub static FREED_OBJ_LIST: MutexWrap<ShadowObjectTable> = MutexWrap::new(ShadowObjectTable::new());
 
