@@ -23,12 +23,8 @@ cargo build             # Debug build (default)
 ## Directory Structure
 ```bash
 .
-├── Cargo.lock
-├── Cargo.toml
-├── README.md
-├── rust-toolchain.toml
 └── src
-    ├── lib.rs          
+    ├── lib.rs        - File operations 
     ├── remediate.rs  - Runtime instrumentation 
     ├── shadowobjs.rs - Shadow object implementation 
     └── trace.rs      - Function prototypes for recording function activations  
