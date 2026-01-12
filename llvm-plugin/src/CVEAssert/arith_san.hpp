@@ -10,4 +10,4 @@
 #include "Vulnerability.hpp"
 void sanitizeDivideByZero(llvm::Function *F, Vulnerability::RemediationStrategies strategy);
 void sanitizeIntOverflow(llvm::Function *F, Vulnerability::RemediationStrategies strategy);
-void sanitizeBitShift(llvm::Function *F);
+void sanitizeBitShift(llvm::Function *F, Vulnerability::RemediationStrategies strategy);
