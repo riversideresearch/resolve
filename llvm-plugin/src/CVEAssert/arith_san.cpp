@@ -184,9 +184,9 @@ void sanitizeDivideByZero(Function *F, Vulnerability::RemediationStrategies stra
     }
   }
 
-  Value *dividend = nullptr;
-  Value *divisor = nullptr;
-  Value *isZero = nullptr;
+  Value *dividend;
+  Value *divisor;
+  Value *isZero;
 
   // Loop over each instruction in the list
   for (auto *binary_instr : worklist) {
