@@ -90,7 +90,7 @@ pub extern "C" fn resolve_init() {
 }
 
 fn open_resolve_log_file() -> File {
-    let log_dir = env::var("RESOLVE_RUNTIME_LOG")
+    let log_dir = env::var("RESOLVE_RUNTIME_LOG_DIR")
         .unwrap_or_else(|_| ".".to_string());
 
     let mut path = PathBuf::from(log_dir);
