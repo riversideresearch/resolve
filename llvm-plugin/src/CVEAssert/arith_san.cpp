@@ -203,13 +203,13 @@ void sanitizeDivideByZero(Function *F, Vulnerability::RemediationStrategies stra
     case Instruction::UDiv:
     case Instruction::SRem:
     case Instruction::URem: {
-      IsZero = Builder.CreateICmpEQ(divisor,
+      isZero = Builder.CreateICmpEQ(divisor,
                                     ConstantInt::get(divisor->getType(), 0));
       break;
     }
     case Instruction::FDiv:
     case Instruction::FRem: {
-      IsZero = Builder.CreateFCmpOEQ(
+      isZero = Builder.CreateFCmpOEQ(
           divisor, ConstantFP::get(divisor->getType(), 0.0));
       break;
     }
