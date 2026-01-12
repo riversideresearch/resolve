@@ -139,6 +139,7 @@ void sanitizeDivideByZero(Function *F, Vulnerability::RemediationStrategies stra
   Module *M = F->getParent();
   auto &Ctx = M->getContext();
   IRBuilder<> Builder(Ctx);
+  std::vector<Instruction *> worklist;
 
   switch (strategy) {
     case Vulnerability::RemediationStrategies::SAFE:
