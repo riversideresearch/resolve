@@ -33,14 +33,32 @@ impl<T> MutexWrap<T> {
     }
 }
 
+fn idify_file_path(path: &mut PathBuf, id: impl Display) {
+    let file_name = path.file_name().unwrap().to_owned();
+    let mut updated_file_name = OsString::new();
+
+    updated_file_name.push(file_name);
+    updated_file_name.push("-");
+    updated_file_name.push(id.to_string()); 
+
+    path.set_file_name(updated_file_name);
+}
+
 /// File for "resolve_dlsym.json"
 pub static DLSYM_LOG_FILE: LazyLock<MutexWrap<File>> = LazyLock::new(|| {
-    let path = env::var("RESOLVE_DLSYM_LOG");
-    let path = path.unwrap_or_else(|_| "resolve_dlsym.json".to_string());
+    let log_dir = env::var("RESOLVE_DLSYM_LOG")
+        .unwrap_or_else(|_| ".".to_string());
 
-    let path = idify_file_path(&path, process::id());
+    let mut path = PathBuf::from(log_dir);
 
-    let mut file = File::create(path).unwrap();
+    // Check if the directory exists
+    fs::create_dir_all(&path).unwrap();
+
+    path.push("resolve_dlsym.json");
+
+    idify_file_path(&mut path, process::id());
+
+    let mut file = File::create(&path).unwrap();
 
     // Write JSON header only once, when the file is first opened
     let _ = write!(&mut file, "{{\n \"loaded_symbols\": [\n");
@@ -69,17 +87,6 @@ pub extern "C" fn resolve_init() {
     }
 
     let _ = builder.try_init();
-}
-
-fn idify_file_path(path: &mut PathBuf, id: impl Display) {
-    let file_name = path.file_name().unwrap().to_owned();
-    let mut updated_file_name = OsString::new();
-
-    updated_file_name.push(file_name);
-    updated_file_name.push("-");
-    updated_file_name.push(id.to_string()); 
-
-    path.set_file_name(updated_file_name);
 }
 
 fn open_resolve_log_file() -> File {
