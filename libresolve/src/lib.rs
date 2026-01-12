@@ -8,21 +8,13 @@ mod shadowobjs;
 mod trace;
 
 use libc::{Dl_info, atexit, c_void, dladdr, dlsym};
-use std::ffi::CStr;
+use std::ffi::{CStr, OsString};
 use std::fmt::Display;
-use std::fs::File;
+use std::fs::{self, File};
+use std::path::PathBuf;
 use std::io::{Seek, Write};
 use std::sync::{LazyLock, Mutex};
 use std::{env, process};
-
-/// Appends id to base path, but before the first .suffix if any
-fn idify_file_path(path: &str, id: impl Display) -> String {
-    if let Some((stem, ext)) = path.rsplit_once('.') {
-        format!("{}_{}.{}", stem, id, ext)
-    } else {
-        format!("{}_{}", path, id)
-    }
-}
 
 pub struct MutexWrap<T> {
     mutex: Mutex<T>,
@@ -79,15 +71,32 @@ pub extern "C" fn resolve_init() {
     let _ = builder.try_init();
 }
 
+fn idify_file_path(path: &mut PathBuf, id: impl Display) {
+    let file_name = path.file_name().unwrap().to_owned();
+    let mut updated_file_name = OsString::new();
+
+    updated_file_name.push(file_name);
+    updated_file_name.push("-");
+    updated_file_name.push(id.to_string()); 
+
+    path.set_file_name(updated_file_name);
+}
+
 fn open_resolve_log_file() -> File {
-    let path = env::var("RESOLVE_RUNTIME_LOG");
-    let path = path.unwrap_or_else(|_| "resolve_log.out".to_string());
+    let log_dir = env::var("RESOLVE_RUNTIME_LOG")
+        .unwrap_or_else(|_| ".".to_string());
 
-    let path = idify_file_path(&path, process::id());
+    let mut path = PathBuf::from(log_dir);
 
-    let file = File::create(path).unwrap();
+    // Check if the directory exists
+    fs::create_dir_all(&path).unwrap();
+    
+    // Append the file name
+    path.push("resolve_log.out");
 
-    file
+    idify_file_path(&mut path, process::id());
+
+    File::create(&path).unwrap()
 }
 
 /**
