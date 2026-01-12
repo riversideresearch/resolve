@@ -36,14 +36,11 @@ cargo build             # Debug build (default)
 
 ## Environment variables
 Libresolve uses environment variables to control where the runtime logs are written:
-- `RESOLVE_DLSYM_LOG`
-- `RESOLVE_RUNTIME_LOG`
+- `RESOLVE_DLSYM_LOG_DIR`
+- `RESOLVE_RUNTIME_LOG_DIR`
 
-Each log file automatically appends the process ID before the extension. 
-For example, setting:
-```bash
-export RESOLVE_RUNTIME_LOG=./resolve_log.out
-```
+Both environment variables expect a file path as input. If the file path has not been created then
+libresolve will create the directories. Each log file automatically appends the process ID before the extension. 
 
 After linking and running the resulting file will have this format.
 ```bash
