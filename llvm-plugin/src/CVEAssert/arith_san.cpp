@@ -517,11 +517,10 @@ void sanitizeIntOverflow(Function *F,
     Builder.SetInsertPoint(originalBB);
     Builder.CreateCondBr(isOverflow, remedOverflowBB, contExeBB);
 
-    // remedOverflowBB: Construct saturated instructions
+    // remedOverflowBB: Call resolve_remediation_behavior 
     Builder.SetInsertPoint(remedOverflowBB);
     Builder.CreateCall(getOrCreateResolveReportSanitizerTriggered(M));
     Builder.CreateCall(getOrCreateRemediationBehavior(M, strategy));
-
     Builder.CreateBr(contExeBB);
 
     // contExeBB: resume control flow execution
