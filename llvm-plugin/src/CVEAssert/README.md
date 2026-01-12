@@ -7,7 +7,7 @@
 CVEAssert is an LLVM compiler pass that instruments source code
 by applying a sanitizer to an affected function. CVEAssert takes a CVE description formatted using a json. CVEAssert instruments programs that exhibit arithmetic and memory vulnerabilities. 
 
-# Types of Sanitizers
+## Types of Sanitizers
 | Type | Sanitizer |
 | --- | --- |
 | Arithmetic | Divide by Zero|
@@ -29,6 +29,14 @@ by applying a sanitizer to an affected function. CVEAssert takes a CVE descripti
 ├── Vulnerability.hpp - Source code for internal data structure to parse CVE description
 └── Worklist.hpp      - Source code for internal data structure
 ```
+## Supported Sanitizers 
+| Sanitizer | Behavior | 
+| --- | --- |
+| Divide by Zero | Collects division and remainder operation in vulnerable function. Inserts checks before operations to check if divisors are zero. |
+| Integer Overflow | Collects arithmetic instructions in vulnerable function. Checks for the presence of *nsw* and *nuw* flags and inserts arithmetic overflow checking instructions. |
+| Heap/Stack OOB | Collects load/store and GEP (getelementptr) instructions in the vulnerable function. Replaces load/store and GEPs with instrumented versions. |
+| Null Pointer Dereference | Collects load/store operations in the vulnerable function. Replaces load/store operations with instrumented versions. |
+| Operation Masking | Collects function calls in vulnerable function that are "undesirable". Replaces old calls with calls to a sanitized version of the undesirable function that returns the value of the first argument. | 
 
  Testing LLVM-IR rendering
 ```llvm
