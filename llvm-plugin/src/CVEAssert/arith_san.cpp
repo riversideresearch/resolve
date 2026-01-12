@@ -135,7 +135,6 @@ void sanitizeBinShift(Function *F) {
 }
 
 void sanitizeDivideByZero(Function *F, Vulnerability::RemediationStrategies strategy) {
-  std::vector<Instruction *> worklist;
   Module *M = F->getParent();
   auto &Ctx = M->getContext();
   IRBuilder<> Builder(Ctx);
@@ -494,7 +493,7 @@ void sanitizeIntOverflow(Function *F,
 
       Function *satOp = Intrinsic::getDeclaration(M, intrinsic_id, BinOpType);
 
-      // add fracBits parameter for saturated multiplication operations
+      // Add fracBits parameter for saturated multiplication operations
       // LLVM LangRef:
       // https://llvm.org/docs/LangRef.html#fixed-point-arithmetic-intrinsics
       if (binary_inst->getOpcode() == Instruction::Mul) {
@@ -507,16 +506,7 @@ void sanitizeIntOverflow(Function *F,
     };
 
     auto [safeResult, isOverflow] = insertSafeOp(binary_inst, op1, op2);
-    if (!safeResult || !isOverflow) {
-      // FIXME: when does this branch happen and do we need warnings about it
-      continue;
-    }
-
     auto satResult = insertSatOp(binary_inst, op1, op2);
-    if (!satResult) {
-      // FIXME: when does this branch happen and do we need warnings about it
-      continue;
-    }
 
     BasicBlock *originalBB = binary_inst->getParent();
     BasicBlock *contExeBB = originalBB->splitBasicBlock(satResult);
