@@ -26,11 +26,23 @@
 
 using namespace llvm;
 
-void sanitizeBinShift(Function *F) {
-  std::vector<Instruction *> worklist;
+void sanitizeBitShift(Function *F, Vulnerability::RemediationStrategies strategy) {
   Module *M = F->getParent();
   auto &Ctx = M->getContext();
   IRBuilder<> Builder(Ctx);
+  std::vector<Instruction *> worklist;
+
+  switch (strategy) {
+  case Vulnerability::RemediationStrategies::EXIT:
+  case Vulnerability::RemediationStrategies::RECOVER:
+    break;
+  
+  default:
+    llvm::errs() << "[CVEAssert] Error: sanitizeBitShift does not support "
+                 << " remediation strategy defaulting to EXIT strategy!\n";
+    strategy = Vulnerability::RemediationStrategies::EXIT;
+    break;
+  }
 
   for (auto &BB : *F) {
     for (auto &instr : BB) {
@@ -46,16 +58,15 @@ void sanitizeBinShift(Function *F) {
     }
   }
 
+  Value *IsNegative = nullptr;
+  Value *IsGreaterThanBitWidth = nullptr;
+  Value *CheckShiftAmtCond = nullptr;
+
   for (auto *binary_instr : worklist) {
     Builder.SetInsertPoint(binary_instr);
-
     Value *shifted_value = binary_instr->getOperand(0);
     Value *shift_amt = binary_instr->getOperand(1);
-
     unsigned BitWidth = shifted_value->getType()->getIntegerBitWidth();
-    Value *IsNegative = nullptr;
-    Value *IsGreaterThanBitWidth = nullptr;
-    Value *CheckShiftAmtCond = nullptr;
 
     IsNegative = Builder.CreateICmpULT(
         shift_amt, ConstantInt::get(shift_amt->getType(), 0));
@@ -173,17 +184,18 @@ void sanitizeDivideByZero(Function *F, Vulnerability::RemediationStrategies stra
     }
   }
 
+  Value *dividend = nullptr;
+  Value *divisor = nullptr;
+  Value *isZero = nullptr;
+
   // Loop over each instruction in the list
   for (auto *binary_instr : worklist) {
     // Set the insertion point at the div instruction
     Builder.SetInsertPoint(binary_instr);
 
     // Extract dividend and divisor
-    Value *dividend = binary_instr->getOperand(0);
-    Value *divisor = binary_instr->getOperand(1);
-
-    // Compare divisor == 0
-    Value *IsZero = nullptr;
+    dividend = binary_instr->getOperand(0);
+    divisor = binary_instr->getOperand(1);
 
     // Check opcode of instruction
     switch (binary_instr->getOpcode()) {
