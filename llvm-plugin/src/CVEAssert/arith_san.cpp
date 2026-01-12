@@ -419,14 +419,17 @@ void sanitizeIntOverflow(Function *F,
     }
   }
 
+  Value *op1;
+  Value *op2;
+
   for (auto *binary_inst : worklist) {
     if (!binary_inst->hasNoSignedWrap() &&
         !binary_inst->hasNoUnsignedWrap()) {
       continue;
     }
 
-    Value *op1 = binary_inst->getOperand(0);
-    Value *op2 = binary_inst->getOperand(1);
+    op1 = binary_inst->getOperand(0);
+    op2 = binary_inst->getOperand(1);
 
     Builder.SetInsertPoint(binary_inst);
 
