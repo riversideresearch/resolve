@@ -73,6 +73,12 @@ back to `continue`.
 > combination is encountered.
 
 > [!NOTE]
+> The **`continue`** strategy preserves program execution
+> by substituting safe default values. For arithmetic sanitizers,
+> this corresponds to 2's-complement wraparound for memory sanitizers,
+> it corresponds to `null` pointer values.    
+
+> [!NOTE]
 > Unlike the other strategies, RECOVER is semi-automatic.
 > This strategy requires the programmer to insert a
 > *jmp_buf* construct within the program and insert 
@@ -82,7 +88,7 @@ back to `continue`.
 ## Example 
 ```C
 // Divide by Zero
-int div_zero_main(int argc, const char* argv[]) { // <- This is the vulnerable function     
+int div_zero_main(int argc, const char* argv[]) {    
     int math = (int) (42.0 / (float)argc);
     return 42 % argc + math / argc;
 }
@@ -93,7 +99,7 @@ int main(int argc, const char* argv[]) {
 }
 ```
 
-Pre-Instrumented IR 
+**Pre-Instrumented IR** 
 ```llvm
 ; Function Attrs: noinline nounwind optnone uwtable
 define dso_local i32 @div_zero_main(i32 noundef %0, ptr noundef %1) #0 {
@@ -118,7 +124,7 @@ define dso_local i32 @div_zero_main(i32 noundef %0, ptr noundef %1) #0 {
 }
 ```
 
-Post-Instrumented IR
+**Post-Instrumented IR**
 ```llvm
 ; Function Attrs: noinline nounwind optnone uwtable
 define dso_local i32 @div_zero_main(i32 noundef %0, ptr noundef %1) #0 {
@@ -188,7 +194,12 @@ define internal void @resolve_remediation_behavior() {
 }
 ```
 
-Talk about the semantic differences between pre and post IR.
+This example demonstrates remediation applied to a divide-by-zero in
+the function `div_zero_main`. The instrumented IR contains a call to 
+`resolve_remediation_behavior`. When a remediation strategy is selected, the compiler generates a helper function that implements the corresponding remediation strategy.
+At runtime, this helper is invoked when a violation is detected, and execution proceeds according to the selected strategy.
+In this example, the `EXIT` strategy is specified, causing the program to terminate early with a sanitizer-specific
+exit code. 
 
 ## Testing
 To verify correct IR transformation and binary behavior, we developed a testing suite with regression testing. The suite contains testcases for each sanitizer and tests that the resulting binaries perform the intended behaviors with and without the remediation instrumentation. The testing suite can be found in *./llvm-plugin/tests/regression* and the tests can be executed by calling *make*. 
