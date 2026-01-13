@@ -8,9 +8,12 @@ CVEAssert is an LLVM compiler pass that instruments programs
 by inserting runtime checks into functions identified as vulnerable.
 It consumes a CVE description encoded in JSON, which is parsed into
 an internal representation containing the target file, function,
-weakness identifier, and remediation strategy. The pass is executed
-early in the compilation pipeline to allow LLVM's optimization
-framework to optimize the inserted instrumentation. 
+weakness identifier, and remediation strategy. Based on this
+description, CVEAssert selects and applies the appropriate sanitizer
+to each affected function. CVEAssert can optionally be linked with
+the **libresolve** runtime library to enforce stack and heap bounds.  
+The pass is executed early in the compilation pipeline to allow
+LLVM's optimization framework to optimize the injected instrumentation. 
 
 ## Architecture Diagram
 ![CVEAssert pipeline](cveassert_pipeline.png)
@@ -40,11 +43,12 @@ framework to optimize the inserted instrumentation.
 ## Supported Sanitizers 
 | Sanitizer | Behavior | 
 | --- | --- |
-| Divide by Zero | Collects division and remainder operation in vulnerable function. Inserts checks before operations to check if divisors are zero. |
-| Integer Overflow | Collects arithmetic instructions in vulnerable function. Checks for the presence of *nsw* and *nuw* flags and inserts arithmetic overflow checking instructions. |
-| Heap/Stack OOB | Collects load/store and GEP (getelementptr) instructions in the vulnerable function. Replaces load/store and GEPs with instrumented versions. |
-| Null Pointer Dereference | Collects load/store operations in the vulnerable function. Replaces load/store operations with instrumented versions. |
-| Operation Masking | Collects function calls in vulnerable function that are "undesirable". Replaces old calls with calls to a sanitized version of the undesirable function that returns the value of the first argument. | 
+| Divide by Zero | Instruments division and remainder operations with runtime checks that remediate when the divisor is zero. |
+| Integer Overflow | Instruments arithmetic operations using *nsw/nuw* and inserts overflow checks where undefined behavior may occur. |
+| Heap Out-of-Bounds | Instruments heap loads, stores, and `getelementptr` instructions with runtime checks to enforce heap bounds. |
+| Stack Out-of-Bounds | Instruments stack `alloca`, loads, stores, and `getelementptr` instructions with runtime checks to enforce stack bounds. | 
+| Null Pointer Dereference | Instruments pointer load and store instructions with runtime checks that detect null dereference. |
+| Operation Masking | Replaces selected 'undesirable' operations with guarded calls that validate operands before execution. | 
 
 ## Remediation Strategies
 Remediation strategies define how sanitizers respond to detected errors. If a sanitizer does not specify a remediation strategy in its internal data structure, the `continue` startegy is used by default. Certain
@@ -53,8 +57,8 @@ back to `continue`.
 
 | Remediation Strategy | Behavior |
 | --- | --- |
-| None | Skip remediation for vulnerablility | 
-| Recover | Inserts calls to longjmp in affected function | 
+| None | Does not perform remediation | 
+| Recover |  | 
 | Sat | Applies saturated arithmetic to affected function |
 | Exit | Inserts exit function call with specified exit code |
 | Continue | Inserts a value that allows program to continue execution |
@@ -173,6 +177,11 @@ define dso_local i32 @div_zero_main(i32 noundef %0, ptr noundef %1) #0 {
   %31 = phi i32 [ %29, %28 ], [ %27, %26 ]
   %32 = add nsw i32 %22, %31
   ret i32 %32
+}
+
+define internal void @resolve_remediation_behavior() {
+  call void @exit(i32 3)
+  ret void
 }
 ```
 
