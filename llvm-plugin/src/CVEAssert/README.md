@@ -23,6 +23,7 @@ the **libresolve** runtime library to enforce stack and heap bounds. The pass is
 | Arithmetic | Integer Overflow | 
 | Memory | Heap OOB |
 | Memory | Stack OOB |
+| Memory | Free Nonheap | 
 | Memory | Null Pointer Deref |
 | Other | Operation Masking | 
 
