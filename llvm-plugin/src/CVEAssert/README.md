@@ -61,7 +61,7 @@ back to `continue`.
 | --- | --- |
 | None | Does not perform remediation | 
 | Recover | Transfer control to a recovery handler using `longjmp` | 
-| Sat | Applies saturated arithmetic to affected function |
+| Saturate (Sat) | Applies saturated arithmetic to affected function |
 | Exit | Inserts `exit` function call with specified exit code |
 | Continue | Inserts a value that allows program to continue execution |
 | Widen | Widen potentially overflowing intermediate operations |
