@@ -79,7 +79,7 @@ back to `continue`.
 > it corresponds to `null` pointer values.    
 
 > [!NOTE]
-> Unlike the other strategies, RECOVER is semi-automatic.
+> Unlike the other strategies, **`recover`** is semi-automatic.
 > This strategy requires the programmer to insert a
 > *jmp_buf* construct within the program and insert 
 > additional logic to cause the program to call setjmp
