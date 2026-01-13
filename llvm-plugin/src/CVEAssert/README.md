@@ -75,7 +75,7 @@ back to `continue`.
 ## Example 
 ```C
 // Divide by Zero
-int div_zero_main(int argc, const char* argv[]) {        
+int div_zero_main(int argc, const char* argv[]) { // <- This is the vulnerable function     
     int math = (int) (42.0 / (float)argc);
     return 42 % argc + math / argc;
 }
@@ -88,11 +88,92 @@ int main(int argc, const char* argv[]) {
 
 Pre-Instrumented IR 
 ```llvm
-
+; Function Attrs: noinline nounwind optnone uwtable
+define dso_local i32 @div_zero_main(i32 noundef %0, ptr noundef %1) #0 {
+  %3 = alloca i32, align 4
+  %4 = alloca ptr, align 8
+  %5 = alloca i32, align 4
+  store i32 %0, ptr %3, align 4
+  store ptr %1, ptr %4, align 8
+  %6 = load i32, ptr %3, align 4
+  %7 = sitofp i32 %6 to float
+  %8 = fpext float %7 to double
+  %9 = fdiv double 4.200000e+01, %8
+  %10 = fptosi double %9 to i32
+  store i32 %10, ptr %5, align 4
+  %11 = load i32, ptr %3, align 4
+  %12 = srem i32 42, %11
+  %13 = load i32, ptr %5, align 4
+  %14 = load i32, ptr %3, align 4
+  %15 = sdiv i32 %13, %14
+  %16 = add nsw i32 %12, %15
+  ret i32 %16
+}
 ```
 
 Post-Instrumented IR
 ```llvm
+; Function Attrs: noinline nounwind optnone uwtable
+define dso_local i32 @div_zero_main(i32 noundef %0, ptr noundef %1) #0 {
+  %3 = alloca i32, align 4
+  %4 = alloca ptr, align 8
+  %5 = alloca i32, align 4
+  store i32 %0, ptr %3, align 4
+  store ptr %1, ptr %4, align 8
+  %6 = load i32, ptr %3, align 4
+  %7 = sitofp i32 %6 to float
+  %8 = fpext float %7 to double
+  %9 = fcmp oeq double %8, 0.000000e+00
+  br i1 %9, label %12, label %10
+
+10:                                               ; preds = %2
+  %11 = fdiv double 4.200000e+01, %8
+  br label %13
+
+12:                                               ; preds = %2
+  call void @resolve_report_sanitizer_triggered()
+  call void @resolve_remediation_behavior()
+  br label %13
+
+13:                                               ; preds = %10, %12
+  %14 = phi double [ 4.200000e+01, %12 ], [ %11, %10 ]
+  %15 = fptosi double %14 to i32
+  store i32 %15, ptr %5, align 4
+  %16 = load i32, ptr %3, align 4
+  %17 = icmp eq i32 %16, 0
+  br i1 %17, label %20, label %18
+
+18:                                               ; preds = %13
+  %19 = srem i32 42, %16
+  br label %21
+
+20:                                               ; preds = %13
+  call void @resolve_report_sanitizer_triggered()
+  call void @resolve_remediation_behavior()
+  br label %21
+
+21:                                               ; preds = %18, %20
+  %22 = phi i32 [ 0, %20 ], [ %19, %18 ]
+  %23 = load i32, ptr %5, align 4
+  %24 = load i32, ptr %3, align 4
+  %25 = icmp eq i32 %24, 0
+  br i1 %25, label %28, label %26
+
+26:                                               ; preds = %21
+  %27 = sdiv i32 %23, %24
+  br label %30
+
+28:                                               ; preds = %21
+  call void @resolve_report_sanitizer_triggered()
+  call void @resolve_remediation_behavior()
+  %29 = sdiv i32 %23, 1
+  br label %30
+
+30:                                               ; preds = %26, %28
+  %31 = phi i32 [ %29, %28 ], [ %27, %26 ]
+  %32 = add nsw i32 %22, %31
+  ret i32 %32
+}
 ```
 
 Talk about the semantic differences between pre and post IR.
