@@ -55,7 +55,7 @@ NOTE: Add note about invalid combinations
 | Continue | Inserts a value that allows program to continue execution |
 | Widen | Widen potentially overflowing intermediate operations |
 
-> **Note**
+> [!NOTE:]
 > Unlike the other strategies, RECOVER is semi-automatic.
 > This strategy requires the programmer to insert a
 > *jmp_buf* construct within the program and insert 
