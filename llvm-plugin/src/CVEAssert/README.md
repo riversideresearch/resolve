@@ -47,10 +47,23 @@ the **libresolve** runtime library to enforce stack and heap bounds. The pass is
 | Stack Out-of-Bounds | Instruments stack `alloca`, loads, stores, and `getelementptr` instructions with runtime checks to enforce stack bounds. | 
 | Null Pointer Dereference | Instruments pointer load and store instructions with runtime checks that detect null dereference. |
 | Operation Masking | Replaces selected 'undesirable' function calls with guarded calls that validate operands before execution. |
+| Free Nonheap | Instruments calls to `free` with runtime checks that ensure argument is a heap-allocated pointer. |
 > [!NOTE]
 > The CVE description must include an 'undesirable-function` field
 > for the Operation Masking sanitizer to be applied. If this field
 > is not present, Operation Masking is not enabled. 
+
+> [!NOTE]
+> Here is a table of weakness identifiers and alternatives that can be used to
+> activate specific sanitizers.
+> | Weakness Identifiers | Sanitizer |
+> | --- | --- |
+> | `190` | Integer Overflow | 
+> | `369` | Divide by Zero |
+> | `476` | Null Pointer Dereference |
+> | `590` | Free Nonheap |
+> | `121`, `123`, `125`, `131`, `797`| Stack OOB |
+> | `122`, `123`, `125`, `131`, `797`| Heap OOB |   
 
 ## Remediation Strategies
 Remediation strategies define how sanitizers respond to detected errors. If a sanitizer does not specify a remediation strategy in its internal data structure, the `continue` startegy is used by default. Certain
