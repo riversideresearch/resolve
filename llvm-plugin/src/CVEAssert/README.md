@@ -56,9 +56,9 @@ back to `continue`.
 | Remediation Strategy | Behavior |
 | --- | --- |
 | None | Does not perform remediation | 
-| Recover |  | 
+| Recover | Transfer control to a recovery handler using `longjmp` | 
 | Sat | Applies saturated arithmetic to affected function |
-| Exit | Inserts exit function call with specified exit code |
+| Exit | Inserts `exit` function call with specified exit code |
 | Continue | Inserts a value that allows program to continue execution |
 | Widen | Widen potentially overflowing intermediate operations |
 
@@ -72,7 +72,8 @@ back to `continue`.
 > Unlike the other strategies, RECOVER is semi-automatic.
 > This strategy requires the programmer to insert a
 > *jmp_buf* construct within the program and insert 
-> additional logic to cause the program to call setjmp.
+> additional logic to cause the program to call setjmp
+> to transfer control to a recovery handler.
 
 ## Example 
 ```C
