@@ -5,7 +5,7 @@
 
 # CVEAssert
 CVEAssert is a LLVM compiler pass that instruments source code
-by inserting runtime checks into a specified affected function. CVEAssert takes a CVE description formatted using a json. The CVE description is parsed into an internal data structure which stores the target file name, function name, weakness ID, and remediation strategy.   
+by inserting runtime checks into a specified affected function. CVEAssert takes a CVE description formatted using a json. The CVE description is parsed into an internal data structure which stores the target file name, function name, weakness ID, and remediation strategy. This pass runs at the beginning of the pipeline to take advantage of LLVM's suite of compiler optimizations.  
 
 ## Architecture Diagram
 ![CVEAssert pipeline](cveassert_pipeline.png)
@@ -42,9 +42,9 @@ by inserting runtime checks into a specified affected function. CVEAssert takes 
 | Operation Masking | Collects function calls in vulnerable function that are "undesirable". Replaces old calls with calls to a sanitized version of the undesirable function that returns the value of the first argument. | 
 
 ## Remediation Strategies
-Remediation strategies generalize remediation behaviors across sanitizers. If a remediation strategy is not specified within the internal data structure then the sanitizer will default to using the continue strategy.   
-
-NOTE: Add note about invalid combinations
+Remediation strategies define how sanitizers respond to detected errors. If a sanitizer does not specify a remediation strategy in its internal data structure, the `continue` startegy is used by default. Certain
+sanitizer-strategy combinations are invalid; when a combination is encountered, the implementation falls 
+back to `continue`. 
 
 | Remediation Strategy | Behavior |
 | --- | --- |
@@ -55,6 +55,12 @@ NOTE: Add note about invalid combinations
 | Continue | Inserts a value that allows program to continue execution |
 | Widen | Widen potentially overflowing intermediate operations |
 
+> [!WARNING:]
+> The default remediation stategy is
+> **`continue`**, both when no strategy is
+> specified and when an invalid sanitizer-strategy
+> combination is encountered.
+
 > [!NOTE:]
 > Unlike the other strategies, RECOVER is semi-automatic.
 > This strategy requires the programmer to insert a
@@ -62,16 +68,29 @@ NOTE: Add note about invalid combinations
 > additional logic to cause the program to call setjmp.
 
 ## Example 
- Testing LLVM-IR rendering
-```llvm
-define dso_local i32 @square(i32 noundef %0) #0 {
-  %2 = alloca i32, align 4
-  store i32 %0, ptr %2, align 4
-  %3 = load i32, ptr %2, align 4
-  %4 = load i32, ptr %2, align 4
-  %5 = mul nsw i32 %3, %4
-  ret i32 %5
+```C
+// Divide by Zero
+int div_zero_main(int argc, const char* argv[]) {        
+    int math = (int) (42.0 / (float)argc);
+    return 42 % argc + math / argc;
+}
+
+int main(int argc, const char* argv[]) {
+    // call with 1 arg to trigger div by zero
+    return div_zero_main(argc-2, argv);
 }
 ```
+
+Pre-Instrumented IR 
+```llvm
+
+```
+
+Post-Instrumented IR
+```llvm
+```
+
+Talk about the semantic differences between pre and post IR.
+
 ## Testing
 To verify correct IR transformation and binary behavior, we developed a testing suite with regression testing. The suite contains testcases for each sanitizer and tests that the resulting binaries perform the intended behaviors with and without the remediation instrumentation. The testing suite can be found in *./llvm-plugin/tests/regression* and the tests can be executed by calling *make*. 
