@@ -4,8 +4,13 @@
 -->
 
 # CVEAssert
-CVEAssert is a LLVM compiler pass that instruments source code
-by inserting runtime checks into a specified affected function. CVEAssert takes a CVE description formatted using a json. The CVE description is parsed into an internal data structure which stores the target file name, function name, weakness ID, and remediation strategy. This pass runs at the beginning of the pipeline to take advantage of LLVM's suite of compiler optimizations.  
+CVEAssert is an LLVM compiler pass that instruments programs 
+by inserting runtime checks into functions identified as vulnerable.
+It consumes a CVE description encoded in JSON, which is parsed into
+an internal representation containing the target file, function,
+weakness identifier, and remediation strategy. The pass is executed
+early in the compilation pipeline to allow LLVM's optimization
+framework to optimize the inserted instrumentation. 
 
 ## Architecture Diagram
 ![CVEAssert pipeline](cveassert_pipeline.png)
