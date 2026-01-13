@@ -144,7 +144,6 @@ define dso_local i32 @div_zero_main(i32 noundef %0, ptr noundef %1) #0 {
   br label %13
 
 12:                                               ; preds = %2
-  call void @resolve_report_sanitizer_triggered()
   call void @resolve_remediation_behavior()
   br label %13
 
@@ -161,7 +160,6 @@ define dso_local i32 @div_zero_main(i32 noundef %0, ptr noundef %1) #0 {
   br label %21
 
 20:                                               ; preds = %13
-  call void @resolve_report_sanitizer_triggered()
   call void @resolve_remediation_behavior()
   br label %21
 
@@ -177,7 +175,6 @@ define dso_local i32 @div_zero_main(i32 noundef %0, ptr noundef %1) #0 {
   br label %30
 
 28:                                               ; preds = %21
-  call void @resolve_report_sanitizer_triggered()
   call void @resolve_remediation_behavior()
   %29 = sdiv i32 %23, 1
   br label %30
