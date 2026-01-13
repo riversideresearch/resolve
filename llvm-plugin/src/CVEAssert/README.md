@@ -46,11 +46,15 @@ the **libresolve** runtime library to enforce stack and heap bounds. The pass is
 | Heap Out-of-Bounds | Instruments heap loads, stores, and `getelementptr` instructions with runtime checks to enforce heap bounds. |
 | Stack Out-of-Bounds | Instruments stack `alloca`, loads, stores, and `getelementptr` instructions with runtime checks to enforce stack bounds. | 
 | Null Pointer Dereference | Instruments pointer load and store instructions with runtime checks that detect null dereference. |
-| Operation Masking | Replaces selected 'undesirable' operations with guarded calls that validate operands before execution. | 
+| Operation Masking | Replaces selected 'undesirable' function calls with guarded calls that validate operands before execution. |
+> [!NOTE]
+> The CVE description must include an 'undesirable-function` field
+> for the Operation Masking sanitizer to be applied. If this field
+> is not present, Operation Masking is not enabled. 
 
 ## Remediation Strategies
 Remediation strategies define how sanitizers respond to detected errors. If a sanitizer does not specify a remediation strategy in its internal data structure, the `continue` startegy is used by default. Certain
-sanitizer-strategy combinations are invalid; when a combination is encountered, the implementation falls 
+sanitizer-strategy combinations are invalid. When a combination is encountered, the implementation falls 
 back to `continue`. 
 
 | Remediation Strategy | Behavior |
@@ -62,13 +66,13 @@ back to `continue`.
 | Continue | Inserts a value that allows program to continue execution |
 | Widen | Widen potentially overflowing intermediate operations |
 
-> [!WARNING:]
+> [!WARNING]
 > The default remediation stategy is
 > **`continue`**, both when no strategy is
 > specified and when an invalid sanitizer-strategy
 > combination is encountered.
 
-> [!NOTE:]
+> [!NOTE]
 > Unlike the other strategies, RECOVER is semi-automatic.
 > This strategy requires the programmer to insert a
 > *jmp_buf* construct within the program and insert 
