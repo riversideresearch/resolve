@@ -14,7 +14,6 @@ to each affected function. CVEAssert can optionally be linked with
 the [`libresolve`](/libresolve/README.md) runtime library to enforce stack and heap bounds. The pass is executed early in the compilation pipeline to allow LLVM's optimization framework to optimize the injected instrumentation. 
 
 ## Architecture Diagram
-> Update diagram before merging to main!
 ![CVEAssert pipeline](cveassert_pipeline.png)
 
 ## Types of Sanitizers
