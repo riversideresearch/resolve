@@ -384,14 +384,14 @@ void sanitizeIntOverflow(Function *F,
 
   case Vulnerability::RemediationStrategies::RECOVER:
   case Vulnerability::RemediationStrategies::EXIT:
-  case Vulnerability::RemediationStrategies::CONTINUE:
+  case Vulnerability::RemediationStrategies::WRAP:
   case Vulnerability::RemediationStrategies::SAT:
     break;
 
   default:
     llvm::errs() << "[CVEAssert] Error: sanitizeIntOverflow does not support "
                     "remediation strategy specified... defaulting to SAT strategy!\n";
-    strategy = Vulnerability::RemediationStrategies::SAT;
+    strategy = Vulnerability::RemediationStrategies::WRAP;
     break;
   }
 
