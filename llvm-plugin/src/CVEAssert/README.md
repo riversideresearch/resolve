@@ -14,6 +14,7 @@ to each affected function. CVEAssert can optionally be linked with
 the [`libresolve`](/libresolve/README.md) runtime library to enforce stack and heap bounds. The pass is executed early in the compilation pipeline to allow LLVM's optimization framework to optimize the injected instrumentation. 
 
 ## Architecture Diagram
+> Update diagram before merging to main!
 ![CVEAssert pipeline](cveassert_pipeline.png)
 
 ## Types of Sanitizers
@@ -73,7 +74,7 @@ back to `continue`.
 
 | Remediation Strategy | Behavior |
 | --- | --- |
-| Continue | Invalid memory operations are ignored and return 0 |
+| Continue | Invalid operations are ignored and return 0 |
 | Exit | Inserts `exit` function call with specified exit code |
 | None | Does not perform remediation | 
 | Recover | Transfer control to a recovery handler using `longjmp` | 
@@ -93,6 +94,11 @@ back to `continue`.
 > memory sanitizers is **`Continue`**, both when no
 > strategy is specified and when an invalid 
 > sanitizer-strategy combination is encountered.
+
+> [!NOTE]
+> If the divide by zero sanitizer is selected
+> with the continue strategy, intermediate 
+> results will return the dividend. 
 
 > [!NOTE]
 > Unlike the other strategies, **`recover`** is semi-automatic.
