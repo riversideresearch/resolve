@@ -563,15 +563,15 @@ void sanitizeLoadStore(Function *F, Vulnerability::RemediationStrategies strateg
     // case Vulnerability::RemediationStrategies::CONTINUE-WRAP: /* TODO: Not yet supported. Implement this remediaion strategy */
     // case Vulnerability::RemediationStrategies::CONTINUE-ZERO: /* TODO: Not yet supported. Implement this remediation strategy */
     // case Vulnerability::RemediationStrategies::SAT:          /* TODO: Not yet supported. Implement this remediation strategy */
-    case Vulnerability::RemediationStrategies::SAFE:
+    case Vulnerability::RemediationStrategies::CONTINUE:
     case Vulnerability::RemediationStrategies::EXIT:
     case Vulnerability::RemediationStrategies::RECOVER:
       break;
 
     default:
       llvm::errs() << "[CVEAssert] Error: sanitizeLoadStore does not support remediation strategy "
-                   << "defaulting to SAFE strategy!\n";
-      strategy = Vulnerability::RemediationStrategies::SAFE;
+                   << "defaulting to CONTINUE strategy!\n";
+      strategy = Vulnerability::RemediationStrategies::CONTINUE;
       break;
   }
 
