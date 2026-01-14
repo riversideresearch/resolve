@@ -34,7 +34,7 @@ the [`libresolve`](/libresolve/README.md) runtime library to enforce stack and h
 ├── bounds_check.cpp  - Source code for oob memory sanitizers 
 ├── CVEAssert.cpp     - Driver code 
 ├── helpers.cpp       - Compiler generated helper functions
-├── null_ptr.cpp      - Source code for null pointer sanitizers
+├── null_ptr.cpp      - Source code for null pointer sanitizer
 ├── undesirableop.cpp - Source code for operation masking sanitizer
 ├── Vulnerability.hpp - Source code for internal data structure to parse CVE description
 └── Worklist.hpp      - Source code for internal data structure
