@@ -60,7 +60,7 @@ static Function *getOrCreateNullPtrLoadSanitizer(Module *M, LLVMContext &Ctx, Ty
     Builder.CreateCall(LogMemInstFunc, { InputPtr });
 
     switch(strategy) {
-        case Vulnerability::RemediationStrategies::SAFE: {
+        case Vulnerability::RemediationStrategies::CONTINUE: {
             Builder.CreateRet(Constant::getNullValue(ty));
         }
 
@@ -127,7 +127,7 @@ static Function *getOrCreateNullPtrStoreSanitizer(Module *M, LLVMContext &Ctx, T
     Builder.CreateCall(LogMemInstFunc, { InputPtr });
     
     switch (strategy) {
-        case Vulnerability::RemediationStrategies::SAFE:{
+        case Vulnerability::RemediationStrategies::CONTINUE:{
             Builder.CreateRetVoid();
         }
 
@@ -157,13 +157,13 @@ void sanitizeNullPointers(Function *f, Vulnerability::RemediationStrategies stra
     switch(strategy) {
         case Vulnerability::RemediationStrategies::EXIT:
         case Vulnerability::RemediationStrategies::RECOVER:
-        case Vulnerability::RemediationStrategies::SAFE:
+        case Vulnerability::RemediationStrategies::CONTINUE:
             break;
         
         default:
             llvm::errs() << "[CVEAssert] Error: sanitizeNullPointers does not support remediation strategy "
-                         << "defaulting to EXIT strategy!\n";
-            strategy = Vulnerability::RemediationStrategies::EXIT;
+                         << "defaulting to CONTINUE strategy!\n";
+            strategy = Vulnerability::RemediationStrategies::CONTINUE;
             break;
     }
     
