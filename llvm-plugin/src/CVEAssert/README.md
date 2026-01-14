@@ -210,7 +210,72 @@ the function `div_zero_main`. The instrumented IR contains a call to
 `resolve_remediation_behavior`. When a remediation strategy is selected, the compiler generates a helper function that implements the corresponding remediation strategy.
 At runtime, this helper is invoked when a violation is detected, and execution proceeds according to the selected strategy.
 In this example, the `EXIT` strategy is specified, causing the program to terminate early with a sanitizer-specific
-exit code. 
+exit code.
+
+```C
+// Out-of-bounds Write 
+#include <stdlib.h>
+int main() {
+  char *p = malloc(16);
+  p[45] = 100;
+  return 0;
+}
+```
+**Pre-Instrumented IR**
+```llvm
+; Function Attrs: noinline nounwind optnone uwtable
+define dso_local i32 @main() #0 {
+  %1 = alloca i32, align 4
+  %2 = alloca ptr, align 8
+  store i32 0, %1, align 4
+  %3 = call noalias ptr @malloc(i64 noundef 16) #2
+  store ptr %3, ptr %2, align 8
+  %4 = load ptr, ptr %2, align 8
+  %5 = getelementptr inbounds i8, ptr %4, i64 42
+  store i8 100, ptr %5, align 1
+  ret i32 0
+}
+```
+
+**Post-Instrumented IR**
+```llvm
+; Function Attrs: noinline nounwind optnone uwtable
+define dso_local @main() #0 {
+  %1 = alloca i32, align 4
+  call void @resolve_stack_obj(ptr %1, i64 4)
+  %2 = alloca ptr, align 8
+  call void @resolve_stack_obj(ptr %2, i64 8)
+  store i32 0, ptr %1, align 4
+  %3 = call ptr @resolve_malloc(i64 16)
+  store ptr %3, ptr %2, align 8
+  %4 = load ptr, ptr %2, align 8
+  %5 = getelementptr i8, ptr %4, i64 45
+  %6 = call ptr @resolve_gep(ptr %4, ptr %5)
+  call void @resolve_bounds_check_st_ty_i8(ptr %6, i8 100)
+  call void @resolve_invalidate_stack(ptr %1, ptr %1)
+  call void @resolve_invalidate_stack(ptr %2, ptr %2)
+  ret i32 0
+}
+```
+This example demonstrates an Out of Bounds write in `main`.
+The instrumented IR contains calls to `resolve_stack_obj`,
+`resolve_gep`, and `resolve_invalidate_stack`. The `resolve_stack_obj`
+function records stack allocations as shadow object in the libresolve runtime, while
+`resolve_malloc` records heap allocations in the same shadow memory.
+
+The `resolve_gep` function enforces spatial safety by performing a shadow object lookup
+on the base pointer and checking whether the derived pointer lies within the allocation 
+bounds. If a derived pointer falls outside of these boudns, `resolve_gep` returns a
+tainted pointer, a pointer whose address exceeds the allocation range. 
+
+In the subsequent
+`resolve_bounds_check_st_ty_i8` call the pointer is checked for taintedness. If the pointer
+is tainted, the specified resolve strategy is applied; otherwise the load or store
+is allowed to proceed.
+
+At function exit, the compiler inserts a call to `resolve_invalidate_stack` to mirror
+stack unwinding by invalidating the corresponding shadow objects.    
+
 
 ## Testing
 To verify correct IR transformations and binary behavior, we developed a testing suite with regression testing. The suite contains testcases for each sanitizer and tests that the resulting binaries perform the intended behaviors with and without the remediation instrumentation. The testing suite can be found in [`llvm-plugin/tests/regression`](/llvm-plugin/tests/regression) and the tests can be executed by calling *make*. 
