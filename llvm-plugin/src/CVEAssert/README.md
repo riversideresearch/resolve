@@ -257,7 +257,7 @@ define dso_local @main() #0 {
   ret i32 0
 }
 ```
-This example demonstrates an Out of Bounds write in `main`.
+This example demonstrates an out of bounds write in `main`.
 The instrumented IR contains calls to `resolve_stack_obj`,
 `resolve_gep`, and `resolve_invalidate_stack`. The `resolve_stack_obj`
 function records stack allocations as shadow object in the libresolve runtime, while
