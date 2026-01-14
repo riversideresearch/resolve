@@ -31,7 +31,7 @@ the [`libresolve`](/libresolve/README.md) runtime library to enforce stack and h
 ```bash
 .
 ├── arith_san.cpp     - Source code for arithmetic sanitizers (i.e. divide by zero, integer overflow)
-├── bounds_check.cpp  - Source code for OOB-access memory sanitizers 
+├── bounds_check.cpp  - Source code for oob memory sanitizers 
 ├── CVEAssert.cpp     - Driver code 
 ├── helpers.cpp       - Helper functions 
 ├── null_ptr.cpp      - Source code for null pointer sanitizers
@@ -73,24 +73,26 @@ back to `continue`.
 
 | Remediation Strategy | Behavior |
 | --- | --- |
+| Continue | Invalid memory operations are ignored and return 0 |
+| Exit | Inserts `exit` function call with specified exit code |
 | None | Does not perform remediation | 
 | Recover | Transfer control to a recovery handler using `longjmp` | 
-| Saturate (Sat) | Applies saturated arithmetic to affected function |
-| Exit | Inserts `exit` function call with specified exit code |
-| Continue | Inserts a value that allows program to continue execution |
+| Saturate (Sat) | Use saturated arithmetic |
 | Widen | Widen potentially overflowing intermediate operations |
+| Wrap | Use 2's complement arithmetic | 
 
 > [!WARNING]
-> The default remediation stategy is
-> **`continue`**, both when no strategy is
-> specified and when an invalid sanitizer-strategy
-> combination is encountered.
+> The default remediation stategy 
+> for arithmetic sanitizers is **`Wrap`**, both when 
+> no strategy is specified and when
+> an invalid sanitizer-strategy combination
+> is encountered.
 
-> [!NOTE]
-> The **`continue`** strategy preserves program execution
-> by substituting safe default values. For arithmetic sanitizers,
-> this corresponds to 2's-complement wraparound for memory sanitizers,
-> it corresponds to `null` pointer values.    
+> [!WARNING]
+> The default remediation strategy for
+> memory sanitizers is **`Continue`**, both when no
+> strategy is specified and when an invalid 
+> sanitizer-strategy combination is encountered.
 
 > [!NOTE]
 > Unlike the other strategies, **`recover`** is semi-automatic.
