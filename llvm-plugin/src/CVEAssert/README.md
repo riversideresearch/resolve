@@ -33,7 +33,7 @@ the [`libresolve`](/libresolve/README.md) runtime library to enforce stack and h
 ├── arith_san.cpp     - Source code for arithmetic sanitizers (i.e. divide by zero, integer overflow)
 ├── bounds_check.cpp  - Source code for oob memory sanitizers 
 ├── CVEAssert.cpp     - Driver code 
-├── helpers.cpp       - Compiler generated helper functions
+├── helpers.cpp       - Helper functions
 ├── null_ptr.cpp      - Source code for null pointer sanitizer
 ├── undesirableop.cpp - Source code for operation masking sanitizer
 ├── Vulnerability.hpp - Source code for internal data structure to parse CVE description
