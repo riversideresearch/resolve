@@ -560,9 +560,6 @@ void sanitizeLoadStore(Function *F, Vulnerability::RemediationStrategies strateg
   std::vector<StoreInst *> storeList;
 
   switch(strategy) {
-    // case Vulnerability::RemediationStrategies::CONTINUE-WRAP: /* TODO: Not yet supported. Implement this remediaion strategy */
-    // case Vulnerability::RemediationStrategies::CONTINUE-ZERO: /* TODO: Not yet supported. Implement this remediation strategy */
-    // case Vulnerability::RemediationStrategies::SAT:          /* TODO: Not yet supported. Implement this remediation strategy */
     case Vulnerability::RemediationStrategies::CONTINUE:
     case Vulnerability::RemediationStrategies::EXIT:
     case Vulnerability::RemediationStrategies::RECOVER:
