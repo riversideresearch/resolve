@@ -98,7 +98,7 @@ Remediation strategies define how sanitizers respond to detected errors encounte
 > results will return the dividend. 
 
 > [!NOTE]
-> Unlike the other strategies, **`recover`** is semi-automatic.
+> Unlike the other strategies, **`RECOVER`** is semi-automatic.
 > This strategy requires the programmer to insert a
 > *jmp_buf* construct within the program and insert 
 > additional logic to cause the program to call setjmp
