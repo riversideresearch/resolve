@@ -67,9 +67,7 @@ the [`libresolve`](/libresolve/README.md) runtime library to enforce stack and h
 > | `122`, `123`, `125`, `131`, `797`| Heap OOB |   
 
 ## Remediation Strategies
-Remediation strategies define how sanitizers respond to detected errors. If a sanitizer does not specify a remediation strategy in its internal data structure, the `continue` startegy is used by default. Certain
-sanitizer-strategy combinations are invalid. When a combination is encountered, the implementation falls 
-back to `continue`. 
+Remediation strategies define how sanitizers respond to detected errors encountered at runtime. 
 
 | Remediation Strategy | Behavior |
 | --- | --- |
