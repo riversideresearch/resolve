@@ -236,7 +236,7 @@ define dso_local i32 @main() #0 {
   %3 = call noalias ptr @malloc(i64 noundef 16) #2
   store ptr %3, ptr %2, align 8
   %4 = load ptr, ptr %2, align 8
-  %5 = getelementptr inbounds i8, ptr %4, i64 42
+  %5 = getelementptr inbounds i8, ptr %4, i64 45
   store i8 100, ptr %5, align 1
   ret i32 0
 }
