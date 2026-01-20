@@ -58,11 +58,11 @@ void sanitizeBitShift(Function *F, Vulnerability::RemediationStrategies strategy
     }
   }
 
-  Value *IsNegative = nullptr;
-  Value *IsGreaterThanBitWidth = nullptr;
-  Value *CheckShiftAmtCond = nullptr;
-
   for (auto *binary_instr : worklist) {
+    Value *IsNegative = nullptr;
+    Value *IsGreaterThanBitWidth = nullptr;
+    Value *CheckShiftAmtCond = nullptr;
+
     Builder.SetInsertPoint(binary_instr);
     Value *shifted_value = binary_instr->getOperand(0);
     Value *shift_amt = binary_instr->getOperand(1);
@@ -184,12 +184,12 @@ void sanitizeDivideByZero(Function *F, Vulnerability::RemediationStrategies stra
     }
   }
 
-  Value *dividend;
-  Value *divisor;
-  Value *isZero;
-
   // Loop over each instruction in the list
   for (auto *binary_instr : worklist) {
+    Value *dividend;
+    Value *divisor;
+    Value *isZero;
+
     // Set the insertion point at the div instruction
     Builder.SetInsertPoint(binary_instr);
 
