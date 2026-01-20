@@ -148,7 +148,7 @@ void sanitizeDivideByZero(Function *F, Vulnerability::RemediationStrategies stra
 
     default:
       llvm::errs() << "[CVEAssert] Error: sanitizeDivideByZero does not support "
-                   << " remediation strategy defaulting to CONTINUE strategy!\n";
+                   << " remediation strategy defaulting to continue strategy!\n";
       strategy = Vulnerability::RemediationStrategies::CONTINUE;
       break; 
   }
@@ -379,7 +379,7 @@ void sanitizeIntOverflow(Function *F,
   IRBuilder<> Builder(Ctx);
 
   switch (strategy) {
-  case Vulnerability::RemediationStrategies::CONTINUE_WIDEN:
+  case Vulnerability::RemediationStrategies::WIDEN:
     return widenIntOverflow(F);
 
   case Vulnerability::RemediationStrategies::RECOVER:
@@ -390,7 +390,7 @@ void sanitizeIntOverflow(Function *F,
 
   default:
     llvm::errs() << "[CVEAssert] Error: sanitizeIntOverflow does not support "
-                    "remediation strategy specified... defaulting to SAT strategy!\n";
+                    "remediation strategy specified defaulting to sat strategy!\n";
     strategy = Vulnerability::RemediationStrategies::WRAP;
     break;
   }
