@@ -8,11 +8,12 @@ mod shadowobjs;
 mod trace;
 
 use libc::{Dl_info, atexit, c_void, dladdr, dlsym};
+use std::error::Report;
 use std::ffi::{CStr, OsString};
 use std::fmt::Display;
 use std::fs::{self, File};
 use std::path::PathBuf;
-use std::io::{Seek, Write};
+use std::io::{self, Seek, Write};
 use std::sync::{LazyLock, Mutex};
 use std::{env, process};
 
@@ -51,14 +52,14 @@ pub static DLSYM_LOG_FILE: LazyLock<MutexWrap<File>> = LazyLock::new(|| {
 
     let mut path = PathBuf::from(log_dir);
 
-    // Check if the directory exists
-    fs::create_dir_all(&path).unwrap();
+    // Ensure the directory exists
+    fs::create_dir_all(&path).expect("Cannot create the parent directories");
 
     path.push("resolve_dlsym.json");
 
     idify_file_path(&mut path, process::id());
 
-    let mut file = File::create(&path).unwrap();
+    let mut file = File::create(&path).expect("Cannot create file in directory");
 
     // Write JSON header only once, when the file is first opened
     let _ = write!(&mut file, "{{\n \"loaded_symbols\": [\n");
@@ -81,29 +82,32 @@ pub extern "C" fn resolve_init() {
     if cfg!(test) {
         builder.is_test(true);
     } else {
-        let file = open_resolve_log_file();
-
+        let file = open_resolve_log_file().unwrap_or_else(|err| { 
+            eprintln!("Libresolve log file could not be created.");
+            eprintln!("Error: {err:?}");
+            process::exit(12);
+        });
+        
         builder.target(env_logger::Target::Pipe(Box::new(file)));
     }
 
     let _ = builder.try_init();
 }
 
-fn open_resolve_log_file() -> File {
+fn open_resolve_log_file() -> Result<File, io::Error> {
     let log_dir = env::var("RESOLVE_RUNTIME_LOG_DIR")
         .unwrap_or_else(|_| ".".to_string());
 
     let mut path = PathBuf::from(log_dir);
 
-    // Check if the directory exists
-    fs::create_dir_all(&path).unwrap();
+    // Create the necessary parent dirs
+    fs::create_dir_all(&path)?;
     
     // Append the file name
     path.push("resolve_log.out");
 
     idify_file_path(&mut path, process::id());
-
-    File::create(&path).unwrap()
+    File::create(&path)
 }
 
 /**
