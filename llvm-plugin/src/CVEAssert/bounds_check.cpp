@@ -341,7 +341,7 @@ void instrumentAlloca(Function *F) {
   for (auto &BB: *F) {
     for (auto &instr: BB) {
       if (auto *inst = dyn_cast<AllocaInst>(&instr)) {
-          toFreeList.push(inst);
+          toFreeList.push_back(inst);
           handle_alloca(inst);
       }
     }
