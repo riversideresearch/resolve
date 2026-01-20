@@ -390,7 +390,7 @@ void sanitizeIntOverflow(Function *F,
 
   default:
     llvm::errs() << "[CVEAssert] Error: sanitizeIntOverflow does not support "
-                    "remediation strategy specified defaulting to sat strategy!\n";
+                    "remediation strategy specified defaulting to wrap strategy!\n";
     strategy = Vulnerability::RemediationStrategies::WRAP;
     break;
   }
