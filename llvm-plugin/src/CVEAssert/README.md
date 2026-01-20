@@ -62,7 +62,12 @@ the [`libresolve`](/libresolve/README.md) runtime library to enforce stack and h
 > | `369` | Divide by Zero |
 > | `476` | Null Pointer Dereference |
 > | `590` | Free Nonheap |
-> | `121`, `122`, `123`, `125`, `131`, `797`| Stack & Heap OOB | 
+> | `121` | Stack OOB |
+> | `122` | Heap OOB | 
+
+> [!NOTE]
+> Stack and heap can also activated simulataneously with 
+> these weakness identifiers `123`,`125`,`131`, `797`.  
 
 ## Remediation Strategies
 Remediation strategies define how sanitizers respond to detected errors encountered at runtime. 
