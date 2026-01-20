@@ -73,7 +73,7 @@ Remediation strategies define how sanitizers respond to detected errors encounte
 | Exit | Inserts `exit` function call with specified exit code |
 | None | Does not perform remediation | 
 | Recover | Transfer control to a recovery handler using `longjmp` | 
-| Saturate (Sat) | Use saturated arithmetic |
+| Saturate (Sat) | Use saturating arithmetic |
 | Widen | Widen potentially overflowing intermediate operations |
 | Wrap | Use 2's complement arithmetic | 
 
