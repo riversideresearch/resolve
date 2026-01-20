@@ -141,15 +141,15 @@ void sanitizeDivideByZero(Function *F, Vulnerability::RemediationStrategies stra
   IRBuilder<> Builder(Ctx);
 
   switch (strategy) {
-    case Vulnerability::RemediationStrategies::SAFE:
+    case Vulnerability::RemediationStrategies::CONTINUE:
     case Vulnerability::RemediationStrategies::EXIT:
     case Vulnerability::RemediationStrategies::RECOVER:
       break;
 
     default:
       llvm::errs() << "[CVEAssert] Error: sanitizeDivideByZero does not support "
-                   << " remediation strategy defaulting to SAFE strategy!\n";
-      strategy = Vulnerability::RemediationStrategies::SAFE;
+                   << " remediation strategy defaulting to continue strategy!\n";
+      strategy = Vulnerability::RemediationStrategies::CONTINUE;
       break; 
   }
 
@@ -379,19 +379,19 @@ void sanitizeIntOverflow(Function *F,
   IRBuilder<> Builder(Ctx);
 
   switch (strategy) {
-  case Vulnerability::RemediationStrategies::CONTINUE_WIDEN:
+  case Vulnerability::RemediationStrategies::WIDEN:
     return widenIntOverflow(F);
 
   case Vulnerability::RemediationStrategies::RECOVER:
   case Vulnerability::RemediationStrategies::EXIT:
-  case Vulnerability::RemediationStrategies::SAFE:
+  case Vulnerability::RemediationStrategies::WRAP:
   case Vulnerability::RemediationStrategies::SAT:
     break;
 
   default:
     llvm::errs() << "[CVEAssert] Error: sanitizeIntOverflow does not support "
-                    "remediation strategy specified... defaulting to SAT strategy!\n";
-    strategy = Vulnerability::RemediationStrategies::SAT;
+                    "remediation strategy specified defaulting to wrap strategy!\n";
+    strategy = Vulnerability::RemediationStrategies::WRAP;
     break;
   }
 
