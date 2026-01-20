@@ -567,7 +567,7 @@ void sanitizeLoadStore(Function *F, Vulnerability::RemediationStrategies strateg
 
     default:
       llvm::errs() << "[CVEAssert] Error: sanitizeLoadStore does not support remediation strategy "
-                   << "defaulting to CONTINUE strategy!\n";
+                   << "defaulting to continue strategy!\n";
       strategy = Vulnerability::RemediationStrategies::CONTINUE;
       break;
   }
