@@ -42,6 +42,12 @@ After linking and running the resulting file will have this format.
 ```bash
 ./resolve_log_<pid>.out
 ```
+[!NOTE]
+Both environment variables expect a file path as input. If the file path
+has not been created then libresolve will attempt to create the necessary parent directories. 
+If libresolve fails to create the necessary parent directories due to permission issues, an error is thrown and libresolve 
+will panic. Each log file automatically appends the process ID before the extension.
+
 
 ## LLVM Passes
 Libresolve is designed to used with the LLVM passes within the RESOLVE toolchain.
