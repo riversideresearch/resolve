@@ -26,11 +26,23 @@
 
 using namespace llvm;
 
-void sanitizeBinShift(Function *F) {
-  std::vector<Instruction *> worklist;
+void sanitizeBitShift(Function *F, Vulnerability::RemediationStrategies strategy) {
   Module *M = F->getParent();
   auto &Ctx = M->getContext();
   IRBuilder<> Builder(Ctx);
+  std::vector<Instruction *> worklist;
+
+  switch (strategy) {
+  case Vulnerability::RemediationStrategies::EXIT:
+  case Vulnerability::RemediationStrategies::RECOVER:
+    break;
+  
+  default:
+    llvm::errs() << "[CVEAssert] Error: sanitizeBitShift does not support "
+                 << " remediation strategy defaulting to EXIT strategy!\n";
+    strategy = Vulnerability::RemediationStrategies::EXIT;
+    break;
+  }
 
   for (auto &BB : *F) {
     for (auto &instr : BB) {
@@ -47,15 +59,14 @@ void sanitizeBinShift(Function *F) {
   }
 
   for (auto *binary_instr : worklist) {
-    Builder.SetInsertPoint(binary_instr);
-
-    Value *shifted_value = binary_instr->getOperand(0);
-    Value *shift_amt = binary_instr->getOperand(1);
-
-    unsigned BitWidth = shifted_value->getType()->getIntegerBitWidth();
     Value *IsNegative = nullptr;
     Value *IsGreaterThanBitWidth = nullptr;
     Value *CheckShiftAmtCond = nullptr;
+
+    Builder.SetInsertPoint(binary_instr);
+    Value *shifted_value = binary_instr->getOperand(0);
+    Value *shift_amt = binary_instr->getOperand(1);
+    unsigned BitWidth = shifted_value->getType()->getIntegerBitWidth();
 
     IsNegative = Builder.CreateICmpULT(
         shift_amt, ConstantInt::get(shift_amt->getType(), 0));
@@ -135,10 +146,10 @@ void sanitizeBinShift(Function *F) {
 }
 
 void sanitizeDivideByZero(Function *F, Vulnerability::RemediationStrategies strategy) {
-  std::vector<Instruction *> worklist;
   Module *M = F->getParent();
   auto &Ctx = M->getContext();
   IRBuilder<> Builder(Ctx);
+  std::vector<Instruction *> worklist;
 
   switch (strategy) {
     case Vulnerability::RemediationStrategies::CONTINUE:
@@ -175,15 +186,16 @@ void sanitizeDivideByZero(Function *F, Vulnerability::RemediationStrategies stra
 
   // Loop over each instruction in the list
   for (auto *binary_instr : worklist) {
+    Value *dividend;
+    Value *divisor;
+    Value *isZero;
+
     // Set the insertion point at the div instruction
     Builder.SetInsertPoint(binary_instr);
 
     // Extract dividend and divisor
-    Value *dividend = binary_instr->getOperand(0);
-    Value *divisor = binary_instr->getOperand(1);
-
-    // Compare divisor == 0
-    Value *IsZero = nullptr;
+    dividend = binary_instr->getOperand(0);
+    divisor = binary_instr->getOperand(1);
 
     // Check opcode of instruction
     switch (binary_instr->getOpcode()) {
@@ -191,13 +203,13 @@ void sanitizeDivideByZero(Function *F, Vulnerability::RemediationStrategies stra
     case Instruction::UDiv:
     case Instruction::SRem:
     case Instruction::URem: {
-      IsZero = Builder.CreateICmpEQ(divisor,
+      isZero = Builder.CreateICmpEQ(divisor,
                                     ConstantInt::get(divisor->getType(), 0));
       break;
     }
     case Instruction::FDiv:
     case Instruction::FRem: {
-      IsZero = Builder.CreateFCmpOEQ(
+      isZero = Builder.CreateFCmpOEQ(
           divisor, ConstantFP::get(divisor->getType(), 0.0));
       break;
     }
@@ -212,7 +224,7 @@ void sanitizeDivideByZero(Function *F, Vulnerability::RemediationStrategies stra
     // originalBB: Branch if the divisor is zero
     originalBB->getTerminator()->eraseFromParent();
     Builder.SetInsertPoint(originalBB);
-    Builder.CreateCondBr(IsZero, remedDivBB, preserveDivBB);
+    Builder.CreateCondBr(isZero, remedDivBB, preserveDivBB);
 
     // remedDivBB: Perform safe division
     Builder.SetInsertPoint(remedDivBB);
@@ -407,14 +419,17 @@ void sanitizeIntOverflow(Function *F,
     }
   }
 
+  Value *op1;
+  Value *op2;
+
   for (auto *binary_inst : worklist) {
     if (!binary_inst->hasNoSignedWrap() &&
         !binary_inst->hasNoUnsignedWrap()) {
       continue;
     }
 
-    Value *op1 = binary_inst->getOperand(0);
-    Value *op2 = binary_inst->getOperand(1);
+    op1 = binary_inst->getOperand(0);
+    op2 = binary_inst->getOperand(1);
 
     Builder.SetInsertPoint(binary_inst);
 
@@ -493,7 +508,7 @@ void sanitizeIntOverflow(Function *F,
 
       Function *satOp = Intrinsic::getDeclaration(M, intrinsic_id, BinOpType);
 
-      // add fracBits parameter for saturated multiplication operations
+      // Add fracBits parameter for saturated multiplication operations
       // LLVM LangRef:
       // https://llvm.org/docs/LangRef.html#fixed-point-arithmetic-intrinsics
       if (binary_inst->getOpcode() == Instruction::Mul) {
@@ -506,16 +521,7 @@ void sanitizeIntOverflow(Function *F,
     };
 
     auto [safeResult, isOverflow] = insertSafeOp(binary_inst, op1, op2);
-    if (!safeResult || !isOverflow) {
-      // FIXME: when does this branch happen and do we need warnings about it
-      continue;
-    }
-
     auto satResult = insertSatOp(binary_inst, op1, op2);
-    if (!satResult) {
-      // FIXME: when does this branch happen and do we need warnings about it
-      continue;
-    }
 
     BasicBlock *originalBB = binary_inst->getParent();
     BasicBlock *contExeBB = originalBB->splitBasicBlock(satResult);
@@ -526,11 +532,10 @@ void sanitizeIntOverflow(Function *F,
     Builder.SetInsertPoint(originalBB);
     Builder.CreateCondBr(isOverflow, remedOverflowBB, contExeBB);
 
-    // remedOverflowBB: Construct saturated instructions
+    // remedOverflowBB: Call resolve_remediation_behavior 
     Builder.SetInsertPoint(remedOverflowBB);
     Builder.CreateCall(getOrCreateResolveReportSanitizerTriggered(M));
     Builder.CreateCall(getOrCreateRemediationBehavior(M, strategy));
-
     Builder.CreateBr(contExeBB);
 
     // contExeBB: resume control flow execution
