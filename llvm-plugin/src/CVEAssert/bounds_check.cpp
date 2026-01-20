@@ -13,7 +13,6 @@
 #include "llvm/IR/Verifier.h"
 #include "llvm/Support/raw_ostream.h"
 
-#include "Worklist.hpp"
 #include "Vulnerability.hpp"
 #include "helpers.hpp"
 

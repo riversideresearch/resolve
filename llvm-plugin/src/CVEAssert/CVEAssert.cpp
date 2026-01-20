@@ -25,7 +25,6 @@
 #include <optional>
 
 #include "CVEAssert.hpp"
-#include "Worklist.hpp"
 #include "Vulnerability.hpp"
 
 #include "helpers.hpp"
