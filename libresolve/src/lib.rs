@@ -8,7 +8,6 @@ mod shadowobjs;
 mod trace;
 
 use libc::{Dl_info, atexit, c_void, dladdr, dlsym};
-use std::error::Report;
 use std::ffi::{CStr, OsString};
 use std::fmt::Display;
 use std::fs::{self, File};
