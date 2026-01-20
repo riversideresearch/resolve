@@ -8,21 +8,13 @@ mod shadowobjs;
 mod trace;
 
 use libc::{Dl_info, atexit, c_void, dladdr, dlsym};
-use std::ffi::CStr;
+use std::ffi::{CStr, OsString};
 use std::fmt::Display;
-use std::fs::File;
-use std::io::{Seek, Write};
+use std::fs::{self, File};
+use std::path::PathBuf;
+use std::io::{self, Seek, Write};
 use std::sync::{LazyLock, Mutex};
 use std::{env, process};
-
-/// Appends id to base path, but before the first .suffix if any
-fn idify_file_path(path: &str, id: impl Display) -> String {
-    if let Some((stem, ext)) = path.rsplit_once('.') {
-        format!("{}_{}.{}", stem, id, ext)
-    } else {
-        format!("{}_{}", path, id)
-    }
-}
 
 pub struct MutexWrap<T> {
     mutex: Mutex<T>,
@@ -41,14 +33,35 @@ impl<T> MutexWrap<T> {
     }
 }
 
+fn idify_file_path(path: &mut PathBuf, id: impl Display) {
+    let file_name = path.file_name()
+        .expect("Path could not be found in file system.")
+        .to_owned();
+
+    let mut updated_file_name = OsString::new();
+
+    updated_file_name.push(file_name);
+    updated_file_name.push("-");
+    updated_file_name.push(id.to_string()); 
+
+    path.set_file_name(updated_file_name);
+}
+
 /// File for "resolve_dlsym.json"
 pub static DLSYM_LOG_FILE: LazyLock<MutexWrap<File>> = LazyLock::new(|| {
-    let path = env::var("RESOLVE_DLSYM_LOG");
-    let path = path.unwrap_or_else(|_| "resolve_dlsym.json".to_string());
+    let log_dir = env::var("RESOLVE_DLSYM_LOG_DIR")
+        .unwrap_or_else(|_| ".".to_string());
 
-    let path = idify_file_path(&path, process::id());
+    let mut path = PathBuf::from(log_dir);
 
-    let mut file = File::create(path).unwrap();
+    // Ensure the directory exists
+    fs::create_dir_all(&path).expect("Cannot create parent directories.");
+
+    path.push("resolve_dlsym.json");
+
+    idify_file_path(&mut path, process::id());
+
+    let mut file = File::create(&path).expect("Cannot create file in directory.");
 
     // Write JSON header only once, when the file is first opened
     let _ = write!(&mut file, "{{\n \"loaded_symbols\": [\n");
@@ -71,23 +84,32 @@ pub extern "C" fn resolve_init() {
     if cfg!(test) {
         builder.is_test(true);
     } else {
-        let file = open_resolve_log_file();
-
+        let file = open_resolve_log_file().unwrap_or_else(|err| { 
+            eprintln!("Libresolve log file could not be created.");
+            eprintln!("Error: {err:?}");
+            process::exit(12);
+        });
+        
         builder.target(env_logger::Target::Pipe(Box::new(file)));
     }
 
     let _ = builder.try_init();
 }
 
-fn open_resolve_log_file() -> File {
-    let path = env::var("RESOLVE_RUNTIME_LOG");
-    let path = path.unwrap_or_else(|_| "resolve_log.out".to_string());
+fn open_resolve_log_file() -> Result<File, io::Error> {
+    let log_dir = env::var("RESOLVE_RUNTIME_LOG_DIR")
+        .unwrap_or_else(|_| ".".to_string());
 
-    let path = idify_file_path(&path, process::id());
+    let mut path = PathBuf::from(log_dir);
 
-    let file = File::create(path).unwrap();
+    // Ensure the parent directories exist
+    fs::create_dir_all(&path)?;
+    
+    // Append the file name
+    path.push("resolve_log.out");
 
-    file
+    idify_file_path(&mut path, process::id());
+    File::create(&path)
 }
 
 /**
