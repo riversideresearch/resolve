@@ -36,8 +36,7 @@ the [`libresolve`](/libresolve/README.md) runtime library to enforce stack and h
 ├── helpers.cpp       - Helper functions
 ├── null_ptr.cpp      - Source code for null pointer sanitizer
 ├── undesirableop.cpp - Source code for operation masking sanitizer
-├── Vulnerability.hpp - Source code for internal data structure to parse CVE description
-└── Worklist.hpp      - Source code for internal data structure
+└── Vulnerability.hpp - Source code for internal data structure to parse CVE description
 ```
 ## Supported Sanitizers 
 | Sanitizer | Behavior | 
