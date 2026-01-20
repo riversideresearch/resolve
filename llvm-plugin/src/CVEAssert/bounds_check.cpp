@@ -303,36 +303,59 @@ void instrumentAlloca(Function *F) {
   auto void_ty = Type::getVoidTy(Ctx);
 
   // Initialize list to store pointers to alloca and instructions
-  std::vector<AllocaInst *> allocaList;
+  std::vector<AllocaInst *> toFreeList;
+
+  auto invalidateFn = M->getOrInsertFunction(
+    "resolve_invalidate_stack",
+    FunctionType::get(void_ty, { ptr_ty }, false)
+  );
+
+  auto handle_alloca = [&](auto* allocaInst) {
+      bool hasStart = false;
+      bool hasEnd = false;
+
+      Type *allocatedType = allocaInst->getAllocatedType();
+      uint64_t typeSize = DL.getTypeAllocSize(allocatedType); 
+
+      for (auto* user: allocaInst->users()) {
+        if( auto* call = dyn_cast<CallInst>(user)) {
+          auto called = call->getCalledFunction();
+          if (called && called->getName().starts_with("llvm.lifetime.start")) {
+            hasStart = true;
+            builder.SetInsertPoint(call->getNextNode());
+            builder.CreateCall(getResolveStackObj(M), { allocaInst, ConstantInt::get(size_ty, typeSize)});
+          }
+
+          if (called && called->getName().starts_with("llvm.lifetime.end")) {
+            hasEnd = true;
+            builder.SetInsertPoint(call->getNextNode());
+            builder.CreateCall(invalidateFn, { allocaInst});
+          }
+        }
+      }
+
+      // This is probably always true unless we are given malformed input.
+      assert(hasStart == hasEnd);
+      if (hasStart) { return; }
+      // Otherwise Insert after the alloca instruction
+      builder.SetInsertPoint(allocaInst->getNextNode());
+      builder.CreateCall(getResolveStackObj(M), { allocaInst, ConstantInt::get(size_ty, typeSize)});
+      // If we have not added an invalidate call already make sure we do so later.
+      toFreeList.push_back(allocaInst);
+  };
 
   for (auto &BB: *F) {
     for (auto &instr: BB) {
       if (auto *inst = dyn_cast<AllocaInst>(&instr)) {
-          allocaList.push_back(inst);
+          handle_alloca(inst);
       }
     }
   }
 
-  for (auto* allocaInst: allocaList) {
-      // Insert after the alloca instruction
-      builder.SetInsertPoint(allocaInst->getNextNode());
-      Value* allocatedPtr = allocaInst;
-      Value *sizeVal = nullptr;
-      Type *allocatedType = allocaInst->getAllocatedType();
-      uint64_t typeSize = DL.getTypeAllocSize(allocatedType); 
-      sizeVal = ConstantInt::get(size_ty, typeSize);
-      builder.CreateCall(getResolveStackObj(M), { allocatedPtr, sizeVal });
-  }
-
   // Find low and high allocations and pass to resolve_invaliate_stack
-  if (allocaList.empty()) {
+  if (toFreeList.empty()) {
     return;
   }
-
-  auto invalidateFn = M->getOrInsertFunction(
-    "resolve_invalidate_stack",
-    FunctionType::get(void_ty, { ptr_ty, ptr_ty }, false)
-  );
 
   // Stack grows down, so first allocation is high, last is low
   // Hmm.. compiler seems to be reordering the allocas in ways 
@@ -344,8 +367,8 @@ void instrumentAlloca(Function *F) {
       if (auto *inst = dyn_cast<ReturnInst>(&instr)) {
         builder.SetInsertPoint(inst);
         // builder.CreateCall(invalidateFn, { low, high });
-        for (auto *alloca: allocaList) {
-          builder.CreateCall(invalidateFn, { alloca, alloca });
+        for (auto *alloca: toFreeList) {
+          builder.CreateCall(invalidateFn, { alloca });
         }
       }
     }

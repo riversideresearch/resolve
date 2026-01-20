@@ -33,17 +33,15 @@ pub extern "C" fn resolve_stack_obj(ptr: *mut c_void, size: usize) -> () {
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn resolve_invalidate_stack(base: *mut c_void, limit: *mut c_void) {
+pub extern "C" fn resolve_invalidate_stack(base: *mut c_void) {
     let base = base as Vaddr;
-    let limit = limit as Vaddr;
 
     {
         let mut obj_list = ALIVE_OBJ_LIST.lock();
-        // TODO: Add these to a free list?
-        obj_list.invalidate_region(base, limit);
+        obj_list.invalidate_at(base);
     }
 
-    info!("[STACK] Free range 0x{base:x}..=0x{limit:x}");
+    info!("[STACK] Free addr 0x{base:x}");
 }
 
 /**
