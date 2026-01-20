@@ -96,7 +96,7 @@ pub extern "C" fn resolve_init() {
     let _ = builder.try_init();
 }
 
-fn open_resolve_log_file() -> Result<File, io::Error> {
+fn open_resolve_log_file() -> io::Result<File> {
     let log_dir = env::var("RESOLVE_RUNTIME_LOG_DIR")
         .unwrap_or_else(|_| ".".to_string());
 
