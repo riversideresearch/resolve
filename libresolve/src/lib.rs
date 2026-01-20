@@ -34,7 +34,10 @@ impl<T> MutexWrap<T> {
 }
 
 fn idify_file_path(path: &mut PathBuf, id: impl Display) {
-    let file_name = path.file_name().unwrap().to_owned();
+    let file_name = path.file_name()
+        .expect("Path could not be found in file system.")
+        .to_owned();
+
     let mut updated_file_name = OsString::new();
 
     updated_file_name.push(file_name);
@@ -52,13 +55,13 @@ pub static DLSYM_LOG_FILE: LazyLock<MutexWrap<File>> = LazyLock::new(|| {
     let mut path = PathBuf::from(log_dir);
 
     // Ensure the directory exists
-    fs::create_dir_all(&path).expect("Cannot create the parent directories");
+    fs::create_dir_all(&path).expect("Cannot create parent directories.");
 
     path.push("resolve_dlsym.json");
 
     idify_file_path(&mut path, process::id());
 
-    let mut file = File::create(&path).expect("Cannot create file in directory");
+    let mut file = File::create(&path).expect("Cannot create file in directory.");
 
     // Write JSON header only once, when the file is first opened
     let _ = write!(&mut file, "{{\n \"loaded_symbols\": [\n");
