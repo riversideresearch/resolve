@@ -302,7 +302,7 @@ void instrumentAlloca(Function *F) {
   auto void_ty = Type::getVoidTy(Ctx);
 
   // // Initialize list to store pointers to alloca and instructions
-  // std::vector<AllocaInst *> toFreeList;
+  std::vector<AllocaInst *> toFreeList;
 
   auto handle_alloca = [&](auto* allocaInst) {
       bool hasStart = false;
@@ -341,15 +341,16 @@ void instrumentAlloca(Function *F) {
   for (auto &BB: *F) {
     for (auto &instr: BB) {
       if (auto *inst = dyn_cast<AllocaInst>(&instr)) {
+          toFreeList.push(inst);
           handle_alloca(inst);
       }
     }
   }
 
   // Find low and high allocations and pass to resolve_invaliate_stack
-  // if (toFreeList.empty()) {
-  //   return;
-  // }
+  if (toFreeList.empty()) {
+    return;
+  }
 
   auto invalidateFn = M->getOrInsertFunction(
     "resolve_invalidate_stack",
