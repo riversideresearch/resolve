@@ -5,7 +5,7 @@
 
 # CVEAssert
 CVEAssert is an LLVM compiler pass that instruments programs 
-by inserting runtime checks into functions identified as vulnerable.
+by inserting runtime checks into functions identified by a CVE description. 
 It consumes a CVE description encoded in JSON, which is parsed into
 an internal representation containing the target file, function,
 weakness identifier, and remediation strategy. Based on this
