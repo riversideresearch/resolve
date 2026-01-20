@@ -99,7 +99,7 @@ fn open_resolve_log_file() -> Result<File, io::Error> {
 
     let mut path = PathBuf::from(log_dir);
 
-    // Create the necessary parent dirs
+    // Ensure the parent directories exist
     fs::create_dir_all(&path)?;
     
     // Append the file name
