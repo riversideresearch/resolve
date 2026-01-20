@@ -70,4 +70,4 @@ on a supplied CVE description. The CVE description is encoded as a JSON.
 When the instrumented program is linked with libresolve, it tracks stack and heap allocations using shadow metadata. If an invalid or security-relevant memory access occurs, libresolve records the event in `resolve_log_<pid>.out`.
 
 # DlsymHook
-`DlsymHook` pass instruments `dlsym` function calls and wrapping them with the `resolve_` prefix. When libresolve is linked with `DlsymHook`, the resulting binary will open `resolve_dlsym.json` and record dynamic symbol information used in the program.
+The `DlsymHook` pass instruments calls to `dlsym` by wrapping them with the `resolve_` prefix. When libresolve is linked with `DlsymHook`, the runtime libresolve opens `resolve_dlsym.json` and records each dynamically resolved symbol along with its corresponding library.  
