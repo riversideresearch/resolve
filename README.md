@@ -17,7 +17,7 @@ Fact generation is a static program analysis technique that extracts structured 
 
 The `AnnotateFunctions` pass inserts inline runtime monitors to collect function activation metadata during offline analysis. The inserted inline monitor links against `libresolve`, a runtime library that records activation summaries to files.
 
-Given a CVE description in structured `.json`, the `CVEAssert` pass applies sanitizers to an affected function. `CVEAssert` currently supports a number of memory and arithmetic vulnerability classes (see TODO for details).
+Given a CVE description in structured `.json`, the `CVEAssert` pass applies sanitizers to an affected function. `CVEAssert` currently supports a number of memory and arithmetic vulnerability classes.
 
 `DlsymHook` instruments calls to `dlysm`. `ObjHook` instruments C memory allocators. These passes must also be linked against `libresolve`.   
 
