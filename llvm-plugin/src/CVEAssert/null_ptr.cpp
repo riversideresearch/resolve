@@ -162,7 +162,7 @@ void sanitizeNullPointers(Function *f, Vulnerability::RemediationStrategies stra
         
         default:
             llvm::errs() << "[CVEAssert] Error: sanitizeNullPointers does not support remediation strategy "
-                         << "defaulting to CONTINUE strategy!\n";
+                         << "defaulting to continue strategy!\n";
             strategy = Vulnerability::RemediationStrategies::CONTINUE;
             break;
     }
