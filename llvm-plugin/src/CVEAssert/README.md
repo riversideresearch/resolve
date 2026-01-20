@@ -92,7 +92,7 @@ Remediation strategies define how sanitizers respond to detected errors encounte
 
 > [!NOTE]
 > If the divide by zero sanitizer is selected
-> with the continue strategy, intermediate 
+> with the continue strategy, undefined
 > results will return the dividend. 
 
 > [!NOTE]
