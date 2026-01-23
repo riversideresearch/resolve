@@ -356,6 +356,15 @@ pub extern "C" fn resolve_check_bounds(base_ptr: *mut c_void, size: usize) -> bo
 }
 
 #[unsafe(no_mangle)]
+pub extern "C" fn get_limit(ptr: *mut c_void) -> *mut c_void {
+    let sobj_table = ALIVE_OBJ_LIST.lock();
+    let Some(sobj) =  sobj_table.search_intersection(ptr as Vaddr) else {
+        return 0 as *mut c_void
+    };
+    return sobj.limit as *mut c_void
+}
+
+#[unsafe(no_mangle)]
 pub extern "C" fn resolve_obj_type(base_ptr: *mut c_void) -> AllocType {
     let base = base_ptr as Vaddr;
 
