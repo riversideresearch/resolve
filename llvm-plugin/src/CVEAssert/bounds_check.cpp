@@ -238,6 +238,18 @@ static Function *getOrCreateBoundsCheckMemcpySanitizer(Module *M, Vulnerability:
   return sanitizeMemcpyFn;
 }
 
+static FunctionCallee getResolveGEP(Module *M) {
+  auto &Ctx = M->getContext();
+  auto ptr_ty = PointerType::get(Ctx, 0);
+  return M->getOrInsertFunction(
+    "resolve_gep",
+    FunctionType::get(ptr_ty,
+    {ptr_ty, ptr_ty },
+    false
+    )
+  );
+}
+
 static FunctionCallee getResolveMalloc(Module *M) {
     auto &Ctx = M->getContext();
     auto ptr_ty = PointerType::get(Ctx, 0);
@@ -289,6 +301,44 @@ static FunctionCallee getResolveStackObj(Module *M) {
         false
       )
     );
+}
+
+static FunctionCallee getResolveFree(Module *M) {
+  auto &Ctx = M->getContext();
+  auto ptr_ty = PointerType::get(Ctx, 0);
+  auto void_ty = Type::getVoidTy(Ctx);
+
+  return M->getOrInsertFunction(
+    "resolve_free",
+    FunctionType::get(void_ty, { ptr_ty },
+    false
+    )
+  );
+}
+
+static FunctionCallee getResolveStrdup(Module *M) {
+  auto &Ctx = M->getContext();
+  auto ptr_ty = PointerType::get(Ctx, 0);
+
+  return M->getOrInsertFunction(
+    "resolve_strdup",
+    FunctionType::get(ptr_ty, { ptr_ty },
+    false
+    )
+  );
+}
+
+static FunctionCallee getResolveStrndup(Module *M) {
+  auto &Ctx = M->getContext();
+  auto ptr_ty = PointerType::get(Ctx, 0);
+  auto size_ty = Type::getInt64Ty(Ctx);
+
+  return M->getOrInsertFunction(
+    "resolve_strndup",
+    FunctionType::get(ptr_ty, { ptr_ty, size_ty },
+    false
+    )
+  );
 }
 
 void instrumentAlloca(Function *F) {
@@ -378,7 +428,6 @@ void instrumentMalloc(Function *F) {
   Module *M = F->getParent();
   LLVMContext &Ctx = M->getContext();
   IRBuilder<> builder(Ctx);
-  auto size_ty = Type::getInt64Ty(Ctx);
   std::vector<CallInst *> mallocList;
 
   for (auto &BB : *F) {
@@ -397,20 +446,17 @@ void instrumentMalloc(Function *F) {
 
   for (auto Inst : mallocList) {
     builder.SetInsertPoint(Inst);
-    Value *arg = Inst->getArgOperand(0);
-    CallInst *resolveMallocCall = builder.CreateCall(getResolveMalloc(M), { arg });
+    Value *sizeArg = Inst->getArgOperand(0);
+    CallInst *resolveMallocCall = builder.CreateCall(getResolveMalloc(M), { sizeArg });
     Inst->replaceAllUsesWith(resolveMallocCall);
     Inst->eraseFromParent();  
   }
-  // TODO: instrument free and other libc allocations
 }
 
 void instrumentRealloc(Function *F) {
   Module *M = F->getParent();
   LLVMContext &Ctx = M->getContext();
   IRBuilder<> builder(Ctx);
-  auto size_ty = Type::getInt64Ty(Ctx);
-
   std::vector<CallInst *> reallocList;
 
   for (auto &BB : *F) {
@@ -429,9 +475,9 @@ void instrumentRealloc(Function *F) {
 
   for (auto Inst : reallocList) {
     builder.SetInsertPoint(Inst);
-    Value *ptr_arg =Inst->getArgOperand(0);
-    Value *size_arg = Inst->getArgOperand(1);
-    CallInst *resolveReallocCall = builder.CreateCall(getResolveRealloc(M), { ptr_arg, size_arg });
+    Value *ptrArg =Inst->getArgOperand(0);
+    Value *sizeArg = Inst->getArgOperand(1);
+    CallInst *resolveReallocCall = builder.CreateCall(getResolveRealloc(M), { ptrArg, sizeArg });
     Inst->replaceAllUsesWith(resolveReallocCall);
     Inst->eraseFromParent();
   }
@@ -441,8 +487,6 @@ void instrumentCalloc(Function *F) {
   Module *M = F->getParent();
   LLVMContext &Ctx = M->getContext();
   IRBuilder<> builder(Ctx);
-  auto size_ty = Type::getInt64Ty(Ctx);
-
   std::vector<CallInst *> callocList;
 
   for (auto &BB : *F) {
@@ -453,20 +497,112 @@ void instrumentCalloc(Function *F) {
         if (!calledFn) { continue; }
 
         StringRef fnName = calledFn->getName();
+        if (fnName == "calloc") { callocList.push_back(call); }
 
-        if (fnName == "calloc") { callocList.push_back(call); } 
       }
     }
   }
 
   for (auto Inst : callocList) {
     builder.SetInsertPoint(Inst);
-    Value *num_arg = Inst->getArgOperand(0);
-    Value *size_arg = Inst->getArgOperand(1);
-    CallInst *resolveCallocCall = builder.CreateCall(getResolveCalloc(M), { num_arg, size_arg });
+    Value *numArg = Inst->getArgOperand(0);
+    Value *sizeArg = Inst->getArgOperand(1);
+    CallInst *resolveCallocCall = builder.CreateCall(getResolveCalloc(M), { numArg, sizeArg });
     Inst->replaceAllUsesWith(resolveCallocCall);
     Inst->eraseFromParent();
   }
+
+}
+
+void instrumentFree(Function *F) {
+  Module *M = F->getParent();
+  LLVMContext &Ctx = M->getContext();
+  IRBuilder<> builder(Ctx);
+  std::vector<CallInst *> freeList;
+
+  for (auto &BB : *F) {
+    for (auto &inst : BB) {
+      if (auto *call = dyn_cast<CallInst>(&inst)) {
+        Function *calledFn = call->getCalledFunction();
+
+        if (!calledFn) { continue; }
+
+        StringRef fnName = calledFn->getName();
+        if (fnName == "free") { freeList.push_back(call); }
+
+      }
+    }
+  }
+
+  for (auto Inst : freeList) {
+    builder.SetInsertPoint(Inst);
+    Value *ptrArg = Inst->getArgOperand(0);
+    CallInst *resolveFreeCall = builder.CreateCall(getResolveFree(M), { ptrArg });
+    Inst->replaceAllUsesWith(resolveFreeCall);
+    Inst->eraseFromParent();
+  }
+
+}
+
+void instrumentStrdup(Function *F) {
+  Module *M = F->getParent();
+  LLVMContext &Ctx = M->getContext();
+  IRBuilder<> builder(Ctx);
+  std::vector<CallInst *> strdupList;
+
+  for (auto &BB : *F) {
+    for (auto &inst : BB) {
+      if (auto *call = dyn_cast<CallInst>(&inst)) {
+        Function *calledFn = call->getCalledFunction();
+
+        if (!calledFn) { continue; }
+
+        StringRef fnName = calledFn->getName();
+        if (fnName == "strdup") { strdupList.push_back(call); }
+
+      }
+    }
+  }
+
+  for (auto Inst : strdupList) {
+    builder.SetInsertPoint(Inst);
+    Value *ptrArg = Inst->getArgOperand(0);
+    CallInst *resolveStrdupCall = builder.CreateCall(getResolveStrdup(M), { ptrArg });
+    Inst->replaceAllUsesWith(resolveStrdupCall);
+    Inst->eraseFromParent();
+  }
+
+}
+
+void instrumentStrndup(Function *F) {
+  Module *M = F->getParent();
+  LLVMContext &Ctx = M->getContext();
+  IRBuilder<> builder(Ctx);
+  std::vector<CallInst *> strndupList;
+
+  for (auto &BB : *F) {
+    for (auto &inst : BB) {
+      if (auto *call = dyn_cast<CallInst>(&inst)) {
+        Function *calledFn = call->getCalledFunction();
+
+        if (!calledFn) { continue; }
+
+        StringRef fnName = calledFn->getName();
+        if (fnName == "strndup") { strndupList.push_back(call); }
+
+      }
+    }
+  }
+
+  for (auto Inst : strndupList) {
+    builder.SetInsertPoint(Inst);
+    Value *ptrArg = Inst->getArgOperand(0);
+    Value *sizeArg = Inst->getArgOperand(1);
+    CallInst *resolveStrndupCall = builder.CreateCall(getResolveStrndup(M), { ptrArg, sizeArg });
+    Inst->replaceAllUsesWith(resolveStrndupCall);
+    Inst->eraseFromParent();
+  }
+
 }
 
 void instrumentGEP(Function *F) {
@@ -475,18 +611,6 @@ void instrumentGEP(Function *F) {
   IRBuilder<> builder(Ctx);
   const DataLayout &DL = M->getDataLayout();
   std::vector<GetElementPtrInst *> gepList;
-  auto ptr_ty = PointerType::get(Ctx, 0);
-
-  FunctionType *resolveGEPFnTy = FunctionType::get(
-    ptr_ty,
-    { ptr_ty, ptr_ty },
-    false
-  );
-
-  FunctionCallee resolveGEPFn = M->getOrInsertFunction(
-    "resolve_gep",
-    resolveGEPFnTy
-  );
 
   for (auto &BB : *F) {
     for (auto &inst: BB) {
@@ -506,7 +630,7 @@ void instrumentGEP(Function *F) {
     // Don't assume gep is inbounds, otherwise our remdiation risks being optimized away
     GEPInst->setIsInBounds(false);
 
-    auto resolveGEPCall = builder.CreateCall(resolveGEPFn, { basePtr, derivedPtr });
+    auto resolveGEPCall = builder.CreateCall(getResolveGEP(M), { basePtr, derivedPtr });
 
     // Collect users of gep instruction before mutation
     SmallVector<User*, 8> gep_users;
