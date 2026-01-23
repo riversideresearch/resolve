@@ -27,7 +27,7 @@ pub struct ShadowObject {
     // Base address of the allocated object mapped to u64
     pub base: Vaddr,
     /// Last address of the allocated object
-    limit: Vaddr,
+    pub limit: Vaddr,
     size: usize,
 }
 
