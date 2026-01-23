@@ -15,4 +15,6 @@ void instrumentMalloc(llvm::Function *F);
 void instrumentRealloc(llvm::Function *F);
 void instrumentCalloc(llvm::Function *F);
 void instrumentFree(llvm::Function *F);
+void instrumentStrdup(llvm::Function *F);
+void instrumentStrndup(llvm::Function *F);
 void sanitizeMemInstBounds(llvm::Function *F, Vulnerability::RemediationStrategies strategy);

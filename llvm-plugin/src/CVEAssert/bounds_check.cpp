@@ -317,6 +317,31 @@ static FunctionCallee getResolveFree(Module *M) {
   );
 }
 
+static FunctionCallee getResolveStrdup(Module *M) {
+  auto &Ctx = M->getContext();
+  auto ptr_ty = PointerType::get(Ctx, 0);
+
+  return M->getOrInsertFunction(
+    "resolve_strdup",
+    FunctionType::get(ptr_ty, { ptr_ty },
+    false
+    )
+  );
+}
+
+static FunctionCallee getResolveStrndup(Module *M) {
+  auto &Ctx = M->getContext();
+  auto ptr_ty = PointerType::get(Ctx, 0);
+  auto size_ty = Type::getInt64Ty(Ctx);
+
+  return M->getOrInsertFunction(
+    "resolve_strndup",
+    FunctionType::get(ptr_ty, { ptr_ty, size_ty },
+    false
+    )
+  );
+}
+
 void instrumentAlloca(Function *F) {
   Module *M = F->getParent();
   LLVMContext &Ctx = M->getContext();
@@ -492,6 +517,67 @@ void instrumentFree(Function *F) {
     Value *ptrArg = Inst->getArgOperand(0);
     CallInst *resolveFreeCall = builder.CreateCall(getResolveFree(M), { ptrArg });
     Inst->replaceAllUsesWith(resolveFreeCall);
+    Inst->eraseFromParent();
+  }
+
+}
+
+void instrumentStrdup(Function *F) {
+  Module *M = F->getParent();
+  LLVMContext &Ctx = M->getContext();
+  IRBuilder<> builder(Ctx);
+  std::vector<CallInst *> strdupList;
+
+  for (auto &BB : *F) {
+    for (auto &inst : BB) {
+      if (auto *call = dyn_cast<CallInst>(&inst)) {
+        Function *calledFn = call->getCalledFunction();
+
+        if (!calledFn) { continue; }
+
+        StringRef fnName = calledFn->getName();
+        if (fnName == "strdup") { strdupList.push_back(call); }
+
+      }
+    }
+  }
+
+  for (auto Inst : strdupList) {
+    builder.SetInsertPoint(Inst);
+    Value *ptrArg = Inst->getArgOperand(0);
+    CallInst *resolveStrdupCall = builder.CreateCall(getResolveStrdup(M), { ptrArg });
+    Inst->replaceAllUsesWith(resolveStrdupCall);
+    Inst->eraseFromParent();
+  }
+
+}
+
+void instrumentStrndup(Function *F) {
+  Module *M = F->getParent();
+  LLVMContext &Ctx = M->getContext();
+  IRBuilder<> builder(Ctx);
+  std::vector<CallInst *> strndupList;
+
+  for (auto &BB : *F) {
+    for (auto &inst : BB) {
+      if (auto *call = dyn_cast<CallInst>(&inst)) {
+        Function *calledFn = call->getCalledFunction();
+
+        if (!calledFn) { continue; }
+
+        StringRef fnName = calledFn->getName();
+        if (fnName == "strndup") { strndupList.push_back(call); }
+
+      }
+    }
+  }
+
+  for (auto Inst : strndupList) {
+    builder.SetInsertPoint(Inst);
+    Value *ptrArg = Inst->getArgOperand(0);
+    Value *sizeArg = Inst->getArgOperand(1);
+    CallInst *resolveStrndupCall = builder.CreateCall(getResolveStrndup(M), { ptrArg, sizeArg });
+    Inst->replaceAllUsesWith(resolveStrndupCall);
     Inst->eraseFromParent();
   }
 
