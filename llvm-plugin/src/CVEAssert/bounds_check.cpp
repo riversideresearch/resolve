@@ -236,16 +236,74 @@ static Function *getOrCreateBoundsCheckMemcpySanitizer(Module *M, Vulnerability:
   return sanitizeMemcpyFn;
 }
 
-static FunctionCallee getResolveGEP(Module *M) {
+static FunctionCallee getLimit(Module *M) {
   auto &Ctx = M->getContext();
   auto ptr_ty = PointerType::get(Ctx, 0);
+
   return M->getOrInsertFunction(
-    "resolve_gep",
-    FunctionType::get(ptr_ty,
-    {ptr_ty, ptr_ty },
+    "get_limit",
+    FunctionType::get(ptr_ty, { ptr_ty },
     false
     )
   );
+}
+
+static Function *getOrCreateResolveGep(Module *M) {
+  Twine handlerName = "resolve_gep";
+  SmallVector<char> handlerNameStr;
+  LLVMContext &Ctx = M->getContext();
+
+  if (auto handler = M->getFunction(handlerName.toStringRef(handlerNameStr)))
+    return handler;
+
+  IRBuilder<> builder(Ctx);
+
+  auto ptr_ty = PointerType::get(Ctx, 0);
+  auto size_ty = Type::getInt64Ty(Ctx);
+
+  FunctionType *resolveGepFnTy = FunctionType::get(
+    ptr_ty, { ptr_ty, ptr_ty},
+    false
+  );
+
+  Function *resolveGepFn = Function::Create(
+    resolveGepFnTy,
+    Function::InternalLinkage,
+    handlerName,
+    M
+  );
+
+  BasicBlock *EntryBB = BasicBlock::Create(Ctx, "", resolveGepFn);
+  BasicBlock *NormalBB = BasicBlock::Create(Ctx, "", resolveGepFn);
+  BasicBlock *OnePastBB = BasicBlock::Create(Ctx, "", resolveGepFn);
+
+  // EntryBB: Call libresolve getlimit
+  // to retrieve the size of the allocation
+  builder.SetInsertPoint(EntryBB);
+
+  // Extract the base and derived pointer
+  Value *basePtr = resolveGepFn->getArg(0);
+  Value *derivedPtr = resolveGepFn->getArg(1);
+
+  Value *allocLim = builder.CreateCall(getLimit(M), { basePtr });
+  Value *withinBounds = builder.CreateICmpULE(derivedPtr, allocLim);
+
+  builder.CreateCondBr(withinBounds, NormalBB, OnePastBB);
+  
+  builder.SetInsertPoint(NormalBB);
+  builder.CreateRet(derivedPtr);
+
+  builder.SetInsertPoint(OnePastBB);
+  Value *limNum = builder.CreatePtrToInt(allocLim, size_ty);
+  Value *incrementLim = builder.CreateAdd(limNum, 1);
+  Value *limPtr = builder.CreateIntToPtr(incrementLim);
+  builder.CreateRet(limPtr);
+
+  // DEBUGGING
+  raw_ostream &out = errs();
+  out << *resolveGepFn;
+  if (verifyFunction(*resolveGepFn, &out)) {}
+  return resolveGepFn;
 }
 
 static FunctionCallee getResolveMalloc(Module *M) {
