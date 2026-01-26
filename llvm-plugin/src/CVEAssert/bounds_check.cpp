@@ -21,6 +21,65 @@
 
 using namespace llvm;
 
+static Function *getOrCreateResolveCheckBounds(Module *M) {
+  Twine handlerName = "resolve_check_bounds";
+  SmallVector<char> handlerNameStr;
+  LLVMContext &Ctx = M->getContext();
+
+  if (auto handler = M->getFunction(handlerName.toStringRef(handlerNameStr)))
+    return handler;
+
+  IRBuilder<> builder(Ctx);
+
+  auto ptr_ty = PointerType::get(Ctx, 0);
+  auto size_ty = Type::getInt64Ty(Ctx);
+  auto bool_ty = Type::getIntNTy(Ctx, 1);
+
+  FunctionType *resolveCheckBoundsFnTy = FunctionType::get(
+    bool_ty,
+    { ptr_ty, size_ty },
+    false
+  );
+
+  Function *resolveCheckBoundsFn = Function::Create(
+    resolveCheckBoundsFnTy,
+    Function::InternalLinkage,
+    handlerName,
+    M
+  );
+
+  BasicBlock *EntryBB = BasicBlock::Create(Ctx, "", resolveCheckBoundsFn);
+  BasicBlock *TrueBB = BasicBlock::Create(Ctx, "", resolveCheckBoundsFn);
+  BasicBlock *FalseBB = BasicBlock::Create(Ctx, "", resolveCheckBoundsFn);
+
+  builder.SetInsertPoint(EntryBB);
+
+  Value *basePtr = resolveCheckBoundsFn->getArg(0);
+  Value *accessSize = resolveCheckBoundsFn->getArg(1);
+
+  Value *allocLim = builder.CreateCall(getLimit(M), { basePtr });
+  
+  // TODO: ptr + size - 1
+  Value *baseNum = builder.CreatePtrToInt(basePtr, size_ty);
+  Value *base_p_size = builder.CreateAdd(baseNum, accessSize);
+  Value *baseLim = builder.CreateSub(base_p_size, ConstantInt::get(size_ty, 1)); 
+  Value *withinBounds = builder.CreateICmpULE(baseLim, allocLim);
+
+  builder.CreateCondBr(withinBounds, TrueBB, FalseBB);
+
+  builder.SetInsertPoint(TrueBB);
+  builder.CreateRet(ConstantInt::get(size_ty, 1));
+
+  builder.SetInsertPoint(FalseBB);
+  builder.CreateRet(ConstantInt::get(size_ty, 0));
+
+  raw_ostream &out = errs();
+  out << *resolveCheckBoundsFn;
+  if (verifyFunction(*resolveCheckBoundsFn, &out)) {}
+
+  return resolveCheckBoundsFn;
+}
+
 static Function *getOrCreateBoundsCheckLoadSanitizer(Module *M, LLVMContext &Ctx, Type *ty, Vulnerability::RemediationStrategies strategy) {
   std::string handlerName = "resolve_bounds_check_ld_" + getLLVMType(ty);
 
