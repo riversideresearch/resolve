@@ -295,8 +295,8 @@ static Function *getOrCreateResolveGep(Module *M) {
 
   builder.SetInsertPoint(OnePastBB);
   Value *limNum = builder.CreatePtrToInt(allocLim, size_ty);
-  Value *incrementLim = builder.CreateAdd(limNum, 1);
-  Value *limPtr = builder.CreateIntToPtr(incrementLim);
+  Value *incrementLim = builder.CreateAdd(limNum, ConstantInt::get(size_ty, 1));
+  Value *limPtr = builder.CreateIntToPtr(incrementLim, ptr_ty);
   builder.CreateRet(limPtr);
 
   // DEBUGGING
@@ -686,7 +686,7 @@ void instrumentGEP(Function *F) {
     // Don't assume gep is inbounds, otherwise our remdiation risks being optimized away
     GEPInst->setIsInBounds(false);
 
-    auto resolveGEPCall = builder.CreateCall(getResolveGEP(M), { basePtr, derivedPtr });
+    auto resolveGEPCall = builder.CreateCall(getOrCreateResolveGep(M), { basePtr, derivedPtr });
 
     // Collect users of gep instruction before mutation
     SmallVector<User*, 8> gep_users;
