@@ -326,14 +326,8 @@ static Function *getOrCreateResolveGep(Module *M) {
   Value *derivedPtr = resolveGepFn->getArg(1);
 
   Value *limitPtr = builder.CreateCall(getResolveLimit(M), { basePtr });
-  Value *onePastPtr = builder.CreateGEP(
-    builder.getInt8Ty(),
-    limitPtr,
-    ConstantInt::get(size_ty, 1)
-  );
-
   Value *derivedInt = builder.CreatePtrToInt(derivedPtr, size_ty);
-  Value *limitInt = builder.CreatePtrToInt(onePastPtr, size_ty);
+  Value *limitInt = builder.CreatePtrToInt(limitPtr, size_ty);
 
   Value *withinBounds = builder.CreateICmpULE(derivedInt, limitInt);
 
@@ -343,6 +337,10 @@ static Function *getOrCreateResolveGep(Module *M) {
   builder.CreateRet(derivedPtr);
 
   builder.SetInsertPoint(OnePastBB);
+  // increment limit by 1 and return
+  limitInt = builder.CreatePtrToInt(limitPtr, size_ty);
+  Value *onePastInt = builder.CreateAdd(limitInt, ConstantInt::get(size_ty, 1));
+  Value *onePastPtr = builder.CreateIntToPtr(onePastInt); 
   builder.CreateRet(onePastPtr);
 
   // DEBUGGING
