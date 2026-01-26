@@ -70,20 +70,26 @@ static Function *getOrCreateResolveCheckBounds(Module *M) {
   Value *accessSize = resolveCheckBoundsFn->getArg(1);
 
   Value *allocLim = builder.CreateCall(getResolveLimit(M), { basePtr });
+  allocLim = builder.CreateZExtOrTrunc(allocLim, size_ty);
   
   // TODO: ptr + size - 1
-  Value *baseNum = builder.CreatePtrToInt(basePtr, size_ty);
-  Value *base_p_size = builder.CreateAdd(baseNum, accessSize);
-  Value *baseLim = builder.CreateSub(base_p_size, ConstantInt::get(size_ty, 1)); 
-  Value *withinBounds = builder.CreateICmpULE(baseLim, allocLim);
+  // Tried using ptrtoint conversion but this loses provenance
+  // Use GEP to preserve provenance then cast
+  Value *lastBytePtr = builder.CreateGEP(
+    builder.getInt8Ty(),
+    basePtr,
+    builder.CreateSub(accessSize, ConstantInt::get(size_ty, 1))
+  );
+  Value *lastByteInt = builder.CreatePtrToInt(lastBytePtr, size_ty);
+  Value *withinBounds = builder.CreateICmpULE(lastByteInt allocLim);
 
   builder.CreateCondBr(withinBounds, TrueBB, FalseBB);
 
   builder.SetInsertPoint(TrueBB);
-  builder.CreateRet(ConstantInt::get(size_ty, 1));
+  builder.CreateRet(ConstantInt::getTrue(Ctx));
 
   builder.SetInsertPoint(FalseBB);
-  builder.CreateRet(ConstantInt::get(size_ty, 0));
+  builder.CreateRet(ConstantInt::getFalse(Ctx));
 
   raw_ostream &out = errs();
   out << *resolveCheckBoundsFn;
@@ -323,7 +329,16 @@ static Function *getOrCreateResolveGep(Module *M) {
   Value *derivedPtr = resolveGepFn->getArg(1);
 
   Value *allocLim = builder.CreateCall(getResolveLimit(M), { basePtr });
-  Value *withinBounds = builder.CreateICmpULE(derivedPtr, allocLim);
+  Value *onePastPtr = builder.CreateGEP(
+    builder.getInt8Ty(),
+    allocLim,
+    ConstantInt::get(size_ty, 1)
+  );
+
+  Value *derivedInt = builder.CreatePtrToInt(derivedPtr, size_ty);
+  Value *limitInt = builder.CreatePtrToInt(onePastPtr, size_ty);
+
+  Value *withinBounds = builder.CreateICmpULE(derivedInt, limitInt);
 
   builder.CreateCondBr(withinBounds, NormalBB, OnePastBB);
   
@@ -331,10 +346,7 @@ static Function *getOrCreateResolveGep(Module *M) {
   builder.CreateRet(derivedPtr);
 
   builder.SetInsertPoint(OnePastBB);
-  Value *limNum = builder.CreatePtrToInt(allocLim, size_ty);
-  Value *incrementLim = builder.CreateAdd(limNum, ConstantInt::get(size_ty, 1));
-  Value *limPtr = builder.CreateIntToPtr(incrementLim, ptr_ty);
-  builder.CreateRet(limPtr);
+  builder.CreateRet(onePastPtr);
 
   // DEBUGGING
   raw_ostream &out = errs();
