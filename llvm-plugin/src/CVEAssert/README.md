@@ -66,7 +66,7 @@ the [`libresolve`](/libresolve/README.md) runtime library to enforce stack and h
 > | `122` | Heap OOB | 
 
 > [!NOTE]
-> Stack and heap can also activated simulataneously with 
+> Stack and heap can also activated simultaneously with 
 > these weakness identifiers `123`,`125`,`131`, `797`.  
 
 ## Remediation Strategies
