@@ -72,7 +72,6 @@ static Function *getOrCreateResolveCheckBounds(Module *M) {
   Value *allocLim = builder.CreateCall(getResolveLimit(M), { basePtr });
   Value* limitInt = builder.CreatePtrToInt(allocLim, size_ty);
 
-  // TODO: ptr + size - 1
   // Tried using ptrtoint conversion but this loses provenance
   // Use GEP to preserve provenance then cast
   Value *lastBytePtr = builder.CreateGEP(
@@ -328,10 +327,10 @@ static Function *getOrCreateResolveGep(Module *M) {
   Value *basePtr = resolveGepFn->getArg(0);
   Value *derivedPtr = resolveGepFn->getArg(1);
 
-  Value *allocLim = builder.CreateCall(getResolveLimit(M), { basePtr });
+  Value *limitPtr = builder.CreateCall(getResolveLimit(M), { basePtr });
   Value *onePastPtr = builder.CreateGEP(
     builder.getInt8Ty(),
-    allocLim,
+    limitPtr,
     ConstantInt::get(size_ty, 1)
   );
 
