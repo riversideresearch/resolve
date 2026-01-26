@@ -70,17 +70,15 @@ static Function *getOrCreateResolveCheckBounds(Module *M) {
   Value *accessSize = resolveCheckBoundsFn->getArg(1);
 
   Value *allocLim = builder.CreateCall(getResolveLimit(M), { basePtr });
-  Value* limitInt = builder.CreatePtrToInt(allocLim, size_ty);
-
-  // Tried using ptrtoint conversion but this loses provenance
-  // Use GEP to preserve provenance then cast
-  Value *lastBytePtr = builder.CreateGEP(
-    builder.getInt8Ty(),
-    basePtr,
+  Value *limitInt = builder.CreatePtrToInt(allocLim, size_ty);
+  
+  Value *baseInt = builder.CreatePtrToInt(basePtr, size_ty);
+  Value *endInt = builder.CreateAdd(
+    baseInt,
     builder.CreateSub(accessSize, ConstantInt::get(size_ty, 1))
   );
-  Value *lastByteInt = builder.CreatePtrToInt(lastBytePtr, size_ty);
-  Value *withinBounds = builder.CreateICmpULE(lastByteInt, limitInt);
+
+  Value *withinBounds = builder.CreateICmpULE(endInt, limitInt);
 
   builder.CreateCondBr(withinBounds, TrueBB, FalseBB);
 
