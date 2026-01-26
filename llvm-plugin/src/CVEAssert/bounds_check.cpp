@@ -21,6 +21,19 @@
 
 using namespace llvm;
 
+static FunctionCallee getResolveLimit(Module *M) {
+  auto &Ctx = M->getContext();
+  auto ptr_ty = PointerType::get(Ctx, 0);
+
+  return M->getOrInsertFunction(
+    "resolve_get_limit",
+    FunctionType::get(ptr_ty, { ptr_ty },
+    false
+    )
+  );
+}
+
+
 static Function *getOrCreateResolveCheckBounds(Module *M) {
   Twine handlerName = "resolve_check_bounds";
   SmallVector<char> handlerNameStr;
@@ -57,7 +70,7 @@ static Function *getOrCreateResolveCheckBounds(Module *M) {
   Value *basePtr = resolveCheckBoundsFn->getArg(0);
   Value *accessSize = resolveCheckBoundsFn->getArg(1);
 
-  Value *allocLim = builder.CreateCall(getLimit(M), { basePtr });
+  Value *allocLim = builder.CreateCall(getResolveLimit(M), { basePtr });
   
   // TODO: ptr + size - 1
   Value *baseNum = builder.CreatePtrToInt(basePtr, size_ty);
@@ -295,18 +308,6 @@ static Function *getOrCreateBoundsCheckMemcpySanitizer(Module *M, Vulnerability:
   return sanitizeMemcpyFn;
 }
 
-static FunctionCallee getLimit(Module *M) {
-  auto &Ctx = M->getContext();
-  auto ptr_ty = PointerType::get(Ctx, 0);
-
-  return M->getOrInsertFunction(
-    "get_limit",
-    FunctionType::get(ptr_ty, { ptr_ty },
-    false
-    )
-  );
-}
-
 static Function *getOrCreateResolveGep(Module *M) {
   Twine handlerName = "resolve_gep";
   SmallVector<char> handlerNameStr;
@@ -344,7 +345,7 @@ static Function *getOrCreateResolveGep(Module *M) {
   Value *basePtr = resolveGepFn->getArg(0);
   Value *derivedPtr = resolveGepFn->getArg(1);
 
-  Value *allocLim = builder.CreateCall(getLimit(M), { basePtr });
+  Value *allocLim = builder.CreateCall(getResolveLimit(M), { basePtr });
   Value *withinBounds = builder.CreateICmpULE(derivedPtr, allocLim);
 
   builder.CreateCondBr(withinBounds, NormalBB, OnePastBB);
