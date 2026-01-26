@@ -33,7 +33,6 @@ static FunctionCallee getResolveLimit(Module *M) {
   );
 }
 
-
 static Function *getOrCreateResolveCheckBounds(Module *M) {
   Twine handlerName = "resolve_check_bounds";
   SmallVector<char> handlerNameStr;
@@ -123,21 +122,10 @@ static Function *getOrCreateBoundsCheckLoadSanitizer(Module *M, LLVMContext &Ctx
   BasicBlock *SanitizeLoadBB = BasicBlock::Create(Ctx, "", sanitizeLoadFn);
   
   // Call simplified resolve-check-bounds on pointer if not in sobj table call remediation strategy 
-  FunctionType *resolveCheckBoundsFnTy = FunctionType::get(
-    Type::getInt1Ty(Ctx),
-    { ptr_ty, size_ty },
-    false
-  );
-
-  FunctionCallee resolveCheckBoundsFn = M->getOrInsertFunction(
-    "resolve_check_bounds",
-    resolveCheckBoundsFnTy
-  );
-
   Value *basePtr = sanitizeLoadFn->getArg(0); 
 
   builder.SetInsertPoint(EntryBB);
-  Value *withinBounds = builder.CreateCall(resolveCheckBoundsFn, { basePtr, ConstantExpr::getSizeOf(ty) });
+  Value *withinBounds = builder.CreateCall(getOrCreateResolveCheckBounds(M), { basePtr, ConstantExpr::getSizeOf(ty) });
 
   builder.CreateCondBr(withinBounds, NormalLoadBB, SanitizeLoadBB);
 
@@ -192,22 +180,11 @@ static Function *getOrCreateBoundsCheckStoreSanitizer(Module *M, LLVMContext &Ct
   BasicBlock *NormalStoreBB = BasicBlock::Create(Ctx, "", sanitizeStoreFn);
   BasicBlock *SanitizeStoreBB = BasicBlock::Create(Ctx, "", sanitizeStoreFn);
 
-  FunctionType *resolveCheckBoundsFnTy = FunctionType::get(
-    Type::getInt1Ty(Ctx),
-    { ptr_ty, size_ty },
-    false
-  );
-
-  FunctionCallee resolveCheckBoundsFn = M->getOrInsertFunction(
-    "resolve_check_bounds",
-    resolveCheckBoundsFnTy
-  );
-
   Value *basePtr = sanitizeStoreFn->getArg(0);
   Value *storedVal = sanitizeStoreFn->getArg(1);
   builder.SetInsertPoint(EntryBB);
 
-  Value *withinBounds = builder.CreateCall(resolveCheckBoundsFn,
+  Value *withinBounds = builder.CreateCall(getOrCreateResolveCheckBounds(M),
       { basePtr, ConstantExpr::getSizeOf(ty) });
   
   builder.CreateCondBr(withinBounds, NormalStoreBB, SanitizeStoreBB);
