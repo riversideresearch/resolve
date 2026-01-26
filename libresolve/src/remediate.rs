@@ -356,7 +356,7 @@ pub extern "C" fn resolve_check_bounds(base_ptr: *mut c_void, size: usize) -> bo
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn get_limit(ptr: *mut c_void) -> *mut c_void {
+pub extern "C" fn resolve_get_limit(ptr: *mut c_void) -> *mut c_void {
     let sobj_table = ALIVE_OBJ_LIST.lock();
     let Some(sobj) =  sobj_table.search_intersection(ptr as Vaddr) else {
         return 0 as *mut c_void
