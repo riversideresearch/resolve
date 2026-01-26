@@ -340,7 +340,7 @@ static Function *getOrCreateResolveGep(Module *M) {
   // increment limit by 1 and return
   limitInt = builder.CreatePtrToInt(limitPtr, size_ty);
   Value *onePastInt = builder.CreateAdd(limitInt, ConstantInt::get(size_ty, 1));
-  Value *onePastPtr = builder.CreateIntToPtr(onePastInt); 
+  Value *onePastPtr = builder.CreateIntToPtr(onePastInt, ptr_ty); 
   builder.CreateRet(onePastPtr);
 
   // DEBUGGING
