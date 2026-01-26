@@ -81,7 +81,7 @@ static Function *getOrCreateResolveCheckBounds(Module *M) {
     builder.CreateSub(accessSize, ConstantInt::get(size_ty, 1))
   );
   Value *lastByteInt = builder.CreatePtrToInt(lastBytePtr, size_ty);
-  Value *withinBounds = builder.CreateICmpULE(lastByteInt allocLim);
+  Value *withinBounds = builder.CreateICmpULE(lastByteInt, allocLim);
 
   builder.CreateCondBr(withinBounds, TrueBB, FalseBB);
 
