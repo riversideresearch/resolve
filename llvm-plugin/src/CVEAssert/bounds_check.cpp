@@ -70,8 +70,8 @@ static Function *getOrCreateResolveCheckBounds(Module *M) {
   Value *accessSize = resolveCheckBoundsFn->getArg(1);
 
   Value *allocLim = builder.CreateCall(getResolveLimit(M), { basePtr });
-  allocLim = builder.CreateZExtOrTrunc(allocLim, size_ty);
-  
+  Value* limitInt = builder.CreatePtrToInt(allocLim, size_ty);
+
   // TODO: ptr + size - 1
   // Tried using ptrtoint conversion but this loses provenance
   // Use GEP to preserve provenance then cast
