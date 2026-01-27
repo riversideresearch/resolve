@@ -16,8 +16,8 @@ jobs:
         run: make install-packages
       - name: Build
         run: make build
-#      - name: Test
-#        run: make test
+      - name: Test
+        run: make test
 
   trigger-gitlab:
     runs-on: ubuntu-latest
