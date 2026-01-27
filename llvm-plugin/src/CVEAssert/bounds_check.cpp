@@ -75,7 +75,7 @@ static Function *getOrCreateResolveCheckBounds(Module *M) {
   Value *baseInt = builder.CreatePtrToInt(basePtr, size_ty);
   Value *endInt = builder.CreateAdd(
     baseInt,
-    builder.CreateSub(accessSize, ConstantInt::get(size_ty, 1))
+    accessSize
   );
 
   Value *withinBounds = builder.CreateICmpULE(endInt, limitInt);
