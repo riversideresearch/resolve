@@ -9,14 +9,6 @@ use crate::shadowobjs::{ALIVE_OBJ_LIST, AllocType, FREED_OBJ_LIST, ShadowObject,
 use log::{error, info, trace, warn};
 
 /**
- * NOTE
- * Libresolve supports adding shadow objects for stack objects
- * but we do not currently support removing stack objects from
- * ALIVE_OBJ_LIST once the stack objects are freed at the end
- * of a function scope
- **/
-
-/**
  * @brief - Allocator interface for stack objects
  * @input - size of the pointer allocation in bytes
  * @return - none
@@ -353,6 +345,22 @@ pub extern "C" fn resolve_check_bounds(base_ptr: *mut c_void, size: usize) -> bo
     // Not a tracked pointer, assume good to avoid trapping on otherwise valid pointers
     // TODO: add a strict mode to reject here / add extra tracking.
     true
+}
+
+#[repr(C)]
+pub struct ShadowObjBounds {
+    pub base: *mut c_void,
+    pub limit: *mut c_void,
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn resolve_get_base_and_limit(ptr: *mut c_void) -> ShadowObjBounds {
+    let sobj_table = ALIVE_OBJ_LIST.lock();
+    let Some(sobj) = sobj_table.search_intersection(ptr as Vaddr) else {
+        return ShadowObjBounds { base: std::ptr::null_mut(), limit: std::ptr::null_mut() }
+    };
+
+    return ShadowObjBounds { base: sobj.base as *mut c_void, limit: sobj.limit as *mut c_void }
 }
 
 #[unsafe(no_mangle)]
