@@ -347,20 +347,20 @@ pub extern "C" fn resolve_check_bounds(base_ptr: *mut c_void, size: usize) -> bo
     true
 }
 
-/** 
- * @brief - Returns the last valid byte address for tracked pointer allocation
- * @input
- *  - ptr: pointer to allocation site 
- * @return last valid byte address 
- * @note: If the pointer is not tracked then return null pointer
- */
+#[repr(C)]
+pub struct ShadowObjBounds {
+    pub base: *mut c_void,
+    pub limit: *mut c_void,
+}
+
 #[unsafe(no_mangle)]
-pub extern "C" fn resolve_get_limit(ptr: *mut c_void) -> *mut c_void {
+pub extern "C" fn resolve_get_base_and_limit(ptr: *mut c_void) -> ShadowObjBounds {
     let sobj_table = ALIVE_OBJ_LIST.lock();
-    let Some(sobj) =  sobj_table.search_intersection(ptr as Vaddr) else {
-        return 0 as *mut c_void
+    let Some(sobj) = sobj_table.search_intersection(ptr as Vaddr) else {
+        return ShadowObjBounds { base: std::ptr::null_mut(), limit: std::ptr::null_mut() }
     };
-    return sobj.limit as *mut c_void
+
+    return ShadowObjBounds { base: sobj.base as *mut c_void, limit: sobj.limit as *mut c_void }
 }
 
 #[unsafe(no_mangle)]
