@@ -21,20 +21,28 @@
 
 using namespace llvm;
 
-static FunctionCallee getResolveLimit(Module *M) {
+
+static FunctionCallee getResolveBaseAndLimit(Module *M) {
   auto &Ctx = M->getContext();
   auto ptr_ty = PointerType::get(Ctx, 0);
 
+  auto struct_ty = StructType::get(
+    Ctx,
+    { ptr_ty, ptr_ty },
+    false
+  );
+
   return M->getOrInsertFunction(
-    "resolve_get_limit",
-    FunctionType::get(ptr_ty, { ptr_ty },
+    "resolve_get_base_and_limit",
+    FunctionType::get(struct_ty,
+      { ptr_ty },
     false
     )
   );
 }
 
-static Function *getOrCreateResolveCheckBounds(Module *M) {
-  Twine handlerName = "resolve_check_bounds";
+static Function *getOrCreateResolveAccessOk(Module *M) {
+  Twine handlerName = "resolve_access_ok";
   SmallVector<char> handlerNameStr;
   LLVMContext &Ctx = M->getContext();
 
@@ -47,38 +55,43 @@ static Function *getOrCreateResolveCheckBounds(Module *M) {
   auto size_ty = Type::getInt64Ty(Ctx);
   auto bool_ty = Type::getIntNTy(Ctx, 1);
 
-  FunctionType *resolveCheckBoundsFnTy = FunctionType::get(
+  FunctionType *resolveAccessOkFnTy = FunctionType::get(
     bool_ty,
     { ptr_ty, size_ty },
     false
   );
 
-  Function *resolveCheckBoundsFn = Function::Create(
-    resolveCheckBoundsFnTy,
+  Function *resolveAccessOkFn = Function::Create(
+    resolveAccessOkFnTy,
     Function::InternalLinkage,
     handlerName,
     M
   );
 
-  BasicBlock *EntryBB = BasicBlock::Create(Ctx, "", resolveCheckBoundsFn);
-  BasicBlock *TrueBB = BasicBlock::Create(Ctx, "", resolveCheckBoundsFn);
-  BasicBlock *FalseBB = BasicBlock::Create(Ctx, "", resolveCheckBoundsFn);
+  BasicBlock *EntryBB = BasicBlock::Create(Ctx, "", resolveAccessOkFn);
+  BasicBlock *CheckAccessBB = BasicBlock::Create(Ctx, "", resolveAccessOkFn);
+  BasicBlock *TrueBB = BasicBlock::Create(Ctx, "", resolveAccessOkFn);
+  BasicBlock *FalseBB = BasicBlock::Create(Ctx, "", resolveAccessOkFn);
 
   builder.SetInsertPoint(EntryBB);
 
-  Value *basePtr = resolveCheckBoundsFn->getArg(0);
-  Value *accessSize = resolveCheckBoundsFn->getArg(1);
+  Value *basePtr = resolveAccessOkFn->getArg(0);
+  Value *accessSize = resolveAccessOkFn->getArg(1);
 
-  Value *allocLim = builder.CreateCall(getResolveLimit(M), { basePtr });
-  Value *limitInt = builder.CreatePtrToInt(allocLim, size_ty);
-  
+  Value *baseAndLimit = builder.CreateCall(getResolveBaseAndLimit(M), { basePtr });
+  Value *limitValue = builder.CreateExtractValue(baseAndLimit, 1);
+  Value *limitInt = builder.CreatePtrToInt(limitValue, size_ty);
   Value *baseInt = builder.CreatePtrToInt(basePtr, size_ty);
-  Value *endInt = builder.CreateAdd(
+  Value *isZero = builder.CreateICmpEQ(limitInt, ConstantInt::get(size_ty, 0));
+  builder.CreateCondBr(isZero, TrueBB, CheckAccessBB);
+  
+  builder.SetInsertPoint(CheckAccessBB);
+  Value *accessLimit = builder.CreateAdd(
     baseInt,
     builder.CreateSub(accessSize, ConstantInt::get(size_ty, 1))
   );
 
-  Value *withinBounds = builder.CreateICmpULE(endInt, limitInt);
+  Value *withinBounds = builder.CreateICmpULE(accessLimit, limitInt);
 
   builder.CreateCondBr(withinBounds, TrueBB, FalseBB);
 
@@ -89,10 +102,10 @@ static Function *getOrCreateResolveCheckBounds(Module *M) {
   builder.CreateRet(ConstantInt::getFalse(Ctx));
 
   raw_ostream &out = errs();
-  out << *resolveCheckBoundsFn;
-  if (verifyFunction(*resolveCheckBoundsFn, &out)) {}
+  out << *resolveAccessOkFn;
+  if (verifyFunction(*resolveAccessOkFn, &out)) {}
 
-  return resolveCheckBoundsFn;
+  return resolveAccessOkFn;
 }
 
 static Function *getOrCreateBoundsCheckLoadSanitizer(Module *M, LLVMContext &Ctx, Type *ty, Vulnerability::RemediationStrategies strategy) {
@@ -128,7 +141,7 @@ static Function *getOrCreateBoundsCheckLoadSanitizer(Module *M, LLVMContext &Ctx
   Value *basePtr = sanitizeLoadFn->getArg(0); 
 
   builder.SetInsertPoint(EntryBB);
-  Value *withinBounds = builder.CreateCall(getOrCreateResolveCheckBounds(M), { basePtr, ConstantExpr::getSizeOf(ty) });
+  Value *withinBounds = builder.CreateCall(getOrCreateResolveAccessOk(M), { basePtr, ConstantExpr::getSizeOf(ty) });
 
   builder.CreateCondBr(withinBounds, NormalLoadBB, SanitizeLoadBB);
 
@@ -187,7 +200,7 @@ static Function *getOrCreateBoundsCheckStoreSanitizer(Module *M, LLVMContext &Ct
   Value *storedVal = sanitizeStoreFn->getArg(1);
   builder.SetInsertPoint(EntryBB);
 
-  Value *withinBounds = builder.CreateCall(getOrCreateResolveCheckBounds(M),
+  Value *withinBounds = builder.CreateCall(getOrCreateResolveAccessOk(M),
       { basePtr, ConstantExpr::getSizeOf(ty) });
   
   builder.CreateCondBr(withinBounds, NormalStoreBB, SanitizeStoreBB);
@@ -239,18 +252,7 @@ static Function *getOrCreateBoundsCheckMemcpySanitizer(Module *M, Vulnerability:
   BasicBlock *NormalBB = BasicBlock::Create(Ctx, "", sanitizeMemcpyFn);
   BasicBlock *SanitizeMemcpyBB = BasicBlock::Create(Ctx, "", sanitizeMemcpyFn);
 
-  FunctionType *resolveCheckBoundsFnTy = FunctionType::get(
-    Type::getInt1Ty(Ctx),
-    { ptr_ty, size_ty },
-    false
-  );
-
-  FunctionCallee resolveCheckBoundsFn = M->getOrInsertFunction(
-    "resolve_check_bounds",
-    resolveCheckBoundsFnTy
-  );
-
-  // EntryBB: Call libresolve check_bounds runtime function
+  // EntryBB: Call resolve_access_ok
   // to verify correct bounds of allocation
   builder.SetInsertPoint(EntryBB);
 
@@ -260,9 +262,9 @@ static Function *getOrCreateBoundsCheckMemcpySanitizer(Module *M, Vulnerability:
   Value *size_arg = sanitizeMemcpyFn->getArg(2);
 
   Value *check_src_bd =
-      builder.CreateCall(resolveCheckBoundsFn, { src_ptr, size_arg });
+      builder.CreateCall(getOrCreateResolveAccessOk(M), { src_ptr, size_arg });
   Value *check_dst_bd =
-      builder.CreateCall(resolveCheckBoundsFn, { dst_ptr, size_arg});
+      builder.CreateCall(getOrCreateResolveAccessOk(M), { dst_ptr, size_arg});
 
   Value *withinBounds = builder.CreateAnd(check_src_bd, check_dst_bd);
   builder.CreateCondBr(withinBounds, NormalBB, SanitizeMemcpyBB);
@@ -314,10 +316,11 @@ static Function *getOrCreateResolveGep(Module *M) {
   );
 
   BasicBlock *EntryBB = BasicBlock::Create(Ctx, "", resolveGepFn);
+  BasicBlock *CheckComputedPtrBB = BasicBlock::Create(Ctx, "", resolveGepFn);
   BasicBlock *NormalBB = BasicBlock::Create(Ctx, "", resolveGepFn);
   BasicBlock *OnePastBB = BasicBlock::Create(Ctx, "", resolveGepFn);
 
-  // EntryBB: Call libresolve getlimit
+  // EntryBB: Call libresolve get_base_and_limit
   // to retrieve the size of the allocation
   builder.SetInsertPoint(EntryBB);
 
@@ -325,12 +328,21 @@ static Function *getOrCreateResolveGep(Module *M) {
   Value *basePtr = resolveGepFn->getArg(0);
   Value *derivedPtr = resolveGepFn->getArg(1);
 
-  Value *limitPtr = builder.CreateCall(getResolveLimit(M), { basePtr });
+  Value *baseAndLimit = builder.CreateCall(getResolveBaseAndLimit(M), { basePtr });
+  Value *baseValue = builder.CreateExtractValue(baseAndLimit, 0);
+  Value *limitValue = builder.CreateExtractValue(baseAndLimit, 1);
+
+  Value *baseInt = builder.CreatePtrToInt(baseValue, size_ty);
+  Value *limitInt = builder.CreatePtrToInt(limitValue, size_ty);
+  Value *isSentinel = builder.CreateICmpEQ(limitInt, ConstantInt::get(size_ty, 0));
+  builder.CreateCondBr(isSentinel, NormalBB, CheckComputedPtrBB);
+
+  builder.SetInsertPoint(CheckComputedPtrBB);
   Value *derivedInt = builder.CreatePtrToInt(derivedPtr, size_ty);
-  Value *limitInt = builder.CreatePtrToInt(limitPtr, size_ty);
-
-  Value *withinBounds = builder.CreateICmpULE(derivedInt, limitInt);
-
+  Value *underLimit = builder.CreateICmpULE(derivedInt, limitInt);
+  Value *aboveBase = builder.CreateICmpUGE(derivedInt, baseInt);
+  Value *withinBounds = builder.CreateAnd(underLimit, aboveBase);
+  
   builder.CreateCondBr(withinBounds, NormalBB, OnePastBB);
   
   builder.SetInsertPoint(NormalBB);
@@ -338,7 +350,6 @@ static Function *getOrCreateResolveGep(Module *M) {
 
   builder.SetInsertPoint(OnePastBB);
   // increment limit by 1 and return
-  limitInt = builder.CreatePtrToInt(limitPtr, size_ty);
   Value *onePastInt = builder.CreateAdd(limitInt, ConstantInt::get(size_ty, 1));
   Value *onePastPtr = builder.CreateIntToPtr(onePastInt, ptr_ty); 
   builder.CreateRet(onePastPtr);
