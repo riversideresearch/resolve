@@ -101,18 +101,6 @@ impl ShadowObjectTable {
             .for_each(|_| {})
     }
 
-    /// Finds a shadow object that contains `addr` in its bounds.
-    pub fn search_intersection(&self, addr: Vaddr) -> Option<&ShadowObject> {
-        // Slight optimization, restrict the range searched as no entry after `addr` will contain it.
-        // TODO: use `BTreeMap::upper_bound` when stabilized.
-        let cursor = self.table
-            .upper_bound(Included(&addr));
-
-        cursor.peek_prev()
-            .filter(|(_, o)| o.contains(addr))
-            .map(|(_, o)| o)
-    }
-
     /// Finds a shadow object with a past_limit value matching the input
     pub fn search_invalid(&self, addr: Vaddr) -> Option<&ShadowObject> {
         let cursor = self.table
@@ -121,13 +109,18 @@ impl ShadowObjectTable {
         cursor.peek_prev()
             .filter(|(_, o)| o.past_limit() == addr)
             .map(|(_, o)| o)
-        /*
-        self.table
-            .range(0..=addr)
-            .find(|(_, sobj)| sobj.past_limit() == addr)
-            .map(|pair| pair.1)
-        */
     }
+
+    /// Finds a shadow object that contains 'addr' in its bounds OR a shadow object with
+    /// a past_limit value matching the input
+    pub fn search_intersection(&self, addr: Vaddr) -> Option<&ShadowObject> {
+        let cursor = self.table
+            .upper_bound(Included(&addr));
+
+        cursor.peek_prev()
+            .filter(|(_, o)| o.contains(addr) || o.past_limit() == addr)
+            .map(|(_, o)| o) 
+    }  
 }
 
 // static object lists to store all objects
