@@ -101,16 +101,6 @@ impl ShadowObjectTable {
             .for_each(|_| {})
     }
 
-    /// Finds a shadow object with a past_limit value matching the input
-    pub fn search_invalid(&self, addr: Vaddr) -> Option<&ShadowObject> {
-        let cursor = self.table
-            .upper_bound(Included(&addr));
-
-        cursor.peek_prev()
-            .filter(|(_, o)| o.past_limit() == addr)
-            .map(|(_, o)| o)
-    }
-
     /// Finds a shadow object that contains 'addr' in its bounds OR a shadow object with
     /// a past_limit value matching the input
     pub fn search_intersection(&self, addr: Vaddr) -> Option<&ShadowObject> {

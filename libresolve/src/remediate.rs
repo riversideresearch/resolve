@@ -4,9 +4,9 @@ use libc::{
     c_char, c_void, calloc, free, malloc, realloc, strdup, strlen, strndup, strnlen,
 };
 
-use crate::shadowobjs::{ALIVE_OBJ_LIST, AllocType, FREED_OBJ_LIST, ShadowObject, Vaddr};
+use crate::shadowobjs::{ALIVE_OBJ_LIST, AllocType, FREED_OBJ_LIST, Vaddr};
 
-use log::{error, info, trace, warn};
+use log::{info, warn};
 
 /**
  * @brief - Allocator interface for stack objects
