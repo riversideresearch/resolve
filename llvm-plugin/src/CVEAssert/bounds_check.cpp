@@ -71,7 +71,7 @@ static Function *getOrCreateResolveAccessOk(Module *M) {
   );
 
   MemoryEffects ME = MemoryEffects::readOnly()
-                    .withoutLoc(MemoryEffects::ArgMem);
+                    .getWithoutLoc(MemoryEffects::ArgMem);
   
   resolveAccessOkFn->addFnAttr(Attribute::getMemoryEffects(Ctx, ME));
 
