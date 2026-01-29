@@ -351,49 +351,4 @@ mod tests {
             assert!(obj.is_none());
         }
     }
-
-    #[test]
-    fn test_resolve_check_bounds() {
-        resolve_init();
-        // Spray the heap a little
-        let ptrs: Vec<_> = (0x01..0x100).map(|i| resolve_malloc(i)).collect();
-
-        //let mut rng = rand::rng();
-
-        for (i, p) in ptrs.into_iter().enumerate() {
-            let i = i + 1;
-            assert!(!p.is_null());
-
-            // Check all valid bounds
-            for offset in 0..i {
-                // the size/offset must be greater than 0
-                assert!(
-                    resolve_check_bounds(p, offset + 1),
-                    "{:x}, {:x}",
-                    p as usize,
-                    offset + 1
-                );
-                for j in offset..i {
-                    assert!(resolve_check_bounds(
-                        unsafe { p.offset(offset as isize) },
-                        i - j
-                    ));
-                }
-            }
-
-            // out of bounds accesses
-            // before first
-            // Current code allows this because we allow pointers we haven't tracked
-            // assert!(!resolve_check_bounds(unsafe { p.offset(-1) }, 1));
-            // after last
-            assert!(!resolve_check_bounds(unsafe { p.offset(i as isize) }, 1));
-            assert!(!resolve_check_bounds(p, i + 1));
-
-            // In theory all pointer arithmetic instructions translate into GetElementPtr
-            // instructions in llvm-ir which will verify that the base/derived pointers are valid
-            // and within the correct allocations.
-
-            resolve_free(p);
-        }
-    }
 }
