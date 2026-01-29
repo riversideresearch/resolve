@@ -5,7 +5,7 @@
 
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Twine.h"
-#include "llvm/Analysis/MemorySSA.h"
+#include "llvm/Analysis/CaptureTracking.h"
 #include "llvm/IR/Attributes.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/IRBuilder.h"
@@ -71,7 +71,7 @@ static Function *getOrCreateResolveAccessOk(Module *M) {
   );
 
   MemoryEffects ME = MemoryEffects::readOnly()
-                    .getWithoutLoc(MemoryEffects::ArgMem);
+                    .getWithoutLoc(ArgMem);
   
   resolveAccessOkFn->addFnAttr(Attribute::getMemoryEffects(Ctx, ME));
 
@@ -514,7 +514,9 @@ void instrumentAlloca(Function *F) {
   for (auto &BB: *F) {
     for (auto &instr: BB) {
       if (auto *inst = dyn_cast<AllocaInst>(&instr)) {
-          handle_alloca(inst);
+          if (PointerMayBeCaptured(inst, true, true)) {
+            handle_alloca(inst);
+          }
       }
     }
   }
