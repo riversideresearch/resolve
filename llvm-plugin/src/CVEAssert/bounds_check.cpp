@@ -78,11 +78,6 @@ static Function *getOrCreateResolveAccessOk(Module *M) {
     M
   );
 
-  MemoryEffects ME = MemoryEffects::readOnly()
-                    .getWithoutLoc(ArgMem);
-  
-  resolveAccessOkFn->addFnAttr(Attribute::getMemoryEffects(Ctx, ME));
-
   BasicBlock *EntryBB = BasicBlock::Create(Ctx, "", resolveAccessOkFn);
   BasicBlock *CheckAccessBB = BasicBlock::Create(Ctx, "", resolveAccessOkFn);
   BasicBlock *TrueBB = BasicBlock::Create(Ctx, "", resolveAccessOkFn);
