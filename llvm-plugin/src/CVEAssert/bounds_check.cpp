@@ -34,12 +34,20 @@ static FunctionCallee getResolveBaseAndLimit(Module *M) {
     false
   );
 
+  MemoryEffects ME = MemoryEffects::readOnly()
+                    .getWithoutLoc(IRMemLocation::ArgMem);
+
+  AttrBuilder FnAttrs(Ctx);
+  FnAttrs.addAttribute(Attribute::getWithMemoryEffects(Ctx, ME));
+  FnAttrs.addAttribute(Attribute::WillReturn);
+  FnAttrs.addAttribute(Attribute::Speculatable);
+
+  AttributeList attrs = AttributeList::get(Ctx, AttributeList::FunctionIndex, FnAttrs);
+
   return M->getOrInsertFunction(
     "resolve_get_base_and_limit",
-    FunctionType::get(struct_ty,
-      { ptr_ty },
-    false
-    )
+    FunctionType::get(struct_ty, { ptr_ty }, false),
+    attrs
   );
 }
 

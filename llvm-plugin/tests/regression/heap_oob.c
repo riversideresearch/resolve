@@ -22,12 +22,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 int main() {
-    int *ptr = malloc(2 * sizeof(int));
-    ptr[0] = 1;
-    ptr[1] = 10;
-    ptr[2] = 5;
-
-    int x = ptr[2]; 
-    return x;
-
+    int *ptr = calloc(2, sizeof(int));
+    // ptr[0] = 1;
+    // ptr[1] = 10;
+    // ptr[2] = 5;
+    // int x = ptr[2]; 
+    return ptr[2];
 }
