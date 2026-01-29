@@ -6,11 +6,13 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/Analysis/MemorySSA.h"
+#include "llvm/IR/Attributes.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/IntrinsicInst.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Verifier.h"
+#include "llvm/Support/ModRef.h"
 #include "llvm/Support/raw_ostream.h"
 
 #include "Vulnerability.hpp"
@@ -67,6 +69,11 @@ static Function *getOrCreateResolveAccessOk(Module *M) {
     handlerName,
     M
   );
+
+  MemoryEffects ME = MemoryEffects::readOnly()
+                    .withoutLoc(MemoryEffects::ArgMem);
+  
+  resolveAccessOkFn->addFnAttr(Attribute::getMemoryEffects(Ctx, ME));
 
   BasicBlock *EntryBB = BasicBlock::Create(Ctx, "", resolveAccessOkFn);
   BasicBlock *CheckAccessBB = BasicBlock::Create(Ctx, "", resolveAccessOkFn);
