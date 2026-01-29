@@ -5,12 +5,14 @@
 
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Twine.h"
-#include "llvm/Analysis/MemorySSA.h"
+#include "llvm/Analysis/CaptureTracking.h"
+#include "llvm/IR/Attributes.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/IntrinsicInst.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Verifier.h"
+#include "llvm/Support/ModRef.h"
 #include "llvm/Support/raw_ostream.h"
 
 #include "Vulnerability.hpp"
@@ -32,12 +34,20 @@ static FunctionCallee getResolveBaseAndLimit(Module *M) {
     false
   );
 
+  MemoryEffects ME = MemoryEffects::readOnly()
+                    .getWithoutLoc(IRMemLocation::ArgMem);
+
+  AttrBuilder FnAttrs(Ctx);
+  FnAttrs.addAttribute(Attribute::getWithMemoryEffects(Ctx, ME));
+  FnAttrs.addAttribute(Attribute::WillReturn);
+  FnAttrs.addAttribute(Attribute::Speculatable);
+
+  AttributeList attrs = AttributeList::get(Ctx, AttributeList::FunctionIndex, FnAttrs);
+
   return M->getOrInsertFunction(
     "resolve_get_base_and_limit",
-    FunctionType::get(struct_ty,
-      { ptr_ty },
-    false
-    )
+    FunctionType::get(struct_ty, { ptr_ty }, false),
+    attrs
   );
 }
 
@@ -507,7 +517,9 @@ void instrumentAlloca(Function *F) {
   for (auto &BB: *F) {
     for (auto &instr: BB) {
       if (auto *inst = dyn_cast<AllocaInst>(&instr)) {
-          handle_alloca(inst);
+          if (PointerMayBeCaptured(inst, true, true)) {
+            handle_alloca(inst);
+          }
       }
     }
   }
