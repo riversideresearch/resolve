@@ -348,7 +348,8 @@ static Function *getOrCreateResolveGep(Module *M) {
   builder.CreateRet(derivedPtr);
 
   builder.SetInsertPoint(OnePastBB);
-  // increment limit by 1 and return
+  
+  // Return a pointer that is clamped at one past the last valid byte address
   Value *onePastInt = builder.CreateAdd(limitInt, ConstantInt::get(size_ty, 1));
   Value *onePastPtr = builder.CreateIntToPtr(onePastInt, ptr_ty); 
   builder.CreateRet(onePastPtr);
