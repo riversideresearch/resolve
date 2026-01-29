@@ -16,12 +16,97 @@
 #include "Vulnerability.hpp"
 #include "helpers.hpp"
 
-static const bool FIND_PTR_ROOT_DEBUG = true;
-
 #include <map>
 #include <unordered_set>
 
 using namespace llvm;
+
+
+static FunctionCallee getResolveBaseAndLimit(Module *M) {
+  auto &Ctx = M->getContext();
+  auto ptr_ty = PointerType::get(Ctx, 0);
+
+  auto struct_ty = StructType::get(
+    Ctx,
+    { ptr_ty, ptr_ty },
+    false
+  );
+
+  return M->getOrInsertFunction(
+    "resolve_get_base_and_limit",
+    FunctionType::get(struct_ty,
+      { ptr_ty },
+    false
+    )
+  );
+}
+
+static Function *getOrCreateResolveAccessOk(Module *M) {
+  Twine handlerName = "resolve_access_ok";
+  SmallVector<char> handlerNameStr;
+  LLVMContext &Ctx = M->getContext();
+
+  if (auto handler = M->getFunction(handlerName.toStringRef(handlerNameStr)))
+    return handler;
+
+  IRBuilder<> builder(Ctx);
+
+  auto ptr_ty = PointerType::get(Ctx, 0);
+  auto size_ty = Type::getInt64Ty(Ctx);
+  auto bool_ty = Type::getIntNTy(Ctx, 1);
+
+  FunctionType *resolveAccessOkFnTy = FunctionType::get(
+    bool_ty,
+    { ptr_ty, size_ty },
+    false
+  );
+
+  Function *resolveAccessOkFn = Function::Create(
+    resolveAccessOkFnTy,
+    Function::InternalLinkage,
+    handlerName,
+    M
+  );
+
+  BasicBlock *EntryBB = BasicBlock::Create(Ctx, "", resolveAccessOkFn);
+  BasicBlock *CheckAccessBB = BasicBlock::Create(Ctx, "", resolveAccessOkFn);
+  BasicBlock *TrueBB = BasicBlock::Create(Ctx, "", resolveAccessOkFn);
+  BasicBlock *FalseBB = BasicBlock::Create(Ctx, "", resolveAccessOkFn);
+
+  builder.SetInsertPoint(EntryBB);
+
+  Value *basePtr = resolveAccessOkFn->getArg(0);
+  Value *accessSize = resolveAccessOkFn->getArg(1);
+
+  Value *baseAndLimit = builder.CreateCall(getResolveBaseAndLimit(M), { basePtr });
+  Value *limitValue = builder.CreateExtractValue(baseAndLimit, 1);
+  Value *limitInt = builder.CreatePtrToInt(limitValue, size_ty);
+  Value *baseInt = builder.CreatePtrToInt(basePtr, size_ty);
+  Value *isZero = builder.CreateICmpEQ(limitInt, ConstantInt::get(size_ty, 0));
+  builder.CreateCondBr(isZero, TrueBB, CheckAccessBB);
+  
+  builder.SetInsertPoint(CheckAccessBB);
+  Value *accessLimit = builder.CreateAdd(
+    baseInt,
+    builder.CreateSub(accessSize, ConstantInt::get(size_ty, 1))
+  );
+
+  Value *withinBounds = builder.CreateICmpULE(accessLimit, limitInt);
+
+  builder.CreateCondBr(withinBounds, TrueBB, FalseBB);
+
+  builder.SetInsertPoint(TrueBB);
+  builder.CreateRet(ConstantInt::getTrue(Ctx));
+
+  builder.SetInsertPoint(FalseBB);
+  builder.CreateRet(ConstantInt::getFalse(Ctx));
+
+  raw_ostream &out = errs();
+  out << *resolveAccessOkFn;
+  if (verifyFunction(*resolveAccessOkFn, &out)) {}
+
+  return resolveAccessOkFn;
+}
 
 static Function *getOrCreateBoundsCheckLoadSanitizer(Module *M, LLVMContext &Ctx, Type *ty, Vulnerability::RemediationStrategies strategy) {
   std::string handlerName = "resolve_bounds_check_ld_" + getLLVMType(ty);
@@ -52,22 +137,10 @@ static Function *getOrCreateBoundsCheckLoadSanitizer(Module *M, LLVMContext &Ctx
   BasicBlock *NormalLoadBB = BasicBlock::Create(Ctx, "", sanitizeLoadFn);
   BasicBlock *SanitizeLoadBB = BasicBlock::Create(Ctx, "", sanitizeLoadFn);
   
-  // Call simplified resolve-check-bounds on pointer if not in sobj table call remediation strategy 
-  FunctionType *resolveCheckBoundsFnTy = FunctionType::get(
-    Type::getInt1Ty(Ctx),
-    { ptr_ty, size_ty },
-    false
-  );
-
-  FunctionCallee resolveCheckBoundsFn = M->getOrInsertFunction(
-    "resolve_check_bounds",
-    resolveCheckBoundsFnTy
-  );
-
   Value *basePtr = sanitizeLoadFn->getArg(0); 
 
   builder.SetInsertPoint(EntryBB);
-  Value *withinBounds = builder.CreateCall(resolveCheckBoundsFn, { basePtr, ConstantExpr::getSizeOf(ty) });
+  Value *withinBounds = builder.CreateCall(getOrCreateResolveAccessOk(M), { basePtr, ConstantExpr::getSizeOf(ty) });
 
   builder.CreateCondBr(withinBounds, NormalLoadBB, SanitizeLoadBB);
 
@@ -122,22 +195,11 @@ static Function *getOrCreateBoundsCheckStoreSanitizer(Module *M, LLVMContext &Ct
   BasicBlock *NormalStoreBB = BasicBlock::Create(Ctx, "", sanitizeStoreFn);
   BasicBlock *SanitizeStoreBB = BasicBlock::Create(Ctx, "", sanitizeStoreFn);
 
-  FunctionType *resolveCheckBoundsFnTy = FunctionType::get(
-    Type::getInt1Ty(Ctx),
-    { ptr_ty, size_ty },
-    false
-  );
-
-  FunctionCallee resolveCheckBoundsFn = M->getOrInsertFunction(
-    "resolve_check_bounds",
-    resolveCheckBoundsFnTy
-  );
-
   Value *basePtr = sanitizeStoreFn->getArg(0);
   Value *storedVal = sanitizeStoreFn->getArg(1);
   builder.SetInsertPoint(EntryBB);
 
-  Value *withinBounds = builder.CreateCall(resolveCheckBoundsFn,
+  Value *withinBounds = builder.CreateCall(getOrCreateResolveAccessOk(M),
       { basePtr, ConstantExpr::getSizeOf(ty) });
   
   builder.CreateCondBr(withinBounds, NormalStoreBB, SanitizeStoreBB);
@@ -189,18 +251,7 @@ static Function *getOrCreateBoundsCheckMemcpySanitizer(Module *M, Vulnerability:
   BasicBlock *NormalBB = BasicBlock::Create(Ctx, "", sanitizeMemcpyFn);
   BasicBlock *SanitizeMemcpyBB = BasicBlock::Create(Ctx, "", sanitizeMemcpyFn);
 
-  FunctionType *resolveCheckBoundsFnTy = FunctionType::get(
-    Type::getInt1Ty(Ctx),
-    { ptr_ty, size_ty },
-    false
-  );
-
-  FunctionCallee resolveCheckBoundsFn = M->getOrInsertFunction(
-    "resolve_check_bounds",
-    resolveCheckBoundsFnTy
-  );
-
-  // EntryBB: Call libresolve check_bounds runtime function
+  // EntryBB: Call resolve_access_ok
   // to verify correct bounds of allocation
   builder.SetInsertPoint(EntryBB);
 
@@ -210,9 +261,9 @@ static Function *getOrCreateBoundsCheckMemcpySanitizer(Module *M, Vulnerability:
   Value *size_arg = sanitizeMemcpyFn->getArg(2);
 
   Value *check_src_bd =
-      builder.CreateCall(resolveCheckBoundsFn, { src_ptr, size_arg });
+      builder.CreateCall(getOrCreateResolveAccessOk(M), { src_ptr, size_arg });
   Value *check_dst_bd =
-      builder.CreateCall(resolveCheckBoundsFn, { dst_ptr, size_arg});
+      builder.CreateCall(getOrCreateResolveAccessOk(M), { dst_ptr, size_arg});
 
   Value *withinBounds = builder.CreateAnd(check_src_bd, check_dst_bd);
   builder.CreateCondBr(withinBounds, NormalBB, SanitizeMemcpyBB);
@@ -238,16 +289,76 @@ static Function *getOrCreateBoundsCheckMemcpySanitizer(Module *M, Vulnerability:
   return sanitizeMemcpyFn;
 }
 
-static FunctionCallee getResolveGEP(Module *M) {
-  auto &Ctx = M->getContext();
+static Function *getOrCreateResolveGep(Module *M) {
+  Twine handlerName = "resolve_gep";
+  SmallVector<char> handlerNameStr;
+  LLVMContext &Ctx = M->getContext();
+
+  if (auto handler = M->getFunction(handlerName.toStringRef(handlerNameStr)))
+    return handler;
+
+  IRBuilder<> builder(Ctx);
+
   auto ptr_ty = PointerType::get(Ctx, 0);
-  return M->getOrInsertFunction(
-    "resolve_gep",
-    FunctionType::get(ptr_ty,
-    {ptr_ty, ptr_ty },
+  auto size_ty = Type::getInt64Ty(Ctx);
+
+  FunctionType *resolveGepFnTy = FunctionType::get(
+    ptr_ty, { ptr_ty, ptr_ty},
     false
-    )
   );
+
+  Function *resolveGepFn = Function::Create(
+    resolveGepFnTy,
+    Function::InternalLinkage,
+    handlerName,
+    M
+  );
+
+  BasicBlock *EntryBB = BasicBlock::Create(Ctx, "", resolveGepFn);
+  BasicBlock *CheckComputedPtrBB = BasicBlock::Create(Ctx, "", resolveGepFn);
+  BasicBlock *NormalBB = BasicBlock::Create(Ctx, "", resolveGepFn);
+  BasicBlock *OnePastBB = BasicBlock::Create(Ctx, "", resolveGepFn);
+
+  // EntryBB: Call libresolve get_base_and_limit
+  // to retrieve the last valid byte address of obj
+  builder.SetInsertPoint(EntryBB);
+
+  // Extract the base and derived pointer
+  Value *basePtr = resolveGepFn->getArg(0);
+  Value *derivedPtr = resolveGepFn->getArg(1);
+
+  Value *baseAndLimit = builder.CreateCall(getResolveBaseAndLimit(M), { basePtr });
+  Value *baseValue = builder.CreateExtractValue(baseAndLimit, 0);
+  Value *limitValue = builder.CreateExtractValue(baseAndLimit, 1);
+
+  Value *baseInt = builder.CreatePtrToInt(baseValue, size_ty);
+  Value *limitInt = builder.CreatePtrToInt(limitValue, size_ty);
+  Value *isSentinel = builder.CreateICmpEQ(limitInt, ConstantInt::get(size_ty, 0));
+  builder.CreateCondBr(isSentinel, NormalBB, CheckComputedPtrBB);
+
+  builder.SetInsertPoint(CheckComputedPtrBB);
+  Value *derivedInt = builder.CreatePtrToInt(derivedPtr, size_ty);
+  Value *underLimit = builder.CreateICmpULE(derivedInt, limitInt);
+  Value *aboveBase = builder.CreateICmpUGE(derivedInt, baseInt);
+  Value *withinBounds = builder.CreateAnd(underLimit, aboveBase);
+  
+  builder.CreateCondBr(withinBounds, NormalBB, OnePastBB);
+  
+  builder.SetInsertPoint(NormalBB);
+  builder.CreateRet(derivedPtr);
+
+  builder.SetInsertPoint(OnePastBB);
+  
+  // Return a pointer that is clamped at one past the last valid byte address
+  Value *onePastInt = builder.CreateAdd(limitInt, ConstantInt::get(size_ty, 1));
+  Value *onePastPtr = builder.CreateIntToPtr(onePastInt, ptr_ty); 
+  builder.CreateRet(onePastPtr);
+
+  // DEBUGGING
+  raw_ostream &out = errs();
+  out << *resolveGepFn;
+  if (verifyFunction(*resolveGepFn, &out)) {}
+  return resolveGepFn;
 }
 
 static FunctionCallee getResolveMalloc(Module *M) {
@@ -611,38 +722,52 @@ void instrumentGEP(Function *F) {
   IRBuilder<> builder(Ctx);
   const DataLayout &DL = M->getDataLayout();
   std::vector<GetElementPtrInst *> gepList;
+  std::unordered_set<GetElementPtrInst *> visitedGep;
+
+  auto handle_gep = [&](auto *gep) {
+    if (visitedGep.contains(gep)) {
+      return;
+    }
+
+    Value * basePtr = gep->getPointerOperand();
+    GetElementPtrInst *derivedPtr = gep;
+    gep->setIsInBounds(false);
+
+    // If we are chaining geps we do not need to check each individually,
+    // only the total range
+    while (derivedPtr->hasOneUser()) {
+      if (auto *gep2 = dyn_cast<GetElementPtrInst>(derivedPtr->user_back())) {
+        gep2->setIsInBounds(false);
+        visitedGep.insert(gep2);
+        derivedPtr = gep2;
+      } else {
+        break;
+      }
+    }
+
+    SmallVector<User *, 8> gep_users;
+    for (User *U : derivedPtr->users()) {
+      gep_users.push_back(U);
+    }
+
+    builder.SetInsertPoint(derivedPtr->getNextNode());
+    auto resolveGepCall = builder.CreateCall(getOrCreateResolveGep(M), { basePtr, derivedPtr });
+
+    // Iterate over all the users of the gep instruction and 
+    // replace their operands with resolve_gep result
+    for (User *U : gep_users) {
+      if (U != resolveGepCall) {
+        U->replaceUsesOfWith(derivedPtr, resolveGepCall);
+      }
+    }
+
+    visitedGep.insert(gep);
+  };
 
   for (auto &BB : *F) {
     for (auto &inst: BB) {
       if (auto *gep = dyn_cast<GetElementPtrInst>(&inst)) {
-        gepList.push_back(gep);
-      }
-    }
-  }
-
-  for (auto GEPInst: gepList) {
-    builder.SetInsertPoint(GEPInst->getNextNode());
-
-    // Get the pointer operand and offset from GEP
-    Value *basePtr = GEPInst->getPointerOperand();
-    Value * derivedPtr = GEPInst;
-    
-    // Don't assume gep is inbounds, otherwise our remdiation risks being optimized away
-    GEPInst->setIsInBounds(false);
-
-    auto resolveGEPCall = builder.CreateCall(getResolveGEP(M), { basePtr, derivedPtr });
-
-    // Collect users of gep instruction before mutation
-    SmallVector<User*, 8> gep_users;
-    for (User *U : GEPInst->users()) {
-      gep_users.push_back(U);
-    }
-
-    // Iterate over all the users of the gep instruction and 
-    // replace there operands with resolve_gep result 
-    for (User *U : gep_users) {
-      if (U != resolveGEPCall) {
-        U->replaceUsesOfWith(GEPInst, resolveGEPCall);
+        handle_gep(gep);
       }
     }
   }
