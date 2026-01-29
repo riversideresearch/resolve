@@ -137,7 +137,6 @@ static Function *getOrCreateBoundsCheckLoadSanitizer(Module *M, LLVMContext &Ctx
   BasicBlock *NormalLoadBB = BasicBlock::Create(Ctx, "", sanitizeLoadFn);
   BasicBlock *SanitizeLoadBB = BasicBlock::Create(Ctx, "", sanitizeLoadFn);
   
-  // Call simplified resolve-check-bounds on pointer if not in sobj table call remediation strategy 
   Value *basePtr = sanitizeLoadFn->getArg(0); 
 
   builder.SetInsertPoint(EntryBB);
@@ -321,7 +320,7 @@ static Function *getOrCreateResolveGep(Module *M) {
   BasicBlock *OnePastBB = BasicBlock::Create(Ctx, "", resolveGepFn);
 
   // EntryBB: Call libresolve get_base_and_limit
-  // to retrieve the size of the allocation
+  // to retrieve the last valid byte address of obj
   builder.SetInsertPoint(EntryBB);
 
   // Extract the base and derived pointer
