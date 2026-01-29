@@ -722,38 +722,52 @@ void instrumentGEP(Function *F) {
   IRBuilder<> builder(Ctx);
   const DataLayout &DL = M->getDataLayout();
   std::vector<GetElementPtrInst *> gepList;
+  std::unordered_set<GetElementPtrInst *> visitedGep;
+
+  auto handle_gep = [&](auto *gep) {
+    if (visitedGep.contains(gep)) {
+      return;
+    }
+
+    Value * basePtr = gep->getPointerOperand();
+    GetElementPtrInst *derivedPtr = gep;
+    gep->setIsInBounds(false);
+
+    // If we are chaining geps we do not need to check each individually,
+    // only the total range
+    while (derivedPtr->hasOneUser()) {
+      if (auto *gep2 = dyn_cast<GetElementPtrInst>(derivedPtr->user_back())) {
+        gep2->setIsInBounds(false);
+        visitedGep.insert(gep2);
+        derivedPtr = gep2;
+      } else {
+        break;
+      }
+    }
+
+    SmallVector<User *, 8> gep_users;
+    for (User *U : derivedPtr->users()) {
+      gep_users.push_back(U);
+    }
+
+    builder.SetInsertPoint(derivedPtr->getNextNode());
+    auto resolveGepCall = builder.CreateCall(getOrCreateResolveGep(M), { basePtr, derivedPtr });
+
+    // Iterate over all the users of the gep instruction and 
+    // replace their operands with resolve_gep result
+    for (User *U : gep_users) {
+      if (U != resolveGepCall) {
+        U->replaceUsesOfWith(derivedPtr, resolveGepCall);
+      }
+    }
+
+    visitedGep.insert(gep);
+  };
 
   for (auto &BB : *F) {
     for (auto &inst: BB) {
       if (auto *gep = dyn_cast<GetElementPtrInst>(&inst)) {
-        gepList.push_back(gep);
-      }
-    }
-  }
-
-  for (auto GEPInst: gepList) {
-    builder.SetInsertPoint(GEPInst->getNextNode());
-
-    // Get the pointer operand and offset from GEP
-    Value *basePtr = GEPInst->getPointerOperand();
-    Value * derivedPtr = GEPInst;
-    
-    // Don't assume gep is inbounds, otherwise our remdiation risks being optimized away
-    GEPInst->setIsInBounds(false);
-
-    auto resolveGEPCall = builder.CreateCall(getOrCreateResolveGep(M), { basePtr, derivedPtr });
-
-    // Collect users of gep instruction before mutation
-    SmallVector<User*, 8> gep_users;
-    for (User *U : GEPInst->users()) {
-      gep_users.push_back(U);
-    }
-
-    // Iterate over all the users of the gep instruction and 
-    // replace there operands with resolve_gep result 
-    for (User *U : gep_users) {
-      if (U != resolveGEPCall) {
-        U->replaceUsesOfWith(GEPInst, resolveGEPCall);
+        handle_gep(gep);
       }
     }
   }
