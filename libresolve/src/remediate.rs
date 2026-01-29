@@ -255,8 +255,8 @@ pub struct ShadowObjBounds {
 
 /**
  * @brief - Helper function that queries shadow obj list
- *          to determine if the pointer is tracked, untracked,
- *          or tainted 
+ *          to find a shadow obj where the ptr fits within
+ *          its bounds of allocation 
  * @input
  *  - ptr: ptr to allocation 
  * @return struct containing the base and limit of the
