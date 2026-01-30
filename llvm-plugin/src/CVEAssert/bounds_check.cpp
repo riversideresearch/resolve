@@ -34,8 +34,10 @@ static FunctionCallee getResolveBaseAndLimit(Module *M) {
     false
   );
 
-  MemoryEffects ME = MemoryEffects::readOnly()
-                    .getWithoutLoc(IRMemLocation::ArgMem);
+  // MemoryEffects ME = MemoryEffects::readOnly()
+  //                   .getWithoutLoc(IRMemLocation::ArgMem);
+
+  MemoryEffects ME = MemoryEffects::none();
 
   AttrBuilder FnAttrs(Ctx);
   FnAttrs.addAttribute(Attribute::getWithMemoryEffects(Ctx, ME));
