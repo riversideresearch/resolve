@@ -81,7 +81,7 @@ static Function *getOrCreateResolveAccessOk(Module *M) {
   );
 
   // Adding an attribute to always inline this function
-  resolveAccessOkFn->addAttribute(Attribute::AlwaysInline);
+  resolveAccessOkFn->addFnAttribute(Attribute::AlwaysInline);
 
   BasicBlock *EntryBB = BasicBlock::Create(Ctx, "", resolveAccessOkFn);
   BasicBlock *CheckAccessBB = BasicBlock::Create(Ctx, "", resolveAccessOkFn);
@@ -330,7 +330,7 @@ static Function *getOrCreateResolveGep(Module *M) {
   );
 
   // Adding attribute to always inline
-  resolveGepFn->addAttribute(Attribute::AlwaysInline);
+  resolveGepFn->addFnAttribute(Attribute::AlwaysInline);
 
   BasicBlock *EntryBB = BasicBlock::Create(Ctx, "", resolveGepFn);
   BasicBlock *CheckComputedPtrBB = BasicBlock::Create(Ctx, "", resolveGepFn);
