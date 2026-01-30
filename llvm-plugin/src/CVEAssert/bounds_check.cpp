@@ -34,8 +34,10 @@ static FunctionCallee getResolveBaseAndLimit(Module *M) {
     false
   );
 
-  MemoryEffects ME = MemoryEffects::readOnly()
-                    .getWithoutLoc(IRMemLocation::ArgMem);
+  // MemoryEffects ME = MemoryEffects::readOnly()
+  //                   .getWithoutLoc(IRMemLocation::ArgMem);
+
+  MemoryEffects ME = MemoryEffects::none();
 
   AttrBuilder FnAttrs(Ctx);
   FnAttrs.addAttribute(Attribute::getWithMemoryEffects(Ctx, ME));
@@ -77,6 +79,9 @@ static Function *getOrCreateResolveAccessOk(Module *M) {
     handlerName,
     M
   );
+
+  // Adding an attribute to always inline this function
+  resolveAccessOkFn->addFnAttr(Attribute::AlwaysInline);
 
   BasicBlock *EntryBB = BasicBlock::Create(Ctx, "", resolveAccessOkFn);
   BasicBlock *CheckAccessBB = BasicBlock::Create(Ctx, "", resolveAccessOkFn);
@@ -323,6 +328,9 @@ static Function *getOrCreateResolveGep(Module *M) {
     handlerName,
     M
   );
+
+  // Adding attribute to always inline
+  resolveGepFn->addFnAttr(Attribute::AlwaysInline);
 
   BasicBlock *EntryBB = BasicBlock::Create(Ctx, "", resolveGepFn);
   BasicBlock *CheckComputedPtrBB = BasicBlock::Create(Ctx, "", resolveGepFn);
