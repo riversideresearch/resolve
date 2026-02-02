@@ -280,8 +280,8 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
 
       if (instrument_mem_inst.instrumentMemAllocator) {
         instrumentMalloc(&F);
-        //instrumentRealloc(&F);
-        //instrumentCalloc(&F);
+        instrumentRealloc(&F);
+        instrumentCalloc(&F);
         //instrumentStrdup(&F);
         //instrumentStrndup(&F);
         //instrumentFree(&F);
