@@ -260,7 +260,7 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
         case VulnID::OOB_WRITE:
         case VulnID::INCORRECT_BUF_SIZE:
         case VulnID::WRITE_WHAT_WHERE:
-          instrument_mem_inst.instrumentAlloca = true;
+          //instrument_mem_inst.instrumentAlloca = true;
           instrument_mem_inst.instrumentMemAllocator = true;
           break;
         
@@ -274,9 +274,9 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
     }
 
     for (auto &F: M) {
-      // if (instrument_mem_inst.instrumentAlloca) {
-      //   instrumentAlloca(&F);
-      // }
+      if (instrument_mem_inst.instrumentAlloca) {
+        instrumentAlloca(&F);
+      }
 
       if (instrument_mem_inst.instrumentMemAllocator) {
         instrumentMalloc(&F);
