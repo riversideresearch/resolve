@@ -294,7 +294,7 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
     // }
 
     for (auto &F : M) {
-      if (instrument_mem_inst.instrumentMemAlloca) {
+      if (instrument_mem_inst.instrumentAlloca) {
         instrumentAlloca(&F);
       }
 
