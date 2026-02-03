@@ -282,9 +282,9 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
         instrumentMalloc(&F);
         instrumentRealloc(&F);
         instrumentCalloc(&F);
-        //instrumentStrdup(&F);
-        //instrumentStrndup(&F);
-        //instrumentFree(&F);
+        instrumentStrdup(&F);
+        instrumentStrndup(&F);
+        instrumentFree(&F);
       }
     }  
     
