@@ -517,9 +517,10 @@ void instrumentAlloca(Function *F) {
   for (auto &BB: *F) {
     for (auto &instr: BB) {
       if (auto *inst = dyn_cast<AllocaInst>(&instr)) {
-          if (PointerMayBeCaptured(inst, true, true)) {
-            handle_alloca(inst);
-          }
+          // if (PointerMayBeCaptured(inst, true, true)) {
+          //   handle_alloca(inst);
+          // }
+          handle_alloca(inst);
       }
     }
   }
