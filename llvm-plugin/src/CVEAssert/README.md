@@ -49,7 +49,7 @@ the [`libresolve`](/libresolve/README.md) runtime library to enforce stack and h
 | Operation Masking | Replaces selected 'undesirable' function calls with guarded calls that validate operands before execution. |
 | Free Nonheap | Instruments calls to `free` with runtime checks that ensure argument is a heap-allocated pointer. |
 > [!NOTE]
-> The CVE description must include an 'undesirable-function` field
+> The CVE description must include an `undesirable-function` field
 > for the Operation Masking sanitizer to be applied. If this field
 > is not present, Operation Masking is not enabled. 
 
