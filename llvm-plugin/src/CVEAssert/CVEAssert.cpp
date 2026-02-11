@@ -268,12 +268,6 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
       }
     }
 
-    for (auto &F : M) {
-      for (auto &vuln : vulnerabilities) {
-        result.intersect(runOnFunction(F, MAM, vuln));
-      }
-    }
-
     for (auto &F: M) {
       if (instrument_mem_inst.instrumentAlloca) {
         instrumentAlloca(&F);
@@ -293,6 +287,13 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
       instrument_mem_inst.instrumentMemAllocator) {
       result = PreservedAnalyses::none();
     }
+
+    for (auto &F : M) {
+      for (auto &vuln : vulnerabilities) {
+        result.intersect(runOnFunction(F, MAM, vuln));
+      }
+    }
+
     return result;
   }
 };
