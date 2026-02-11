@@ -282,17 +282,18 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
         instrumentFree(&F);
       }
     }
-    
+        
+    if (instrument_mem_inst.instrumentAlloca ||
+      instrument_mem_inst.instrumentMemAllocator) {
+      result = PreservedAnalyses::none();
+    }
+
     for (auto &F : M) {
       for (auto &vuln : vulnerabilities) {
         result.intersect(runOnFunction(F, MAM, vuln));
       }
     }
-    
-    if (instrument_mem_inst.instrumentAlloca ||
-      instrument_mem_inst.instrumentMemAllocator) {
-      result = PreservedAnalyses::none();
-    }
+
     return result;
   }
 };
