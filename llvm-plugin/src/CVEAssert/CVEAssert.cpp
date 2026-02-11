@@ -221,6 +221,7 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
       default:
         errs() << "[CVEAssert] Error: CWE " << vuln.WeaknessID
                 << " not implemented\n";
+        break;
     }
 
     out << "[CVEAssert] === Post Instrumented IR === \n"; 
