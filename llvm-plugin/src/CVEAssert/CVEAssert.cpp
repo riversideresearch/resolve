@@ -292,7 +292,6 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
       instrument_mem_inst.instrumentMemAllocator) {
       result = PreservedAnalyses::none();
     }
-      
     return result;
   }
 };
