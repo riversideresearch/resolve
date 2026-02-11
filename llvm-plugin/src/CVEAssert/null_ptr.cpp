@@ -62,11 +62,13 @@ static Function *getOrCreateNullPtrLoadSanitizer(Module *M, LLVMContext &Ctx, Ty
     switch(strategy) {
         case Vulnerability::RemediationStrategies::CONTINUE: {
             Builder.CreateRet(Constant::getNullValue(ty));
+            break;
         }
 
         default:
             Builder.CreateCall(getOrCreateRemediationBehavior(M, strategy));
             Builder.CreateUnreachable();
+            break;
     }
     
     // Return Block: returns pointer if non-null
@@ -129,11 +131,13 @@ static Function *getOrCreateNullPtrStoreSanitizer(Module *M, LLVMContext &Ctx, T
     switch (strategy) {
         case Vulnerability::RemediationStrategies::CONTINUE:{
             Builder.CreateRetVoid();
+            break;
         }
 
         default:
             Builder.CreateCall(getOrCreateRemediationBehavior(M, strategy));
             Builder.CreateUnreachable();
+            break;
     }
 
     // Return Block: returns pointer if non-null

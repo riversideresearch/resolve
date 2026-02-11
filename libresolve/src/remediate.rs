@@ -222,7 +222,7 @@ pub extern "C" fn resolve_strdup(ptr: *mut c_char) -> *mut c_char {
  */
 #[unsafe(no_mangle)]
 pub extern "C" fn resolve_strndup(ptr: *mut c_char, size: usize) -> *mut c_char {
-    let string_ptr = unsafe { strndup(ptr, size) };
+    let string_ptr = unsafe { strndup(ptr, size + 1) };
 
     if string_ptr.is_null() {
         return string_ptr;
