@@ -939,6 +939,18 @@ void sanitizeMemset(Function *F, Vulnerability::RemediationStrategies strategy) 
       sizeArg = MC->getArgOperand(2);
     }
 
+    // Normalize value parameter type 
+    Type *ExpectedValueTy = Type::getInt32Ty(Ctx);
+    if (valueArg->getType() != ExpectedValueTy) {
+      valueArg = builder.CreateIntCast(valueArg, ExpectedValueTy, false);
+    }
+
+    // Normalize length parameter type
+    Type *ExpectedLengthTy = Type::getInt64Ty(Ctx);
+    if (sizeArg->getType() != ExpectedLengthTy) {
+      sizeArg = builder.CreateIntCast(sizeArg, ExpectedLengthTy, false);
+    }
+
     auto memsetFn = getOrCreateBoundsCheckMemsetSanitizer(F->getParent(), strategy);
     auto memsetCall = builder.CreateCall(
         memsetFn, { basePtr, valueArg, sizeArg });
