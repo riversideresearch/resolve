@@ -329,7 +329,7 @@ static Function *getOrCreateBoundsCheckMemsetSanitizer(Module *M, Vulnerability:
   BasicBlock *NormalBB = BasicBlock::Create(Ctx, "", sanitizeMemsetFn);
   BasicBlock *SanitizeMemsetBB = BasicBlock::Create(Ctx, "", sanitizeMemsetFn);
 
-  builder.setInsertPoint(EntryBB);
+  builder.SetInsertPoint(EntryBB);
 
   // Extract arguments for memset
   Value *basePtr = sanitizeMemsetFn->getArg(0);
@@ -926,14 +926,13 @@ void sanitizeMemset(Function *F, Vulnerability::RemediationStrategies strategy) 
     builder.SetInsertPoint(Inst);
 
     Value *basePtr = nullptr;
-    Value *ValueArg = nullptr;
+    Value *valueArg = nullptr;
     Value *byteOffset = nullptr;
 
     if (auto *MI = dyn_cast<MemSetInst>(Inst)) {
-      // TODO: Fix this!
-      // dstPtr = MI->getDest();
-      // srcPtr = MI->getSource();
-      // sizeArg = MI->getLength();
+      basePtr = MI->getDest();
+      valueArg = MI->getValue();
+      sizeArg = MI->getLength();
     } else if (auto *MC = dyn_cast<CallInst>(Inst)) {
       basePtr = MC->getArgOperand(0);
       ValueArg = MC->getArgOperand(1);
@@ -942,7 +941,7 @@ void sanitizeMemset(Function *F, Vulnerability::RemediationStrategies strategy) 
 
     auto memsetFn = getOrCreateBoundsCheckMemsetSanitizer(F->getParent(), strategy);
     auto memsetCall = builder.CreateCall(
-        memsetFn, { basePtr, ValueArg, byteOffset });
+        memsetFn, { basePtr, valueArg, byteOffset });
     Inst->replaceAllUsesWith(memsetCall);
     Inst->eraseFromParent();
   }
