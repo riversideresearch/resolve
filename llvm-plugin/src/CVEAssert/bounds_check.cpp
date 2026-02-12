@@ -927,7 +927,7 @@ void sanitizeMemset(Function *F, Vulnerability::RemediationStrategies strategy) 
 
     Value *basePtr = nullptr;
     Value *valueArg = nullptr;
-    Value *byteOffset = nullptr;
+    Value *sizeArg = nullptr;
 
     if (auto *MI = dyn_cast<MemSetInst>(Inst)) {
       basePtr = MI->getDest();
@@ -935,13 +935,13 @@ void sanitizeMemset(Function *F, Vulnerability::RemediationStrategies strategy) 
       sizeArg = MI->getLength();
     } else if (auto *MC = dyn_cast<CallInst>(Inst)) {
       basePtr = MC->getArgOperand(0);
-      ValueArg = MC->getArgOperand(1);
-      byteOffset = MC->getArgOperand(2);
+      valueArg = MC->getArgOperand(1);
+      sizeArg = MC->getArgOperand(2);
     }
 
     auto memsetFn = getOrCreateBoundsCheckMemsetSanitizer(F->getParent(), strategy);
     auto memsetCall = builder.CreateCall(
-        memsetFn, { basePtr, valueArg, byteOffset });
+        memsetFn, { basePtr, valueArg, sizeArg });
     Inst->replaceAllUsesWith(memsetCall);
     Inst->eraseFromParent();
   }
