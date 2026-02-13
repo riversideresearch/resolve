@@ -26,7 +26,7 @@ int main() {
         x[i] = (char)i;
     }
 
-    memcpy(y, x, 5);
+    memcpy(y+10, x, 5);
 
     free(x);
     free(y);
