@@ -1,0 +1,5 @@
+# ignore repos/outputs from tests
+tests/**/*.ll
+**/*.ll.mem
+tests/Output
+tests/.lit_test_times.txt
