@@ -26,11 +26,7 @@ using namespace llvm;
 static FunctionCallee getResolveBaseAndLimit(Module *M) {
   auto &Ctx = M->getContext();
   auto ptr_ty = PointerType::get(Ctx, 0);
-
   auto struct_ty = StructType::get(Ctx, {ptr_ty, ptr_ty}, false);
-
-  // MemoryEffects ME = MemoryEffects::readOnly()
-  //                   .getWithoutLoc(IRMemLocation::ArgMem);
 
   MemoryEffects ME = MemoryEffects::none();
 
