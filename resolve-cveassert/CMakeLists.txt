@@ -15,6 +15,9 @@ endif()
 
 set(CMAKE_CXX_STANDARD 20 STRING "")
 
+# Test: Adding compile commands producing compile_commands.json
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 # LLVM is normally built without RTTI. Be consistent with that.
 if(NOT LLVM_ENABLE_RTTI)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-rtti")
@@ -50,9 +53,13 @@ add_custom_target(check-format
 
 # Target: run clang-tidy
 add_custom_target(lint
-    COMMAND clang-tidy ${SRC}
+    COMMAND clang-tidy
+            -p ${CMAKE_BINARY_DIR}
+            ${SRC}
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
     COMMENT "Running clang-tidy"
 )
+
 
 # Combined check target
 add_custom_target(check
