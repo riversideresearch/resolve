@@ -138,7 +138,7 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
       builder.SetInsertPoint(call);
       auto sanitizerFn = getOrCreateFreeOfNonHeapSanitizer(F->getParent(), strategy);
 
-      auto sanitizedFree = builder.CreateCall(sanitizerFn, { call->getArgOperand(0) });
+      builder.CreateCall(sanitizerFn, { call->getArgOperand(0) });
       call->removeFromParent();
       call->deleteValue();
     }
