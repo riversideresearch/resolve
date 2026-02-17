@@ -1,4 +1,4 @@
-all: build test format check
+all: build test check
 
 .PHONY: format test check clean
 
