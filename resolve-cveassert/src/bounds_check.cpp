@@ -190,7 +190,6 @@ static Function *getOrCreateBoundsCheckStoreSanitizer(Module *M, LLVMContext &Ct
   // TODO: handle address spaces other than 0
   auto ptr_ty = PointerType::get(Ctx, 0);
   auto void_ty = Type::getVoidTy(Ctx);
-  auto size_ty = Type::getInt64Ty(Ctx);
 
   FunctionType *sanitizeStoreFnTy = FunctionType::get(
     void_ty,
