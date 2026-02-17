@@ -88,6 +88,7 @@ void sanitizeBitShift(Function *F, Vulnerability::RemediationStrategies strategy
     // remedShiftBB: Perform safe shift operation
     Builder.SetInsertPoint(remedShiftBB);
     Builder.CreateCall(getOrCreateResolveReportSanitizerTriggered(M));
+    Builder.CreateCall(getOrCreateRemediationBehavior(M, strategy));
     Value *safeShift = nullptr;
     Value *safeShiftAmt;
 
