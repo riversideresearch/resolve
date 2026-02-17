@@ -198,7 +198,8 @@ void sanitizeNullPointers(Function *f, Vulnerability::RemediationStrategies stra
         auto valueTy = Inst->getValueOperand()->getType();
         auto storeFn = getOrCreateNullPtrStoreSanitizer(f->getParent(), f->getContext(), valueTy, strategy);
 
-        auto sanitized_load = builder.CreateCall(storeFn, {Inst->getPointerOperand(), Inst->getValueOperand()});
+        auto sanitized_store = builder.CreateCall(storeFn, {Inst->getPointerOperand(), Inst->getValueOperand()});
+        Inst->replaceAllUsesWith(sanitized_store);
         Inst->removeFromParent();
         Inst->deleteValue();
     }
