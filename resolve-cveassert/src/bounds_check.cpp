@@ -221,7 +221,7 @@ static Function *getOrCreateBoundsCheckStoreSanitizer(Module *M, LLVMContext &Ct
 
   // NormalStoreBB: Store value @ addr
   builder.SetInsertPoint(NormalStoreBB);
-  StoreInst *store = builder.CreateStore(storedVal, basePtr);
+  builder.CreateStore(storedVal, basePtr);
   builder.CreateRetVoid();
 
   // SanitizeStoreBB: Apply remediation strategy
@@ -908,6 +908,7 @@ void sanitizeLoadStore(Function *F, Vulnerability::RemediationStrategies strateg
     );
 
     auto sanitizedStore = builder.CreateCall(storeFn, { ptr, Inst->getValueOperand() });
+    Inst->replaceAllUsesWith(sanitizedStore);
     Inst->removeFromParent();
     Inst->deleteValue();
   }
