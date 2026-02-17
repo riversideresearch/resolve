@@ -133,7 +133,6 @@ static Function *getOrCreateBoundsCheckLoadSanitizer(Module *M, LLVMContext &Ctx
   IRBuilder<> builder(Ctx);
 
   auto ptr_ty = PointerType::get(Ctx, 0);
-  auto size_ty = Type::getInt64Ty(Ctx);
 
   FunctionType *sanitizeLoadFnTy = FunctionType::get(
     ty,
@@ -191,7 +190,6 @@ static Function *getOrCreateBoundsCheckStoreSanitizer(Module *M, LLVMContext &Ct
   // TODO: handle address spaces other than 0
   auto ptr_ty = PointerType::get(Ctx, 0);
   auto void_ty = Type::getVoidTy(Ctx);
-  auto size_ty = Type::getInt64Ty(Ctx);
 
   FunctionType *sanitizeStoreFnTy = FunctionType::get(
     void_ty,
@@ -221,7 +219,7 @@ static Function *getOrCreateBoundsCheckStoreSanitizer(Module *M, LLVMContext &Ct
 
   // NormalStoreBB: Store value @ addr
   builder.SetInsertPoint(NormalStoreBB);
-  StoreInst *store = builder.CreateStore(storedVal, basePtr);
+  builder.CreateStore(storedVal, basePtr);
   builder.CreateRetVoid();
 
   // SanitizeStoreBB: Apply remediation strategy
@@ -908,6 +906,7 @@ void sanitizeLoadStore(Function *F, Vulnerability::RemediationStrategies strateg
     );
 
     auto sanitizedStore = builder.CreateCall(storeFn, { ptr, Inst->getValueOperand() });
+    Inst->replaceAllUsesWith(sanitizedStore);
     Inst->removeFromParent();
     Inst->deleteValue();
   }

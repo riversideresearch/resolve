@@ -105,7 +105,6 @@ Function *getOrCreateIsHeap(Module *M, LLVMContext &Ctx) {
 
 Function *getOrCreateResolveReportSanitizerTriggered(Module *M) {
     auto &Ctx = M->getContext();
-    auto ptr_ty = PointerType::get(Ctx, 0);
     auto void_ty = Type::getVoidTy(Ctx);
 
     FunctionType *resolve_report_fn_ty = FunctionType::get(void_ty, {}, false);

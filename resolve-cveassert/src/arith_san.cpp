@@ -48,11 +48,14 @@ void sanitizeBitShift(Function *F, Vulnerability::RemediationStrategies strategy
     for (auto &instr : BB) {
       if (auto *BinOp = dyn_cast<BinaryOperator>(&instr)) {
         switch (BinOp->getOpcode()) {
-        case Instruction::Shl:
-        case Instruction::AShr:
-        case Instruction::LShr: {
-          worklist.push_back(BinOp);
-        }
+          case Instruction::Shl:
+          case Instruction::AShr:
+          case Instruction::LShr: {
+            worklist.push_back(BinOp);
+          }
+        
+          default:
+            continue;
         }
       }
     }
@@ -88,6 +91,7 @@ void sanitizeBitShift(Function *F, Vulnerability::RemediationStrategies strategy
     // remedShiftBB: Perform safe shift operation
     Builder.SetInsertPoint(remedShiftBB);
     Builder.CreateCall(getOrCreateResolveReportSanitizerTriggered(M));
+    Builder.CreateCall(getOrCreateRemediationBehavior(M, strategy));
     Value *safeShift = nullptr;
     Value *safeShiftAmt;
 
