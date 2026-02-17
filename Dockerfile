@@ -15,6 +15,7 @@ RUN /opt/resolve/scripts/install-deps.sh && apt-get clean && rm -rf /var/lib/apt
 COPY --exclude=build/ klee /opt/resolve/klee
 COPY --exclude=target/ libresolve /opt/resolve/libresolve
 COPY --exclude=build/ llvm-plugin /opt/resolve/llvm-plugin
+COPY --exclude=build/ resolve-cveassert /opt/resolve/resolve-cveassert
 COPY --exclude=build/ reach /opt/resolve/reach
 COPY --exclude=build/ resolve-facts /opt/resolve/resolve-facts
 COPY linker /opt/resolve/linker
