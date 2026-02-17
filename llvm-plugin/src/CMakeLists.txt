@@ -45,14 +45,6 @@ set_target_properties(ResolveFacts PROPERTIES INTERFACE_INCLUDE_DIRECTORIES "${C
 add_library(EnhancedFacts SHARED EnhancedFacts.cpp)
 target_link_libraries(EnhancedFacts PRIVATE ResolveFacts)
 
-add_library(CVEAssert SHARED 
-  CVEAssert/CVEAssert.cpp
-  CVEAssert/bounds_check.cpp
-  CVEAssert/null_ptr.cpp
-  CVEAssert/arith_san.cpp
-  CVEAssert/helpers.cpp
-  CVEAssert/undesirableop.cpp
-)
 add_library(AnnotateFunctions SHARED AnnotateFunctions.cpp)
 add_library(ObjHook SHARED ObjHook.cpp)
 add_library(DlsymHook SHARED DlsymHook.cpp)
