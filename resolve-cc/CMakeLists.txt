@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(resolve-cveassert)
+project(resolve-llvm-plugin)
 
 find_package(LLVM 18.1.3 CONFIG)
 
@@ -15,7 +15,7 @@ endif()
 
 set(CMAKE_CXX_STANDARD 20 STRING "")
 
-# Test: Adding compile commands producing compile_commands.json
+# clang-tidy needs compile commands to work correctly
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # LLVM is normally built without RTTI. Be consistent with that.
@@ -23,9 +23,12 @@ if(NOT LLVM_ENABLE_RTTI)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-rtti")
 endif()
 
+
 # Format and lint checks
 # Collect source files
 file(GLOB_RECURSE SRC
+    "${CMAKE_SOURCE_DIR}/hooks/*.cpp"
+    "${CMAKE_SOURCE_DIR}/hooks/*.hpp"
     "${CMAKE_SOURCE_DIR}/src/*.cpp"
     "${CMAKE_SOURCE_DIR}/src/*.hpp"
 )
@@ -59,11 +62,11 @@ add_custom_target(check
 )
 
 # Build Targets
-add_library(CVEAssert SHARED 
-  src/CVEAssert.cpp
-  src/bounds_check.cpp
-  src/null_ptr.cpp
-  src/arith_san.cpp
-  src/helpers.cpp
-  src/undesirableop.cpp
-)
+add_library(ResolveFacts STATIC IMPORTED GLOBAL)
+set_target_properties(ResolveFacts PROPERTIES IMPORTED_LOCATION "${CMAKE_SOURCE_DIR}/../resolve-facts/build/libResolveFacts.a")
+set_target_properties(ResolveFacts PROPERTIES INTERFACE_INCLUDE_DIRECTORIES "${CMAKE_SOURCE_DIR}/../resolve-facts/src/")
+
+add_library(ResolveFactsPlugin SHARED src/ResolveFactsPlugin.cpp)
+target_link_libraries(ResolveFactsPlugin PRIVATE ResolveFacts)
+
+add_subdirectory(hooks)

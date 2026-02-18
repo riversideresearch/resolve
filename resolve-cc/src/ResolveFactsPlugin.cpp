@@ -3,7 +3,7 @@
  *   LGPL-3; See LICENSE.txt in the repo root for details.
  */
 
-#include "EnhancedFacts.hpp"
+#include "ResolveFactsPlugin.hpp"
 
 #include <cstdlib> // For std::getenv
 #include <iomanip>
@@ -165,7 +165,7 @@ void resolve::embedFacts(Module &M) {
   embedFactsSection(".facts", facts.serialize() + "\n");
 }
 
-struct EnhancedFactsPass : public PassInfoMixin<EnhancedFactsPass> {
+struct ResolveFactsPluginPass : public PassInfoMixin<ResolveFactsPluginPass> {
   PreservedAnalyses run(Module &M, ModuleAnalysisManager &) {
     resolve::getModuleFacts(M);
     resolve::embedFacts(M);
@@ -174,11 +174,11 @@ struct EnhancedFactsPass : public PassInfoMixin<EnhancedFactsPass> {
 };
 
 extern "C" LLVM_ATTRIBUTE_WEAK PassPluginLibraryInfo llvmGetPassPluginInfo() {
-  return {LLVM_PLUGIN_API_VERSION, "EnhancedFacts", LLVM_VERSION_STRING,
+  return {LLVM_PLUGIN_API_VERSION, "ResolveFactsPlugin", LLVM_VERSION_STRING,
           [](PassBuilder &PB) {
             PB.registerPipelineStartEPCallback(
                 [&](ModulePassManager &MPM, OptimizationLevel) {
-                  MPM.addPass(EnhancedFactsPass());
+                  MPM.addPass(ResolveFactsPluginPass());
                 });
           }};
 }
