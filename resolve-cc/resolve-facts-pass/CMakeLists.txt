@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.20)
 project(resolve-llvm-plugin)
 
-find_package(LLVM 18 CONFIG)
+find_package(LLVM 18.1.3 CONFIG)
 
 set(CMAKE_COMPILE_WARNING_AS_ERROR ON)
 
@@ -38,6 +38,9 @@ add_custom_target(clangformat
     COMMENT "Formatting source files with clang-format..."
 )
 
-add_library(AnnotateFunctions SHARED AnnotateFunctions.cpp)
-add_library(ObjHook SHARED ObjHook.cpp)
-add_library(DlsymHook SHARED DlsymHook.cpp)
+add_library(ResolveFacts STATIC IMPORTED GLOBAL)
+set_target_properties(ResolveFacts PROPERTIES IMPORTED_LOCATION "${CMAKE_SOURCE_DIR}/../../resolve-facts/build/libResolveFacts.a")
+set_target_properties(ResolveFacts PROPERTIES INTERFACE_INCLUDE_DIRECTORIES "${CMAKE_SOURCE_DIR}/../../resolve-facts/src/")
+
+add_library(EnhancedFacts SHARED src/EnhancedFacts.cpp)
+target_link_libraries(EnhancedFacts PRIVATE ResolveFacts)
