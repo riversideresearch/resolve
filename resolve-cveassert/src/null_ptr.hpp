@@ -5,6 +5,7 @@
 
 #pragma once
 
-#include "llvm/IR/Function.h"
 #include "Vulnerability.hpp"
-void sanitizeNullPointers(llvm::Function *f, Vulnerability::RemediationStrategies strategy);
+#include "llvm/IR/Function.h"
+void sanitizeNullPointers(llvm::Function *f,
+                          Vulnerability::RemediationStrategies strategy);

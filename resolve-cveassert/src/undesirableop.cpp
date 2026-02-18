@@ -12,46 +12,44 @@
 
 #include "undesirableop.hpp"
 
-#include <vector>
-#include <string>
 #include <optional>
+#include <string>
+#include <vector>
 
 using namespace llvm;
 
-
 enum Cond { // Maybe adding an enum for all the possible conditions
-    EQ = 1,
-    GT = 2,
-    GT_EQ = 3,
-    LT = 4,
-    LT_EQ = 5
+  EQ = 1,
+  GT = 2,
+  GT_EQ = 3,
+  LT = 4,
+  LT_EQ = 5
 };
-
 
 // Parameters
 // 1. Which arguments to return (or zero)
 // 2. Which arguments to test (if any)
 // 3. Condition to test (equality, <, etc..) NOTE: not needed right now delay
 // We will continue generalizing this following eval-2
-// Change this function name to be "replaceUndesirableOperation" more generalized name
-static Function *replaceUndesirableFunction(Module *M, CallInst *call, unsigned int argNum) {
+// Change this function name to be "replaceUndesirableOperation" more
+// generalized name
+static Function *replaceUndesirableFunction(Module *M, CallInst *call,
+                                            unsigned int argNum) {
   LLVMContext &Ctx = M->getContext();
   IRBuilder<> builder(Ctx);
 
-  std::string handlerName = "resolve_sanitized_" + call->getCalledFunction()->getName().str();
+  std::string handlerName =
+      "resolve_sanitized_" + call->getCalledFunction()->getName().str();
 
   if (Function *existingFn = M->getFunction(handlerName)) {
     return existingFn;
   }
 
-  FunctionType *resolveSanitizedFnTy = call->getCalledFunction()->getFunctionType();
+  FunctionType *resolveSanitizedFnTy =
+      call->getCalledFunction()->getFunctionType();
 
   Function *resolveSanitizedFn = Function::Create(
-      resolveSanitizedFnTy,
-      Function::InternalLinkage,
-      handlerName,
-      M
-  );
+      resolveSanitizedFnTy, Function::InternalLinkage, handlerName, M);
 
   BasicBlock *EntryBB = BasicBlock::Create(Ctx, "", resolveSanitizedFn);
   // Insert a return instruction here.
@@ -61,19 +59,20 @@ static Function *replaceUndesirableFunction(Module *M, CallInst *call, unsigned 
   // DEBUGGING
   raw_ostream &out = errs();
   out << *resolveSanitizedFn;
-  if (verifyFunction(*resolveSanitizedFn, &out)) {}
+  if (verifyFunction(*resolveSanitizedFn, &out)) {
+  }
   return resolveSanitizedFn;
 }
 
 void sanitizeUndesirableOperationInFunction(Function *F, std::string fnName,
-    unsigned int argNum) {
+                                            unsigned int argNum) {
   Module *M = F->getParent();
   LLVMContext &Ctx = M->getContext();
   IRBuilder<> builder(Ctx);
 
   // Container to store call insts
   std::vector<CallInst *> callsToReplace;
-    
+
   // loop over each basic block in the vulnerable function
   for (auto &BB : *F) {
     // loop over each instruction
@@ -95,9 +94,10 @@ void sanitizeUndesirableOperationInFunction(Function *F, std::string fnName,
   if (callsToReplace.size() == 0) {
     return;
   }
-  
+
   // Construct the resolve_sanitize_func function
-  Function *resolveSanitizedFn = replaceUndesirableFunction(M, callsToReplace.front(), argNum);
+  Function *resolveSanitizedFn =
+      replaceUndesirableFunction(M, callsToReplace.front(), argNum);
 
   // Replace calls at all callsites in the module
   for (auto call : callsToReplace) {
@@ -106,8 +106,8 @@ void sanitizeUndesirableOperationInFunction(Function *F, std::string fnName,
     // Get the arguments for the vulnerable function
     SmallVector<Value *, 2> fnArgs;
     for (unsigned int i = 0; i < call->arg_size(); ++i) {
-        fnArgs.push_back(call->getOperand(i));
-    } 
+      fnArgs.push_back(call->getOperand(i));
+    }
 
     auto sanitizedCall = builder.CreateCall(resolveSanitizedFn, fnArgs);
 
