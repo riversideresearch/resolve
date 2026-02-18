@@ -42,5 +42,5 @@ add_library(ResolveFacts STATIC IMPORTED GLOBAL)
 set_target_properties(ResolveFacts PROPERTIES IMPORTED_LOCATION "${CMAKE_SOURCE_DIR}/../../resolve-facts/build/libResolveFacts.a")
 set_target_properties(ResolveFacts PROPERTIES INTERFACE_INCLUDE_DIRECTORIES "${CMAKE_SOURCE_DIR}/../../resolve-facts/src/")
 
-add_library(EnhancedFacts SHARED src/EnhancedFacts.cpp)
-target_link_libraries(EnhancedFacts PRIVATE ResolveFacts)
+add_library(ResolveFactsPlugin SHARED src/ResolveFactsPlugin.cpp)
+target_link_libraries(ResolveFactsPlugin PRIVATE ResolveFacts)
