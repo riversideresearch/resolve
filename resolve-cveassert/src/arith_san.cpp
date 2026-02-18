@@ -26,7 +26,8 @@
 
 using namespace llvm;
 
-void sanitizeBitShift(Function *F, Vulnerability::RemediationStrategies strategy) {
+void sanitizeBitShift(Function *F,
+                      Vulnerability::RemediationStrategies strategy) {
   Module *M = F->getParent();
   auto &Ctx = M->getContext();
   IRBuilder<> Builder(Ctx);
@@ -36,7 +37,7 @@ void sanitizeBitShift(Function *F, Vulnerability::RemediationStrategies strategy
   case Vulnerability::RemediationStrategies::EXIT:
   case Vulnerability::RemediationStrategies::RECOVER:
     break;
-  
+
   default:
     llvm::errs() << "[CVEAssert] Error: sanitizeBitShift does not support "
                  << " remediation strategy defaulting to EXIT strategy!\n";
@@ -48,14 +49,14 @@ void sanitizeBitShift(Function *F, Vulnerability::RemediationStrategies strategy
     for (auto &instr : BB) {
       if (auto *BinOp = dyn_cast<BinaryOperator>(&instr)) {
         switch (BinOp->getOpcode()) {
-          case Instruction::Shl:
-          case Instruction::AShr:
-          case Instruction::LShr: {
-            worklist.push_back(BinOp);
-          }
-        
-          default:
-            continue;
+        case Instruction::Shl:
+        case Instruction::AShr:
+        case Instruction::LShr: {
+          worklist.push_back(BinOp);
+        }
+
+        default:
+          continue;
         }
       }
     }
@@ -149,23 +150,24 @@ void sanitizeBitShift(Function *F, Vulnerability::RemediationStrategies strategy
   }
 }
 
-void sanitizeDivideByZero(Function *F, Vulnerability::RemediationStrategies strategy) {
+void sanitizeDivideByZero(Function *F,
+                          Vulnerability::RemediationStrategies strategy) {
   Module *M = F->getParent();
   auto &Ctx = M->getContext();
   IRBuilder<> Builder(Ctx);
   std::vector<Instruction *> worklist;
 
   switch (strategy) {
-    case Vulnerability::RemediationStrategies::CONTINUE:
-    case Vulnerability::RemediationStrategies::EXIT:
-    case Vulnerability::RemediationStrategies::RECOVER:
-      break;
+  case Vulnerability::RemediationStrategies::CONTINUE:
+  case Vulnerability::RemediationStrategies::EXIT:
+  case Vulnerability::RemediationStrategies::RECOVER:
+    break;
 
-    default:
-      llvm::errs() << "[CVEAssert] Error: sanitizeDivideByZero does not support "
-                   << " remediation strategy defaulting to continue strategy!\n";
-      strategy = Vulnerability::RemediationStrategies::CONTINUE;
-      break; 
+  default:
+    llvm::errs() << "[CVEAssert] Error: sanitizeDivideByZero does not support "
+                 << " remediation strategy defaulting to continue strategy!\n";
+    strategy = Vulnerability::RemediationStrategies::CONTINUE;
+    break;
   }
 
   // Loop over each basic block
@@ -213,8 +215,8 @@ void sanitizeDivideByZero(Function *F, Vulnerability::RemediationStrategies stra
     }
     case Instruction::FDiv:
     case Instruction::FRem: {
-      isZero = Builder.CreateFCmpOEQ(
-          divisor, ConstantFP::get(divisor->getType(), 0.0));
+      isZero = Builder.CreateFCmpOEQ(divisor,
+                                     ConstantFP::get(divisor->getType(), 0.0));
       break;
     }
     }
@@ -405,8 +407,9 @@ void sanitizeIntOverflow(Function *F,
     break;
 
   default:
-    llvm::errs() << "[CVEAssert] Error: sanitizeIntOverflow does not support "
-                    "remediation strategy specified defaulting to wrap strategy!\n";
+    llvm::errs()
+        << "[CVEAssert] Error: sanitizeIntOverflow does not support "
+           "remediation strategy specified defaulting to wrap strategy!\n";
     strategy = Vulnerability::RemediationStrategies::WRAP;
     break;
   }
@@ -427,8 +430,7 @@ void sanitizeIntOverflow(Function *F,
   Value *op2;
 
   for (auto *binary_inst : worklist) {
-    if (!binary_inst->hasNoSignedWrap() &&
-        !binary_inst->hasNoUnsignedWrap()) {
+    if (!binary_inst->hasNoSignedWrap() && !binary_inst->hasNoUnsignedWrap()) {
       continue;
     }
 
@@ -438,15 +440,14 @@ void sanitizeIntOverflow(Function *F,
     Builder.SetInsertPoint(binary_inst);
 
     auto insertSafeOp = [&Builder,
-                          M](Instruction *binary_inst, Value *op1,
+                         M](Instruction *binary_inst, Value *op1,
                             Value *op2) -> std::pair<Value *, Value *> {
       Intrinsic::ID intrinsic_id;
       Type *BinOpType = binary_inst->getType();
       bool isUnsigned = false;
 
       // Heuristic: If instruction has NUW but not NSW then, treat as unsigned
-      if (binary_inst->hasNoUnsignedWrap() &&
-          !binary_inst->hasNoSignedWrap()) {
+      if (binary_inst->hasNoUnsignedWrap() && !binary_inst->hasNoSignedWrap()) {
         isUnsigned = true;
       }
 
@@ -470,8 +471,7 @@ void sanitizeIntOverflow(Function *F,
         return {nullptr, nullptr}; // Not a handled opcode
       }
 
-      Function *safeOp =
-          Intrinsic::getDeclaration(M, intrinsic_id, BinOpType);
+      Function *safeOp = Intrinsic::getDeclaration(M, intrinsic_id, BinOpType);
       Value *safeCall = Builder.CreateCall(safeOp, {op1, op2});
       Value *result = Builder.CreateExtractValue(safeCall, 0);
       Value *isOverflow = Builder.CreateExtractValue(safeCall, 1);
@@ -480,13 +480,12 @@ void sanitizeIntOverflow(Function *F,
     };
 
     auto insertSatOp = [&Builder, M](Instruction *binary_inst, Value *op1,
-                                      Value *op2) -> Instruction * {
+                                     Value *op2) -> Instruction * {
       Intrinsic::ID intrinsic_id;
       Type *BinOpType = binary_inst->getType();
       bool isUnsigned = false;
 
-      if (binary_inst->hasNoUnsignedWrap() &&
-          !binary_inst->hasNoSignedWrap()) {
+      if (binary_inst->hasNoUnsignedWrap() && !binary_inst->hasNoSignedWrap()) {
         isUnsigned = true;
       }
 
@@ -503,7 +502,7 @@ void sanitizeIntOverflow(Function *F,
         intrinsic_id = isUnsigned ? Intrinsic::umul_fix_sat
                                   : // Read LLVM LangRef to understand
                                     // semantics of this instruction
-                            Intrinsic::smul_fix_sat;
+                           Intrinsic::smul_fix_sat;
         break;
 
       default:
@@ -536,7 +535,7 @@ void sanitizeIntOverflow(Function *F,
     Builder.SetInsertPoint(originalBB);
     Builder.CreateCondBr(isOverflow, remedOverflowBB, contExeBB);
 
-    // remedOverflowBB: Call resolve_remediation_behavior 
+    // remedOverflowBB: Call resolve_remediation_behavior
     Builder.SetInsertPoint(remedOverflowBB);
     Builder.CreateCall(getOrCreateResolveReportSanitizerTriggered(M));
     Builder.CreateCall(getOrCreateRemediationBehavior(M, strategy));

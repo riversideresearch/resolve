@@ -18,4 +18,3 @@ llvm::Function *getOrCreateResolveReportSanitizerTriggered(llvm::Module *M);
 llvm::Function *
 getOrCreateRemediationBehavior(llvm::Module *M,
                                Vulnerability::RemediationStrategies strategy);
-
