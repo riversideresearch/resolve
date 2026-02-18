@@ -15,29 +15,51 @@ endif()
 
 set(CMAKE_CXX_STANDARD 20 STRING "")
 
+# clang-tidy needs compile commands to work correctly
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 # LLVM is normally built without RTTI. Be consistent with that.
 if(NOT LLVM_ENABLE_RTTI)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-rtti")
 endif()
 
-# Clang format
-find_program(CLANG_FORMAT_EXECUTABLE clang-format)
-if(NOT CLANG_FORMAT_EXECUTABLE)
-    message(FATAL_ERROR "clang-format not found. Please install it or add it to your PATH.")
-endif()
 
-file(GLOB_RECURSE PROJECT_SOURCE_FILES
-    "${CMAKE_SOURCE_DIR}/*.cpp"
-    "${CMAKE_SOURCE_DIR}/*.hpp"
-    "${CMAKE_SOURCE_DIR}/*.c"
-    "${CMAKE_SOURCE_DIR}/*.h"
+# Format and lint checks
+# Collect source files
+file(GLOB_RECURSE SRC
+    "${CMAKE_SOURCE_DIR}/src/*.cpp"
+    "${CMAKE_SOURCE_DIR}/src/*.hpp"
 )
 
-add_custom_target(clangformat
-    COMMAND ${CLANG_FORMAT_EXECUTABLE} -i ${PROJECT_SOURCE_FILES}
-    COMMENT "Formatting source files with clang-format..."
+# Target: auto-format files
+add_custom_target(format
+    COMMAND clang-format -i ${SRC}
+    COMMENT "Formatting source files with clang-format"
 )
 
+# Target: check formatting (no modifications)
+add_custom_target(check-format
+    COMMAND clang-format --dry-run --Werror ${SRC}
+    COMMENT "Checking formatting with clang-format"
+)
+
+# Target: run clang-tidy
+add_custom_target(lint
+    COMMAND clang-tidy
+            -p ${CMAKE_BINARY_DIR}
+            ${SRC}
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    COMMENT "Running clang-tidy"
+)
+
+
+# Combined check target
+add_custom_target(check
+    DEPENDS check-format lint
+    COMMENT "Running all code quality checks"
+)
+
+# Build Targets
 add_library(ResolveFacts STATIC IMPORTED GLOBAL)
 set_target_properties(ResolveFacts PROPERTIES IMPORTED_LOCATION "${CMAKE_SOURCE_DIR}/../../resolve-facts/build/libResolveFacts.a")
 set_target_properties(ResolveFacts PROPERTIES INTERFACE_INCLUDE_DIRECTORIES "${CMAKE_SOURCE_DIR}/../../resolve-facts/src/")

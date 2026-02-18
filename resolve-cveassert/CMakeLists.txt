@@ -23,15 +23,6 @@ if(NOT LLVM_ENABLE_RTTI)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-rtti")
 endif()
 
-add_library(CVEAssert SHARED 
-  src/CVEAssert.cpp
-  src/bounds_check.cpp
-  src/null_ptr.cpp
-  src/arith_san.cpp
-  src/helpers.cpp
-  src/undesirableop.cpp
-)
-
 # Format and lint checks
 # Collect source files
 file(GLOB_RECURSE SRC
@@ -67,3 +58,12 @@ add_custom_target(check
     COMMENT "Running all code quality checks"
 )
 
+# Build Targets
+add_library(CVEAssert SHARED 
+  src/CVEAssert.cpp
+  src/bounds_check.cpp
+  src/null_ptr.cpp
+  src/arith_san.cpp
+  src/helpers.cpp
+  src/undesirableop.cpp
+)
