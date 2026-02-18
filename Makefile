@@ -15,13 +15,13 @@ build-resolve-cveassert: resolve-cveassert build-libresolve
 build-libresolve: libresolve
 	cd libresolve && RUSTFLAGS="-D warnings" cargo build --release 
 
-test: test-resolve-cc test-libresolve
+test: test-resolve-cveassert test-libresolve
 
 test-libresolve:
 	cd libresolve && cargo test
 
-test-resolve-cc:
-	+$(MAKE) -C resolve-cc test
+test-resolve-cveassert:
+	+$(MAKE) -C resolve-cveassert test
 
 build-reach: reach build-resolve-facts
 	+$(MAKE) -C reach
