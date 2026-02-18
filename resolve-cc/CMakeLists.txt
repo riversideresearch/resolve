@@ -27,6 +27,8 @@ endif()
 # Format and lint checks
 # Collect source files
 file(GLOB_RECURSE SRC
+    "${CMAKE_SOURCE_DIR}/hooks/*.cpp"
+    "${CMAKE_SOURCE_DIR}/hooks/*.hpp"
     "${CMAKE_SOURCE_DIR}/src/*.cpp"
     "${CMAKE_SOURCE_DIR}/src/*.hpp"
 )
@@ -61,8 +63,10 @@ add_custom_target(check
 
 # Build Targets
 add_library(ResolveFacts STATIC IMPORTED GLOBAL)
-set_target_properties(ResolveFacts PROPERTIES IMPORTED_LOCATION "${CMAKE_SOURCE_DIR}/../../resolve-facts/build/libResolveFacts.a")
-set_target_properties(ResolveFacts PROPERTIES INTERFACE_INCLUDE_DIRECTORIES "${CMAKE_SOURCE_DIR}/../../resolve-facts/src/")
+set_target_properties(ResolveFacts PROPERTIES IMPORTED_LOCATION "${CMAKE_SOURCE_DIR}/../resolve-facts/build/libResolveFacts.a")
+set_target_properties(ResolveFacts PROPERTIES INTERFACE_INCLUDE_DIRECTORIES "${CMAKE_SOURCE_DIR}/../resolve-facts/src/")
 
 add_library(ResolveFactsPlugin SHARED src/ResolveFactsPlugin.cpp)
 target_link_libraries(ResolveFactsPlugin PRIVATE ResolveFacts)
+
+add_subdirectory(hooks)

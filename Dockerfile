@@ -14,17 +14,16 @@ RUN /opt/resolve/scripts/install-deps.sh && apt-get clean && rm -rf /var/lib/apt
 # Copy in resolve tools
 COPY --exclude=build/ klee /opt/resolve/klee
 COPY --exclude=target/ libresolve /opt/resolve/libresolve
-COPY --exclude=build/ llvm-plugin /opt/resolve/llvm-plugin
+COPY --exclude=build/ resolve-cc /opt/resolve/resolve-cc
 COPY --exclude=build/ resolve-cveassert /opt/resolve/resolve-cveassert
 COPY --exclude=build/ reach /opt/resolve/reach
 COPY --exclude=build/ resolve-facts /opt/resolve/resolve-facts
-COPY linker /opt/resolve/linker
 COPY mcp /opt/resolve/mcp
 COPY reach-wrapper /opt/resolve/reach-wrapper
 COPY Makefile /opt/resolve/Makefile
 
 # Executable Scripts
-RUN chmod -R 777 /opt/resolve/linker /opt/resolve/reach-wrapper
+RUN chmod -R 777 /opt/resolve/resolve-cc/linker /opt/resolve/reach-wrapper
 
 # Build
 WORKDIR /opt/resolve/
