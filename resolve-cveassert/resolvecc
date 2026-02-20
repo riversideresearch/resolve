@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+#
+# Copyright (c) 2025 Riverside Research.
+# LGPL-3; See LICENSE.txt in the repo root for details.
+
+set -e 
+
+REAL_CLANG="/usr/bin/clang"
+
+# Initialize default flags
+FLAGS=(
+    -Wextra
+    -Wall
+    -fpass-plugin=/build-resolve/resolve-cveassert/build/libCVEAssert.so
+)
+
+# Debugging 
+echo "[resolvecc] $@" >&2
+
+if [[ "$1" == "--version" ]]; then
+    exec "$REAL_CLANG" "$@"
+fi
+
+exec "$REAL_CLANG" $FLAGS "$@" 

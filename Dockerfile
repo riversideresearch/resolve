@@ -24,7 +24,10 @@ COPY reach-wrapper /opt/resolve/reach-wrapper
 COPY Makefile /opt/resolve/Makefile
 
 # Executable Scripts
-RUN chmod -R 777 /opt/resolve/linker /opt/resolve/reach-wrapper
+RUN chmod -R 777 /opt/resolve/linker /opt/resolve/reach-wrapper /opt/resolve/resolve-cveassert/resolvecc
+
+# Move resolvecc executable to usr/bin 
+RUN cp /opt/resolve/resolve-cveassert/resolvecc /usr/local/bin
 
 # Build
 WORKDIR /opt/resolve/
