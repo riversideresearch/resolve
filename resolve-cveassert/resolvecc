@@ -7,10 +7,16 @@ set -e
 
 REAL_CLANG="/usr/bin/clang"
 
-# Initialize default flags
+# clang lowers mem* libc funtions into llvm intrinsics with additional metadata
+# for optimization we want our CVEAssert sanitizers to see the original libc
+# functions, so we ask clang to skip the special handling
+# Ideally, we would only do that for vulnerable functions, but that requires behavior changes in clang or modifing source code
 FLAGS=(
     -Wextra
     -Wall
+    -fno-builtin-memcpy
+    -fno-builtin-memmove
+    -fno-builtin-memset
     -fpass-plugin=/build-resolve/resolve-cveassert/build/libCVEAssert.so
 )
 
