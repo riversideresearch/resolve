@@ -13,6 +13,7 @@ RUN /opt/resolve/scripts/install-deps.sh && apt-get clean && rm -rf /var/lib/apt
 
 FROM base AS builder
 # Copy in resolve tools
+<<<<<<< HEAD
 COPY cmake /resolve/cmake
 COPY klee /resolve/klee
 COPY klee-uclibc-160 /resolve/klee-uclibc-160
@@ -24,6 +25,24 @@ COPY mcp /resolve/mcp
 COPY resolve-triage /resolve/resolve-triage
 COPY Makefile /resolve/Makefile
 COPY CMakeLists.txt /resolve/CMakeLists.txt
+=======
+COPY --exclude=build/ klee /opt/resolve/klee
+COPY --exclude=target/ libresolve /opt/resolve/libresolve
+COPY --exclude=build/ llvm-plugin /opt/resolve/llvm-plugin
+COPY --exclude=build/ resolve-cveassert /opt/resolve/resolve-cveassert
+COPY --exclude=build/ reach /opt/resolve/reach
+COPY --exclude=build/ resolve-facts /opt/resolve/resolve-facts
+COPY linker /opt/resolve/linker
+COPY mcp /opt/resolve/mcp
+COPY reach-wrapper /opt/resolve/reach-wrapper
+COPY Makefile /opt/resolve/Makefile
+
+# Executable Scripts
+RUN chmod -R 777 /opt/resolve/linker /opt/resolve/reach-wrapper /opt/resolve/resolve-cveassert/resolvecc
+
+# Move resolvecc executable to usr/bin 
+RUN mv /opt/resolve/resolve-cveassert/resolvecc /usr/local/bin
+>>>>>>> ffcc3c2 (Dockerfile: Move resolvecc executable into usr/local/bin dir.)
 
 # Build
 WORKDIR /resolve/
