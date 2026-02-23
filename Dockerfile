@@ -40,7 +40,7 @@ COPY Makefile /opt/resolve/Makefile
 # Executable Scripts
 RUN chmod -R 777 /opt/resolve/linker /opt/resolve/reach-wrapper /opt/resolve/resolve-cveassert/resolvecc
 
-# Move resolvecc executable to usr/bin 
+# Move resolvecc executable to usr/local/bin 
 RUN mv /opt/resolve/resolve-cveassert/resolvecc /usr/local/bin
 >>>>>>> ffcc3c2 (Dockerfile: Move resolvecc executable into usr/local/bin dir.)
 
