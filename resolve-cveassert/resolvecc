@@ -6,25 +6,49 @@
 set -e 
 
 REAL_CLANG="/usr/bin/clang"
+LIBRESOLVE_PATH="/libresolve/target/release"
 
 # clang lowers mem* libc funtions into llvm intrinsics with additional metadata
 # for optimization we want our CVEAssert sanitizers to see the original libc
 # functions, so we ask clang to skip the special handling
-# Ideally, we would only do that for vulnerable functions, but that requires behavior changes in clang or modifing source code
-FLAGS=(
-    -Wextra
-    -Wall
+# Ideally, we would only do that for vulnerable functions, but that requires behavior changes in clang or modifying source code
+COMPTIME_FLAGS=(
     -fno-builtin-memcpy
     -fno-builtin-memmove
     -fno-builtin-memset
-    -fpass-plugin=/build-resolve/resolve-cveassert/build/libCVEAssert.so
+    -fpass-plugin=/opt/resolve/resolve-cveassert/build/libCVEAssert.so
 )
 
-# Debugging 
+RUNTIME_FLAGS=(
+    -L/opt/resolve/"$LIBRESOLVE_PATH"
+    -lresolve
+)
+
+# DEBUGGING: writes each compiler invocation to stderr 
 echo "[resolvecc] $@" >&2
 
 if [[ "$1" == "--version" ]]; then
     exec "$REAL_CLANG" "$@"
 fi
 
-exec "$REAL_CLANG" $FLAGS "$@" 
+# Detect -lresolve
+LINK_RUNTIME=false
+LINKING=true
+
+for arg in "$@"; do 
+    case "$arg" in 
+        -lresolve) LINK_RUNTIME=true ;; # checks if any argument matches '-lresolve'
+        -c | -S)  LINKING=false ;;     # checks for '-c' '-S'
+    esac 
+done
+
+if $LINK_RUNTIME && $LINKING; then
+    exec "$REAL_CLANG" \
+        "${COMPTIME_FLAGS[@]}" \
+        "$@" \
+        "${RUNTIME_FLAGS[@]}"
+else 
+    exec "$REAL_CLANG" \
+        "${COMPTIME_FLAGS[@]}" \
+        "$@"
+fi
