@@ -1,8 +1,7 @@
 
 all: build
 
-build: src
-	mkdir -p build
+build: libs
 	cmake -B build
 	cmake --build build 
 
