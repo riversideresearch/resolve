@@ -10,11 +10,11 @@ FetchContent_Declare(
 
 FetchContent_MakeAvailable(glaze)
 
-add_library(ResolveFacts STATIC src/resolve_facts.cpp)
-target_link_libraries(ResolveFacts PRIVATE glaze::glaze)
+add_library(resolve_facts STATIC src/resolve_facts.cpp)
+target_link_libraries(resolve_facts PRIVATE glaze::glaze)
 
 # Requires PIC?
-set_target_properties(ResolveFacts PROPERTIES POSITION_INDEPENDENT_CODE ON)
+set_target_properties(resolve_facts PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 # glaze features need cxx 23
-target_compile_features(ResolveFacts PUBLIC cxx_std_23)
+target_compile_features(resolve_facts PUBLIC cxx_std_23)
