@@ -8,9 +8,9 @@
 #include <unordered_set>
 #include <vector>
 
-#include "distmap.hpp"
-#include "search.hpp"
-#include "util.hpp"
+#include "reach/distmap.hpp"
+#include "reach/search.hpp"
+#include "reach/util.hpp"
 
 using namespace std;
 

@@ -9,7 +9,7 @@
 #include <unordered_map>
 #include <unordered_set>
 
-#include "facts.hpp"
+#include "reach/facts.hpp"
 
 using NNodeId = resolve_facts::NamespacedNodeId;
 

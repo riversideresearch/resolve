@@ -8,7 +8,7 @@
 #include <unordered_map>
 #include <vector>
 
-#include "graph.hpp"
+#include "reach/graph.hpp"
 
 namespace search {
   using K = NNodeId;

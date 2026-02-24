@@ -11,7 +11,7 @@
 #include <unordered_set>
 #include <vector>
 
-#include "facts.hpp"
+#include "reach/facts.hpp"
 
 using NNodeId = resolve_facts::NamespacedNodeId;
 

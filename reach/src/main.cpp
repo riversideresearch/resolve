@@ -18,10 +18,10 @@
 #include "argparse/argparse.hpp"
 
 #include "config.hpp"
-#include "facts.hpp"
-#include "graph.hpp"
-#include "search.hpp"
-#include "util.hpp"
+#include "reach/facts.hpp"
+#include "reach/graph.hpp"
+#include "reach/search.hpp"
+#include "reach/util.hpp"
 
 using namespace std;
 using namespace chrono;

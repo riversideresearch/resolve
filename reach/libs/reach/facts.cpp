@@ -9,8 +9,8 @@
 #include <string>
 #include <unordered_map>
 
-#include "facts.hpp"
-#include "util.hpp"
+#include "reach/facts.hpp"
+#include "reach/util.hpp"
 
 using namespace resolve_facts;
 using namespace reach_facts;

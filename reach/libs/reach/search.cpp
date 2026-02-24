@@ -8,9 +8,9 @@
 #include <unordered_map>
 #include <vector>
 
-#include "binary_heap.hpp"
-#include "graph.hpp"
-#include "search.hpp"
+#include "reach/binary_heap.hpp"
+#include "reach/graph.hpp"
+#include "reach/search.hpp"
 
 using namespace std;
 

@@ -10,9 +10,9 @@
 #include <utility>
 #include <vector>
 
-#include "facts.hpp"
-#include "graph.hpp"
-#include "util.hpp"
+#include "reach/facts.hpp"
+#include "reach/graph.hpp"
+#include "reach/util.hpp"
 
 using namespace reach_facts;
 using namespace graph;
