@@ -13,11 +13,6 @@ endif()
 
 
 # Build Targets
-add_library(resolve_facts STATIC IMPORTED GLOBAL)
-set_target_properties(resolve_facts PROPERTIES IMPORTED_LOCATION "${CMAKE_SOURCE_DIR}/../resolve-facts/build/libs/resolve_facts/libresolve_facts.a")
-set_target_properties(resolve_facts PROPERTIES INTERFACE_INCLUDE_DIRECTORIES "${CMAKE_SOURCE_DIR}/../resolve-facts/libs/resolve_facts/src/")
-set_target_properties(resolve_facts PROPERTIES POSITION_INDEPENDENT_CODE ON)
-
 add_library(resolve_facts_llvm STATIC src/resolve_facts_llvm.cpp)
 target_link_libraries(resolve_facts_llvm PUBLIC resolve_facts)
 

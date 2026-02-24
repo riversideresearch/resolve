@@ -3,8 +3,8 @@
  *   LGPL-3; See LICENSE.txt in the repo root for details.
  */
 
-#include "resolve_facts.hpp"
-#include "LLVMFacts.hpp"
+#include "resolve_facts/resolve_facts.hpp"
+#include "resolve_facts_llvm/LLVMFacts.hpp"
 
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/SmallVector.h"

@@ -6,7 +6,7 @@
 #ifndef RESOLVE_LLVM_LLVMFACTS_HPP
 #define RESOLVE_LLVM_LLVMFACTS_HPP
 
-#include "resolve_facts.hpp"
+#include "resolve_facts/resolve_facts.hpp"
 
 #include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/Constants.h"
