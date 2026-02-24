@@ -11,7 +11,8 @@
 #include <unordered_map>
 #include <vector>
 
-#include "json.hpp"
+#include "json/json.hpp"
+
 #include "resolve_facts/resolve_facts.hpp"
 
 using NamespacedNodeId = resolve_facts::NamespacedNodeId;

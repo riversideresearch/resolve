@@ -15,7 +15,8 @@
 #include <vector>
 #include <cxxabi.h>
 
-#include "argparse.hpp"
+#include "argparse/argparse.hpp"
+
 #include "config.hpp"
 #include "facts.hpp"
 #include "graph.hpp"
