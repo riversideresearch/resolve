@@ -17,7 +17,10 @@ file(GLOB_RECURSE SRC
 )
 
 add_library(resolve_facts STATIC src/resolve_facts.cpp)
-target_include_directories(resolve_facts PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_include_directories(resolve_facts PUBLIC 
+    "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>/include"
+    "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>"
+)
 target_link_libraries(resolve_facts PRIVATE glaze::glaze)
 
 # Requires PIC because we want to embedd in shared objects

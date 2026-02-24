@@ -18,3 +18,12 @@ if(NOT LLVM_ENABLE_RTTI)
 endif()
 
 resolve_add_check_targets(ResolveFactsPlugin ${SRC})
+
+# Install
+install(TARGETS ResolveFactsPlugin EXPORT resolve_cc_targets)
+
+install(EXPORT resolve_cc_targets 
+    FILE ResolveCCTargets.cmake
+    NAMESPACE Resolve::
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/Resolve
+)

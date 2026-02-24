@@ -16,7 +16,10 @@ file(GLOB_RECURSE SRC
 add_library(resolve_facts_llvm STATIC src/resolve_facts_llvm.cpp)
 target_link_libraries(resolve_facts_llvm PUBLIC resolve_facts)
 
-target_include_directories(resolve_facts_llvm PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_include_directories(resolve_facts_llvm PUBLIC
+    "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>/include"
+    "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>"
+)
 set_target_properties(resolve_facts_llvm PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 # LLVM is normally built without RTTI. Be consistent with that.

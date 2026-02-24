@@ -17,7 +17,10 @@ add_library(libreach
 
 set_target_properties(libreach PROPERTIES OUTPUT_NAME "reach")
 
-target_include_directories(libreach PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include")
+target_include_directories(libreach PUBLIC
+    "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>/include"
+    "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>"
+)
 target_link_libraries(libreach PUBLIC resolve_facts json)
 
 target_compile_features(libreach PUBLIC cxx_std_23)
@@ -28,3 +31,12 @@ add_executable(reach src/main.cpp)
 target_link_libraries(reach PRIVATE libreach json argparse)
 
 resolve_add_check_targets(reach ${SRC})
+
+install(TARGETS reach libreach EXPORT reach_targets)
+install(DIRECTORY include/reach DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+
+install(EXPORT reach_targets 
+    FILE ReachTargets.cmake
+    NAMESPACE Resolve::
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/Resolve
+)
