@@ -17,9 +17,6 @@ endif()
 
 set(CMAKE_CXX_STANDARD 20 STRING "")
 
-# clang-tidy needs compile commands to work correctly
-set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-
 # LLVM is normally built without RTTI. Be consistent with that.
 if(NOT LLVM_ENABLE_RTTI)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-rtti")
@@ -35,10 +32,10 @@ file(GLOB_RECURSE SRC
     "${CMAKE_SOURCE_DIR}/src/*.hpp"
 )
 
-resolve_add_check_targets(ResolveFactsPlugin ${SRC})
-
 # Build Targets
 add_subdirectory(hooks)
 
 add_library(ResolveFactsPlugin SHARED src/ResolveFactsPluginPass.cpp)
 target_link_libraries(ResolveFactsPlugin PRIVATE resolve_facts_llvm)
+
+resolve_add_check_targets(ResolveFactsPlugin ${SRC})

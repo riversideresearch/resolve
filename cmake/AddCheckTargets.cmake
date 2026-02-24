@@ -41,11 +41,14 @@ function(resolve_add_check_targets target_name)
     # Target: run clang-tidy
     add_custom_target(lint-${target_name}
         COMMAND clang-tidy
-                -p ${CMAKE_BINARY_DIR}
+                -p $<TARGET_FILE_DIR:${target_name}>
                 ${sources}
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
         COMMENT "Running clang-tidy checks on ${target_name}"
     )
+
+    # Needed by clang tidy
+    set_target_properties(${target_name} PROPERTIES EXPORT_COMPILE_COMMANDS ON)
 
     # Combined check target
     add_custom_target(check-${target_name}
