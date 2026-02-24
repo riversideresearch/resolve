@@ -1,3 +1,11 @@
+# Collect source files for checks
+file(GLOB_RECURSE SRC
+    "${CMAKE_CURRENT_SOURCE_DIR}/libs/**/*.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/include/**/*.hpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/*.hpp"
+)
+
 # reach lib
 add_library(libreach 
     libs/reach/distmap.cpp
@@ -18,3 +26,5 @@ target_compile_features(libreach PUBLIC cxx_std_23)
 add_executable(reach src/main.cpp)
 
 target_link_libraries(reach PRIVATE libreach json argparse)
+
+resolve_add_check_targets(reach ${SRC})
