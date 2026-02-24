@@ -9,3 +9,4 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 
 add_subdirectory(libs/resolve_facts)
+add_subdirectory(libs/resolve_facts_llvm)

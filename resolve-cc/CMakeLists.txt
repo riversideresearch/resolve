@@ -63,7 +63,6 @@ add_custom_target(check
 
 # Build Targets
 add_subdirectory(hooks)
-add_subdirectory(libs/resolve_facts_llvm)
 
 add_library(ResolveFactsPlugin SHARED src/ResolveFactsPluginPass.cpp)
 target_link_libraries(ResolveFactsPlugin PRIVATE resolve_facts_llvm)
