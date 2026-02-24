@@ -23,8 +23,7 @@ if(NOT LLVM_ENABLE_RTTI)
 endif()
 
 
-# Format and lint checks
-# Collect source files
+# Collect source files for checks
 file(GLOB_RECURSE SRC
     "${CMAKE_SOURCE_DIR}/hooks/*.cpp"
     "${CMAKE_SOURCE_DIR}/hooks/*.hpp"
