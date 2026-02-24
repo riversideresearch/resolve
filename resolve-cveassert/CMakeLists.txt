@@ -39,3 +39,10 @@ if(NOT LLVM_ENABLE_RTTI)
 endif()
 
 resolve_add_check_targets(CVEAssert ${SRC})
+
+# Test Targets
+add_custom_target(test-CVEAssert 
+    lit -v ${CMAKE_CURRENT_SOURCE_DIR}/tests/
+    DEPENDS CVEAssert
+    COMMENT "Running regression tests for CVEAssert"
+)

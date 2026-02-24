@@ -12,7 +12,7 @@ check: build
 	cmake --build build/ --target check
 
 test: build
-	lit -v tests/
+	cmake --build build/ --target test
 
 clean:
 	rm -rf build
