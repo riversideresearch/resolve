@@ -18,11 +18,6 @@ set(CMAKE_CXX_STANDARD 20 STRING "")
 # Test: Adding compile commands producing compile_commands.json
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-# LLVM is normally built without RTTI. Be consistent with that.
-if(NOT LLVM_ENABLE_RTTI)
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-rtti")
-endif()
-
 # Format and lint checks
 # Collect source files
 file(GLOB_RECURSE SRC
@@ -67,3 +62,8 @@ add_library(CVEAssert SHARED
   src/helpers.cpp
   src/undesirableop.cpp
 )
+
+# LLVM is normally built without RTTI. Be consistent with that.
+if(NOT LLVM_ENABLE_RTTI)
+  target_compile_options(CVEAssert PRIVATE -fno-rtti)
+endif()
