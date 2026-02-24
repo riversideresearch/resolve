@@ -30,3 +30,6 @@ set_target_properties(resolve_facts PROPERTIES POSITION_INDEPENDENT_CODE ON)
 target_compile_features(resolve_facts PUBLIC cxx_std_23)
 
 resolve_add_check_targets(resolve_facts ${SRC})
+
+install(TARGETS resolve_facts EXPORT resolve_targets)
+install(DIRECTORY include/resolve_facts DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})

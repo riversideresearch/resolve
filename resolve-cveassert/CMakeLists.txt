@@ -29,10 +29,4 @@ add_custom_target(test-CVEAssert
 )
 
 # Install
-install(TARGETS CVEAssert EXPORT resolve_cveassert_targets)
-
-install(EXPORT resolve_cveassert_targets 
-    FILE ResolveCVEAssertTargets.cmake
-    NAMESPACE Resolve::
-    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/Resolve
-)
+install(TARGETS CVEAssert EXPORT resolve_targets)

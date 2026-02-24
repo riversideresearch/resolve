@@ -28,3 +28,6 @@ if(NOT LLVM_ENABLE_RTTI)
 endif()
 
 resolve_add_check_targets(resolve_facts_llvm ${SRC})
+
+install(TARGETS resolve_facts_llvm EXPORT resolve_targets)
+install(DIRECTORY include/resolve_facts_llvm DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})

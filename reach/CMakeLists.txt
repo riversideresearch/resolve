@@ -32,11 +32,5 @@ target_link_libraries(reach PRIVATE libreach json argparse)
 
 resolve_add_check_targets(reach ${SRC})
 
-install(TARGETS reach libreach EXPORT reach_targets)
+install(TARGETS reach libreach EXPORT resolve_targets)
 install(DIRECTORY include/reach DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
-
-install(EXPORT reach_targets 
-    FILE ReachTargets.cmake
-    NAMESPACE Resolve::
-    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/Resolve
-)
