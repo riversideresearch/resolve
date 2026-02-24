@@ -7,13 +7,6 @@
 
 Fast graph reachability for E-BOSS RESOLVE.
 
-## Build
-
-```
-cmake -B build && \
-cd build; make
-```
-
 ## Run
 
 ```

@@ -12,7 +12,7 @@
 #include <vector>
 
 #include "json.hpp"
-#include "resolve_facts.hpp"
+#include "resolve_facts/resolve_facts.hpp"
 
 using NamespacedNodeId = resolve_facts::NamespacedNodeId;
 
