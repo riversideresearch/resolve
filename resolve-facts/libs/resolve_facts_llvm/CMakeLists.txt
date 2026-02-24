@@ -6,6 +6,11 @@ include_directories(SYSTEM ${LLVM_INCLUDE_DIRS})
 
 set(CMAKE_CXX_STANDARD 20 STRING "")
 
+# Collect source files for checks
+file(GLOB_RECURSE SRC
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/**/*.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/include/**/*.hpp"
+)
 
 # Build Targets
 add_library(resolve_facts_llvm STATIC src/resolve_facts_llvm.cpp)
@@ -18,3 +23,5 @@ set_target_properties(resolve_facts_llvm PROPERTIES POSITION_INDEPENDENT_CODE ON
 if(NOT LLVM_ENABLE_RTTI)
   target_compile_options(resolve_facts_llvm PRIVATE -fno-rtti)
 endif()
+
+resolve_add_check_targets(resolve_facts_llvm ${SRC})
