@@ -14,7 +14,7 @@ check: configure
 test: configure
 	cmake --build build --target test-CVEAssert
 
-install:
+install: build
 	cmake --install install
 
 clean:
