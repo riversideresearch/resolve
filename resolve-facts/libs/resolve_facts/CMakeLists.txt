@@ -31,5 +31,5 @@ target_compile_features(resolve_facts PUBLIC cxx_std_23)
 
 resolve_add_check_targets(resolve_facts ${SRC})
 
-install(TARGETS resolve_facts EXPORT resolve_targets)
+install(TARGETS resolve_facts EXPORT resolve_facts_targets)
 install(DIRECTORY include/resolve_facts DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})

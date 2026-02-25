@@ -1,0 +1,8 @@
+@PACKAGE_INIT@
+
+include("${CMAKE_CURRENT_LIST_DIR}/ResolveFactsTargets.cmake")
+
+include(CMakeFindDependencyMacro)
+find_dependency(glaze)
+
+check_required_components(ResolveFacts)
