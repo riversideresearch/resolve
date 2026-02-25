@@ -1,12 +1,15 @@
 SHELL := /bin/bash
 all: build
 
-.PHONY: build test install clean
+.PHONY: build check test install clean
 build: configure
 	cmake --build build
 
 configure: 
 	cmake -Bbuild -GNinja
+
+check: configure
+	cmake --build build --target check
 
 test: configure
 	cmake --build build --target test-CVEAssert
