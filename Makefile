@@ -1,54 +1,42 @@
 SHELL := /bin/bash
 all: build
 
-build: build-resolve-facts build-resolve-cc build-resolve-cveassert build-libresolve build-reach build-klee
+build: build-resolve build-libresolve
+.PHONY: build build-resolve build-libresolve
 
-build-resolve-facts: resolve-facts
-	+$(MAKE) -C resolve-facts
-
-build-resolve-cc: resolve-cc build-libresolve build-resolve-facts
-	+$(MAKE) -C resolve-cc
-
-build-resolve-cveassert: resolve-cveassert build-libresolve
-	+$(MAKE) -C resolve-cveassert
+build-resolve: 
+	cmake -Bbuild -GNinja
+	cmake --build build
 
 build-libresolve: libresolve
 	cd libresolve && RUSTFLAGS="-D warnings" cargo build --release 
 
-test: test-resolve-cveassert test-libresolve
+test: test-libresolve test-resolve-cveassert
+.PHONY: test test-libresolve test-resolve-cveassert
 
 test-libresolve:
 	cd libresolve && cargo test
 
-test-resolve-cveassert:
-	+$(MAKE) -C resolve-cveassert test
+test-resolve-cveassert: build-resolve
+	cmake --build build --target test-CVEAssert
 
-build-reach: reach build-resolve-facts
-	+$(MAKE) -C reach
+install: install-resolve
+.PHONY: install install-resolve
 
-build-klee: klee build-reach build-resolve-facts
-# 	+$(MAKE) -C klee
+install-resolve: build-resolve
+	cmake --install install
 
-clean: clean-resolve-facts clean-resolve-cc clean-resolve-cveassert clean-libresolve clean-reach clean-klee
+clean: clean-resolve clean-libresolve
+.PHONY: clean clean-resolve clean-libresolve
 
-clean-resolve-facts:
-	cd resolve-facts && make clean
-
-clean-resolve-cc:
-	cd resolve-cc && make clean
-
-clean-resolve-cveassert:
-	+$(MAKE) -C resolve-cveassert clean
+clean-resolve:
+	rm -rf build/
+	rm -rf install/
 
 clean-libresolve:
 	cd libresolve && cargo clean
 
-clean-reach:
-	cd reach && make clean
-
-clean-klee:
-	cd klee && make clean
-
-install-packages:
+install-deps:
 	chmod u+x ./scripts/install-deps.sh
 	./scripts/install-deps.sh
+.PHONY: install-deps
