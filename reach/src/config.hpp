@@ -10,8 +10,9 @@
 #include <string>
 #include <vector>
 
-#include "json.hpp"
-#include "facts.hpp"
+#include "json/json.hpp"
+
+#include "reach/facts.hpp"
 
 using NNodeId = resolve_facts::NamespacedNodeId;
 

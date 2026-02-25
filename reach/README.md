@@ -7,13 +7,6 @@
 
 Fast graph reachability for E-BOSS RESOLVE.
 
-## Build
-
-```
-cmake -B build && \
-cd build; make
-```
-
 ## Run
 
 ```
@@ -83,8 +76,6 @@ stdout if no path was given.
 ## Code
 
 Under `lib/`:
-- json.hpp
-  + open-source (MIT) JSON library from https://github.com/nlohmann/json
 - cache.hpp
   + templated helper functions for reading/writing data structures
     (vector, unordered_set, unordered_map) to/from disk
@@ -113,8 +104,6 @@ Under `lib/`:
 
 Under `src/`:
 
-- argparse.hpp
-  + open-source (MIT) argument parsing library from http://github.com/p-ranav/argparse
 - config.hpp
   + specifications of the tool's input and output formats as structs
   + JSON serializers and deserializers are auto-generated from these
