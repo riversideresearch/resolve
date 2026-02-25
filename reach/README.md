@@ -10,6 +10,7 @@ Fast graph reachability for E-BOSS RESOLVE.
 ## Run
 
 ```
+cmake -B build && cmake --build build/
 ./build/reach --help
 ```
 

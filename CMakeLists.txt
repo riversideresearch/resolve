@@ -15,8 +15,6 @@ include_directories(SYSTEM ${LLVM_INCLUDE_DIRS})
 
 set(CMAKE_CXX_STANDARD 20 STRING "")
 
-add_subdirectory(vendor)
-
 add_subdirectory(reach)
 add_subdirectory(resolve-cc)
 add_subdirectory(resolve-cveassert)
