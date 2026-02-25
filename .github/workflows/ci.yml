@@ -13,7 +13,7 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v5
       - name: Install deps
-        run: make install-packages
+        run: make install-deps
       - name: Build
         run: make build
       - name: Test
