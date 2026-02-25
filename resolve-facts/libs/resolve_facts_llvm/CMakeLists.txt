@@ -27,7 +27,9 @@ if(NOT LLVM_ENABLE_RTTI)
   target_compile_options(resolve_facts_llvm PRIVATE -fno-rtti)
 endif()
 
-resolve_add_check_targets(resolve_facts_llvm ${SRC})
+if(COMMAND resolve_add_check_targets)
+  resolve_add_check_targets(resolve_facts_llvm ${SRC})
+endif()
 
 install(TARGETS resolve_facts_llvm EXPORT resolve_facts_targets)
 install(DIRECTORY include/resolve_facts_llvm DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})

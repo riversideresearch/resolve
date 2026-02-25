@@ -21,7 +21,9 @@ if(NOT LLVM_ENABLE_RTTI)
   target_compile_options(CVEAssert PRIVATE -fno-rtti)
 endif()
 
-resolve_add_check_targets(CVEAssert ${SRC})
+if(COMMAND resolve_add_check_targets)
+  resolve_add_check_targets(CVEAssert ${SRC})
+endif()
 
 # Test Targets
 add_custom_target(test-CVEAssert 

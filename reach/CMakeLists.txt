@@ -50,7 +50,9 @@ add_executable(reach src/main.cpp)
 
 target_link_libraries(reach PRIVATE libreach json argparse)
 
-resolve_add_check_targets(reach ${SRC})
+if(COMMAND resolve_add_check_targets)
+    resolve_add_check_targets(reach ${SRC})
+endif()
 
 install(TARGETS reach libreach EXPORT reach_targets)
 install(DIRECTORY include/reach DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
