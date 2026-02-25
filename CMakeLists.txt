@@ -3,6 +3,10 @@ project(resolve)
 
 include(${CMAKE_SOURCE_DIR}/cmake/AddCheckTargets.cmake)
 
+if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
+    set(CMAKE_INSTALL_PREFIX "/opt/resolve" CACHE PATH "Resolve Install Location" FORCE)
+endif()
+
 include(GNUInstallDirs)
 
 # Add LLVM headers to include search paths
