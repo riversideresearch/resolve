@@ -4,6 +4,8 @@ file(GLOB_RECURSE SRC
     "${CMAKE_CURRENT_SOURCE_DIR}/src/*.hpp"
 )
 
+add_subdirectory(libresolve)
+
 # Build Targets
 add_library(CVEAssert SHARED 
   src/CVEAssert.cpp
