@@ -34,7 +34,7 @@ plugin = os.path.dirname(__file__) + "/../../build/resolve-cveassert/libCVEAsser
 config.substitutions.append(("%plugin", plugin))
 
 # Add path to libresolve rlib
-rlib = os.path.dirname(__file__) + "/../../build/resolve-cveassert/libresolve/debug/libresolve.so"
+rlib = os.path.dirname(__file__) + "/../../build/resolve-cveassert/libresolve/libresolve/debug/"
 config.substitutions.append(("%rlib", rlib))
 
 # Add suffixes to test
