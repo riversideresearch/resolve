@@ -24,10 +24,10 @@
 #include "klee/Support/PrintVersion.h"
 #include "klee/System/Time.h"
 
-#include "distmap.hpp"
-#include "facts.hpp"
-#include "graph.hpp"
-#include "EnhancedFacts.hpp"
+#include "reach/distmap.hpp"
+#include "reach/facts.hpp"
+#include "reach/graph.hpp"
+#include "resolve_facts_llvm/resolve_facts_llvm.hpp"
 
 #include "klee/Support/CompilerWarning.h"
 DISABLE_WARNING_PUSH

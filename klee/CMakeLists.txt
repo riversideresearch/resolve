@@ -643,26 +643,14 @@ message(STATUS "KLEE_COMPONENT_CXX_DEFINES: '${KLEE_COMPONENT_CXX_DEFINES}'")
 message(STATUS "KLEE_COMPONENT_CXX_FLAGS: '${KLEE_COMPONENT_CXX_FLAGS}'")
 message(STATUS "KLEE_SOLVER_LIBRARIES: '${KLEE_SOLVER_LIBRARIES}'")
 
-
 ################################################################################
-# REACH
+# RESOLVE components
 ################################################################################
-add_library(reachlib STATIC IMPORTED GLOBAL)
-set_target_properties(reachlib PROPERTIES IMPORTED_LOCATION "${CMAKE_SOURCE_DIR}/../reach/build/lib/libreachlib.a")
-set_target_properties(reachlib PROPERTIES INTERFACE_INCLUDE_DIRECTORIES "${CMAKE_SOURCE_DIR}/../reach/lib/")
+add_subdirectory(../reach ${CMAKE_CURRENT_BINARY_DIR}/reach)
+add_subdirectory(../resolve-facts  ${CMAKE_CURRENT_BINARY_DIR}/resolve-facts)
 
-#set(REACH_SOURCE_DIR "${CMAKE_SOURCE_DIR}/../reach")
-#set(REACH_BUILD_DIR "${CMAKE_BINARY_DIR}/reach_build")
-#add_subdirectory(${REACH_SOURCE_DIR} ${REACH_BUILD_DIR})
-#set(REACHLIB_DIR "${REACH_SOURCE_DIR}/lib")
-
-################################################################################
-# RESOLVE LLVM-PLUGIN
-################################################################################
-
-add_library(ResolveFacts STATIC IMPORTED GLOBAL)
-set_target_properties(ResolveFacts PROPERTIES IMPORTED_LOCATION "${CMAKE_SOURCE_DIR}/../resolve-facts/build/libResolveFacts.a")
-set_target_properties(ResolveFacts PROPERTIES INTERFACE_INCLUDE_DIRECTORIES "${CMAKE_SOURCE_DIR}/../resolve-facts/src/")
+# find_package(Reach REQUIRED)
+# find_package(ResolveFacts REQUIRED)
 
 ################################################################################
 # KLEE components
