@@ -18,7 +18,7 @@ cargo build --release            # Release build
 ## Usage
 1. Build the rust library in `libresolve/`.
 2. Link the library with the binary using linker options.
-3. Execute the binary.
+3. Execute the binary with `RUSTLOG=info`.
 
 ## Directory Structure
 ```bash
@@ -36,17 +36,15 @@ Libresolve uses environment variables to control where the runtime logs are writ
 - `RESOLVE_RUNTIME_LOG_DIR`
 
 Both environment variables expect a file path as input. If the file path has not been created then
-libresolve will create the directories. Each log file automatically appends the process ID before the extension. 
+libresolve will create the directories. If a file path is not set then libresolve 
+will create the file in the same directory as the binary. 
+Each log file automatically appends the process ID before the extension. 
 
-After linking and running the resulting file will have this format.
-```bash
-./resolve_log_<pid>.out
-```
 >[!NOTE]
 Both environment variables expect a file path as input. If the file path
 has not been created then libresolve will attempt to create the necessary parent directories. 
 If libresolve fails to create the necessary parent directories due to permission issues, an error is thrown and libresolve 
-will panic. Each log file automatically appends the process ID before the extension.
+will panic.
 
 
 ## LLVM Passes
