@@ -38,7 +38,7 @@ Libresolve uses environment variables to control where the runtime logs are writ
 Both environment variables expect a file path as input. If the file path has not been created then
 libresolve will create the directories. If a file path is not set then libresolve 
 will create the file in the same directory as the binary. 
-Each log file automatically appends the process ID before the extension. 
+Each log file automatically appends the process ID after the extension. 
 
 >[!NOTE]
 Both environment variables expect a file path as input. If the file path
