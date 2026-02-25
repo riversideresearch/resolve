@@ -38,8 +38,7 @@ COPY reach-wrapper /opt/resolve/reach-wrapper
 COPY Makefile /opt/resolve/Makefile
 
 # Executable Scripts
-RUN chmod -R 777 /opt/resolve/linker /opt/resolve/reach-wrapper /opt/resolve/resolve-cveassert/resolvecc
-RUN chmod -R 777 /opt/resolve/resolve-cc/linker /opt/resolve/reach-wrapper
+RUN chmod -R 777 /opt/resolve/resolve-cc/linker /opt/resolve/reach-wrapper /opt/resolve/resolve-cveassert/resolvecc
 
 # Add resolvecc to PATH
 ENV PATH="/opt/resolve/resolve-cveassert:${PATH}"
