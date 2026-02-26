@@ -27,6 +27,11 @@ endif()
 
 # Test Targets
 add_custom_target(test-CVEAssert 
+    COMMAND
+      ${CMAKE_COMMAND} -E env 
+        RESOLVE_TEST_CVEASSERT_LIB=$<TARGET_FILE:CVEAssert>
+        RESOLVE_TEST_LIBRESOLVE_LIBRARY_PATH=${LIBRESOLVE_LIBRARY_PATH}
+        
     lit -v ${CMAKE_CURRENT_SOURCE_DIR}/tests/
     DEPENDS CVEAssert
     COMMENT "Running regression tests for CVEAssert"

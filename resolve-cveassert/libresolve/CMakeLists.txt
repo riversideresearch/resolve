@@ -12,7 +12,9 @@ endif()
 
 set(RUST_CRATE_DIR   ${CMAKE_CURRENT_SOURCE_DIR})
 set(RUST_OUT_DIR   ${CMAKE_CURRENT_BINARY_DIR}/libresolve-build)
-set(RUST_LIB ${RUST_OUT_DIR}/${CARGO_PROFILE}/libresolve.so)
+set(LIBRESOLVE_LIBRARY_PATH ${RUST_OUT_DIR}/${CARGO_PROFILE} PARENT_SCOPE)
+set(RUST_LIB ${LIBRESOLVE_LIBRARY_PATH}/libresolve.so)
+
 
 add_custom_command(
     OUTPUT ${RUST_LIB}

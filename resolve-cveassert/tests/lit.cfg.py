@@ -30,11 +30,15 @@ config.substitutions.append(("%clang", clang))
 config.substitutions.append(("%FileCheck", filecheck))
 
 # Add path to pass plugin
-plugin = os.path.dirname(__file__) + "/../../build/resolve-cveassert/libCVEAssert.so"
+plugin = os.environ.get("RESOLVE_TEST_CVEASSERT_LIB",
+    default=os.path.dirname(__file__) + "/../../build/resolve-cveassert/libCVEAssert.so"
+)
 config.substitutions.append(("%plugin", plugin))
 
 # Add path to libresolve rlib
-rlib = os.path.dirname(__file__) + "/../../build/resolve-cveassert/libresolve/libresolve/debug/"
+rlib = os.environ.get("RESOLVE_TEST_LIBRESOLVE_LIBRARY_PATH",
+    default=os.path.dirname(__file__) + "/../../build/resolve-cveassert/libresolve/libresolve-build/debug/"
+)
 config.substitutions.append(("%rlib", rlib))
 
 # Add suffixes to test
