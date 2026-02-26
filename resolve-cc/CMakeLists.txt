@@ -22,4 +22,4 @@ if(COMMAND resolve_add_check_targets)
 endif()
 
 install(TARGETS ResolveFactsPlugin EXPORT resolve_targets)
-install(PROGRAMS linker/extract_facts.py DESTINATION ${CMAKE_INSTALL_BINDIR})
+install(DIRECTORY bin/ DESTINATION ${CMAKE_INSTALL_BINDIR})
