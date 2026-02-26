@@ -8,8 +8,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Install deps
-COPY scripts /resolve/scripts
-RUN /resolve/scripts/install-deps.sh && apt-get clean && rm -rf /var/lib/apt/lists/*
+COPY scripts /opt/resolve/scripts
+RUN /opt/resolve/scripts/install-deps.sh && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 FROM base AS builder
 # Copy in resolve tools
