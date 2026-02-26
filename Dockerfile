@@ -27,7 +27,7 @@ COPY CMakeLists.txt /resolve/CMakeLists.txt
 
 # Build
 WORKDIR /resolve/
-RUN make build && make install
+RUN PATH=$PATH:~/.cargo/bin make build install
 
 FROM base AS git-version
 COPY .git/ /resolve-git/
