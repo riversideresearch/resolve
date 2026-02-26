@@ -6,8 +6,8 @@
 # Link facts from multiple object files, storing them in <build-dir>
 # See HELP for usage.
 
-LINKMAP=/opt/resolve/linker/AnalysisEngine_linkmap.py
-BUILD_DIR= # e.g., /shared-volume/ProgramAnalysis/nasa-cfs/Build
+SCRIPT_DIR="${0%/*}"
+EXTRACT_FACTS="${SCRIPT_DIR}/extract_facts.py"
 FACT_FILES="facts.facts"
 
 HELP="Usage: ./link-facts.sh <build-dir> <object-file1> [<object-file2> ... <object-fileN>]"
@@ -28,7 +28,7 @@ for f in $TARGETS; do
         echo "Target $BASENAME: artifact directory $BUILD_DIR/$BASENAME";
         rm -rf $BUILD_DIR/$BASENAME &&
         mkdir -p $BUILD_DIR/$BASENAME &&
-        $LINKMAP --in_bin $f --out_dir $BUILD_DIR/$BASENAME &&
+        $EXTRACT_FACTS --in_bin $f --out_dir $BUILD_DIR/$BASENAME &&
         for fact_file in $FACT_FILES; do
             echo "Target $BASENAME: Source fact file $BUILD_DIR/$BASENAME/$fact_file";
             echo "Target $BASENAME: Destination fact file $BUILD_DIR/$fact_file";
