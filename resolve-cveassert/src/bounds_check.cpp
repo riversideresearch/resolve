@@ -253,11 +253,10 @@ static Function *getOrCreateBoundsCheckMemcpySanitizer(
 
   // NormalBB: Call memcpy and return the ptr
   builder.SetInsertPoint(NormalBB);
-  FunctionCallee memcpyfn = M->getOrInsertFunction(
+  FunctionCallee memcpyFn = M->getOrInsertFunction(
       "memcpy", FunctionType::get(ptr_ty, {ptr_ty, ptr_ty, size_ty}, false));
-  Value *memcpy_ptr =
-      builder.CreateCall(memcpyfn, {dst_ptr, src_ptr, size_arg});
-  builder.CreateRet(memcpy_ptr);
+  Value *memcpyPtr = builder.CreateCall(memcpyFn, {dst_ptr, src_ptr, size_arg});
+  builder.CreateRet(memcpyPtr);
 
   // SanitizeMemcpyBB: Remediate memcpy returns null pointer.
   builder.SetInsertPoint(SanitizeMemcpyBB);
@@ -271,6 +270,65 @@ static Function *getOrCreateBoundsCheckMemcpySanitizer(
   if (verifyFunction(*sanitizeMemcpyFn, &out)) {
   }
   return sanitizeMemcpyFn;
+}
+
+static Function *getOrCreateBoundsCheckMemsetSanitizer(
+    Module *M, Vulnerability::RemediationStrategies strategy) {
+  Twine handlerName = "resolve_bounds_check_memset";
+  SmallVector<char> handlerNameStr;
+  LLVMContext &Ctx = M->getContext();
+
+  if (auto handler = M->getFunction(handlerName.toStringRef(handlerNameStr)))
+    return handler;
+
+  IRBuilder<> builder(Ctx);
+
+  auto ptr_ty = PointerType::get(Ctx, 0);
+  auto i32_ty = Type::getInt32Ty(Ctx);
+  auto size_ty = Type::getInt64Ty(Ctx);
+
+  FunctionType *sanitizeMemsetFnTy =
+      FunctionType::get(ptr_ty, {ptr_ty, i32_ty, size_ty}, false);
+
+  Function *sanitizeMemsetFn = Function::Create(
+      sanitizeMemsetFnTy, Function::InternalLinkage, handlerName, M);
+
+  BasicBlock *EntryBB = BasicBlock::Create(Ctx, "", sanitizeMemsetFn);
+  BasicBlock *NormalBB = BasicBlock::Create(Ctx, "", sanitizeMemsetFn);
+  BasicBlock *SanitizeMemsetBB = BasicBlock::Create(Ctx, "", sanitizeMemsetFn);
+
+  builder.SetInsertPoint(EntryBB);
+
+  // Extract arguments for memset
+  Value *basePtr = sanitizeMemsetFn->getArg(0);
+  Value *valueArg = sanitizeMemsetFn->getArg(1);
+  Value *accessSize = sanitizeMemsetFn->getArg(2);
+
+  Value *check_dst_bd =
+      builder.CreateCall(getOrCreateResolveAccessOk(M), {basePtr, accessSize});
+  builder.CreateCondBr(check_dst_bd, NormalBB, SanitizeMemsetBB);
+
+  // NormalBB: call memset and return the pointer
+  builder.SetInsertPoint(NormalBB);
+
+  FunctionCallee memsetFn = M->getOrInsertFunction(
+      "memset", FunctionType::get(ptr_ty, {ptr_ty, i32_ty, size_ty}, false));
+
+  Value *memsetPtr =
+      builder.CreateCall(memsetFn, {basePtr, valueArg, accessSize});
+  builder.CreateRet(memsetPtr);
+
+  // SanitizeMemsetBB: Jump to remediation
+  builder.SetInsertPoint(SanitizeMemsetBB);
+  builder.CreateCall(getOrCreateRemediationBehavior(M, strategy));
+  builder.CreateRet(basePtr);
+
+  // DEBUGGING
+  raw_ostream &out = errs();
+  out << *sanitizeMemsetFn;
+  if (verifyFunction(*sanitizeMemsetFn, &out)) {
+  }
+  return sanitizeMemsetFn;
 }
 
 static Function *getOrCreateResolveGep(Module *M) {
@@ -810,6 +868,75 @@ void sanitizeMemcpy(Function *F,
   }
 }
 
+void sanitizeMemset(Function *F,
+                    Vulnerability::RemediationStrategies strategy) {
+  LLVMContext &Ctx = F->getContext();
+  IRBuilder<> builder(Ctx);
+  std::vector<Instruction *> memsetList;
+
+  for (auto &BB : *F) {
+    for (auto &inst : BB) {
+      if (isa<MemSetInst>(&inst)) {
+        memsetList.push_back(&inst);
+        continue;
+      }
+
+      auto *call = dyn_cast<CallInst>(&inst);
+      if (!call) {
+        continue;
+      }
+
+      Function *calledFn = call->getCalledFunction();
+      if (!calledFn) {
+        continue;
+      }
+
+      StringRef fnName = calledFn->getName();
+
+      if (fnName == "memset") {
+        memsetList.push_back(call);
+      }
+    }
+  }
+
+  for (auto Inst : memsetList) {
+    builder.SetInsertPoint(Inst);
+
+    Value *basePtr = nullptr;
+    Value *valueArg = nullptr;
+    Value *sizeArg = nullptr;
+
+    if (auto *MI = dyn_cast<MemSetInst>(Inst)) {
+      basePtr = MI->getDest();
+      valueArg = MI->getValue();
+      sizeArg = MI->getLength();
+    } else if (auto *MC = dyn_cast<CallInst>(Inst)) {
+      basePtr = MC->getArgOperand(0);
+      valueArg = MC->getArgOperand(1);
+      sizeArg = MC->getArgOperand(2);
+    }
+
+    // Normalize value parameter type
+    Type *ExpectedValueTy = Type::getInt32Ty(Ctx);
+    if (valueArg->getType() != ExpectedValueTy) {
+      valueArg = builder.CreateIntCast(valueArg, ExpectedValueTy, false);
+    }
+
+    // Normalize length parameter type
+    Type *ExpectedLengthTy = Type::getInt64Ty(Ctx);
+    if (sizeArg->getType() != ExpectedLengthTy) {
+      sizeArg = builder.CreateIntCast(sizeArg, ExpectedLengthTy, false);
+    }
+
+    auto memsetFn =
+        getOrCreateBoundsCheckMemsetSanitizer(F->getParent(), strategy);
+    auto memsetCall =
+        builder.CreateCall(memsetFn, {basePtr, valueArg, sizeArg});
+    Inst->replaceAllUsesWith(memsetCall);
+    Inst->eraseFromParent();
+  }
+}
+
 void sanitizeLoadStore(Function *F,
                        Vulnerability::RemediationStrategies strategy) {
   LLVMContext &Ctx = F->getContext();
@@ -890,5 +1017,6 @@ void sanitizeMemInstBounds(Function *F,
                            Vulnerability::RemediationStrategies strategy) {
   instrumentGEP(F);
   sanitizeMemcpy(F, strategy);
+  sanitizeMemset(F, strategy);
   sanitizeLoadStore(F, strategy);
 }
