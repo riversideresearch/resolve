@@ -10,22 +10,16 @@ else()
     set(CARGO_FLAGS --release)
 endif()
 
-set(RUST_OUT_DIR   ${CMAKE_CURRENT_BINARY_DIR}/libresolve)
+set(RUST_CRATE_DIR   ${CMAKE_CURRENT_SOURCE_DIR})
+set(RUST_OUT_DIR   ${CMAKE_CURRENT_BINARY_DIR}/libresolve-build)
 set(RUST_LIB ${RUST_OUT_DIR}/${CARGO_PROFILE}/libresolve.so)
 
-ExternalProject_Add(libresolve
-    PREFIX          ${CMAKE_CURRENT_BINARY_DIR}
-    SOURCE_DIR      ${CMAKE_CURRENT_SOURCE_DIR}
-    BUILD_IN_SOURCE YES
+add_custom_command(
+    OUTPUT ${RUST_LIB}
+    COMMAND 
+        ${CMAKE_COMMAND} -E env CARGO_TARGET_DIR=${RUST_OUT_DIR} cargo build ${CARGO_FLAGS} 
+    WORKING_DIRECTORY ${RUST_CRATE_DIR}
+    COMMENT "Building Rust library" VERBATIM)
 
-    CONFIGURE_COMMAND ""
-    INSTALL_COMMAND ""
-    BUILD_COMMAND
-        ${CMAKE_COMMAND} -E env
-            CARGO_TARGET_DIR=${RUST_OUT_DIR}
-            cargo build ${CARGO_FLAGS}
-
-    BUILD_BYPRODUCTS ${RUST_LIB}
-)
-
+add_custom_target(libresolve ALL DEPENDS ${RUST_LIB})
 install(FILES ${RUST_LIB} DESTINATION ${CMAKE_INSTALL_LIBDIR})
