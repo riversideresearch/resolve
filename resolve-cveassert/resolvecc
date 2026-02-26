@@ -3,10 +3,10 @@
 # Copyright (c) 2025 Riverside Research.
 # LGPL-3; See LICENSE.txt in the repo root for details.
 
-set -e 
+set -e -x
 
 REAL_CLANG="/usr/bin/clang"
-LIBRESOLVE_PATH="/libresolve/target/release"
+LIBRESOLVE_PATH="libresolve/target/release"
 
 # clang lowers mem* libc funtions into llvm intrinsics with additional metadata
 # for optimization we want our CVEAssert sanitizers to see the original libc
@@ -22,6 +22,7 @@ COMPTIME_FLAGS=(
 RUNTIME_FLAGS=(
     -L/opt/resolve/"$LIBRESOLVE_PATH"
     -lresolve
+    -Wl,-rpath=/opt/resolve/"$LIBRESOLVE_PATH"
 )
 
 # DEBUGGING: writes each compiler invocation to stderr 
@@ -32,17 +33,16 @@ if [[ "$1" == "--version" ]]; then
 fi
 
 # Detect -lresolve
-LINK_RUNTIME=false
 LINKING=true
 
 for arg in "$@"; do 
     case "$arg" in 
-        -lresolve) LINK_RUNTIME=true ;; # checks if any argument matches '-lresolve'
+        -lresolve) LINKING=true ;; # checks if any argument matches '-lresolve'
         -c | -S)  LINKING=false ;;     # checks for '-c' '-S'
     esac 
 done
 
-if $LINK_RUNTIME && $LINKING; then
+if $LINKING; then
     exec "$REAL_CLANG" \
         "${COMPTIME_FLAGS[@]}" \
         "$@" \
