@@ -3,10 +3,15 @@
 # Copyright (c) 2025 Riverside Research.
 # LGPL-3; See LICENSE.txt in the repo root for details.
 
-set -e -x
+set -e
+# set -x for debugging
 
+# Paths for clang and libresolve rtlib
 REAL_CLANG="/usr/bin/clang"
 LIBRESOLVE_PATH="libresolve/target/release"
+
+# DEBUGGING: Writes each compiler invocation to stderr 
+echo "[resolvecc] $@" >&2
 
 # clang lowers mem* libc funtions into llvm intrinsics with additional metadata
 # for optimization we want our CVEAssert sanitizers to see the original libc
@@ -25,30 +30,51 @@ RUNTIME_FLAGS=(
     -Wl,-rpath=/opt/resolve/"$LIBRESOLVE_PATH"
 )
 
-# DEBUGGING: writes each compiler invocation to stderr 
-echo "[resolvecc] $@" >&2
-
+# Ensure --version flag works with wrapper
 if [[ "$1" == "--version" ]]; then
     exec "$REAL_CLANG" "$@"
 fi
 
-# Detect -lresolve
-LINKING=true
+# Variable tells resolvecc whether to link libresolve or not
+LINK_LIBRESOLVE=true
 
-for arg in "$@"; do 
-    case "$arg" in 
-        -lresolve) LINKING=true ;; # checks if any argument matches '-lresolve'
-        -c | -S)  LINKING=false ;;     # checks for '-c' '-S'
-    esac 
-done
+
+# resolvecc -fcve-assert=<vuln.json> <flags> <source>
+RESOLVE_LABEL_CVE=""
+NEW_ARGS=()
+args=("$@")
+
+for ((i=0; i<${#args[@]}; i++)); do
+    
+    arg="${args[$i]}"
+
+    if [[ "$arg" == "-c" || "$arg" == "-S" || "$arg" == "-E" ]]; then
+        LINK_LIBRESOLVE=false
+    fi
+
+    if [[ "$arg" == "-fcve-assert" ]]; then
+        file_path="${args[$((i + 1))]}"
+        if [[ ! -f "$file_path" ]]; then
+            echo "[resolvecc]: ERROR '$file_path' could not be found!"
+            exit 1
+        fi 
+
+        RESOLVE_LABEL_CVE="$file_path"
+        i=$((i + 2)) # Skip over flag and file path, clang does not understand these flags. 
+    else 
+        NEW_ARGS+=("$arg")
+    fi
+done 
 
 if $LINKING; then
+    RESOLVE_LABEL_CVE="$RESOLVE_LABEL_CVE"\
     exec "$REAL_CLANG" \
         "${COMPTIME_FLAGS[@]}" \
-        "$@" \
+        "${NEW_ARGS[@]}" \
         "${RUNTIME_FLAGS[@]}"
 else 
+    RESOLVE_LABEL_CVE="$RESOLVE_LABEL_CVE"\
     exec "$REAL_CLANG" \
         "${COMPTIME_FLAGS[@]}" \
-        "$@"
+        "${NEW_ARGS[@]}"
 fi
