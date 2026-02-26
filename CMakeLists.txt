@@ -15,18 +15,13 @@ include_directories(SYSTEM ${LLVM_INCLUDE_DIRS})
 
 set(CMAKE_CXX_STANDARD 20 STRING "")
 
-add_subdirectory(vendor)
-
-add_subdirectory(reach)
 add_subdirectory(resolve-cc)
 add_subdirectory(resolve-cveassert)
 add_subdirectory(resolve-facts)
+add_subdirectory(resolve-triage)
 
 install(EXPORT resolve_targets 
     FILE ResolveTargets.cmake
     NAMESPACE Resolve::
     DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/resolve
 )
-
-# Klee
-

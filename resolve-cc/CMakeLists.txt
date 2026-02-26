@@ -17,6 +17,8 @@ if(NOT LLVM_ENABLE_RTTI)
   target_compile_options(ResolveFactsPlugin PRIVATE -fno-rtti)
 endif()
 
-resolve_add_check_targets(ResolveFactsPlugin ${SRC})
+if(COMMAND resolve_add_check_targets)
+  resolve_add_check_targets(ResolveFactsPlugin ${SRC})
+endif()
 
 install(TARGETS ResolveFactsPlugin EXPORT resolve_targets)

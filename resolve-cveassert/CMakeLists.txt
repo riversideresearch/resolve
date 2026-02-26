@@ -21,10 +21,17 @@ if(NOT LLVM_ENABLE_RTTI)
   target_compile_options(CVEAssert PRIVATE -fno-rtti)
 endif()
 
-resolve_add_check_targets(CVEAssert ${SRC})
+if(COMMAND resolve_add_check_targets)
+  resolve_add_check_targets(CVEAssert ${SRC})
+endif()
 
 # Test Targets
 add_custom_target(test-CVEAssert 
+    COMMAND
+      ${CMAKE_COMMAND} -E env 
+        RESOLVE_TEST_CVEASSERT_LIB=$<TARGET_FILE:CVEAssert>
+        RESOLVE_TEST_LIBRESOLVE_LIBRARY_PATH=${LIBRESOLVE_LIBRARY_PATH}
+        
     lit -v ${CMAKE_CURRENT_SOURCE_DIR}/tests/
     DEPENDS CVEAssert
     COMMENT "Running regression tests for CVEAssert"

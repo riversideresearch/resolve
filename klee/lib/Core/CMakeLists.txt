@@ -35,11 +35,11 @@ target_link_libraries(kleeCore PRIVATE
   kleaverSolver
   kleaverExpr
   kleeSupport
-  reachlib
-  ResolveFacts
+  libreach
+  resolve_facts_llvm
 )
 
-set(RESOLVE_LLVM_PLUGIN_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/../llvm-plugin/src")
+set(RESOLVE_LLVM_PLUGIN_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/../resolve-facts/libs/resolve_facts_llvm/src")
 
 llvm_config(kleeCore "${USE_LLVM_SHARED}" core executionengine mcjit native support)
 target_link_libraries(kleeCore PRIVATE ${SQLite3_LIBRARIES})

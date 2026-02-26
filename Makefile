@@ -15,7 +15,7 @@ test: configure
 	cmake --build build --target test-CVEAssert
 
 install: build
-	cmake --install install
+	cmake --install build
 
 clean:
 	rm -rf build/
