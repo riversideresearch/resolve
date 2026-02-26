@@ -18,9 +18,10 @@
 #include <string.h>
 
 int main() {
+    size_t small_size = 16;
     size_t large_size = 64;
 
-    char *buf = malloc(large_size);
+    char *buf = malloc(small_size);
 
     if (!buf) {
         perror("malloc failed");
