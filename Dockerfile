@@ -13,22 +13,23 @@ RUN /opt/resolve/scripts/install-deps.sh && apt-get clean && rm -rf /var/lib/apt
 
 FROM base AS builder
 # Copy in resolve tools
-COPY --exclude=build/ klee /opt/resolve/klee
-COPY --exclude=target/ libresolve /opt/resolve/libresolve
-COPY --exclude=build/ llvm-plugin /opt/resolve/llvm-plugin
-COPY --exclude=build/ resolve-cveassert /opt/resolve/resolve-cveassert
-COPY --exclude=build/ reach /opt/resolve/reach
-COPY --exclude=build/ resolve-facts /opt/resolve/resolve-facts
-COPY linker /opt/resolve/linker
-COPY mcp /opt/resolve/mcp
-COPY reach-wrapper /opt/resolve/reach-wrapper
-COPY Makefile /opt/resolve/Makefile
+COPY cmake /resolve/cmake
+COPY klee /resolve/klee
+COPY klee-uclibc-160 /resolve/klee-uclibc-160
+COPY resolve-cc /resolve/resolve-cc
+COPY resolve-cveassert /resolve/resolve-cveassert
+COPY reach /resolve/reach
+COPY resolve-facts /resolve/resolve-facts
+COPY mcp /resolve/mcp
+COPY resolve-triage /resolve/resolve-triage
+COPY Makefile /resolve/Makefile
+COPY CMakeLists.txt /resolve/CMakeLists.txt
 
 # Executable Scripts
-RUN chmod -R 777 /opt/resolve/resolve-cc/linker /opt/resolve/reach-wrapper /opt/resolve/resolve-cveassert/resolvecc
+RUN chmod -R 777 /resolve/resolve-cc/linker /resolve/resolve-cveassert/resolvecc
 
 # Add resolvecc to PATH
-ENV PATH="/opt/resolve/resolve-cveassert:${PATH}"
+ENV PATH="/resolve/resolve-cveassert:${PATH}"
 
 # Build
 WORKDIR /resolve/
