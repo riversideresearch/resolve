@@ -52,7 +52,7 @@ eval "$INSTALL_CMD $PKGS"
 python3 -m pip install lit wllvm univers --break-system-packages
 
 # Install rust
-if ! command -v rustc >/dev/null 2&>1; then
+if ! command -v rustc >/dev/null 2>&1; then
     echo "[*] Installing Rust via rustup..."
     curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- --default-toolchain nightly -y  
     source "$HOME/.cargo/env"
