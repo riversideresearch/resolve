@@ -23,5 +23,11 @@ add_custom_command(
     WORKING_DIRECTORY ${RUST_CRATE_DIR}
     COMMENT "Building libresolve.so" VERBATIM)
 
+add_custom_target(test-libresolve
+    COMMAND cargo test
+    WORKING_DIRECTORY ${RUST_CRATE_DIR}
+    COMMENT "Running regression tests for libresolve"
+)
+
 add_custom_target(libresolve ALL DEPENDS ${RUST_LIB})
 install(FILES ${RUST_LIB} DESTINATION ${CMAKE_INSTALL_LIBDIR})
