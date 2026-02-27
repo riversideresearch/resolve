@@ -2,11 +2,14 @@
 #
 # Copyright (c) 2025 Riverside Research.
 # LGPL-3; See LICENSE.txt in the repo root for details.
+#
+# Clang wrapper with CVEAssert instrumentation 
 
 set -e
 # set -x for debugging
 
-# Paths for clang and libresolve rtlib
+# Paths for clang
+SCRIPT_DIR="${0%/*}"
 REAL_CLANG="/usr/bin/clang"
 LIBRESOLVE_PATH="libresolve/target/release"
 
