@@ -51,9 +51,7 @@ DESCRIPTION:
     resolvecc wraps /usr/bin/clang and automatically:
 
       • Loads the CVEAssert LLVM pass plugin
-      • Disables builtin lowering of memcpy/memmove/memset
       • Links against libresolve at link time
-      • Adds rpath for libresolve
 
 WRAPPER OPTIONS:
     -fcve-assert <file>
