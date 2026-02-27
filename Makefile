@@ -12,7 +12,7 @@ check: configure
 	cmake --build build --target check
 
 test: configure
-	cmake --build build --target test-CVEAssert
+	cmake --build build --target test-CVEAssert test-libresolve
 
 install: build
 	cmake --install build
