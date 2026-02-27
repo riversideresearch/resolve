@@ -25,6 +25,9 @@ COPY resolve-triage /resolve/resolve-triage
 COPY Makefile /resolve/Makefile
 COPY CMakeLists.txt /resolve/CMakeLists.txt
 
+# Add resolvecc to PATH
+ENV PATH="/opt/resolve/bin:${PATH}"
+
 # Build
 WORKDIR /resolve/
 RUN PATH=$PATH:~/.cargo/bin make build install

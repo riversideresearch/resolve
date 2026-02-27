@@ -1,0 +1,118 @@
+#!/usr/bin/env bash
+#
+# Copyright (c) 2025 Riverside Research.
+# LGPL-3; See LICENSE.txt in the repo root for details.
+#
+# Clang wrapper with CVEAssert instrumentation 
+
+set -e
+# set -x for debugging
+
+# Paths for clang
+SCRIPT_DIR="${0%/*}"
+REAL_CLANG="/usr/bin/clang"
+LIB_DIR="$SCRIPT_DIR"/../lib
+
+# DEBUGGING: Writes each compiler invocation to stderr 
+echo "[resolvecc] $@" >&2
+
+# clang lowers mem* libc funtions into llvm intrinsics with additional metadata
+# for optimization we want our CVEAssert sanitizers to see the original libc
+# functions, so we ask clang to skip the special handling
+# Ideally, we would only do that for vulnerable functions, but that requires behavior changes in clang or modifying source code
+COMPTIME_FLAGS=(
+    -fno-builtin-memcpy
+    -fno-builtin-memmove
+    -fno-builtin-memset
+    -fpass-plugin="$LIB_DIR"/libCVEAssert.so
+)
+
+RUNTIME_FLAGS=(
+    -L"$LIB_DIR"
+    -lresolve
+    -Wl,-rpath="$LIB_DIR"
+)
+
+
+# Ensure --version flag works with wrapper
+if [[ "$1" == "--version" ]]; then
+    exec "$REAL_CLANG" "$@"
+fi
+
+# Usage message
+if [[ "$1" == "-h" || "$1" == "--help" ]]; then 
+    cat <<EOF
+    resolvecc — Clang wrapper with CVEAssert instrumentation
+
+USAGE:
+    resolvecc [options] file...
+
+DESCRIPTION:
+    resolvecc wraps /usr/bin/clang and automatically:
+
+      • Loads the CVEAssert LLVM pass plugin
+      • Links against libresolve at link time
+
+WRAPPER OPTIONS:
+    -fcve-assert <file>
+        Path to CVE assertion configuration JSON file.
+    
+    -lresolve 
+        Links against libresolve at link time. 
+
+    -h, --help
+        Show this help message.
+
+All other options are forwarded directly to clang.
+
+EXAMPLES:
+    resolvecc -fcve-assert vuln.json test.c
+    resolvecc -fcve-assert vuln.json -lresolve -O2 -g test.c
+    resolvecc -c test.c
+EOF
+    exit 0
+fi
+
+# Variable tells resolvecc whether to link libresolve or not
+LINK_LIBRESOLVE=true
+
+
+# resolvecc -fcve-assert=<vuln.json> <flags> <source>
+RESOLVE_LABEL_CVE=""
+NEW_ARGS=()
+args=("$@")
+
+for ((i=0; i<${#args[@]}; i++)); do
+    
+    arg="${args[$i]}"
+
+    if [[ "$arg" == "-c" || "$arg" == "-S" || "$arg" == "-E" ]]; then
+        LINK_LIBRESOLVE=false
+    fi
+
+    if [[ "$arg" == "-fcve-assert" ]]; then
+        file_path="${args[$((i + 1))]}"
+        if [[ ! -f "$file_path" ]]; then
+            echo "[resolvecc]: ERROR '$file_path' could not be found!"
+            exit 1
+        fi 
+
+        RESOLVE_LABEL_CVE="$file_path"
+        i=$((i + 2)) # Skip over flag and file path, clang does not understand these flags. 
+    else 
+        NEW_ARGS+=("$arg")
+    fi
+done 
+
+if $LINKING; then
+    RESOLVE_LABEL_CVE="$RESOLVE_LABEL_CVE"\
+    exec "$REAL_CLANG" \
+        "${COMPTIME_FLAGS[@]}" \
+        "${NEW_ARGS[@]}" \
+        "${RUNTIME_FLAGS[@]}"
+else 
+    RESOLVE_LABEL_CVE="$RESOLVE_LABEL_CVE"\
+    exec "$REAL_CLANG" \
+        "${COMPTIME_FLAGS[@]}" \
+        "${NEW_ARGS[@]}"
+fi
