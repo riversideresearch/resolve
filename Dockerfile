@@ -25,11 +25,8 @@ COPY resolve-triage /resolve/resolve-triage
 COPY Makefile /resolve/Makefile
 COPY CMakeLists.txt /resolve/CMakeLists.txt
 
-# Executable Scripts
-RUN chmod -R 777 /resolve/resolve-cc/linker /resolve/resolve-cveassert/resolvecc
-
 # Add resolvecc to PATH
-ENV PATH="/resolve/resolve-cveassert:${PATH}"
+ENV PATH="/opt/resolve/bin:${PATH}"
 
 # Build
 WORKDIR /resolve/
