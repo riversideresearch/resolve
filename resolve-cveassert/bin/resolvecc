@@ -40,7 +40,7 @@ if [[ "$1" == "--version" ]]; then
 fi
 
 # Usage message
-if [[ "$1" == "-h" ]]; then 
+if [[ "$1" == "-h" || "$1" == "--help" ]]; then 
     cat <<EOF
     resolvecc — Clang wrapper with CVEAssert instrumentation
 
@@ -60,7 +60,7 @@ WRAPPER OPTIONS:
     -lresolve 
         Links against libresolve at link time. 
 
-    -h
+    -h, --help
         Show this help message.
 
 All other options are forwarded directly to clang.
