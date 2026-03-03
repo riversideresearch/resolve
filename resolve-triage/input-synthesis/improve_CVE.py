@@ -24,7 +24,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "cve_path",
         type=Path,
-        help="Path to the input CVE JSON file used as the starting point.",
+        help="Path to the input CVE file used as the starting point.",
     )
     parser.add_argument(
         "output_path",
@@ -83,7 +83,7 @@ def refine_conditions(
         require_file(revised_condition_path, f"{role} condition refinement for {p.name}")
 
 
-def run_pipeline(
+def run(
     agent: str,
     cve_path: Path,
     output_path: Path,
@@ -118,14 +118,14 @@ def run_pipeline(
     require_file(cve_tmp_path / "antithesis.md", "CVE dialectic antithesis")
     require_file(cve_tmp_path / "synthesis.md", "CVE dialectic synthesis")
 
-    improved_cve_path = cve_tmp_path / "CVE.json"
+    improved_cve_path = cve_tmp_path / ("CVE" + cve_path.suffix)
 
     cve_improve_prompt = f"""
 {cve_preamble}
 
 # Your task
 
-`{cve_tmp_path}/synthesis.md` contains an analysis of the above CVE. Your task is to produce an improved version of the CVE in the same JSON format and save it to `{improved_cve_path}`. Don't add any additional fields to the JSON; use the exact same fields as the original. Don't include line numbers. Don't attempt to verify the CVE by performing additional analysis on the source code. Ensure that the scope of the improved CVE is the same as the original; it should address only the specific vulnerability described in the original. If the affected function name is a mangled C++ name, verify that it's exactly correct.
+`{cve_tmp_path}/synthesis.md` contains an analysis of the above CVE. Your task is to produce an improved version of the CVE in the same format and save it to `{improved_cve_path}`. Use the exact same structure and fields as the original. Don't include line numbers. Don't attempt to verify the CVE by performing additional analysis on the source code. Ensure that the scope of the improved CVE is the same as the original; it should address only the specific vulnerability described in the original. If the affected function name is a mangled C++ name, verify that it's exactly correct.
 
 Match the tone and style of the original CVE description. Assume that there is a legitimate vulnerability, but it may not be exactly as described by the original. Keep particular details to a minimum; just describe the nature of the vulnerability and conditions for causing it.
 """
@@ -223,7 +223,7 @@ Create exactly one markdown file per sufficient condition, named `SC_1.md`, `SC_
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     try:
-        return run_pipeline(
+        return run(
             agent=args.agent,
             cve_path=args.cve_path,
             output_path=args.output_path,

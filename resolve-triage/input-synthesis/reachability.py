@@ -24,7 +24,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "cve_path",
         type=Path,
-        help="Path to the input CVE JSON file.",
+        help="Path to the input CVE file.",
     )
     parser.add_argument(
         "improve_cve_path",
@@ -44,7 +44,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
-def run_pipeline(
+def run(
     agent: str,
     cve_path: Path,
     improve_cve_path: Path,
@@ -145,7 +145,7 @@ Put any files you create in `{output_root}/input-synthesis/`. If a triggering in
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     try:
-        return run_pipeline(
+        return run(
             agent=args.agent,
             cve_path=args.cve_path,
             improve_cve_path=args.improve_cve_path,
