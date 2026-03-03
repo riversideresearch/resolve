@@ -286,4 +286,4 @@ stack unwinding by invalidating the corresponding shadow objects.
 
 
 ## Testing
-To verify correct IR transformations and binary behavior, we developed a testing suite with regression testing. The suite contains testcases for each sanitizer and tests that the resulting binaries perform the intended behaviors with and without the remediation instrumentation. The testing suite can be found in [`llvm-plugin/tests/regression`](/llvm-plugin/tests/regression) and the tests can be executed by calling *make*. 
+To verify correct IR transformations and binary behavior, we developed a testing suite with regression testing. The suite contains testcases for each sanitizer and tests that the resulting binaries perform the intended behaviors with and without the remediation instrumentation. The testing suite can be found in [`resolve-cveassert/tests`](/resolve-cveassert/tests) and the tests can be executed by calling `make test`. 
