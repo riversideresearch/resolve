@@ -12,8 +12,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Run an iterative CVE-improvement pipeline with a coding agent. All intermediate artifacts are written under a unique /tmp workspace and final results are copied to output_path.",
         epilog="""Examples:
-  python3 improve_CVE.py codex input/cve.json out/cve_run
-  python3 improve_CVE.py claude input/cve.json out/cve_run""",
+  python3 improve_CVE.py codex cve.json out/improve_cve
+  python3 improve_CVE.py claude cve.json out/improve_cve""",
         formatter_class=argparse.RawTextHelpFormatter,
     )
     parser.add_argument(
@@ -118,7 +118,7 @@ def run(
     require_file(cve_tmp_path / "antithesis.md", "CVE dialectic antithesis")
     require_file(cve_tmp_path / "synthesis.md", "CVE dialectic synthesis")
 
-    improved_cve_path = cve_tmp_path / ("CVE" + cve_path.suffix)
+    improved_cve_path = cve_tmp_path / cve_path.name
 
     cve_improve_prompt = f"""
 {cve_preamble}
@@ -215,7 +215,19 @@ Create exactly one markdown file per sufficient condition, named `SC_1.md`, `SC_
     # COPY FINAL RESULTS TO OUTPUT PATH
     ############################################################################
 
-    shutil.copytree(cve_tmp_path, output_path)
+    output_path.mkdir(parents=True, exist_ok=False)
+
+    shutil.copy(improved_cve_path, output_path / improved_cve_path.name)
+    shutil.copytree(necessary_conditions_path, output_path / "necessary_conditions")
+    shutil.copytree(
+        revised_necessary_conditions_path,
+        output_path / "necessary_conditions_revised",
+    )
+    shutil.copytree(sufficient_conditions_path, output_path / "sufficient_conditions")
+    shutil.copytree(
+        revised_sufficient_conditions_path,
+        output_path / "sufficient_conditions_revised",
+    )
 
     return 0
 

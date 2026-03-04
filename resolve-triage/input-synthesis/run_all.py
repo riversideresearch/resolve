@@ -11,8 +11,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Run the full CVE analysis pipeline: setup, CVE improvement, reachability analysis, and input synthesis.",
         epilog="""Examples:
-  python3 run_all.py claude input/cve.json out/run
-  python3 run_all.py codex input/cve.json out/run""",
+  python3 run_all.py claude cve.json out/
+  python3 run_all.py codex cve.json out/""",
         formatter_class=argparse.RawTextHelpFormatter,
     )
     parser.add_argument(
