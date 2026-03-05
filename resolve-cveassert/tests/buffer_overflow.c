@@ -32,6 +32,7 @@ void vuln(FILE* fd)
     fread(full, 1, fsize, fd);
     memcpy(tiny, full, fsize);
     printf("Tiny: %s\n", tiny);
+    free(full);
 }
 
 void check(char* input, FILE* fd)
