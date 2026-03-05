@@ -60,10 +60,8 @@ Notes:
 
 Output directory contains:
 - `CVE.<ext>` -- improved CVE description (same format as input)
-- `necessary_conditions/` -- initial necessary conditions
-- `necessary_conditions_revised/` -- refined necessary conditions
-- `sufficient_conditions/` -- initial sufficient conditions
-- `sufficient_conditions_revised/` -- refined sufficient conditions
+- `necessary_conditions/` -- refined necessary conditions
+- `sufficient_conditions/` -- refined sufficient conditions
 
 ### 3. `reachability.py`
 

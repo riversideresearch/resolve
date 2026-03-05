@@ -218,15 +218,13 @@ Create exactly one markdown file per sufficient condition, named `SC_1.md`, `SC_
     output_path.mkdir(parents=True, exist_ok=False)
 
     shutil.copy(improved_cve_path, output_path / improved_cve_path.name)
-    shutil.copytree(necessary_conditions_path, output_path / "necessary_conditions")
     shutil.copytree(
         revised_necessary_conditions_path,
-        output_path / "necessary_conditions_revised",
+        output_path / "necessary_conditions",
     )
-    shutil.copytree(sufficient_conditions_path, output_path / "sufficient_conditions")
     shutil.copytree(
         revised_sufficient_conditions_path,
-        output_path / "sufficient_conditions_revised",
+        output_path / "sufficient_conditions",
     )
 
     return 0
