@@ -17,4 +17,7 @@ examples/openssl_reach_out.json
 reach_wrap_input.json
 reach_wrap_output.json
 
-
+# Emacs temporary/backup files
+*~
+\#*\#
+.\#*
