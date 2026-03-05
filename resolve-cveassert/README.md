@@ -109,6 +109,8 @@ Remediation strategies define how sanitizers respond to detected errors encounte
 
 ## Example 
 ```C
+// div_zero.c
+
 // Divide by Zero
 int div_zero_main(int argc, const char* argv[]) {    
     int math = (int) (42.0 / (float)argc);
@@ -119,6 +121,11 @@ int main(int argc, const char* argv[]) {
     // call with 1 arg to trigger div by zero
     return div_zero_main(argc-2, argv);
 }
+```
+
+```bash
+# Compiler invocation
+resolvecc -fcve-assert /path/to/cve div_zero.c
 ```
 
 **Pre-Instrumented IR** 
@@ -221,6 +228,7 @@ In this example, the `EXIT` strategy is specified, causing the program to termin
 exit code.
 
 ```C
+// heap_oob.c
 // Out-of-bounds Write 
 #include <stdlib.h>
 int main() {
@@ -229,6 +237,12 @@ int main() {
   return 0;
 }
 ```
+
+```bash
+# Compiler invocation
+resolvecc -fcve-assert /path/to/cve -lresolve heap_oob.c 
+```
+
 **Pre-Instrumented IR**
 ```llvm
 ; Function Attrs: noinline nounwind optnone uwtable
@@ -286,4 +300,4 @@ stack unwinding by invalidating the corresponding shadow objects.
 
 
 ## Testing
-To verify correct IR transformations and binary behavior, we developed a testing suite with regression testing. The suite contains testcases for each sanitizer and tests that the resulting binaries perform the intended behaviors with and without the remediation instrumentation. The testing suite can be found in [`llvm-plugin/tests/regression`](/llvm-plugin/tests/regression) and the tests can be executed by calling *make*. 
+To verify correct IR transformations and binary behavior, we developed a testing suite with regression testing. The suite contains testcases for each sanitizer and tests that the resulting binaries perform the intended behaviors with and without the remediation instrumentation. The testing suite can be found in [`resolve-cveassert/tests`](/resolve-cveassert/tests) and the tests can be executed by calling `make test`. 
