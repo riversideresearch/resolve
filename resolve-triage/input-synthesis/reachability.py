@@ -56,8 +56,8 @@ def run(
     if not improve_cve_path.is_dir():
         raise RuntimeError(f"improve_cve_path is not a directory: {improve_cve_path}")
 
-    necessary_conditions_path = improve_cve_path / "necessary_conditions_revised"
-    sufficient_conditions_path = improve_cve_path / "sufficient_conditions_revised"
+    necessary_conditions_path = improve_cve_path / "necessary_conditions"
+    sufficient_conditions_path = improve_cve_path / "sufficient_conditions"
     if not necessary_conditions_path.is_dir():
         raise RuntimeError(f"missing directory: {necessary_conditions_path}")
     if not sufficient_conditions_path.is_dir():
