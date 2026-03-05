@@ -3,3 +3,4 @@ tests/**/*.ll
 **/*.ll.mem
 tests/Output
 tests/.lit_test_times.txt
+input.bin
