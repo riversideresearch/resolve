@@ -15,8 +15,8 @@ from pathlib import Path
 from enum import Enum, auto
 from typing import Any, Callable, Iterable, TypeVar
 
-from univers.version_range import GenericVersionRange # type: ignore
-from univers.versions import SemverVersion # type: ignore
+from univers.version_range import GenericVersionRange
+from univers.versions import SemverVersion
 
 class Reachability(Enum):
     UNKNOWN = auto()
