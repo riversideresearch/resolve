@@ -62,3 +62,15 @@ ExternalProject_Add(klee
     INSTALL_COMMAND
         ${CMAKE_COMMAND} --build <BINARY_DIR> --target install
 )
+
+# Install as python package with uv
+install(CODE "
+    message(STATUS \"Installing resolve-triage python package with uv pip install...\")
+    execute_process(
+        COMMAND uv pip install --prefix \"\${CMAKE_INSTALL_PREFIX}\" \"${CMAKE_CURRENT_SOURCE_DIR}\"
+        RESULT_VARIABLE _uv_result
+    )
+    if(NOT _uv_result EQUAL 0)
+        message(FATAL_ERROR \"uv pip install failed with exit code \${_uv_result}\")
+    endif()
+")
