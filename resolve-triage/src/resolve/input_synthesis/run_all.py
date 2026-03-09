@@ -2,9 +2,9 @@ import argparse
 import subprocess
 from pathlib import Path
 
-import improve_CVE
-import reachability
-import setup
+from . import improve_CVE
+from . import reachability
+from . import setup
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:

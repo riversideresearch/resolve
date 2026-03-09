@@ -2,7 +2,7 @@ import argparse
 import subprocess
 from pathlib import Path
 
-from agent import run_prompt
+from .agent import run_prompt
 
 AGENTS_FILE = {
     "claude": "CLAUDE.md",
