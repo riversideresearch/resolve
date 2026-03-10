@@ -586,7 +586,7 @@ void instrumentMalloc(Function *F) {
   };
 
   for (auto malloc : mallocList) {
-    handlemalloc(malloc);
+    handle_malloc(malloc);
   }
 }
 
