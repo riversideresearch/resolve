@@ -15,8 +15,8 @@ from pathlib import Path
 from enum import Enum, auto
 from typing import Any, Callable, Iterable, TypeVar
 
-from univers.version_range import GenericVersionRange # type: ignore
-from univers.versions import SemverVersion # type: ignore
+from univers.version_range import GenericVersionRange
+from univers.versions import SemverVersion
 
 class Reachability(Enum):
     UNKNOWN = auto()
@@ -616,7 +616,7 @@ class Orchestrator:
         self.serialize_output()
         self.serialize_as_graph()
 
-if __name__ == "__main__":
+def main():
     parser = argparse.ArgumentParser(
         description="Reach tool wrapper used to manipulate inputs and outputs to desired forms"
     )
@@ -692,3 +692,6 @@ if __name__ == "__main__":
     # reach_out = Path("/tmp/reach_out.json")
 
     Orchestrator(args.facts, args.input, args.output, args.reach, args.args, args.src, args.graph, args.entry).main()
+
+if __name__ == "__main__":
+    main()
