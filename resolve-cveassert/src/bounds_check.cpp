@@ -709,6 +709,15 @@ void instrumentStrdup(Function *F) {
   IRBuilder<> builder(Ctx);
   std::vector<CallInst *> strdupList;
 
+  auto handle_strdup = [&](auto *strdupInst) {
+    builder.SetInsertPoint(strdupInst);
+    Value *ptrArg = strdupInst->getArgOperand(0);
+    CallInst *resolveStrdupCall =
+        builder.CreateCall(getResolveStrdup(M), {ptrArg});
+    strdupInst->replaceAllUsesWith(resolveStrdupCall);
+    strdupInst->eraseFromParent();
+  };
+
   for (auto &BB : *F) {
     for (auto &inst : BB) {
       if (auto *call = dyn_cast<CallInst>(&inst)) {
@@ -726,13 +735,8 @@ void instrumentStrdup(Function *F) {
     }
   }
 
-  for (auto Inst : strdupList) {
-    builder.SetInsertPoint(Inst);
-    Value *ptrArg = Inst->getArgOperand(0);
-    CallInst *resolveStrdupCall =
-        builder.CreateCall(getResolveStrdup(M), {ptrArg});
-    Inst->replaceAllUsesWith(resolveStrdupCall);
-    Inst->eraseFromParent();
+  for (auto strdup : strdupList) {
+    handle_strdup(strdup);
   }
 }
 
@@ -741,6 +745,16 @@ void instrumentStrndup(Function *F) {
   LLVMContext &Ctx = M->getContext();
   IRBuilder<> builder(Ctx);
   std::vector<CallInst *> strndupList;
+
+  auto handle_strndup = [&](auto *strndupInst) {
+    builder.SetInsertPoint(strndupInst);
+    Value *ptrArg = strndupInst->getArgOperand(0);
+    Value *sizeArg = strndupInst->getArgOperand(1);
+    CallInst *resolveStrndupCall =
+        builder.CreateCall(getResolveStrndup(M), {ptrArg, sizeArg});
+    strndupInst->replaceAllUsesWith(resolveStrndupCall);
+    strndupInst->eraseFromParent();
+  };
 
   for (auto &BB : *F) {
     for (auto &inst : BB) {
@@ -759,14 +773,8 @@ void instrumentStrndup(Function *F) {
     }
   }
 
-  for (auto Inst : strndupList) {
-    builder.SetInsertPoint(Inst);
-    Value *ptrArg = Inst->getArgOperand(0);
-    Value *sizeArg = Inst->getArgOperand(1);
-    CallInst *resolveStrndupCall =
-        builder.CreateCall(getResolveStrndup(M), {ptrArg, sizeArg});
-    Inst->replaceAllUsesWith(resolveStrndupCall);
-    Inst->eraseFromParent();
+  for (auto strndup : strndupList) {
+    handle_strndup(strndup);
   }
 }
 
