@@ -558,6 +558,15 @@ void instrumentMalloc(Function *F) {
   IRBuilder<> builder(Ctx);
   std::vector<CallInst *> mallocList;
 
+  auto handle_malloc = [&](auto *mallocInst) {
+    builder.SetInsertPoint(mallocInst);
+    Value *sizeArg = mallocInst->getArgOperand(0);
+    CallInst *resolveMallocInst = 
+        builder.CreateCall(getResolveMalloc(M), { sizeArg });
+    mallocInst->replaceAllUsesWith(resolveMallocInst);
+    mallocInst->eraseFromParent();
+  };
+
   for (auto &BB : *F) {
     for (auto &inst : BB) {
       if (auto *call = dyn_cast<CallInst>(&inst)) {
@@ -576,15 +585,6 @@ void instrumentMalloc(Function *F) {
     }
   }
 
-  auto handle_malloc = [&](auto *mallocInst) {
-    builder.SetInsertPoint(mallocInst);
-    Value *sizeArg = mallocInst->getArgOperand(0);
-    CallInst *resolveMallocInst = 
-        builder.CreateCall(getResolveMalloc(M), { sizeArg });
-    mallocInst->replaceAllUsesWith(resolveMallocInst);
-    mallocInst->eraseFromParent();
-  };
-
   for (auto malloc : mallocList) {
     handle_malloc(malloc);
   }
@@ -595,6 +595,16 @@ void instrumentRealloc(Function *F) {
   LLVMContext &Ctx = M->getContext();
   IRBuilder<> builder(Ctx);
   std::vector<CallInst *> reallocList;
+
+  auto handle_realloc = [&](auto *reallocInst) {
+    builder.SetInsertPoint(reallocInst);
+    Value *ptrArg = reallocInst->getArgOperand(0);
+    Value *sizeArg = reallocInst->getArgOperand(1);
+    CallInst *resolveReallocCall =
+      builder.CreateCall(getResolveRealloc(M), {ptrArg, sizeArg});
+    reallocInst>replaceAllUsesWith(resolveReallocCall);
+    reallocInst->eraseFromParent();
+  };
 
   for (auto &BB : *F) {
     for (auto &inst : BB) {
@@ -614,14 +624,8 @@ void instrumentRealloc(Function *F) {
     }
   }
 
-  for (auto Inst : reallocList) {
-    builder.SetInsertPoint(Inst);
-    Value *ptrArg = Inst->getArgOperand(0);
-    Value *sizeArg = Inst->getArgOperand(1);
-    CallInst *resolveReallocCall =
-        builder.CreateCall(getResolveRealloc(M), {ptrArg, sizeArg});
-    Inst->replaceAllUsesWith(resolveReallocCall);
-    Inst->eraseFromParent();
+  for (auto realloc : reallocList) {
+    handle_realloc(realloc);
   }
 }
 
@@ -630,6 +634,16 @@ void instrumentCalloc(Function *F) {
   LLVMContext &Ctx = M->getContext();
   IRBuilder<> builder(Ctx);
   std::vector<CallInst *> callocList;
+
+  auto handle_calloc = [&](auto *callocInst) {
+    builder.SetInsertPoint(callocInst);
+    Value *numArg = callocInst->getArgOperand(0);
+    Value *sizeArg = callocInst->getArgOperand(1);
+    CallInst *resolveCallocCall =
+        builder.CreateCall(getResolveCalloc(M), {numArg, sizeArg});
+    callocInst->replaceAllUsesWith(resolveCallocCall);
+    callocInst->eraseFromParent();
+  };
 
   for (auto &BB : *F) {
     for (auto &inst : BB) {
@@ -648,14 +662,8 @@ void instrumentCalloc(Function *F) {
     }
   }
 
-  for (auto Inst : callocList) {
-    builder.SetInsertPoint(Inst);
-    Value *numArg = Inst->getArgOperand(0);
-    Value *sizeArg = Inst->getArgOperand(1);
-    CallInst *resolveCallocCall =
-        builder.CreateCall(getResolveCalloc(M), {numArg, sizeArg});
-    Inst->replaceAllUsesWith(resolveCallocCall);
-    Inst->eraseFromParent();
+  for (auto calloc : callocList) {
+    handle_calloc(calloc);
   }
 }
 
