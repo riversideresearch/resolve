@@ -576,13 +576,17 @@ void instrumentMalloc(Function *F) {
     }
   }
 
-  for (auto Inst : mallocList) {
-    builder.SetInsertPoint(Inst);
-    Value *sizeArg = Inst->getArgOperand(0);
-    CallInst *resolveMallocCall =
-        builder.CreateCall(getResolveMalloc(M), {sizeArg});
-    Inst->replaceAllUsesWith(resolveMallocCall);
-    Inst->eraseFromParent();
+  auto handle_malloc = [&](auto *mallocInst) {
+    builder.SetInsertPoint(mallocInst);
+    Value *sizeArg = mallocInst->getArgOperand(0);
+    CallInst *resolveMallocInst = 
+        builder.CreateCall(getResolveMalloc(M), { sizeArg });
+    mallocInst->replaceAllUsesWith(resolveMallocInst);
+    mallocInst->eraseFromParent();
+  };
+
+  for (auto malloc : mallocList) {
+    handlemalloc(malloc);
   }
 }
 
