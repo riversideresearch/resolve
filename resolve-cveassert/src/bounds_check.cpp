@@ -602,7 +602,7 @@ void instrumentRealloc(Function *F) {
     Value *sizeArg = reallocInst->getArgOperand(1);
     CallInst *resolveReallocCall =
       builder.CreateCall(getResolveRealloc(M), {ptrArg, sizeArg});
-    reallocInst>replaceAllUsesWith(resolveReallocCall);
+    reallocInst->replaceAllUsesWith(resolveReallocCall);
     reallocInst->eraseFromParent();
   };
 
@@ -673,6 +673,14 @@ void instrumentFree(Function *F) {
   IRBuilder<> builder(Ctx);
   std::vector<CallInst *> freeList;
 
+  auto handle_free = [&](auto *freeInst) {
+    builder.SetInsertPoint(freeInst);
+    Value *ptrArg = freeInst->getArgOperand(0);
+    CallInst *resolveFreeCall = builder.CreateCall(getResolveFree(M), {ptrArg});
+    freeInst->replaceAllUsesWith(resolveFreeCall);
+    freeInst->eraseFromParent();
+  };
+
   for (auto &BB : *F) {
     for (auto &inst : BB) {
       if (auto *call = dyn_cast<CallInst>(&inst)) {
@@ -690,12 +698,8 @@ void instrumentFree(Function *F) {
     }
   }
 
-  for (auto Inst : freeList) {
-    builder.SetInsertPoint(Inst);
-    Value *ptrArg = Inst->getArgOperand(0);
-    CallInst *resolveFreeCall = builder.CreateCall(getResolveFree(M), {ptrArg});
-    Inst->replaceAllUsesWith(resolveFreeCall);
-    Inst->eraseFromParent();
+  for (auto free : freeList) {
+    handle_free(free);
   }
 }
 
