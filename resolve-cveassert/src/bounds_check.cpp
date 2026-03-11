@@ -479,7 +479,7 @@ void instrumentAlloca(Function *F) {
 
   SmallVector<AllocaInst *, 16> allocas;
   // Initialize list to store pointers to alloca and instructions
-  std::vector<AllocaInst *> toFreeList;
+  std::vector<Value *> toFreeList;
 
   auto invalidateFn = M->getOrInsertFunction(
       "resolve_invalidate_stack", FunctionType::get(void_ty, {ptr_ty}, false));
