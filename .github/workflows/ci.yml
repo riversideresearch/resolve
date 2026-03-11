@@ -18,6 +18,8 @@ jobs:
         run: make build
       - name: Test
         run: make test
+      - name: Build Examples
+        run: ./examples/openssl.sh
 
   trigger-gitlab:
     runs-on: ubuntu-latest

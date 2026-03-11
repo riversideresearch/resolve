@@ -1,25 +1,33 @@
-#/bin/bash
+#!/usr/bin/bash env
 
+# TODO:
+# Get build working first
+# Add caching mechanism for openssl download (specifically for CI)
+# Get fact generation
+
+set -e 
+
+SCRIPT_DIR="${0%/*}"
+EXTRACT_FACTS_SCRIPT="/opt/resolve/bin/extract_facts.py"
+REACH_WRAPPER="/opt/resolve/bin/resolve-triage.py"
+
+export CC="/usr/bin/clang"
+export CXX="/usr/bin/clang++"
+export CFLAGS="-fpass-plugin=/resolve/build/resolve-cc/libResolveFactsPlugin.so"
+export CXXFLAGS="$CFLAGS"
+#export LDLIBS="/path/to/libresolve"
 OPENSSL="https://github.com/openssl/openssl.git"
 
-# Ensure the parent repo has been built before running
-make -C "../"
+cd "$SCRIPT_DIR"
 
 # get the OpenSSL repo
 if [ ! -d "openssl" ]; then
 
 #    git clone https://github.com/openssl/openssl.git
-    git clone --branch openssl-3.5.0 --depth 1 $OPENSSL   
+    git clone --branch openssl-3.5.0 --depth 1 $OPENSSL  
 fi
 
 cd openssl
-
-# Set compiler flags to use the EnhancedFacts pass 
-export CC=clang
-export CXX=clang
-export CFLAGS="-fpass-plugin=../../llvm-plugin/build/libEnhancedFacts.so"
-export CXXFLAGS="$CFLAGS"
-export LDLIBS="../../libresolve/target/release/libresolve.so"
 
 # Run OpenSSL's build
 ./Configure
@@ -35,14 +43,13 @@ fi
 mkdir openssl_facts
 
 # Extract the embedded info from the openssl binary
-
-python3 ../linker/extract_facts.py --in_bin=openssl/libcrypto.so --out_dir=openssl_facts
+# Define the path to extract facts 
+"$EXTRACT_FACTS_SCRIPT" --in_bin=openssl/libcrypto.so --out_dir=openssl_facts
 
 # Run the reach-wrapper tool
-python3 ../reach-wrapper/reach-wrapper.py \
-        -i openssl_vulnerabilities.json \
-        -o openssl_reach_out.json \
-        -f openssl_facts \
-        -e "CMS_RecipientInfo_decrypt" \
-        -r ../reach/build/reach
-        
+"$REACH_WRAPPER" \
+    -i openssl_vulnerabilities.json \
+    -o openssl_reach_out.json \
+    -f openssl_facts \
+    -e "CMS_RecipientInfo_decrypt" \
+    -r ../reach/build/reach
