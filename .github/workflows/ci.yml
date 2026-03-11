@@ -16,6 +16,8 @@ jobs:
         run: make install-deps
       - name: Build
         run: make build
+      - name: Install
+        run: make install
       - name: Test
         run: make test
       - name: Build Examples
