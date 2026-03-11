@@ -31,7 +31,7 @@ if [ -f "$CACHE_TAR" ]; then
 else 
     echo "[+] No cache found. Building OpenSSL..."
 
-    git clone --branch openssl-3.5.5 --depth 1 $OPENSSL
+    git clone --revision=67b5686b4419b4cb8caa502711c41815f5279751 --branch openssl-3.5.5 --depth 1 $OPENSSL
     cd openssl
 
     ./Configure
