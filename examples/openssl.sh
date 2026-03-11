@@ -28,9 +28,8 @@ git clone --branch openssl-3.5.0 --depth 1 $OPENSSL
 cd openssl
 ./Configure && make -j 
 
-# return to the examples dir
+# Change dir back to example
 cd ..
-
 
 # -----------------------
 # Fact extraction
@@ -40,8 +39,9 @@ if [ -d "openssl_facts" ]; then
 fi
 mkdir openssl_facts
 
+# NOTE: In this openssl config, libcrypto.so is symlinked to libcrypto.so.3
 "$EXTRACT_FACTS_SCRIPT" \
-    --in_bin /openssl/libcrypto.so \
+    --in_bin ./openssl/libcrypto.so.3 \
     --out_dir openssl_facts
 
 # -------------------
