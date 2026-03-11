@@ -31,7 +31,7 @@ if [ -f "$CACHE_TAR" ]; then
 else 
     echo "[+] No cache found. Building OpenSSL..."
 
-    git clone --branch openssl-3.5.5 --depth 1 $OPENSSL
+    git clone --branch openssl-3.5.0 --depth 1 $OPENSSL
     cd openssl
 
     ./Configure
@@ -55,8 +55,8 @@ fi
 mkdir openssl_facts
 
 "$EXTRACT_FACTS_SCRIPT" \ 
-    --in_bin=openssl/libcrypto.so \ 
-    --out_dir=openssl_facts
+    --in_bin openssl/libcrypto.so \ 
+    --out_dir openssl_facts
 
 # -------------------
 # Run reach analysis
