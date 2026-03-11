@@ -10,7 +10,8 @@ set -e
 SCRIPT_DIR="${0%/*}"
 CACHE_TAR="openssl-cache.tar.gz"
 
-EXTRACT_FACTS_SCRIPT="/opt/resolve/bin/extract_facts.py"
+# EXTRACT_FACTS_SCRIPT="/opt/resolve/bin/extract_facts.py"
+EXTRACT_FACTS_SCRIPT="$HOME/EBOSS/resolve/install/bin/extract_facts.py"
 REACH_WRAPPER="/opt/resolve/bin/resolve-triage"
 
 export CC="/usr/bin/clang"
@@ -25,23 +26,23 @@ cd "$SCRIPT_DIR"
 # -----------------------
 # Get OpenSSL from cache
 # -----------------------
-if [ -f "$CACHE_TAR" ]; then
-    echo "[+] Using cached OpenSSL build"
-    tar -xzf "$CACHE_TAR"
-else 
-    echo "[+] No cache found. Building OpenSSL..."
+# if [ -f "$CACHE_TAR" ]; then
+#     echo "[+] Using cached OpenSSL build"
+#     tar -xzf "$CACHE_TAR"
+# else 
+#     echo "[+] No cache found. Building OpenSSL..."
 
-    git clone --branch openssl-3.5.0 --depth 1 $OPENSSL
-    cd openssl
+#     git clone --branch openssl-3.5.0 --depth 1 $OPENSSL
+#     cd openssl
 
-    ./Configure
-    make -j 
+#     ./Configure
+#     make -j 
 
-    cd ..
+#     cd ..
 
-    echo "[+] Creating cache archive"
-    tar -czf "$CACHE_TAR" openssl
-fi
+#     echo "[+] Creating cache archive"
+#     tar -czf "$CACHE_TAR" openssl
+# fi
 
 # return to the examples folder
 cd ..
@@ -54,8 +55,8 @@ if [ -d "openssl_facts" ]; then
 fi
 mkdir openssl_facts
 
-"$EXTRACT_FACTS_SCRIPT" \ 
-    --in_bin openssl/libcrypto.so \ 
+"$EXTRACT_FACTS_SCRIPT" \
+    --in_bin openssl/libcrypto.so \
     --out_dir openssl_facts
 
 # -------------------
