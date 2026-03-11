@@ -21,29 +21,16 @@ OPENSSL="https://github.com/openssl/openssl.git"
 
 cd "$SCRIPT_DIR"
 
-# -----------------------
-# Get OpenSSL from cache
-# -----------------------
-if [ -f "$CACHE_TAR" ]; then
-    echo "[+] Using cached OpenSSL build"
-    tar -xzf "$CACHE_TAR"
-else 
-    echo "[+] No cache found. Building OpenSSL..."
+# -----------------
+# Download OpenSSL
+# -----------------
+git clone --branch openssl-3.5.0 --depth 1 $OPENSSL
+cd openssl
+./Configure && make -j 
 
-    git clone --branch openssl-3.5.0 --depth 1 $OPENSSL
-    cd openssl
-
-    ./Configure
-    make -j 
-
-    cd ..
-
-    echo "[+] Creating cache archive"
-    tar -czf "$CACHE_TAR" openssl
-fi
-
-# return to the examples folder
+# return to the examples dir
 cd ..
+
 
 # -----------------------
 # Fact extraction
@@ -54,7 +41,7 @@ fi
 mkdir openssl_facts
 
 "$EXTRACT_FACTS_SCRIPT" \
-    --in_bin openssl/libcrypto.so \
+    --in_bin /openssl/libcrypto.so \
     --out_dir openssl_facts
 
 # -------------------
