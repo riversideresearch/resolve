@@ -552,7 +552,7 @@ void instrumentAlloca(Function *F) {
         { typedPtr, ConstantInt::get(size_ty, typeSize )});
       }
     }
-    toFreeList.push_back(paddedAlloca);
+    toFreeList.push_back(typedPtr);
     allocaInst->eraseFromParent();
   };
 
