@@ -479,7 +479,7 @@ void instrumentAlloca(Function *F) {
 
   SmallVector<AllocaInst *, 16> allocas;
   // Initialize list to store pointers to alloca and instructions
-  std::vector<Value *> toFreeList;
+  std::vector<AllocaInst *> toFreeList;
 
   auto invalidateFn = M->getOrInsertFunction(
       "resolve_invalidate_stack", FunctionType::get(void_ty, {ptr_ty}, false));
@@ -539,7 +539,7 @@ void instrumentAlloca(Function *F) {
       }
     }
 
-    allocaInst->replaceAllUsesWith(typedPtr);
+    allocaInst->replaceAllUsesWith(paddedAlloca);
 
     // This is probably always true unless we are given malformed input.
     assert(hasStart == hasEnd);
