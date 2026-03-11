@@ -8,8 +8,10 @@
 set -e 
 
 SCRIPT_DIR="${0%/*}"
+CACHE_TAR="openssl-cache.tar.gz"
+
 EXTRACT_FACTS_SCRIPT="/opt/resolve/bin/extract_facts.py"
-REACH_WRAPPER="/opt/resolve/bin/resolve-triage.py"
+REACH_WRAPPER="/opt/resolve/bin/resolve-triage"
 
 export CC="/usr/bin/clang"
 export CXX="/usr/bin/clang++"
@@ -20,23 +22,33 @@ OPENSSL="https://github.com/openssl/openssl.git"
 
 cd "$SCRIPT_DIR"
 
-# get the OpenSSL repo
-if [ ! -d "openssl" ]; then
+# -----------------------
+# Get OpenSSL from cache
+# -----------------------
+if [ -f "$CACHE_TAR" ]; then
+    echo "[+] Using cached OpenSSL build"
+    tar -xzf "$CACHE_TAR"
+else 
+    echo "[+] No cache found. Building OpenSSL..."
 
-#    git clone https://github.com/openssl/openssl.git
-    git clone --branch openssl-3.5.0 --depth 1 $OPENSSL  
+    git clone --branch openssl-3.5.5 --depth 1 $OPENSSL
+    cd openssl
+
+    ./Configure
+    make -j 
+
+    cd ..
+
+    echo "[+] Creating cache archive"
+    tar -czf "$CACHE_TAR" openssl
 fi
-
-cd openssl
-
-# Run OpenSSL's build
-./Configure
-make -j
 
 # return to the examples folder
 cd ..
 
-# Ensure we build new facts
+# -----------------------
+# Fact extraction
+# -----------------------
 if [ -d "openssl_facts" ]; then
     rm -r openssl_facts
 fi
@@ -44,9 +56,14 @@ mkdir openssl_facts
 
 # Extract the embedded info from the openssl binary
 # Define the path to extract facts 
-"$EXTRACT_FACTS_SCRIPT" --in_bin=openssl/libcrypto.so --out_dir=openssl_facts
+"$EXTRACT_FACTS_SCRIPT" \ 
+    --in_bin=openssl/libcrypto.so --out_dir=openssl_facts
 
-# Run the reach-wrapper tool
+
+
+# -------------------
+# Run reach analysis
+# -------------------
 "$REACH_WRAPPER" \
     -i openssl_vulnerabilities.json \
     -o openssl_reach_out.json \
