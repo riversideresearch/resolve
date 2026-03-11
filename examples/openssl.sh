@@ -3,7 +3,6 @@
 # TODO:
 # Get build working first
 # Add caching mechanism for openssl download (specifically for CI)
-# Get fact generation
 
 set -e 
 
@@ -28,7 +27,11 @@ git clone --branch openssl-3.5.0 --depth 1 $OPENSSL
 cd openssl
 ./Configure && make -j 
 
-# Change dir back to example
+if [ ! -f "libcrypto.so" ]; then
+    make -j 
+fi
+
+
 cd ..
 
 # -----------------------
@@ -39,7 +42,6 @@ if [ -d "openssl_facts" ]; then
 fi
 mkdir openssl_facts
 
-# NOTE: In this openssl config, libcrypto.so is symlinked to libcrypto.so.3
 "$EXTRACT_FACTS_SCRIPT" \
     --in_bin ./openssl/libcrypto.so.3 \
     --out_dir openssl_facts
@@ -47,11 +49,13 @@ mkdir openssl_facts
 # -------------------
 # Run reach analysis
 # -------------------
+export PYTHONPATH="/resolve/resolve-triage/src:$PYTHONPATH"
+
 "$REACH_WRAPPER" \
     -i openssl_vulnerabilities.json \
     -o openssl_reach_out.json \
     -f openssl_facts \
     -e "CMS_RecipientInfo_decrypt" \
-    -r ../reach/build/reach
+    -r /opt/resolve/bin/reach
 
 # TODO: Add remediation portion check for exit code 3 for successful remediation
