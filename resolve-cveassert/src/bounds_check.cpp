@@ -558,6 +558,15 @@ void instrumentMalloc(Function *F) {
   IRBuilder<> builder(Ctx);
   std::vector<CallInst *> mallocList;
 
+  auto handle_malloc = [&](auto *mallocInst) {
+    builder.SetInsertPoint(mallocInst);
+    Value *sizeArg = mallocInst->getArgOperand(0);
+    CallInst *resolveMallocInst = 
+        builder.CreateCall(getResolveMalloc(M), { sizeArg });
+    mallocInst->replaceAllUsesWith(resolveMallocInst);
+    mallocInst->eraseFromParent();
+  };
+
   for (auto &BB : *F) {
     for (auto &inst : BB) {
       if (auto *call = dyn_cast<CallInst>(&inst)) {
@@ -576,13 +585,8 @@ void instrumentMalloc(Function *F) {
     }
   }
 
-  for (auto Inst : mallocList) {
-    builder.SetInsertPoint(Inst);
-    Value *sizeArg = Inst->getArgOperand(0);
-    CallInst *resolveMallocCall =
-        builder.CreateCall(getResolveMalloc(M), {sizeArg});
-    Inst->replaceAllUsesWith(resolveMallocCall);
-    Inst->eraseFromParent();
+  for (auto malloc : mallocList) {
+    handle_malloc(malloc);
   }
 }
 
@@ -591,6 +595,16 @@ void instrumentRealloc(Function *F) {
   LLVMContext &Ctx = M->getContext();
   IRBuilder<> builder(Ctx);
   std::vector<CallInst *> reallocList;
+
+  auto handle_realloc = [&](auto *reallocInst) {
+    builder.SetInsertPoint(reallocInst);
+    Value *ptrArg = reallocInst->getArgOperand(0);
+    Value *sizeArg = reallocInst->getArgOperand(1);
+    CallInst *resolveReallocCall =
+      builder.CreateCall(getResolveRealloc(M), {ptrArg, sizeArg});
+    reallocInst->replaceAllUsesWith(resolveReallocCall);
+    reallocInst->eraseFromParent();
+  };
 
   for (auto &BB : *F) {
     for (auto &inst : BB) {
@@ -610,14 +624,8 @@ void instrumentRealloc(Function *F) {
     }
   }
 
-  for (auto Inst : reallocList) {
-    builder.SetInsertPoint(Inst);
-    Value *ptrArg = Inst->getArgOperand(0);
-    Value *sizeArg = Inst->getArgOperand(1);
-    CallInst *resolveReallocCall =
-        builder.CreateCall(getResolveRealloc(M), {ptrArg, sizeArg});
-    Inst->replaceAllUsesWith(resolveReallocCall);
-    Inst->eraseFromParent();
+  for (auto realloc : reallocList) {
+    handle_realloc(realloc);
   }
 }
 
@@ -626,6 +634,16 @@ void instrumentCalloc(Function *F) {
   LLVMContext &Ctx = M->getContext();
   IRBuilder<> builder(Ctx);
   std::vector<CallInst *> callocList;
+
+  auto handle_calloc = [&](auto *callocInst) {
+    builder.SetInsertPoint(callocInst);
+    Value *numArg = callocInst->getArgOperand(0);
+    Value *sizeArg = callocInst->getArgOperand(1);
+    CallInst *resolveCallocCall =
+        builder.CreateCall(getResolveCalloc(M), {numArg, sizeArg});
+    callocInst->replaceAllUsesWith(resolveCallocCall);
+    callocInst->eraseFromParent();
+  };
 
   for (auto &BB : *F) {
     for (auto &inst : BB) {
@@ -644,14 +662,8 @@ void instrumentCalloc(Function *F) {
     }
   }
 
-  for (auto Inst : callocList) {
-    builder.SetInsertPoint(Inst);
-    Value *numArg = Inst->getArgOperand(0);
-    Value *sizeArg = Inst->getArgOperand(1);
-    CallInst *resolveCallocCall =
-        builder.CreateCall(getResolveCalloc(M), {numArg, sizeArg});
-    Inst->replaceAllUsesWith(resolveCallocCall);
-    Inst->eraseFromParent();
+  for (auto calloc : callocList) {
+    handle_calloc(calloc);
   }
 }
 
@@ -660,6 +672,14 @@ void instrumentFree(Function *F) {
   LLVMContext &Ctx = M->getContext();
   IRBuilder<> builder(Ctx);
   std::vector<CallInst *> freeList;
+
+  auto handle_free = [&](auto *freeInst) {
+    builder.SetInsertPoint(freeInst);
+    Value *ptrArg = freeInst->getArgOperand(0);
+    CallInst *resolveFreeCall = builder.CreateCall(getResolveFree(M), {ptrArg});
+    freeInst->replaceAllUsesWith(resolveFreeCall);
+    freeInst->eraseFromParent();
+  };
 
   for (auto &BB : *F) {
     for (auto &inst : BB) {
@@ -678,12 +698,8 @@ void instrumentFree(Function *F) {
     }
   }
 
-  for (auto Inst : freeList) {
-    builder.SetInsertPoint(Inst);
-    Value *ptrArg = Inst->getArgOperand(0);
-    CallInst *resolveFreeCall = builder.CreateCall(getResolveFree(M), {ptrArg});
-    Inst->replaceAllUsesWith(resolveFreeCall);
-    Inst->eraseFromParent();
+  for (auto free : freeList) {
+    handle_free(free);
   }
 }
 
@@ -692,6 +708,15 @@ void instrumentStrdup(Function *F) {
   LLVMContext &Ctx = M->getContext();
   IRBuilder<> builder(Ctx);
   std::vector<CallInst *> strdupList;
+
+  auto handle_strdup = [&](auto *strdupInst) {
+    builder.SetInsertPoint(strdupInst);
+    Value *ptrArg = strdupInst->getArgOperand(0);
+    CallInst *resolveStrdupCall =
+        builder.CreateCall(getResolveStrdup(M), {ptrArg});
+    strdupInst->replaceAllUsesWith(resolveStrdupCall);
+    strdupInst->eraseFromParent();
+  };
 
   for (auto &BB : *F) {
     for (auto &inst : BB) {
@@ -710,13 +735,8 @@ void instrumentStrdup(Function *F) {
     }
   }
 
-  for (auto Inst : strdupList) {
-    builder.SetInsertPoint(Inst);
-    Value *ptrArg = Inst->getArgOperand(0);
-    CallInst *resolveStrdupCall =
-        builder.CreateCall(getResolveStrdup(M), {ptrArg});
-    Inst->replaceAllUsesWith(resolveStrdupCall);
-    Inst->eraseFromParent();
+  for (auto strdup : strdupList) {
+    handle_strdup(strdup);
   }
 }
 
@@ -725,6 +745,16 @@ void instrumentStrndup(Function *F) {
   LLVMContext &Ctx = M->getContext();
   IRBuilder<> builder(Ctx);
   std::vector<CallInst *> strndupList;
+
+  auto handle_strndup = [&](auto *strndupInst) {
+    builder.SetInsertPoint(strndupInst);
+    Value *ptrArg = strndupInst->getArgOperand(0);
+    Value *sizeArg = strndupInst->getArgOperand(1);
+    CallInst *resolveStrndupCall =
+        builder.CreateCall(getResolveStrndup(M), {ptrArg, sizeArg});
+    strndupInst->replaceAllUsesWith(resolveStrndupCall);
+    strndupInst->eraseFromParent();
+  };
 
   for (auto &BB : *F) {
     for (auto &inst : BB) {
@@ -743,14 +773,8 @@ void instrumentStrndup(Function *F) {
     }
   }
 
-  for (auto Inst : strndupList) {
-    builder.SetInsertPoint(Inst);
-    Value *ptrArg = Inst->getArgOperand(0);
-    Value *sizeArg = Inst->getArgOperand(1);
-    CallInst *resolveStrndupCall =
-        builder.CreateCall(getResolveStrndup(M), {ptrArg, sizeArg});
-    Inst->replaceAllUsesWith(resolveStrndupCall);
-    Inst->eraseFromParent();
+  for (auto strndup : strndupList) {
+    handle_strndup(strndup);
   }
 }
 
