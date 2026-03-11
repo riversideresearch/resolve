@@ -13,7 +13,7 @@ REACH_WRAPPER="/opt/resolve/bin/resolve-triage.py"
 
 export CC="/usr/bin/clang"
 export CXX="/usr/bin/clang++"
-export CFLAGS="-fpass-plugin=/resolve/build/resolve-cc/libResolveFactsPlugin.so"
+export CFLAGS="-fpass-plugin=/opt/resolve/lib/libResolveFactsPlugin.so"
 export CXXFLAGS="$CFLAGS"
 #export LDLIBS="/path/to/libresolve"
 OPENSSL="https://github.com/openssl/openssl.git"
@@ -53,3 +53,5 @@ mkdir openssl_facts
     -f openssl_facts \
     -e "CMS_RecipientInfo_decrypt" \
     -r ../reach/build/reach
+
+# TODO: Add remediation portion check for exit code 3 for successful remediation
