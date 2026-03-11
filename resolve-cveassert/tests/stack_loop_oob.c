@@ -2,6 +2,7 @@
 // RUN: RESOLVE_LABEL_CVE=vulnerabilities/stack_loop_oob.json %clang -S -emit-llvm \
 // RUN: -fpass-plugin=%plugin \
 // RUN: %s -o - | %FileCheck %s 
+// CHECK: call void @resolve_stack_obj
 // RUN: RESOLVE_LABEL_CVE=vulnerabilities/stack_loop_oob.json %clang -O0 -g -fpass-plugin=%plugin \ 
 // RUN: -L%rlib -lresolve -Wl,-rpath=%rlib %s -o %t.exe
 // RUN: %t.exe; test $? -eq 3
