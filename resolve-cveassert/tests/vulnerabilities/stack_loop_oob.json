@@ -8,7 +8,7 @@
             "cwe-id": "121",
             "cwe-name": "Stack OOB write",
             "affected-function": "vuln",
-            "affected-file": "foo.c",
+            "affected-file": "stack_loop_oob.c",
             "remediation-strategy": "exit" 
         }
     ]
