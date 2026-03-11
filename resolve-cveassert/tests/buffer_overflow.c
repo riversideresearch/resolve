@@ -1,3 +1,8 @@
+/*
+ *   Copyright (c) 2025 Riverside Research.
+ *   LGPL-3; See LICENSE.txt in the repo root for details.
+ */
+
 // Test that the remediation is successful (exits with code 3)
 // RUN: RESOLVE_LABEL_CVE=vulnerabilities/buffer_overflow.json %clang -S -emit-llvm \
 // RUN: -fpass-plugin=%plugin \
