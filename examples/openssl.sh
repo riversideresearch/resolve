@@ -44,7 +44,7 @@ else
 fi
 
 # return to the examples folder
-cd "$SCRIPT_DIR"
+cd ..
 
 # -----------------------
 # Fact extraction
@@ -54,13 +54,9 @@ if [ -d "openssl_facts" ]; then
 fi
 mkdir openssl_facts
 
-# Extract the embedded info from the openssl binary
-# Define the path to extract facts 
 "$EXTRACT_FACTS_SCRIPT" \ 
     --in_bin=openssl/libcrypto.so \ 
     --out_dir=openssl_facts
-
-
 
 # -------------------
 # Run reach analysis
