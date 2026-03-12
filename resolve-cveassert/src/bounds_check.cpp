@@ -379,9 +379,9 @@ static Function *getOrCreateResolveGep(Module *M) {
 
   builder.SetInsertPoint(CheckComputedPtrBB);
   Value *derivedInt = builder.CreatePtrToInt(derivedPtr, size_ty);
-  Value *differDerivedBase = builder.CreateSub(derivedInt, baseInt);
-  Value *differLimitBase = builder.CreateSub(limitInt, baseInt);
-  Value *withinBounds = builder.CreateICmpULE(differDerivedBase, differLimitBase);
+  Value *underLimit = builder.CreateICmpULE(derivedInt, limitInt);
+  Value *aboveBase = builder.CreateICmpUGE(derivedInt, baseInt);
+  Value *withinBounds = builder.CreateAnd(underLimit, aboveBase);
 
   builder.CreateCondBr(withinBounds, NormalBB, OnePastBB);
 
