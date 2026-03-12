@@ -33,14 +33,15 @@ fi
 
 cd "$SCRIPT_DIR"
 
-# -----------------------
+# ----------------
 # Fact extraction
-# -----------------------
+# ----------------
 if [ -d "openssl_facts" ]; then
     rm -r openssl_facts
 fi
 mkdir openssl_facts
 
+# NOTE: libcrypto.so is symlinked to libcrypto.so.3
 "$EXTRACT_FACTS_SCRIPT" \
     --in_bin ./openssl/libcrypto.so.3 \
     --out_dir openssl_facts
@@ -48,7 +49,6 @@ mkdir openssl_facts
 # -------------------
 # Run reach analysis
 # -------------------
-# DEBUGGING: Look at python sys path
 "$REACH_WRAPPER" \
     -i openssl_vulnerabilities.json \
     -o openssl_reach_out.json \
