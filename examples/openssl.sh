@@ -47,9 +47,11 @@ mkdir openssl_facts
 # -------------------
 # Run reach analysis
 # -------------------
-echo "PYTHONPATH=$PYTHONPATH"
-# Look at python sys path
+
+# DEBUGGING: Look at python sys path
 python3 -c "import sys; print(sys.path)" 
+# Works in docker container have not tested locally yet.
+PYTHONPATH=/resolve/resolve-triage/src:$PYTHONPATH
 "$REACH_WRAPPER" \
     -i openssl_vulnerabilities.json \
     -o openssl_reach_out.json \
