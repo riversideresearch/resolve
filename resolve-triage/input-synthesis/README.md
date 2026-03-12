@@ -2,6 +2,19 @@
 
 Scripts for driving coding agents to perform CVE analysis, reachability analysis, and input synthesis. The pipeline takes a CVE description as input, improves it through structured reasoning, determines whether the vulnerability is reachable in a target project, and attempts to synthesize a triggering input.
 
+## Example
+
+Enter the root directory of the project of interest and:
+```bash
+# Run the full pipeline
+python3 run_all.py claude cve.json out/
+
+# Or run each step individually
+python3 setup.py claude cve.json
+python3 improve_CVE.py claude cve.json out/improve_cve
+python3 reachability.py claude cve.json out/improve_cve out/reachability
+```
+
 ## Overview
 
 The scripts work by delegating reasoning to coding agents (Claude, Codex, or OpenCode) through carefully structured prompts. Two key patterns from `agent.py` are used throughout:
@@ -94,18 +107,6 @@ python3 run_all.py <agent> <cve_path> <output_path> [--overwrite]
 ```
 
 This calls `setup.run()`, `improve_CVE.run()`, and `reachability.run()` directly, placing artifacts under `<output_path>/improve_cve/` and `<output_path>/reachability/`.
-
-## Example
-
-```bash
-# Run the full pipeline
-python3 run_all.py claude cve.json out/
-
-# Or run each step individually
-python3 setup.py claude cve.json
-python3 improve_CVE.py claude cve.json out/improve_cve
-python3 reachability.py claude cve.json out/improve_cve out/reachability
-```
 
 ## Supported agents
 
