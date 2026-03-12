@@ -7,8 +7,6 @@
 set -e 
 
 SCRIPT_DIR="${0%/*}"
-CACHE_TAR="openssl-cache.tar.gz"
-
 EXTRACT_FACTS_SCRIPT="/opt/resolve/bin/extract_facts.py"
 REACH_WRAPPER="/opt/resolve/bin/resolve-triage"
 
@@ -49,7 +47,11 @@ mkdir openssl_facts
 # -------------------
 # Run reach analysis
 # -------------------
-export PYTHONPATH="/resolve/resolve-triage/src:$PYTHONPATH"
+
+# Debugging by printing env variable PYTHONPATH
+echo "PYTHONPATH: $PYTHONPATH"
+export PYTHONPATH="/resolve/resolve/resolve-triage/src:$PYTHONPATH"
+echo "PYTHONPATH: $PYTHONPATH"
 
 "$REACH_WRAPPER" \
     -i openssl_vulnerabilities.json \
