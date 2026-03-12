@@ -31,6 +31,10 @@ if [ ! -d "openssl" ]; then
     ./Configure && make -j
 fi
 
+if [ ! -d "libcrypto.so" ]; then 
+    make - j
+fi
+
 cd "$SCRIPT_DIR"
 
 # -----------------------
