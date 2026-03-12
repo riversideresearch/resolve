@@ -26,7 +26,7 @@ cd "$SCRIPT_DIR"
 # Download OpenSSL
 # -----------------
 if [ ! -d "openssl" ]; then
-    echo "[+] Downloading and building OpenSSL 3.5.0."
+    echo -n "[+] Downloading and building OpenSSL 3.5.0."
     git clone --branch openssl-3.5.0 --depth 1 $OPENSSL
     cd openssl
     ./Configure && make -j
@@ -37,7 +37,7 @@ cd "$SCRIPT_DIR"
 # ----------------
 # Fact extraction
 # ---------------
-echo "[+] Performing fact extraction."
+echo -n "[+] Performing fact extraction."
 if [ -d "openssl_facts" ]; then
     rm -r openssl_facts
 fi
@@ -51,7 +51,7 @@ mkdir openssl_facts
 # -------------------
 # Run reach analysis
 # -------------------
-echo "[+] Running reachability analysis." 
+echo -n "[+] Running reachability analysis." 
 "$REACH_WRAPPER" \
     -i openssl_vulnerabilities.json \
     -o openssl_reach_out.json \
