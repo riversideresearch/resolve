@@ -20,37 +20,8 @@ jobs:
         run: make install
       - name: Test
         run: make test
-      
-      - name: Cache OpenSSL library
-        id: cache-openssl
-        uses: actions/cache@v4
-        with:
-          path: ./examples/openssl.tar.gz
-          key: ${{ runner.os }}-build-openssl
-          restore-keys: |
-            ${{ runner.os }}-build-openssl
-            ${{ runner.os }}-build
-            ${{ runner.os }}-
-  
-      # Only clone and build if cache miss
-      - name: Build OpenSSL (if cache miss)
-        if: ${{ steps.cache-openssl.outputs.cache-hit != 'true' }}
-        # clone the openssl repo into the examples directory
-        run: |
-          cd examples
-          git clone --branch openssl-3.5.0 --depth 1 https://github.com/openssl/openssl.git
-          tar -czf openssl.tar.gz openssl
-      
-      - name: Restore OpenSSL from tarball
-        if: ${{ steps.cache-openssl.outputs.cache-hit == 'true' }}
-        run: |
-          cd examples
-          tar -xzf openssl.tar.gz
-
       - name: Build Examples
-        run: |
-          tar -xzf openssl.tar.gz 
-          ./examples/openssl.sh
+        run: ./examples/openssl.sh
 
   trigger-gitlab:
     runs-on: ubuntu-latest
