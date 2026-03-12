@@ -47,12 +47,11 @@ mkdir openssl_facts
 # -------------------
 # Run reach analysis
 # -------------------
+echo "PYTHONPATH=$PYTHONPATH"
+# Look at python sys path
+python3 -c "import sys; print(sys.path)" 
 
-# Debugging by printing env variable PYTHONPATH
-echo "PYTHONPATH: $PYTHONPATH"
-export PYTHONPATH="/resolve/resolve/resolve-triage/src:$PYTHONPATH"
-echo "PYTHONPATH: $PYTHONPATH"
-
+PYTHONPATH=/resolve/resolve-triage/src:$PYTHONPATH \
 "$REACH_WRAPPER" \
     -i openssl_vulnerabilities.json \
     -o openssl_reach_out.json \
