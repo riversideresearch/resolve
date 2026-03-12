@@ -29,10 +29,14 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         type=Path,
         help="Path to the input CVE file.",
     )
+    parser.add_argument(
+        "--model",
+        help="Optional model override passed through to the selected agent CLI.",
+    )
     return parser.parse_args(argv)
 
 
-def run(agent: str, cve_path: Path) -> int:
+def run(agent: str, cve_path: Path, model: str | None = None) -> int:
     agents_file = AGENTS_FILE[agent]
 
     setup_prompt = f"""
@@ -49,7 +53,7 @@ Do the following:
 4) Build the project. Put build artifacts in a `build/` directory.
 5) Update `{agents_file}` if necessary to account for any issues encountered when installing deps and building the project.
 """
-    run_prompt(agent, setup_prompt)
+    run_prompt(agent, setup_prompt, model=model)
 
     return 0
 
@@ -57,7 +61,7 @@ Do the following:
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     try:
-        return run(agent=args.agent, cve_path=args.cve_path)
+        return run(agent=args.agent, cve_path=args.cve_path, model=args.model)
     except subprocess.CalledProcessError as exc:
         print(f"agent failed with exit code {exc.returncode}")
         return exc.returncode if exc.returncode != 0 else 1

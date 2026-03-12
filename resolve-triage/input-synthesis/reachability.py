@@ -37,6 +37,10 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="Destination directory for final artifacts.",
     )
     parser.add_argument(
+        "--model",
+        help="Optional model override passed through to the selected agent CLI.",
+    )
+    parser.add_argument(
         "--overwrite",
         action="store_true",
         help="Overwrite output_path if it already exists.",
@@ -50,6 +54,7 @@ def run(
     improve_cve_path: Path,
     output_path: Path,
     overwrite: bool,
+    model: str | None = None,
 ) -> int:
     cve = cve_path.read_text()
 
@@ -104,7 +109,7 @@ The CVE is triggerable only if a sufficient condition can be satisfied. The CVE 
 
 If the only satisfiable sufficient condition(s) are machine-dependent (e.g., x86 or ARM) or depend on unreliable compiler features such as "typical" results of undefined behavior, the CVE is inconclusive.
 """
-    run_prompt(agent, analyze_prompt)
+    run_prompt(agent, analyze_prompt, model=model)
     require_file(reachability_path, "reachability analysis")
 
     ############################################################################
@@ -127,6 +132,7 @@ If the only satisfiable sufficient condition(s) are machine-dependent (e.g., x86
         negation="The reachability analysis is incorrect. Your task is to determine what errors it contains and how the conclusion should change.",
         tmp_dir=critique_path,
         output_path=reachability_path,
+        model=model,
     )
     require_file(reachability_path, "reachability critique")
 
@@ -143,7 +149,7 @@ If you synthesize an input, ensure that it will work on any realistic system if 
 
 Put any files you create in `{output_root}/input-synthesis/`. If a triggering input is synthesized, include an explanation of how it was synthesized and how to test that it works. Don't delete any scripts/programs that were used to generate the input.
 """
-    run_prompt(agent, final_prompt)
+    run_prompt(agent, final_prompt, model=model)
     require_file(output_root / "conclusion.md", "final conclusion")
 
     ############################################################################
@@ -164,6 +170,7 @@ def main(argv: list[str] | None = None) -> int:
             improve_cve_path=args.improve_cve_path,
             output_path=args.output_path,
             overwrite=args.overwrite,
+            model=args.model,
         )
     except subprocess.CalledProcessError as exc:
         print(f"agent failed with exit code {exc.returncode}")
