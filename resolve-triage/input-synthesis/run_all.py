@@ -31,6 +31,10 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="Top-level output directory. Subdirectories are created for each phase.",
     )
     parser.add_argument(
+        "--model",
+        help="Optional model override passed through to the selected agent CLI.",
+    )
+    parser.add_argument(
         "--overwrite",
         action="store_true",
         help="Overwrite output subdirectories if they already exist.",
@@ -43,17 +47,19 @@ def run(
     cve_path: Path,
     output_path: Path,
     overwrite: bool,
+    model: str | None = None,
 ) -> int:
     improve_cve_path = output_path / "improve_cve"
     reachability_path = output_path / "reachability"
 
-    setup.run(agent=agent, cve_path=cve_path)
+    setup.run(agent=agent, cve_path=cve_path, model=model)
 
     improve_CVE.run(
         agent=agent,
         cve_path=cve_path,
         output_path=improve_cve_path,
         overwrite=overwrite,
+        model=model,
     )
 
     reachability.run(
@@ -62,6 +68,7 @@ def run(
         improve_cve_path=improve_cve_path,
         output_path=reachability_path,
         overwrite=overwrite,
+        model=model,
     )
 
     return 0
@@ -75,6 +82,7 @@ def main(argv: list[str] | None = None) -> int:
             cve_path=args.cve_path,
             output_path=args.output_path,
             overwrite=args.overwrite,
+            model=args.model,
         )
     except subprocess.CalledProcessError as exc:
         print(f"agent failed with exit code {exc.returncode}")

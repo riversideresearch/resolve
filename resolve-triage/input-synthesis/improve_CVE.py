@@ -32,6 +32,10 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="Destination directory for final artifacts copied from the temporary workspace.",
     )
     parser.add_argument(
+        "--model",
+        help="Optional model override passed through to the selected agent CLI.",
+    )
+    parser.add_argument(
         "--overwrite",
         action="store_true",
         help="Overwrite output_path if it already exists.",
@@ -51,6 +55,7 @@ def refine_conditions(
     dest_dir: Path,
     scratch_root: Path,
     role: str,
+    model: str | None,
 ) -> None:
     """Critique each condition in source_dir, writing revised conditions to dest_dir."""
     dest_dir.mkdir(parents=True, exist_ok=True)
@@ -79,7 +84,14 @@ def refine_conditions(
 
 {condition}"""
 
-        run_critique(agent, preamble, negation, p_tmp, revised_condition_path)
+        run_critique(
+            agent,
+            preamble,
+            negation,
+            p_tmp,
+            revised_condition_path,
+            model=model,
+        )
         require_file(revised_condition_path, f"{role} condition refinement for {p.name}")
 
 
@@ -88,6 +100,7 @@ def run(
     cve_path: Path,
     output_path: Path,
     overwrite: bool,
+    model: str | None = None,
 ) -> int:
     original_cve = cve_path.read_text()
     cve_name = str(cve_path.with_suffix("")).replace("/", "_")
@@ -113,6 +126,7 @@ def run(
         affirmation="The above CVE description is correct but possibly incomplete. Your task is to determine why it is correct.",
         negation="The above CVE description is incorrect. Your task is to determine why it is incorrect.",
         tmp_dir=cve_tmp_path,
+        model=model,
     )
     require_file(cve_tmp_path / "thesis.md", "CVE dialectic thesis")
     require_file(cve_tmp_path / "antithesis.md", "CVE dialectic antithesis")
@@ -129,7 +143,7 @@ def run(
 
 Match the tone and style of the original CVE description. Assume that there is a legitimate vulnerability, but it may not be exactly as described by the original. Keep particular details to a minimum; just describe the nature of the vulnerability and conditions for causing it.
 """
-    run_prompt(agent, cve_improve_prompt)
+    run_prompt(agent, cve_improve_prompt, model=model)
     require_file(improved_cve_path, "CVE improvement")
 
     ############################################################################
@@ -161,7 +175,7 @@ Verify that the necessary conditions are truly necessary, not just sufficient. A
     # careful" paragraph. Something like "just state the general condition
     # and don't include further elaboration like 'this happens when ...'.
 
-    run_prompt(agent, necessary_conditions_prompt)
+    run_prompt(agent, necessary_conditions_prompt, model=model)
 
     ############################################################################
     # NECESSARY CONDITION WEAKENING
@@ -176,6 +190,7 @@ Verify that the necessary conditions are truly necessary, not just sufficient. A
         dest_dir=revised_necessary_conditions_path,
         scratch_root=scratch_root,
         role="necessary",
+        model=model,
     )
 
     ############################################################################
@@ -194,7 +209,7 @@ Your task is to determine a disjunctive (either/or) list of sufficient condition
 
 Create exactly one markdown file per sufficient condition, named `SC_1.md`, `SC_2.md`, etc. Write only those `SC_*.md` files in `{sufficient_conditions_path}/`.
 """
-    run_prompt(agent, sufficient_conditions_prompt)
+    run_prompt(agent, sufficient_conditions_prompt, model=model)
 
     ############################################################################
     # SUFFICIENT CONDITION STRENGTHENING
@@ -209,6 +224,7 @@ Create exactly one markdown file per sufficient condition, named `SC_1.md`, `SC_
         dest_dir=revised_sufficient_conditions_path,
         scratch_root=scratch_root,
         role="sufficient",
+        model=model,
     )
 
     ############################################################################
@@ -238,6 +254,7 @@ def main(argv: list[str] | None = None) -> int:
             cve_path=args.cve_path,
             output_path=args.output_path,
             overwrite=args.overwrite,
+            model=args.model,
         )
     except subprocess.CalledProcessError as exc:
         print(f"agent failed with exit code {exc.returncode}")
