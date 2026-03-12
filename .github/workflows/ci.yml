@@ -25,7 +25,7 @@ jobs:
           echo "PYTHONPATH=$PYTHONPATH"
           ./examples/openssl.sh
         env: 
-          PYTHONPATH: /resolve/resolve/resolve-triage/src
+          PYTHONPATH: /resolve/resolve/resolve-triage
 
   trigger-gitlab:
     runs-on: ubuntu-latest
