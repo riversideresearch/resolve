@@ -48,7 +48,9 @@ jobs:
           tar -xzf openssl.tar.gz
 
       - name: Build Examples
-        run: ./examples/openssl.sh
+        run: |
+          tar -xzf openssl.tar.gz 
+          ./examples/openssl.sh
 
   trigger-gitlab:
     runs-on: ubuntu-latest
