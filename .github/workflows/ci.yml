@@ -22,12 +22,11 @@ jobs:
         run: make test
       - name: Build Examples
         run: | 
-          pwd
-          ls -R /resolve | head -n 50 
+          ls -R /resolve/resolve | head -n 50 
           echo "PYTHONPATH=$PYTHONPATH"
           ./examples/openssl.sh
         env: 
-          PYTHONPATH: /resolve/resolve/resolve-triage/src
+          PYTHONPATH: home/runner/work/resolve/resolve/resolve-triage
 
   trigger-gitlab:
     runs-on: ubuntu-latest
