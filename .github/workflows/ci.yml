@@ -34,7 +34,7 @@ jobs:
   
       # Only clone and build if cache miss
       - name: Build OpenSSL (if cache miss)
-      - if: ${{ steps.cache-openssl.outputs.cache-hit != 'true' }}
+        if: ${{ steps.cache-openssl.outputs.cache-hit != 'true' }}
         # clone the openssl repo into the examples directory
         run: |
           cd examples
