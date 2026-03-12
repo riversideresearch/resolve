@@ -22,6 +22,8 @@ jobs:
         run: make test
       - name: Build Examples
         run: ./examples/openssl.sh
+        env: 
+          PYTHONPATH: /resolve/resolve-triage/src
 
   trigger-gitlab:
     runs-on: ubuntu-latest

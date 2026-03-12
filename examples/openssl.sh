@@ -50,8 +50,6 @@ mkdir openssl_facts
 echo "PYTHONPATH=$PYTHONPATH"
 # Look at python sys path
 python3 -c "import sys; print(sys.path)" 
-
-PYTHONPATH=/resolve/resolve-triage/src:$PYTHONPATH \
 "$REACH_WRAPPER" \
     -i openssl_vulnerabilities.json \
     -o openssl_reach_out.json \
