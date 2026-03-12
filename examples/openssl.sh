@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # TODO:
-# Get build working first
+# Get build working first (done!)
 # Add caching mechanism for openssl download (specifically for CI)
 
 set -e 
@@ -25,16 +25,14 @@ cd "$SCRIPT_DIR"
 # -----------------
 # Download OpenSSL
 # -----------------
-git clone --branch openssl-3.5.0 --depth 1 $OPENSSL
-cd openssl
-./Configure && make -j 
 
-if [ ! -f "libcrypto.so" ]; then
-    make -j 
+if [ ! -d "openssl" ]; then
+    git clone --branch openssl-3.5.0 --depth 1 $OPENSSL
+    cd openssl
+    ./Configure && make -j
 fi
 
-
-cd ..
+cd "$SCRIPT_DIR"
 
 # -----------------------
 # Fact extraction
