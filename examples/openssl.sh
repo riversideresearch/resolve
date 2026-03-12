@@ -52,7 +52,7 @@ mkdir openssl_facts
 # Run reach analysis
 # -------------------
 
-ls -l "$REPO_ROOT"
+ls -l "$REPO_ROOT/resolve-triage/src"
 
 # DEBUGGING: Look at python sys path
 "$REACH_WRAPPER" \
