@@ -6,7 +6,10 @@
 
 set -e 
 
-SCRIPT_DIR="${0%/*}"
+# Gives the path to the current script file
+# Changes directory and prints the absolute path
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 EXTRACT_FACTS_SCRIPT="/opt/resolve/bin/extract_facts.py"
 REACH_WRAPPER="/opt/resolve/bin/resolve-triage"
 
@@ -14,6 +17,7 @@ export CC="/usr/bin/clang"
 export CXX="/usr/bin/clang++"
 export CFLAGS="-fpass-plugin=/opt/resolve/lib/libResolveFactsPlugin.so"
 export CXXFLAGS="$CFLAGS"
+#export PYTHONPATH="$REPO_ROOT/resolve-triage/src:$PYTHONPATH"
 OPENSSL="https://github.com/openssl/openssl.git"
 
 cd "$SCRIPT_DIR"
@@ -48,10 +52,9 @@ mkdir openssl_facts
 # Run reach analysis
 # -------------------
 
+ls -l "$REPO_ROOT"
+
 # DEBUGGING: Look at python sys path
-python3 -c "import sys; print(sys.path)" 
-# Works in docker container have not tested locally yet.
-PYTHONPATH=/resolve/resolve-triage/src:$PYTHONPATH
 "$REACH_WRAPPER" \
     -i openssl_vulnerabilities.json \
     -o openssl_reach_out.json \
