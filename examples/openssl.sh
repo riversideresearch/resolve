@@ -25,7 +25,6 @@ cd "$SCRIPT_DIR"
 # -----------------
 # Download OpenSSL
 # -----------------
-
 if [ ! -d "openssl" ]; then
     git clone --branch openssl-3.5.0 --depth 1 $OPENSSL
     cd openssl
