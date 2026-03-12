@@ -1,9 +1,10 @@
+#
+#    Copyright (c) 2025 Riverside Research.
+#    LGPL-3; See LICENSE.txt in the repo root for details.
+#
+
 #!/usr/bin/env bash
-#
-# Copyright (c) 2025 Riverside Research.
-# LGPL-3; See LICENSE.txt in the repo root for details.
-#
-# Clang wrapper with CVEAssert instrumentation 
+# RESOLVE clang wrapper  
 
 set -e
 # set -x for debugging
