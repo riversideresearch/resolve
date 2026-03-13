@@ -93,4 +93,3 @@ jobs:
 
             sleep "$POLL_INTERVAL"
           done
-          
