@@ -43,9 +43,8 @@ if [ -d "openssl_facts" ]; then
 fi
 mkdir openssl_facts
 
-# NOTE: libcrypto.so is symlinked to libcrypto.so.3
 "$EXTRACT_FACTS_SCRIPT" \
-    --in_bin ./openssl/libcrypto.so.3 \
+    --in_bin ./openssl/libcrypto.so \
     --out_dir openssl_facts
 
 # -------------------
