@@ -52,7 +52,7 @@ eval "$INSTALL_CMD $PKGS"
 python3 -m pip install lit wllvm univers --break-system-packages
 
 # Install uv
-curl -LsSf https://astral.sh/uv/0.10.9/install.sh | env UV_INSTALL_DIR="/usr/local/bin/" sh
+curl -LsSf https://astral.sh/uv/0.10.9/install.sh | env UV_INSTALL_DIR="/usr/local/bin" sh
 
 # Install rust
 if ! command -v rustc >/dev/null 2>&1; then

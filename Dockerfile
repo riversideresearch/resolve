@@ -11,6 +11,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY scripts /opt/resolve/scripts
 RUN /opt/resolve/scripts/install-deps.sh && apt-get clean && rm -rf /var/lib/apt/lists/*
 
+RUN echo 'export PATH=/opt/resolve/bin:$PATH' >> ~/.bashrc
+
 FROM base AS builder
 # Copy in resolve tools
 COPY cmake /resolve/cmake

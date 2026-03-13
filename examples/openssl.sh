@@ -1,48 +1,61 @@
-#/bin/bash
+#
+#    Copyright (c) 2025 Riverside Research.
+#    LGPL-3; See LICENSE.txt in the repo root for details.
+#
 
+#!/usr/bin/env bash
+set -e 
+
+# Gives the path to the current script file
+# Changes directory and prints the absolute path
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+EXTRACT_FACTS_SCRIPT="/opt/resolve/bin/extract_facts.py"
+REACH_WRAPPER="/opt/resolve/bin/resolve-triage"
+
+export CC="/usr/bin/clang"
+export CXX="/usr/bin/clang++"
+export CFLAGS="-fpass-plugin=/opt/resolve/lib/libResolveFactsPlugin.so"
+export CXXFLAGS="$CFLAGS"
+export PYTHONPATH="$REPO_ROOT/resolve-triage/src:$PYTHONPATH"
 OPENSSL="https://github.com/openssl/openssl.git"
 
-# Ensure the parent repo has been built before running
-make -C "../"
+cd "$SCRIPT_DIR"
 
-# get the OpenSSL repo
+# -----------------
+# Download OpenSSL
+# -----------------
 if [ ! -d "openssl" ]; then
-
-#    git clone https://github.com/openssl/openssl.git
-    git clone --branch openssl-3.5.0 --depth 1 $OPENSSL   
+    echo "[+] Downloading and building OpenSSL 3.5.0."
+    git clone --branch openssl-3.5.0 --depth 1 $OPENSSL
+    cd openssl
+    ./Configure && make -j
 fi
 
-cd openssl
+cd "$SCRIPT_DIR"
 
-# Set compiler flags to use the EnhancedFacts pass 
-export CC=clang
-export CXX=clang
-export CFLAGS="-fpass-plugin=../../llvm-plugin/build/libEnhancedFacts.so"
-export CXXFLAGS="$CFLAGS"
-export LDLIBS="../../libresolve/target/release/libresolve.so"
-
-# Run OpenSSL's build
-./Configure
-make -j
-
-# return to the examples folder
-cd ..
-
-# Ensure we build new facts
+# ----------------
+# Fact extraction
+# ---------------
+echo "[+] Performing fact extraction."
 if [ -d "openssl_facts" ]; then
     rm -r openssl_facts
 fi
 mkdir openssl_facts
 
-# Extract the embedded info from the openssl binary
+"$EXTRACT_FACTS_SCRIPT" \
+    --in_bin ./openssl/libcrypto.so \
+    --out_dir openssl_facts
 
-python3 ../linker/extract_facts.py --in_bin=openssl/libcrypto.so --out_dir=openssl_facts
+# -------------------
+# Run reach analysis
+# -------------------
+echo "[+] Running reachability analysis." 
+"$REACH_WRAPPER" \
+    -i openssl_vulnerabilities.json \
+    -o openssl_reach_out.json \
+    -f openssl_facts \
+    -e "CMS_RecipientInfo_decrypt" \
+    -r /opt/resolve/bin/reach
 
-# Run the reach-wrapper tool
-python3 ../reach-wrapper/reach-wrapper.py \
-        -i openssl_vulnerabilities.json \
-        -o openssl_reach_out.json \
-        -f openssl_facts \
-        -e "CMS_RecipientInfo_decrypt" \
-        -r ../reach/build/reach
-        
+# TODO: Add remediation portion check for exit code 3 for successful remediation
