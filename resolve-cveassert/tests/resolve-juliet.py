@@ -157,7 +157,8 @@ def testCwe(testcase: tuple):
     
     for test_key, test_files in sorted(grouped_tests.items()):
         
-        binary_path = Path(root_dir) / f"{test_files[0]}"
+        # Binary path to tmp directory
+        binary_path = Path("/tmp") / f"{cwe_id}_{test_files[0].stem}"
         # Create the JSON-formatted CVE description
         cve_descriptions = getCveDescription(cwe_id, test_files)
 
@@ -168,19 +169,20 @@ def testCwe(testcase: tuple):
             env_var["RESOLVE_LABEL_CVE"] = cve_descriptions
 
             # Determine which compiler to use based on extensions
-            use_cpp = any(f.suffix == ".cpp" for f in files)
+            use_cpp = any(f.suffix == ".cpp" for f in test_files)
             compiler = "clang++" if use_cpp else "clang"
 
             # Support files for compilation
             testsupport_dir = Path(root_dir) / "testcasesupport"
             io_file = testsupport_dir / "io.c"
 
+            # NOTE: Do NOT compile a binary and its source in the same directory
             compile_cmd = [
                 compiler,
                 "-fpass-plugin=/opt/resolve/lib/libCVEAssert.so",
                 "-L/opt/resolve/lib",
                 "-lresolve",
-                "-Wl,-rpath=opt/resolve/lib",
+                "-Wl,-rpath=/opt/resolve/lib",
                 "-DOMITGOOD",
                 "-DINCLUDEMAIN",
                 "-I", str(testsupport_dir),
@@ -189,15 +191,17 @@ def testCwe(testcase: tuple):
                 "-o", str(binary_path)
             ]
 
+            # Compile source files with CVE description
             process = subprocess.run(
                 compile_cmd,
                 env=env_var,
-                capture_output=True
+                capture_output=True,
+                text=True
             )
 
             # Check if return code is 0 (clean compilation)
             if process.returncode != 0:
-                print(f"Compilation failed for: {binary_path}")
+                print(f"\nCompilation failed for: {binary_path}")
                 print(process.stderr)
                 failed_to_compile += 1
 
@@ -283,19 +287,10 @@ def getCveDescription(cwe_id: int, test_files: list[Path]):
 
     json_obj = {"vulnerabilities" : vulnerabilities }
 
-    # Create a temprary JSON file
-    json_file = tempfile.NamedTemporaryFile(
-        mode="w",
-        suffix=".json",
-        delete=False      
-    )
-
     json_path = Path("/tmp") / f"{test_files[0].stem}.json" 
 
     with json_path.open("w") as f:
         json.dump(json_obj, f, indent=4)
-        f.close()
-
 
     return json_path
 
