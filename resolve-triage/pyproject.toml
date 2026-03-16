@@ -9,8 +9,15 @@ dependencies = [
 ]
 
 [project.scripts]
-resolve-triage = "resolve_triage:main"
+resolve-triage = "resolve.triage:main"
+input-synthesis-setup = "resolve.input_synthesis.setup:main"
+input-synthesis-run-all = "resolve.input_synthesis.run_all:main"
+input-synthesis-improve-cve = "resolve.input_synthesis.improve_CVE:main"
+input-synthesis-reachability = "resolve.input_synthesis.reachability:main"
 
 [build-system]
 requires = ["uv_build>=0.10.9,<0.11.0"]
 build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = ["resolve.input_synthesis", "resolve.triage"]
