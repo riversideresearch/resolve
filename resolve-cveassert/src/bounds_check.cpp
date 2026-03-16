@@ -477,6 +477,7 @@ void instrumentAlloca(Function *F) {
   auto size_ty = Type::getInt64Ty(Ctx);
   auto void_ty = Type::getVoidTy(Ctx);
 
+  SmallVector<AllocaInst *, 16> allocas;
   // Initialize list to store pointers to alloca and instructions
   std::vector<AllocaInst *> toFreeList;
 
@@ -490,43 +491,81 @@ void instrumentAlloca(Function *F) {
     Type *allocatedType = allocaInst->getAllocatedType();
     uint64_t typeSize = DL.getTypeAllocSize(allocatedType);
 
+    // Create padded alloca type
+    builder.SetInsertPoint(allocaInst->getNextNode());
+    StructType *paddedType = StructType::get(allocatedType, Type::getInt8Ty(Ctx));
+    AllocaInst *paddedAlloca = builder.CreateAlloca(paddedType, nullptr, allocaInst->getName() + ".pad"); 
+    paddedAlloca->setAlignment(allocaInst->getAlign());
+
+    // Emit a gep instruction to point to allocated type 
+    Value *typedPtr = builder.CreateStructGEP(paddedType, paddedAlloca, 0);
+    // NOTE: attaching metadata to gep instruction to prevent instrumentation of gep
+    if (auto *inst = dyn_cast<Instruction>(typedPtr)) {
+      inst->setMetadata("resolve.noinstrument", MDNode::get(Ctx, {}));
+    }
+
+    // Collect lifetime calls
+    SmallVector<Instruction *, 8> lifetimeCalls;
+
     for (auto *user : allocaInst->users()) {
       if (auto *call = dyn_cast<CallInst>(user)) {
-        auto called = call->getCalledFunction();
-        if (called && called->getName().starts_with("llvm.lifetime.start")) {
-          hasStart = true;
-          builder.SetInsertPoint(call->getNextNode());
-          builder.CreateCall(getResolveStackObj(M),
-                             {allocaInst, ConstantInt::get(size_ty, typeSize)});
-        }
+        if (auto *intrinsic = dyn_cast<IntrinsicInst>(call)) {
+          if (intrinsic->getIntrinsicID() == Intrinsic::lifetime_start) {
+            hasStart = true;
+            lifetimeCalls.push_back(call);
+          }
 
-        if (called && called->getName().starts_with("llvm.lifetime.end")) {
-          hasEnd = true;
-          builder.SetInsertPoint(call->getNextNode());
-          builder.CreateCall(invalidateFn, {allocaInst});
+          if (intrinsic->getIntrinsicID() == Intrinsic::lifetime_end) {
+            hasEnd = true;
+            lifetimeCalls.push_back(call);
+          }
         }
       }
     }
 
+    for (auto *call : lifetimeCalls) {
+      if (auto* intrinsic = dyn_cast<IntrinsicInst>(call)) {
+        if (intrinsic->getIntrinsicID() == Intrinsic::lifetime_start) {
+          builder.SetInsertPoint(call->getNextNode());
+          builder.CreateCall(getResolveStackObj(M), { typedPtr, ConstantInt::get(size_ty, typeSize )});
+          call->setOperand(1, typedPtr);
+        }
+
+        if (intrinsic->getIntrinsicID() == Intrinsic::lifetime_end) {
+          builder.SetInsertPoint(call->getNextNode());
+          builder.CreateCall(invalidateFn, { typedPtr });
+          call->setOperand(1, typedPtr);
+        }
+      }
+    }
+
+    allocaInst->replaceAllUsesWith(paddedAlloca);
+
     // This is probably always true unless we are given malformed input.
     assert(hasStart == hasEnd);
-    if (hasStart) {
-      return;
+
+    // Instrument allocas that don't have lifetime markers
+    if (!hasStart) {
+      if (auto *inst = dyn_cast<Instruction>(typedPtr)) {
+        builder.SetInsertPoint(inst->getNextNode());
+        builder.CreateCall(getResolveStackObj(M),
+        { typedPtr, ConstantInt::get(size_ty, typeSize )});
+      }
     }
-    // Otherwise Insert after the alloca instruction
-    builder.SetInsertPoint(allocaInst->getNextNode());
-    builder.CreateCall(getResolveStackObj(M),
-                       {allocaInst, ConstantInt::get(size_ty, typeSize)});
-    // If we have not added an invalidate call already make sure we do so later.
-    toFreeList.push_back(allocaInst);
+    toFreeList.push_back(paddedAlloca);
+    allocaInst->eraseFromParent();
   };
 
   for (auto &BB : *F) {
     for (auto &instr : BB) {
       if (auto *inst = dyn_cast<AllocaInst>(&instr)) {
-        handle_alloca(inst);
+        allocas.push_back(inst);
       }
     }
+  }
+
+  for (auto *alloca : allocas) {
+    handle_alloca(alloca);
   }
 
   // Find low and high allocations and pass to resolve_invaliate_stack
@@ -543,9 +582,8 @@ void instrumentAlloca(Function *F) {
     for (auto &instr : BB) {
       if (auto *inst = dyn_cast<ReturnInst>(&instr)) {
         builder.SetInsertPoint(inst);
-        // builder.CreateCall(invalidateFn, { low, high });
-        for (auto *alloca : toFreeList) {
-          builder.CreateCall(invalidateFn, {alloca});
+        for (auto *padded : toFreeList) {
+          builder.CreateCall(invalidateFn, { padded });
         }
       }
     }
@@ -790,6 +828,8 @@ void instrumentGEP(Function *F) {
     if (visitedGep.contains(gep)) {
       return;
     }
+
+    if (gep->getMetadata("resolve.noinstrument")) { return; }
 
     Value *basePtr = gep->getPointerOperand();
     GetElementPtrInst *derivedPtr = gep;
