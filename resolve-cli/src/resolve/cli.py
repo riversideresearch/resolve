@@ -33,31 +33,46 @@ def find_subcommands():
 def main():
     subcommands = find_subcommands()
 
-    parser = argparse.ArgumentParser(prog=PROGRAM)
-    parser.add_argument("subcommand", nargs="?", help="Subcommand to run")
+    parser = argparse.ArgumentParser(prog=PROGRAM, add_help=False)
+    parser.add_argument("subcommand", nargs="?", metavar="subcommand")
+    parser.add_argument("-h", "--help", action="store_true")
     parser.add_argument("args", nargs=argparse.REMAINDER)
+
+    def show_help():
+        parser.print_usage()
+        print()
+        print("available subcommands:")
+        for name in sorted(subcommands):
+            print(f"  {name}")
+
+    def show_unknown_subcommand(sub: str):
+        parser.print_usage()
+        print(f"error: unknown subcommand: {sub}")
+        print()
+        print("available subcommands:")
+        for name in sorted(subcommands):
+            print(f"  {name}")
+
 
     args = parser.parse_args()
 
-    if not args.subcommand:
-        print("Available subcommands:")
-        for name in sorted(subcommands):
-            print(f"  {name}")
+    if args.help or not args.subcommand:
+        show_help()
         return 0
 
     # Handle resolve help <subcommand>
     if args.subcommand == "help":
         if not args.args:
-            print(f"Usage: {PROGRAM} help <subcommand>")
+            show_help()
             return 1
         sub = args.args[0]
         if sub not in subcommands:
-            print(f"Unknown subcommand: {sub}")
+            show_unknown_subcommand(sub)
             return 1
         return subprocess.call([subcommands[sub], "--help"])
 
     if args.subcommand not in subcommands:
-        print(f"Unknown subcommand: {args.subcommand}")
+        show_unknown_subcommand(args.subcommand)
         return 1
 
     # Dispatch to the external executable
