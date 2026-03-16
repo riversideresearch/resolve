@@ -23,7 +23,7 @@ COPY resolve-cveassert /resolve/resolve-cveassert
 COPY reach /resolve/reach
 COPY resolve-facts /resolve/resolve-facts
 COPY mcp /resolve/mcp
-COPY resolve-triage /resolve/resolve-triage
+COPY resolve-cli /resolve/resolve-cli
 COPY Makefile /resolve/Makefile
 COPY CMakeLists.txt /resolve/CMakeLists.txt
 
