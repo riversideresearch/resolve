@@ -1,6 +1,6 @@
 version = 1
-revision = 2
-requires-python = ">=3.13"
+revision = 3
+requires-python = ">=3.12"
 
 [[package]]
 name = "attrs"
@@ -21,7 +21,7 @@ wheels = [
 ]
 
 [[package]]
-name = "resolve-triage"
+name = "resolve"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
