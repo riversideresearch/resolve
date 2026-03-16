@@ -11,6 +11,7 @@ dependencies = [
 [project.scripts]
 resolve = "resolve.cli:main"
 resolve-reach = "resolve.reach:main"
+resolve-input-synthesis = "resolve.input_synthesis.__main__:main"
 resolve-input-synthesis-setup = "resolve.input_synthesis.setup:main"
 resolve-input-synthesis-run-all = "resolve.input_synthesis.run_all:main"
 resolve-input-synthesis-improve-cve = "resolve.input_synthesis.improve_CVE:main"
