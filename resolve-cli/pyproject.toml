@@ -11,10 +11,10 @@ dependencies = [
 [project.scripts]
 resolve = "resolve.cli:main"
 resolve-reach = "resolve.reach:main"
-input-synthesis-setup = "resolve.input_synthesis.setup:main"
-input-synthesis-run-all = "resolve.input_synthesis.run_all:main"
-input-synthesis-improve-cve = "resolve.input_synthesis.improve_CVE:main"
-input-synthesis-reachability = "resolve.input_synthesis.reachability:main"
+resolve-input-synthesis-setup = "resolve.input_synthesis.setup:main"
+resolve-input-synthesis-run-all = "resolve.input_synthesis.run_all:main"
+resolve-input-synthesis-improve-cve = "resolve.input_synthesis.improve_CVE:main"
+resolve-input-synthesis-reachability = "resolve.input_synthesis.reachability:main"
 
 [build-system]
 requires = ["uv_build>=0.10.9,<0.11.0"]
