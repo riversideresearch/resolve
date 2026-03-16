@@ -11,7 +11,7 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 EXTRACT_FACTS_SCRIPT="/opt/resolve/bin/extract_facts.py"
-REACH_WRAPPER="/opt/resolve/bin/resolve-triage"
+REACH_WRAPPER="/opt/resolve/bin/resolve-reach"
 
 export CC="/usr/bin/clang"
 export CXX="/usr/bin/clang++"
