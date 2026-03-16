@@ -1,3 +1,6 @@
+# Copyright (c) 2026 Riverside Research.
+# LGPL-3; See LICENSE.txt in the repo root for details.
+
 include(ExternalProject)
 
 # Detect CPU count for parallel builds
