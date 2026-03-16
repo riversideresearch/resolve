@@ -1,8 +1,4 @@
 #!/usr/bin/env python3
-#
-# Copyright (c) 2025 Riverside Research.
-# LGPL-3; See LICENSE.txt in the repo root for details.
-
 import argparse, os, re, subprocess, pathlib, json
 from pathlib import Path
 from collections import defaultdict
@@ -19,6 +15,7 @@ class Result:
     test_name: str
     test_number: str
     exit_code: int
+
 
 
 def findMatches(source_files: list[Path], pattern: re.Pattern) -> list[tuple]:
@@ -87,43 +84,42 @@ def findGood(source_files: list[Path]) -> list[tuple]:
     return matching_cwe_pattern_files + matching_g_b_pattern_files 
  
 def testCwe(testcase: tuple):
-    print("\n===== ENTERING testCwe() =====")
+    print("\n>>> ENTERING testCwe()")
     cwe_id, testcase_dir_path = testcase
 
     print(f"[DEBUGGING] Path: {testcase_dir_path}")
 
     grouped_tests = defaultdict(list)
+    file_counter = 0
 
-    # [DEBGGING] Counting the number of source code files in a directory
-    counter = 0
     for source_path in testcase_dir_path.iterdir():
         if not source_path.is_file():
             continue
+        
+        if source_path.stem == ".cpp":
+            continue
 
-        # Parse extension from source file
+        # Extract group key from stem
         stem = source_path.stem
-
         match = re.search(r"^(.*_\d+)", stem)
 
         if not match:
             continue
 
         group_key = match.group(1)
-
         grouped_tests[group_key].append(source_path)
         
         # [DEBUGGING]
-        counter += 1
+        file_counter += 1
 
     # print("             ==== [DEBUGGING] ====")
     # for key, files in sorted(grouped_tests.items()):
     #     print(f"\nTest group: {key}")
     #     for f in sorted(files):
     #         print("     ", f.name)
-    print(f"\n[DEBUGGING] Number of files: {counter}\n")
+    print(f"\n[DEBUGGING] Number of relevant files: {file_counter}\n")
     # print("             ==== [DEBUGGING] ====")
 
-    # Iterating over each source files and parsing to see if src has matching patterns
     for key, files in sorted(grouped_tests.items()):
         print(f"\nChecking groups: {key}")
         bad_files = findBad(files)
@@ -151,8 +147,6 @@ def testCwe(testcase: tuple):
     #     cve_descriptions = getCveDescription(cwe_id, test_files)
     #     print(f"\nJSON output for group {key}:\n{cve_descriptions}")
 
-    
-    
     # Loop over all the testcases and store results in list
     results = []
     total_tests = 0
@@ -162,6 +156,8 @@ def testCwe(testcase: tuple):
     
     for test_key, test_files in sorted(grouped_tests.items()):
         
+        total_tests+= 1
+
         # Binary path to tmp directory
         binary_path = Path("/tmp") / f"{cwe_id}_{test_files[0].stem}"
         # Create the JSON-formatted CVE description
@@ -214,6 +210,7 @@ def testCwe(testcase: tuple):
                 # Execute the compiled binary
                 executed_binary = subprocess.run(
                     [str(binary_path)],
+                    input="",
                     capture_output=True,
                     text=True
                 )
@@ -232,27 +229,16 @@ def testCwe(testcase: tuple):
         # test_number = match.group(2)
 
         # results.append(Result(test_name, test_number, exit_code))
-        # clean up binaries when done
-        # If the file does not exist then do not throw an error (similar behavior as POSIX rm -f cmd)
-        # binary_path.unlink(missing_ok=True)
-        total_tests += 1
 
-    print("============================= SUMMARY =============================")
+    print("-----------------------------------------------------------------")
     print(f"Total testcases: {total_tests}\n")
     print(f"Cases exit with remediated code: {correct_exit_code}\n")
     print(f"Cases exit with incorrect code : {incorrect_exit_code}\n")
     print(f"Number of cases failed to compile: {failed_to_compile}\n")
     print(f"Percentage of CWE{cwe_id} directory covered: { (correct_exit_code / total_tests) * 100:.2f}%")
-    print("============================ SUMMARY =============================")
-
-
+    print("-----------------------------------------------------------------")
     
 def testAllCwes(cwe_ids: set):
-    """
-    Iterates over each CWE directory specified by the user
-    and calls testCwe on it 
-    """
-
     testcases = Path(root_dir) / "testcases"
 
     # DEBUGGING: print the ids
@@ -289,7 +275,7 @@ def getCveDescription(cwe_id: int, test_files: list[Path]):
         print("No affected function found!") # replace with error handler
         # raise CouldNotFindBadFunction 
 
-    # Build CVE description
+    # Build JSON
     vulnerabilities = [
         {
             "cwe-id": str(cwe_id),
@@ -302,7 +288,6 @@ def getCveDescription(cwe_id: int, test_files: list[Path]):
 
     json_obj = {"vulnerabilities" : vulnerabilities }
 
-    # Create a path to a json file in the tmp dir 
     json_path = Path("/tmp") / f"{test_files[0].stem}.json" 
 
     with json_path.open("w") as f:
