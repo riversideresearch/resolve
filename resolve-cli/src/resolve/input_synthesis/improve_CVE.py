@@ -1,6 +1,8 @@
 import argparse
+import os
 import shutil
 import subprocess
+import sys
 import tempfile
 from pathlib import Path
 
@@ -9,11 +11,13 @@ from .utils import prepare_output_path, require_file
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    prog = os.path.basename(sys.argv[0])
+
     parser = argparse.ArgumentParser(
         description="Run an iterative CVE-improvement pipeline with a coding agent. All intermediate artifacts are written under a unique /tmp workspace and final results are copied to output_path.",
-        epilog="""Examples:
-  python3 improve_CVE.py codex cve.json out/improve_cve
-  python3 improve_CVE.py claude cve.json out/improve_cve""",
+        epilog=f"""Examples:
+  {prog} codex cve.json out/improve_cve
+  {prog} claude cve.json out/improve_cve""",
         formatter_class=argparse.RawTextHelpFormatter,
     )
     parser.add_argument(

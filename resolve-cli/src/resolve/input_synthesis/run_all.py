@@ -1,6 +1,8 @@
 import argparse
+import os
 import subprocess
 from pathlib import Path
+import sys
 
 from . import improve_CVE
 from . import reachability
@@ -8,11 +10,13 @@ from . import setup
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    prog = os.path.basename(sys.argv[0])
+
     parser = argparse.ArgumentParser(
         description="Run the full CVE analysis pipeline: setup, CVE improvement, reachability analysis, and input synthesis.",
-        epilog="""Examples:
-  python3 run_all.py claude cve.json out/
-  python3 run_all.py codex cve.json out/""",
+        epilog=f"""Examples:
+  {prog} claude cve.json out/
+  {prog} codex cve.json out/""",
         formatter_class=argparse.RawTextHelpFormatter,
     )
     parser.add_argument(

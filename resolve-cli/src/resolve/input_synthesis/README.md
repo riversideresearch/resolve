@@ -7,12 +7,12 @@ Scripts for driving coding agents to perform CVE analysis, reachability analysis
 Enter the root directory of the project of interest and:
 ```bash
 # Run the full pipeline
-python3 run_all.py claude cve.json out/
+python3 -m resolve.input_synthesis run_all claude cve.json out/
 
 # Or run each step individually
-python3 setup.py claude cve.json
-python3 improve_CVE.py claude cve.json out/improve_cve
-python3 reachability.py claude cve.json out/improve_cve out/reachability
+python3 -m resolve.input_synthesis setup claude cve.json
+python3 -m resolve.input_synthesis improve_CVE claude cve.json out/improve_cve
+python3 -m resolve.input_synthesis reachability claude cve.json out/improve_cve out/reachability
 ```
 
 ## Overview
@@ -48,7 +48,7 @@ The scripts work by delegating reasoning to coding agents (Claude, Codex, or Ope
 Prepares the target project for analysis. Given a CVE description, it checks out the affected version, maps the project architecture, installs dependencies (ensuring source code is available locally for analysis), and builds the project.
 
 ```
-python3 setup.py <agent> <cve_path>
+python3 -m resolve.input_synthesis setup <agent> <cve_path>
 ```
 
 ### 2. `improve_CVE.py`
@@ -56,7 +56,7 @@ python3 setup.py <agent> <cve_path>
 Improves a CVE description and decomposes it into necessary and sufficient conditions for triggering the vulnerability.
 
 ```
-python3 improve_CVE.py <agent> <cve_path> <output_path> [--overwrite]
+python3 -m resolve.input_synthesis improve_CVE <agent> <cve_path> <output_path> [--overwrite]
 ```
 
 Steps:
@@ -81,7 +81,7 @@ Output directory contains:
 Determines whether the vulnerability is reachable in the target project and attempts to synthesize a triggering input.
 
 ```
-python3 reachability.py <agent> <cve_path> <improve_cve_path> <output_path> [--overwrite]
+python3 -m resolve.input_synthesis reachability <agent> <cve_path> <improve_cve_path> <output_path> [--overwrite]
 ```
 
 Where `<improve_cve_path>` is the output directory from `improve_CVE.py`.
@@ -103,7 +103,7 @@ Output directory contains:
 Runs the full pipeline (setup, CVE improvement, reachability) in sequence.
 
 ```
-python3 run_all.py <agent> <cve_path> <output_path> [--overwrite]
+python3 -m resolve.input_synthesis run_all <agent> <cve_path> <output_path> [--overwrite]
 ```
 
 This calls `setup.run()`, `improve_CVE.run()`, and `reachability.run()` directly, placing artifacts under `<output_path>/improve_cve/` and `<output_path>/reachability/`.
