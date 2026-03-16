@@ -2,7 +2,8 @@
 import argparse, os, re, subprocess, pathlib, json
 from pathlib import Path
 from collections import defaultdict
-from dataclass import dataclass
+from dataclasses import dataclass
+import tempfile
 
 # Global variable stores parent directory absolute path 
 root_dir = str(Path(__file__).parent)
@@ -177,9 +178,9 @@ def testCwe(testcase: tuple):
             compile_cmd = [
                 compiler,
                 "-fpass-plugin=/opt/resolve/lib/libCVEAssert.so",
-                "-L/path/to/libresolve",
+                "-L/opt/resolve/lib",
                 "-lresolve",
-                "-Wl,-rpath=/path/to/libresolve",
+                "-Wl,-rpath=opt/resolve/lib",
                 "-DOMITGOOD",
                 "-DINCLUDEMAIN",
                 "-I", str(testsupport_dir),
@@ -280,7 +281,24 @@ def getCveDescription(cwe_id: int, test_files: list[Path]):
         for file, func in affected_functions
     ]
 
-    return json.dumps({"vulnerabilities": vulnerabilities}, indent=4)
+    json_obj = {"vulnerabilities" : vulnerabilities }
+
+    # Create a temprary JSON file
+    json_file = tempfile.NamedTemporaryFile(
+        mode="w",
+        suffix=".json",
+        delete=False      
+    )
+
+    json_path = Path("/tmp") / f"{test_files[0].stem}.json" 
+
+    with json_path.open("w") as f:
+        json.dump(json_obj, f, indent=4)
+        f.close()
+
+
+    return json_path
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
