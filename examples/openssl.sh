@@ -17,7 +17,6 @@ export CC="/usr/bin/clang"
 export CXX="/usr/bin/clang++"
 export CFLAGS="-fpass-plugin=/opt/resolve/lib/libResolveFactsPlugin.so"
 export CXXFLAGS="$CFLAGS"
-export PYTHONPATH="$REPO_ROOT/resolve-triage/src:$PYTHONPATH"
 OPENSSL="https://github.com/openssl/openssl.git"
 
 cd "$SCRIPT_DIR"
