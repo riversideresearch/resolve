@@ -227,6 +227,9 @@ def testCwe(testcase: tuple):
         # test_number = match.group(2)
 
         # results.append(Result(test_name, test_number, exit_code))
+        # clean up binariews when done
+        # If the file does not exist then do not throw an error (similar behavior as POSIX rm -f cmd)
+        # binary_path.unlink(missing_ok=True)
         total_tests += 1
 
     print("-----------------------------------------------------------------")
@@ -236,6 +239,8 @@ def testCwe(testcase: tuple):
     print(f"Number of cases failed to compile: {failed_to_compile}\n")
     print(f"Percentage of CWE{cwe_id} directory covered: { (correct_exit_code / total_tests) * 100:.2f}%")
     print("-----------------------------------------------------------------")
+
+
     
 def testAllCwes(cwe_ids: set):
     testcases = Path(root_dir) / "testcases"
