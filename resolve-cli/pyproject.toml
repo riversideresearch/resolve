@@ -9,7 +9,7 @@ dependencies = [
 ]
 
 [project.scripts]
-resolve = "resolve.cli:main"
+resolve = "resolve.__main__:main"
 resolve-reach = "resolve.reach:main"
 resolve-input-synthesis = "resolve.input_synthesis.__main__:main"
 resolve-input-synthesis-setup = "resolve.input_synthesis.setup:main"

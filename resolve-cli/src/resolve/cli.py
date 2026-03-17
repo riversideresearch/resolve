@@ -5,14 +5,12 @@ from pathlib import Path
 import subprocess
 import sys
 
-PROGRAM = "resolve"
-
-def find_subcommands():
+def find_subcommands(program: str):
     """Return a dict of {subcommand: full_path_to_executable}."""
     def is_subcommand(file: Path) -> str | None:
         name = file.name
-        if name.startswith(PROGRAM + "-"):
-            return name[len(PROGRAM) + 1:]
+        if name.startswith(program + "-"):
+            return name[len(program) + 1:]
         else:
             return None
 
@@ -30,10 +28,17 @@ def find_subcommands():
             subcommands[sub] = file
     return subcommands
 
-def main():
-    subcommands = find_subcommands()
+def subcommand_cli(program: str):
+    """
+    Given `program`, presents a cli of the form '`program` <subcommand>', 
+    where <subcommand> is any program in PATH of the form '`program`-<subcommand>'
 
-    parser = argparse.ArgumentParser(prog=PROGRAM, add_help=False)
+    i.e., if `program` == "resolve" and `resolve-reach` and `resolve-input-synthesis` are binaries in a folder in PATH,
+    then this cli would have two subcommands accessed as 'resolve reach' and 'resolve input-syntheis'
+    """
+    subcommands = find_subcommands(program)
+
+    parser = argparse.ArgumentParser(prog=program, add_help=False)
     parser.add_argument("subcommand", nargs="?", metavar="subcommand")
     parser.add_argument("-h", "--help", action="store_true")
     parser.add_argument("args", nargs=argparse.REMAINDER)
@@ -79,5 +84,8 @@ def main():
     cmd = [subcommands[args.subcommand]] + args.args
     return subprocess.call(cmd)
 
+def main():
+    return subcommand_cli(program="resolve")
+
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(main)
