@@ -236,12 +236,15 @@ def testCwe(testcase: tuple):
                     text=True
                 )
 
+                # Check if binary exits with remediation code
                 if executed_binary.returncode == 3:
                     correct_exit_code += 1
                 
+                # Check if the binary terminates with signal SIGSEV
                 elif executed_binary.returncode == -11:
                     signal_segfault += 1
 
+                # Catch-all else stmt (catches exit code 0)
                 else:
                     incorrect_exit_code += 1 
         
@@ -257,9 +260,9 @@ def testCwe(testcase: tuple):
 
     print("-----------------------------------------------------------------")
     print(f"Total testcases: {total_tests}\n")
-    print(f"Cases exit with remediated code (exit code 3): {correct_exit_code}\n")
-    print(f"Cases exit with incorrect code (exit with code 0): {incorrect_exit_code}\n")
-    print(f"Segmentation faults: {signal_segfault}\n")
+    print(f"Number of cases exit with remediated code (exit code 3): {correct_exit_code}\n")
+    print(f"Number of cases exit with incorrect code (exit with code 0): {incorrect_exit_code}\n")
+    print(f"Number of cases that terminate with segmentation faults: {signal_segfault}\n")
     print(f"Number of cases failed to compile: {failed_to_compile}\n")
     print(f"Percentage of CWE{cwe_id} directory covered: { (correct_exit_code / total_tests) * 100:.2f}%")
     print("-----------------------------------------------------------------")
