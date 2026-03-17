@@ -16,6 +16,9 @@ class Result:
     test_number: str
     exit_code: int
 
+    def __repr__(self) -> str:
+        return f"Test name: {self.test_name}, Test number: {self.test_number}, Exit code: {self.exit_code}"
+
 
 
 def findMatches(source_files: list[Path], pattern: re.Pattern) -> list[tuple]:
@@ -92,9 +95,25 @@ def testCwe(testcase: tuple):
     grouped_tests = defaultdict(list)
     file_counter = 0
 
+
+    # Check to see if the source path is a directory or a file
     for source_path in testcase_dir_path.iterdir():
-        if not source_path.is_file():
-            continue
+        if source_path.is_dir():
+            for source_code in source_path.iterdir():
+                if "_listen_socket_" in source_code.name:
+                    continue
+
+                stem = source_code.stem
+                match = re.search(r"^(.*_\d+)", stem)
+                
+                if not match:
+                    continue
+
+                group_key = match.group(1)
+                grouped_tests[group_key].append(source_code) 
+
+        # if not source_path.is_file():
+        #     continue
         
         if source_path.stem == ".cpp":
             continue
@@ -120,16 +139,16 @@ def testCwe(testcase: tuple):
     print(f"\n[DEBUGGING] Number of relevant files: {file_counter}\n")
     # print("             ==== [DEBUGGING] ====")
 
-    for key, files in sorted(grouped_tests.items()):
-        print(f"\nChecking groups: {key}")
-        bad_files = findBad(files)
+    # for key, files in sorted(grouped_tests.items()):
+    #     print(f"\nChecking groups: {key}")
+    #     bad_files = findBad(files)
 
-        if bad_files:
-            print(" BAD cases found: ")
-            for bf in bad_files:
-                print("     ", bf[0].name)
-        else:
-            print(" No BAD cases found")
+    #     if bad_files:
+    #         print(" BAD cases found: ")
+    #         for bf in bad_files:
+    #             print("     ", bf[0].name)
+    #     else:
+    #         print(" No BAD cases found")
 
     # for key, files in sorted(grouped_tests.items()):
     #     print(f"\nChecking groups: {key}")
@@ -153,6 +172,7 @@ def testCwe(testcase: tuple):
     failed_to_compile = 0
     correct_exit_code = 0
     incorrect_exit_code = 0
+    signal_segfault = 0
     
     for test_key, test_files in sorted(grouped_tests.items()):
         
@@ -212,11 +232,16 @@ def testCwe(testcase: tuple):
                     [str(binary_path)],
                     input="",
                     capture_output=True,
+                    timeout=30,
                     text=True
                 )
 
                 if executed_binary.returncode == 3:
                     correct_exit_code += 1
+                
+                elif executed_binary.returncode == -11:
+                    signal_segfault += 1
+
                 else:
                     incorrect_exit_code += 1 
         
@@ -224,19 +249,23 @@ def testCwe(testcase: tuple):
             print("Compilation failed: ", e)
             failed_to_compile += 1
 
-        # match = re.search(r"(.*)_(\d+)$", test_key)
-        # test_name = match.group(1)
-        # test_number = match.group(2)
+        match = re.search(r"(.*)_(\d+)$", test_key)
+        test_name = match.group(1)
+        test_number = match.group(2)
 
-        # results.append(Result(test_name, test_number, exit_code))
+        results.append(Result(test_name, test_number, executed_binary.returncode))
 
     print("-----------------------------------------------------------------")
     print(f"Total testcases: {total_tests}\n")
-    print(f"Cases exit with remediated code: {correct_exit_code}\n")
-    print(f"Cases exit with incorrect code : {incorrect_exit_code}\n")
+    print(f"Cases exit with remediated code (exit code 3): {correct_exit_code}\n")
+    print(f"Cases exit with incorrect code (exit with code 0): {incorrect_exit_code}\n")
+    print(f"Segmentation faults: {signal_segfault}\n")
     print(f"Number of cases failed to compile: {failed_to_compile}\n")
     print(f"Percentage of CWE{cwe_id} directory covered: { (correct_exit_code / total_tests) * 100:.2f}%")
     print("-----------------------------------------------------------------")
+
+    # for result in results:
+    #     print(repr(result))
     
 def testAllCwes(cwe_ids: set):
     testcases = Path(root_dir) / "testcases"
