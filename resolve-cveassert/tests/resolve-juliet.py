@@ -244,8 +244,8 @@ def testCwe(testcase: tuple):
                 elif executed_binary.returncode == -11:
                     signal_segfault += 1
 
-                # Catch-all else stmt (catches exit code 0)
-                else:
+                # Check if the binary retcode is 0
+                elif executed_binary.returncode == 0:
                     incorrect_exit_code += 1 
         
         except Exception as e:
