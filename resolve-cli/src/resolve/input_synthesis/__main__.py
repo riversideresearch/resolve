@@ -1,9 +1,7 @@
-#!/usr/bin/env python3
 import sys
 
-from ..cli import subcommand_cli
+from resolve.cli import subcommand_cli
 
-def main():
-    subcommand_cli(program="resolve-input-synthesis")
-
-sys.exit(main())
+# Convert current module (resolve or resolve.my_module) into a hypothetical exe for subcommand search
+program = __spec__.parent.replace(".", "-").replace("_", "-")
+sys.exit(subcommand_cli(program))

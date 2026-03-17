@@ -1,9 +1,7 @@
-#!/usr/bin/env python3
 import argparse
 import os
 from pathlib import Path
 import subprocess
-import sys
 
 def find_subcommands(program: str):
     """Return a dict of {subcommand: full_path_to_executable}."""
@@ -85,7 +83,5 @@ def subcommand_cli(program: str):
     return subprocess.call(cmd)
 
 def main():
-    return subcommand_cli(program="resolve")
-
-if __name__ == "__main__":
-    sys.exit(main)
+    import sys
+    return subcommand_cli(Path(sys.argv[0]).name)
