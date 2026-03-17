@@ -170,6 +170,7 @@ def testCwe(testcase: tuple):
     results = []
     total_tests = 0
     failed_to_compile = 0
+    failed_to_compile_cpp_build = 0
     correct_exit_code = 0
     incorrect_exit_code = 0
     signal_segfault = 0
@@ -250,7 +251,10 @@ def testCwe(testcase: tuple):
         
         except Exception as e:
             print("Compilation failed: ", e)
-            failed_to_compile += 1
+            if use_cpp:
+                failed_to_compile_cpp_build += 1
+            else:
+                failed_to_compile += 1
 
         match = re.search(r"(.*)_(\d+)$", test_key)
         test_name = match.group(1)
@@ -264,6 +268,7 @@ def testCwe(testcase: tuple):
     print(f"Number of cases exit with incorrect code (exit with code 0): {incorrect_exit_code}\n")
     print(f"Number of cases that terminate with segmentation faults: {signal_segfault}\n")
     print(f"Number of cases failed to compile: {failed_to_compile}\n")
+    print(f"Number of cases failed to compile (Require C++ support): {failed_to_compile_cpp_build}\n")
     print(f"Percentage of CWE{cwe_id} directory covered: { (correct_exit_code / total_tests) * 100:.2f}%")
     print("-----------------------------------------------------------------")
 
