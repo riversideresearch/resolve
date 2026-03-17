@@ -26,6 +26,18 @@ USE_RESOLVE=true
 # DEBUGGING: Writes each compiler invocation to stderr 
 echo "[resolvecc] $@" >&2
 
+
+# Compiler wrapper pipeline
+# 1. Parse the arguments (preserve users argument ordering)
+# 2. Config flags (detect resolve flags then load plugins)
+# 3. Execute clang invocaton
+
+main() {
+    parse_args "$@"
+    configure_flags
+    invoke_clang
+}
+
 # clang lowers mem* libc funtions into llvm intrinsics with additional metadata
 # for optimization we want our CVEAssert sanitizers to see the original libc
 # functions, so we ask clang to skip the special handling
@@ -52,6 +64,17 @@ COMPTIME_FLAGS=(
 if [[ "$1" == "--version" ]]; then
     exec "$REAL_CLANG" "$@"
 fi
+
+configure_flags() {
+    COMPTIME_FLAGS=(
+        -fno-builtin-memcpy
+        -fno-builtin-memmove
+        -fno-builtin-memset
+        -fpass-plugin="$LIB_DIR"/libCVEAssert.so
+    )
+
+    if 
+}
 
 # Usage message
 if [[ "$1" == "-h" || "$1" == "--help" ]]; then 
@@ -135,6 +158,15 @@ else
     exec "$REAL_CLANG" \
         "${NEW_ARGS[@]}"
 fi
+
+main() {
+    parse_args "$@"
+    configure_flags
+    invoke_clang
+}
+
+# Pass arguments in as separate strings
+main "$@"
 
 # if $LINKING; then
 #     RESOLVE_LABEL_CVE="$RESOLVE_LABEL_CVE"\
