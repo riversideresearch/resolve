@@ -114,10 +114,7 @@ def testCwe(testcase: tuple):
 
         # if not source_path.is_file():
         #     continue
-        
-        if source_path.stem == ".cpp":
-            continue
-
+    
         # Extract group key from stem
         stem = source_path.stem
         match = re.search(r"^(.*_\d+)", stem)
