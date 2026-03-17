@@ -43,7 +43,7 @@ fi
 # Usage message
 if [[ "$1" == "-h" || "$1" == "--help" ]]; then 
     cat <<EOF
-    resolvecc — Clang wrapper with CVEAssert instrumentation
+    resolvecc — Clang wrapper with RESOLVE plugins 
 
 USAGE:
     resolvecc [options] file...
@@ -52,11 +52,15 @@ DESCRIPTION:
     resolvecc wraps /usr/bin/clang and automatically:
 
       • Loads the CVEAssert LLVM pass plugin
+      • Loads the ResolveFactsPlugin LLVM pass plugin
       • Links against libresolve at link time
 
 WRAPPER OPTIONS:
     -fcve-assert <file>
         Path to CVE assertion configuration JSON file.
+
+    -fno-resolve
+        Does not load fact generation plugin.
     
     -lresolve 
         Links against libresolve at link time. 
