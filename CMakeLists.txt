@@ -1,3 +1,6 @@
+# Copyright (c) 2025 Riverside Research.
+# LGPL-3; See LICENSE.txt in the repo root for details.
+
 cmake_minimum_required(VERSION 3.20)
 project(resolve)
 
@@ -18,7 +21,9 @@ set(CMAKE_CXX_STANDARD 20 STRING "")
 add_subdirectory(resolve-cc)
 add_subdirectory(resolve-cveassert)
 add_subdirectory(resolve-facts)
-add_subdirectory(resolve-triage)
+add_subdirectory(reach)
+include(${CMAKE_SOURCE_DIR}/cmake/InstallKlee.cmake)
+add_subdirectory(resolve-cli)
 
 install(EXPORT resolve_targets 
     FILE ResolveTargets.cmake

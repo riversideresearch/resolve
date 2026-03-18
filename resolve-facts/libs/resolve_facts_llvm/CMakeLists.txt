@@ -1,4 +1,7 @@
 
+# Copyright (c) 2025 Riverside Research.
+# LGPL-3; See LICENSE.txt in the repo root for details.
+
 find_package(LLVM 18.1.3 CONFIG)
 
 # Add LLVM headers to include search paths
