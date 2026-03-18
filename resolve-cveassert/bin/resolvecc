@@ -1,13 +1,11 @@
+#!/usr/bin/env bash 
 #
 #    Copyright (c) 2025 Riverside Research.
 #    LGPL-3; See LICENSE.txt in the repo root for details.
 #
 
-#!/usr/bin/env bash
-# RESOLVE clang wrapper  
-
 set -e
-# set -x for debugging
+#set -x # for debugging
 
 # Paths for clang
 SCRIPT_DIR="${0%/*}"
@@ -21,7 +19,7 @@ RESOLVE_PLUGIN="$LIB_DIR"/libResolveFactsPlugin.so
 CVEASSERT_PLUGIN="$LIB_DIR"/libCVEAssert.so
 
 # Variable tells resolvecc whether to link libresolve or not
-LINK_LIBRESOLVE=false
+LINK_LIBRESOLVE=true
 
 # Variable tells resolvecc to include ResolveFacts plugin
 USE_RESOLVE=true
@@ -32,9 +30,10 @@ USE_CVEASSERT=false
 # Variable stores path of CVE description
 RESOLVE_LABEL_CVE=""
 
-# DEBUGGING: Writes each compiler invocation to stderr 
-# echo "[resolvecc] "$@"" >&2
-
+# Initialize arrays for flags and arguments
+COMPTIME_FLAGS=()
+RUNTIME_FLAGS=()
+NEW_ARGS=()
 
 # Compiler wrapper pipeline
 # 1. Parse the arguments (preserve users argument ordering)
@@ -85,7 +84,8 @@ parse_args() {
                 # handle the -fcve-assert flag and the file following it
                 handle_cve_assert "$i"
                 USE_CVEASSERT=true
-                ((i++))
+                i=$((i + 1))
+                continue # continue to next argument in loop
                 ;;
             -c|-S|-E)
                 # If -c, -S, or -E is present set LINK_LIBRESOLVE to false
@@ -93,10 +93,6 @@ parse_args() {
                 NEW_ARGS+=("$arg")
                 ;;
             
-            -lresolve)
-                LINK_LIBRESOLVE=true
-                ;;
-
             -h|--help)
                 resolvecc_help
                 exit 0
@@ -174,6 +170,9 @@ EOF
 }
 
 invoke_clang() {
+    #DEBUGGING writing compiler invocation to stderr
+    echo "[resolvecc] invoking:" >&2
+    echo "$REAL_CLANG ${COMPTIME_FLAGS[*]} ${NEW_ARGS[*]} ${RUNTIME_FLAGS[*]}" >&2
     RESOLVE_LABEL_CVE="$RESOLVE_LABEL_CVE" \
     exec "$REAL_CLANG" \
         "${COMPTIME_FLAGS[@]}" \
