@@ -21,13 +21,16 @@ RESOLVE_PLUGIN="$LIB_DIR"/libResolveFactsPlugin.so
 CVEASSERT_PLUGIN="$LIB_DIR"/libCVEAssert.so
 
 # Variable tells resolvecc whether to link libresolve or not
-LINK_LIBRESOLVE=true
+LINK_LIBRESOLVE=false
 
 # Variable tells resolvecc to include ResolveFacts plugin
 USE_RESOLVE=true
 
 # Variable tells resolvecc to load CVEAssert plugin
 USE_CVEASSERT=false
+
+# Variable stores path of CVE description
+RESOLVE_LABEL_CVE=""
 
 # DEBUGGING: Writes each compiler invocation to stderr 
 # echo "[resolvecc] "$@"" >&2
@@ -89,6 +92,10 @@ parse_args() {
                 LINK_LIBRESOLVE=false
                 NEW_ARGS+=("$arg")
                 ;;
+            
+            -lresolve)
+                LINK_LIBRESOLVE=true
+                ;;
 
             -h|--help)
                 resolvecc_help
@@ -104,6 +111,7 @@ parse_args() {
 
 configure_flags() {
 
+    # Check if USE_CVEASSERT var is set to true
     if $USE_CVEASSERT; then
         COMPTIME_FLAGS+=("-fno-builtin-memcpy")
         COMPTIME_FLAGS+=("-fno-builtin-memmove")
@@ -112,17 +120,16 @@ configure_flags() {
     fi
 
 
-    # Check if USE_RESOLVE flag is set
+    # Check if USE_RESOLVE flag is set to true
     if $USE_RESOLVE; then 
         COMPTIME_FLAGS+=("-fpass-plugin=$RESOLVE_PLUGIN")
     fi
 
     if $LINK_LIBRESOLVE; then 
-        RUNTIME_FLAGS=(
-            -L"$LIB_DIR"
-            -lresolve
-            -Wl,-rpath="$LIB_DIR"
-        )
+        RUNTIME_FLAGS+=(-L"$LIB_DIR")
+        RUNTIME_FLAGS+=("-lresolve")
+        RUNTIME_FLAGS+=(-Wl,-rpath="$LIB_DIR")
+
     else
         RUNTIME_FLAGS=()
     fi
