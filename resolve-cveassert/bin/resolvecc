@@ -109,6 +109,7 @@ configure_flags() {
         COMPTIME_FLAGS+=("-fno-builtin-memmove")
         COMPTIME_FLAGS+=("-fno-builtin-memset")
         COMPTIME_FLAGS+=("-fpass-plugin=$CVEASSERT_PLUGIN")
+    fi
 
 
     # Check if USE_RESOLVE flag is set
