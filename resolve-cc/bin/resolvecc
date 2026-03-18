@@ -7,7 +7,7 @@
 set -e
 #set -x # for debugging
 
-# Paths for clang
+# Path for clang
 SCRIPT_DIR="${0%/*}"
 REAL_CLANG="/usr/bin/clang"
 LIB_DIR="$SCRIPT_DIR"/../lib
