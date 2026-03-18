@@ -36,3 +36,6 @@ add_custom_target(test-CVEAssert
     DEPENDS CVEAssert
     COMMENT "Running regression tests for CVEAssert"
 )
+
+#Install 
+install(TARGETS CVEAssert EXPORT resolve_targets)
