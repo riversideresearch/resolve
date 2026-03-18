@@ -2,9 +2,8 @@
 # Copyright (c) 2025 Riverside Research.
 # LGPL-3; See LICENSE.txt in the repo root for details.
 
-find_package(LLVM 18.1.3 CONFIG)
-
 # Add LLVM headers to include search paths
+find_package(LLVM CONFIG)
 include_directories(SYSTEM ${LLVM_INCLUDE_DIRS})
 
 set(CMAKE_CXX_STANDARD 20 STRING "")

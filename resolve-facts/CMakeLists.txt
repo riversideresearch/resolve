@@ -7,12 +7,7 @@ project(resolve-facts)
 if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
     include(${CMAKE_SOURCE_DIR}/../cmake/AddCheckTargets.cmake)
 
-    # Add LLVM headers to include search paths
-    find_package(LLVM 18.1.3 CONFIG)
-    include_directories(SYSTEM ${LLVM_INCLUDE_DIRS})
-
     set(CMAKE_CXX_STANDARD 20 STRING "")
-
 endif()
 
 include(GNUInstallDirs)

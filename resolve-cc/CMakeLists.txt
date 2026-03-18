@@ -9,6 +9,10 @@ file(GLOB_RECURSE SRC
     "${CMAKE_CURRENT_SOURCE_DIR}/src/*.hpp"
 )
 
+# Add LLVM headers to include search paths
+find_package(LLVM 18.1.3 CONFIG)
+include_directories(SYSTEM ${LLVM_INCLUDE_DIRS})
+
 # Build Targets
 add_subdirectory(hooks)
 
