@@ -1,0 +1,185 @@
+#!/usr/bin/env bash 
+#
+#    Copyright (c) 2025 Riverside Research.
+#    LGPL-3; See LICENSE.txt in the repo root for details.
+#
+
+set -e
+#set -x # for debugging
+
+# Path for clang
+SCRIPT_DIR="${0%/*}"
+REAL_CLANG="/usr/bin/clang"
+LIB_DIR="$SCRIPT_DIR"/../lib
+
+# Path to fact-gen plugin
+RESOLVE_PLUGIN="$LIB_DIR"/libResolveFactsPlugin.so
+
+# Path to cve-assert plugin
+CVEASSERT_PLUGIN="$LIB_DIR"/libCVEAssert.so
+
+# Variable tells resolvecc whether to link libresolve or not
+LINK_LIBRESOLVE=true
+
+# Variable tells resolvecc to include ResolveFacts plugin
+USE_RESOLVE=true
+
+# Variable tells resolvecc to load CVEAssert plugin
+USE_CVEASSERT=false
+
+# Variable stores path of CVE description
+RESOLVE_LABEL_CVE=""
+
+# Initialize arrays for flags and arguments
+COMPTIME_FLAGS=()
+RUNTIME_FLAGS=()
+NEW_ARGS=()
+
+# Compiler wrapper pipeline
+# 1. Parse the arguments (preserve users argument ordering)
+# 2. Configure flags (detect resolve flags then load plugins)
+# 3. Execute clang invocation
+
+
+# clang lowers mem* libc funtions into llvm intrinsics with additional metadata
+# for optimization we want our CVEAssert sanitizers to see the original libc
+# functions, so we ask clang to skip the special handling
+# Ideally, we would only do that for vulnerable functions, but that requires behavior changes in clang or modifying source code
+
+
+# This function parses the -fcve-assert and path to CVE description
+handle_cve_assert() {
+    local idx=$1
+    local file="${args[$((idx + 1))]}"
+
+    if [[ ! -f "$file" ]]; then
+        echo "[resolvecc]: ERROR '$file' not found."
+        exit 1
+    fi 
+
+    # Point the RESOLVE_LABEL_CVE at the file path
+    RESOLVE_LABEL_CVE="$file" 
+}
+
+# Parsing arguments logic
+parse_args() {
+    args=("$@")
+    NEW_ARGS=()
+
+    for ((i=0; i<${#args[@]}; i++)); do
+        arg="${args[$i]}"
+
+        # check each case for flag presence
+        case "$arg" in
+            -fno-resolve)
+            # set USE_RESOLVE to false if -fno-resolve is found
+                USE_RESOLVE=false
+                ;;
+            -fcve-assert)
+                # handle the -fcve-assert flag and the file following it
+                handle_cve_assert "$i"
+                USE_CVEASSERT=true
+                i=$((i + 1))
+                continue # continue to next argument in loop
+                ;;
+            -c|-S|-E)
+                # If -c, -S, or -E is present set LINK_LIBRESOLVE to false
+                LINK_LIBRESOLVE=false
+                NEW_ARGS+=("$arg")
+                ;;
+            
+            -h|--help)
+                resolvecc_help
+                exit 0
+                ;;
+
+            *) # This catch all statement gets the rest of the arguments passed to the compiler
+                NEW_ARGS+=("$arg")
+                ;;
+        esac
+    done 
+}
+
+configure_flags() {
+
+    # Check if USE_CVEASSERT var is set to true
+    if $USE_CVEASSERT; then
+        COMPTIME_FLAGS+=("-fno-builtin-memcpy")
+        COMPTIME_FLAGS+=("-fno-builtin-memmove")
+        COMPTIME_FLAGS+=("-fno-builtin-memset")
+        COMPTIME_FLAGS+=("-fpass-plugin=$CVEASSERT_PLUGIN")
+    fi
+
+
+    # Check if USE_RESOLVE flag is set to true
+    if $USE_RESOLVE; then 
+        COMPTIME_FLAGS+=("-fpass-plugin=$RESOLVE_PLUGIN")
+    fi
+
+    if $LINK_LIBRESOLVE; then 
+        RUNTIME_FLAGS+=(-L"$LIB_DIR")
+        RUNTIME_FLAGS+=("-lresolve")
+        RUNTIME_FLAGS+=(-Wl,-rpath="$LIB_DIR")
+
+    else
+        RUNTIME_FLAGS=()
+    fi
+}
+
+resolvecc_help() {
+    # Usage message
+    cat <<EOF
+resolvecc — Clang wrapper with RESOLVE plugins 
+
+USAGE:
+    resolvecc [options] file...
+
+DESCRIPTION:
+    resolvecc wraps /usr/bin/clang and automatically:
+
+      • Loads the CVEAssert LLVM pass plugin
+      • Loads the ResolveFactsPlugin LLVM pass plugin
+      • Links against libresolve at link time
+
+WRAPPER OPTIONS:
+    -fcve-assert <file>
+        Path to CVE assertion configuration JSON file.
+
+    -fno-resolve
+        Does not load fact generation plugin.
+    
+    -lresolve 
+        Links against libresolve at link time. 
+
+    -h, --help
+        Show this help message.
+
+All other options are forwarded directly to clang.
+
+EXAMPLES:
+    resolvecc -fcve-assert vuln.json test.c
+    resolvecc -fcve-assert vuln.json -lresolve -O2 -g test.c
+    resolvecc -fno-resolve test.c 
+    resolvecc -c test.c
+EOF
+}
+
+invoke_clang() {
+    #DEBUGGING writing compiler invocation to stderr
+    echo "[resolvecc] invoking:" >&2
+    echo "$REAL_CLANG ${COMPTIME_FLAGS[*]} ${NEW_ARGS[*]} ${RUNTIME_FLAGS[*]}" >&2
+    RESOLVE_LABEL_CVE="$RESOLVE_LABEL_CVE" \
+    exec "$REAL_CLANG" \
+        "${COMPTIME_FLAGS[@]}" \
+        "${NEW_ARGS[@]}" \
+        "${RUNTIME_FLAGS[@]}"
+}
+
+main() {
+    parse_args "$@"
+    configure_flags
+    invoke_clang
+}
+
+# Pass arguments to main as separate strings
+main "$@"

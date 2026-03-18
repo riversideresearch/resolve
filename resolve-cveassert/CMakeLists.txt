@@ -39,12 +39,3 @@ add_custom_target(test-CVEAssert
     DEPENDS CVEAssert
     COMMENT "Running regression tests for CVEAssert"
 )
-
-# Install
-install(TARGETS CVEAssert EXPORT resolve_targets)
-install(DIRECTORY bin/ DESTINATION ${CMAKE_INSTALL_BINDIR}
-  FILE_PERMISSIONS
-    OWNER_READ OWNER_EXECUTE OWNER_WRITE
-    GROUP_READ GROUP_EXECUTE
-    WORLD_READ WORLD_EXECUTE
-)
