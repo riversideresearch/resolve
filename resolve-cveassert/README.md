@@ -4,14 +4,14 @@
 -->
 
 # CVEAssert
-CVEAssert is an LLVM compiler pass that instruments programs 
+CVEAssert is an LLVM compiler pass plugin that instruments programs 
 by inserting runtime checks into functions identified by a CVE description. 
 It consumes a CVE description encoded in JSON, which is parsed into
-an internal representation containing the target file, function,
-weakness identifier, and remediation strategy. Based on this
+an internal representation containing the affected source file, affected function,
+CWE identifier, and remediation strategy. Based on this
 description, CVEAssert selects and applies the appropriate sanitizer
 to each affected function. CVEAssert can optionally be linked with
-the [`libresolve`](/libresolve/README.md) runtime library to enforce stack and heap bounds. The pass is executed early in the compilation pipeline to allow LLVM's optimization framework to optimize the injected instrumentation. 
+the [`libresolve`](/libresolve/README.md) runtime library to enforce stack and heap bounds protections. The pass is executed early in the compilation pipeline to allow LLVM's analysis and optimization framework to optimize the injected instrumentation. 
 
 ## Architecture Diagram
 ![CVEAssert pipeline](docs/images/cveassert_pipeline.png)
@@ -44,8 +44,8 @@ the [`libresolve`](/libresolve/README.md) runtime library to enforce stack and h
 | Divide by Zero | Instruments division and remainder operations with runtime checks that remediate when the divisor is zero. |
 | Integer Overflow | Instruments arithmetic operations using *nsw/nuw* and inserts overflow checks where undefined behavior may occur. |
 | Heap Out-of-Bounds | Instruments heap loads, stores, and `getelementptr` instructions with runtime checks to enforce heap bounds. |
-| Stack Out-of-Bounds | Instruments stack `alloca`, loads, stores, and `getelementptr` instructions with runtime checks to enforce stack bounds. | 
-| Null Pointer Dereference | Instruments pointer load and store instructions with runtime checks that detect null dereference. |
+| Stack Out-of-Bounds | Instruments stack `alloca`, `load`, `store`, and `getelementptr` instructions with runtime checks to enforce stack bounds. | 
+| Null Pointer Dereference | Instruments pointer `load` and `store` instructions with runtime checks that check for null dereference. |
 | Operation Masking | Replaces selected 'undesirable' function calls with guarded calls that validate operands before execution. |
 | Free Nonheap | Instruments calls to `free` with runtime checks that ensure argument is a heap-allocated pointer. |
 > [!NOTE]
@@ -240,7 +240,7 @@ int main() {
 
 ```bash
 # Compiler invocation
-resolvecc -fcve-assert /path/to/cve -lresolve heap_oob.c 
+resolvecc -fcve-assert /path/to/cve heap_oob.c 
 ```
 
 **Pre-Instrumented IR**
@@ -287,8 +287,8 @@ function records stack allocations as shadow object in the libresolve runtime, w
 
 The `resolve_gep` function enforces spatial safety by performing a shadow object lookup
 on the base pointer and checking whether the derived pointer lies within the allocation 
-bounds. If a derived pointer falls outside of these boudns, `resolve_gep` returns a
-tainted pointer, a pointer whose address exceeds the allocation range. 
+bounds. If a derived pointer falls outside of these bounds, `resolve_gep` returns a
+tainted pointer, a pointer whose one-past the end of a valid allocation. 
 
 In the subsequent
 `resolve_bounds_check_st_ty_i8` call the pointer is checked for taintedness. If the pointer
