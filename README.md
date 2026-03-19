@@ -11,7 +11,7 @@
 `resolve` consists of a number of components. See below for high-level descriptions.
 
 ### Compiler Passes
-`resolve` modifies the Clang compiler by dynamically loading  pass plugins to perform program fact generation and remediation.
+`resolve` modifies the Clang compiler by dynamically loading pass plugins to perform program fact generation and remediation.
 
 Fact generation is a static program analysis technique that extracts structured information about a program from its source code or intermediate representation (i.e. LLVM-IR). A *fact* is a piece of information that describes some property of a program. Facts can be used to describe relationships between code and data. The `EnhancedFacts` pass constructs program facts based on the program's control- and data-flow, and embeds these facts into custom ELF sections for downstream analysis.
 
