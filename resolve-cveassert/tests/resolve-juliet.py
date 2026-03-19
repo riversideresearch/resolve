@@ -21,7 +21,7 @@ class Result:
 
 def find_matching_file_contents(source_files: list[Path], pattern: re.Pattern) -> list[tuple]:
     """ 
-    Finds the first match of `pattern` in each file in `source_files`
+    Finds the first match group of `pattern` in each file in `source_files`
     Returns a list of pairs of the form (<matched_file>, match.group(1))
     Files with no matches are not included in the return file 
     """
@@ -32,7 +32,7 @@ def find_matching_file_contents(source_files: list[Path], pattern: re.Pattern) -
             continue
 
         # open the file for reading
-        with path.open("r", errors="ignore") as f:
+        with path.open("r") as f:
             # scan each line
             for line in f:
                 match = pattern.search(line)
