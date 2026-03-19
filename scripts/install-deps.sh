@@ -35,6 +35,7 @@ PKGS="build-essential \
     llvm-16 \
     llvm-16-dev \
     libncurses-dev \
+    libssl-dev \
     libz3-dev \
     zlib1g-dev \
     libsqlite3-dev \
