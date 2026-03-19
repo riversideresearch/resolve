@@ -5,11 +5,9 @@ from collections import defaultdict
 from dataclasses import dataclass
 import tempfile
 
-# Global variable stores parent directory absolute path 
-root_dir = str(Path(__file__).parent)
+juliet_testsuite_root_dir = Path(__file__).parent
 
-
-# Data type packages testname, testnumber, and exitcode (pass, fail, or exception) 
+# Packages test name, number, with its result (pass, fail, exception)
 @dataclass
 class Result:
     test_name: str
@@ -192,7 +190,7 @@ def testCwe(testcase: tuple):
             compiler = "clang++" if use_cpp else "clang"
 
             # Support files for compilation
-            testsupport_dir = Path(root_dir) / "testcasesupport"
+            testsupport_dir = juliet_testsuite_root_dir / "testcasesupport"
             io_file = testsupport_dir / "io.c"
 
             # NOTE: Do NOT compile a binary and its source in the same directory
@@ -273,7 +271,7 @@ def testCwe(testcase: tuple):
     #     print(repr(result))
     
 def testAllCwes(cwe_ids: set):
-    testcases = Path(root_dir) / "testcases"
+    testcases = juliet_testsuite_root_dir / "testcases"
 
     # DEBUGGING: print the ids
     print("[DEBUGGING] CWE-ids:", cwe_ids)
