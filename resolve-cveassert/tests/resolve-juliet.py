@@ -180,8 +180,8 @@ def testCwe(testcase: tuple):
         
         total_tests+= 1
 
-        # Binary path to tmp directory
-        binary_path = Path("/tmp") / f"{cwe_id}_{test_files[0].stem}"
+        # Binary path to compiled testcase executable
+        testcase_exe_path = Path("/tmp") / f"{cwe_id}_{test_files[0].stem}"
         # Create the JSON-formatted CVE description
         cve_descriptions = getCveDescription(cwe_id, test_files)
 
@@ -211,7 +211,7 @@ def testCwe(testcase: tuple):
                 "-I", str(testsupport_dir),
                 str(io_file),
                 *[str(f) for f in test_files],
-                "-o", str(binary_path)
+                "-o", str(testcase_exe_path)
             ]
 
             # Compile source files with CVE description
@@ -224,14 +224,14 @@ def testCwe(testcase: tuple):
 
             # Check if return code is 0 (clean compilation)
             if process.returncode != 0:
-                print(f"\nCompilation failed for: {binary_path}")
+                print(f"\nCompilation failed for: {testcase_exe_path}")
                 print(process.stderr)
                 failed_to_compile += 1
 
             else:
                 # Execute the compiled binary
                 executed_binary = subprocess.run(
-                    [str(binary_path)],
+                    [str(testcase_exe_path)],
                     input="",
                     capture_output=True,
                     timeout=30,
