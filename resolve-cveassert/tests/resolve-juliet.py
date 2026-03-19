@@ -48,7 +48,7 @@ def find_matching_file_contents(source_files: list[Path], pattern: re.Pattern) -
 def findBad(source_files: list[Path]) -> list[tuple]:
     """ 
     Given a list of source files, return the files
-    that contain a CWE bad function defintion.
+    that contain a CWE bad function defintion and the function name.
     """
     bad_pattern = re.compile(
         r"^\s*(?:static\s+)?(?:void|int)\s+(\w+_bad)\s*\(",
