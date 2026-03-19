@@ -168,7 +168,7 @@ def testCwe(testcase: tuple):
     #     print(f"\nJSON output for group {key}:\n{cve_descriptions}")
 
     # Loop over all the testcases and store results in list
-    results = []
+    results: list[Result] = []
     total_tests = 0
     failed_to_compile = 0
     failed_to_compile_cpp_build = 0
