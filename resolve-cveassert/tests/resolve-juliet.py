@@ -21,7 +21,9 @@ class Result:
 
 def findMatches(source_files: list[Path], pattern: re.Pattern) -> list[tuple]:
     """ 
-    Helper function that returns files that match the given pattern 
+    Finds the first match of `pattern` in each file in `source_files`
+    Returns a list of pairs of the form (<matched_file>, match.group(1))
+    Files with no matches are not included in the return file 
     """
     matched_files = []
 
