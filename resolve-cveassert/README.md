@@ -11,7 +11,7 @@ an internal representation containing the affected source file, affected functio
 CWE identifier, and remediation strategy. Based on this
 description, CVEAssert selects and applies the appropriate sanitizer
 to each affected function. CVEAssert can optionally be linked with
-the [`libresolve`](/libresolve/README.md) runtime library to enforce stack and heap bounds protections. The pass is executed early in the compilation pipeline to allow LLVM's analysis and optimization framework to optimize the injected instrumentation. 
+the [`libresolve`](libresolve/README.md) runtime library to enforce stack and heap bounds protections. The pass is executed early in the compilation pipeline to allow LLVM's analysis and optimization framework to optimize the injected instrumentation. 
 
 ## Architecture Diagram
 ![CVEAssert pipeline](docs/images/cveassert_pipeline.png)
