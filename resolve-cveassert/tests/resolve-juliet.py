@@ -219,7 +219,7 @@ def testCwe(testcase: tuple):
                 compile_cmd,
                 env=env_var,
                 capture_output=True,
-                check=True,
+                check=True,         # If the compilation fails then a CalledProcessError exception is raised
                 text=True
             )
 
