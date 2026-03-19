@@ -19,7 +19,7 @@ class Result:
 
 
 
-def findMatches(source_files: list[Path], pattern: re.Pattern) -> list[tuple]:
+def find_matching_file_contents(source_files: list[Path], pattern: re.Pattern) -> list[tuple]:
     """ 
     Finds the first match of `pattern` in each file in `source_files`
     Returns a list of pairs of the form (<matched_file>, match.group(1))
@@ -54,7 +54,7 @@ def findBad(source_files: list[Path]) -> list[tuple]:
         r"^\s*(?:static\s+)?(?:void|int)\s+(\w+_bad)\s*\(",
     re.VERBOSE)
 
-    bad_files = findMatches(source_files, bad_pattern)
+    bad_files = find_matching_file_contents(source_files, bad_pattern)
 
     return bad_files
 
@@ -80,8 +80,8 @@ def findGood(source_files: list[Path]) -> list[tuple]:
 
     #TODO: Add regular expression for good?
 
-    matching_cwe_pattern_files = findMatches(source_files, cwe_good_pattern)
-    matching_g_b_pattern_files = findMatches(source_files, good_g_b_flow_pattern)
+    matching_cwe_pattern_files = find_matching_file_contents(source_files, cwe_good_pattern)
+    matching_g_b_pattern_files = find_matching_file_contents(source_files, good_g_b_flow_pattern)
     
     # Return both lists as a combined list
     return matching_cwe_pattern_files + matching_g_b_pattern_files 
