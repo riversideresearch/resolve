@@ -12,7 +12,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY scripts /opt/resolve/scripts
 RUN /opt/resolve/scripts/install-deps.sh && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-RUN echo 'export PATH=/opt/resolve/bin:$PATH' >> ~/.bashrc
+# Add resolve to PATH
+ENV PATH="/opt/resolve/bin:${PATH}"
 
 FROM ubuntu:24.04 AS cmake-builder
 ARG RESOLVE_PREFIX=/opt/resolve
@@ -48,9 +49,6 @@ COPY mcp /resolve/mcp
 COPY resolve-cli /resolve/resolve-cli
 COPY Makefile /resolve/Makefile
 COPY CMakeLists.txt /resolve/CMakeLists.txt
-
-# Add resolvecc to PATH
-ENV PATH="/opt/resolve/bin:${PATH}"
 
 # Build
 WORKDIR /resolve/
