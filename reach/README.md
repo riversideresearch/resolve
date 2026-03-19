@@ -29,7 +29,7 @@ attempt to find the shortest path from `src` to `dst` in it.
 
 The `src` and `dst` node IDs should match how they appear in the facts
 files, which is determined by the [RESOLVE LLVM
-pass](https://github.com/riversideresearch/resolve/blob/main/llvm-plugin/src/EnhancedFacts.cpp)
+pass](../resolve-cc/src/ResolveFactsPluginPass.cpp)
 that generates the facts.
 
 For example, if `nodeprops.facts` contains the following line:
