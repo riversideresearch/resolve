@@ -97,7 +97,7 @@ def testCwe(testcase: tuple):
 
 
     # Check to see if the source path is a directory or a file
-    for source_path in testcase_dir_path.iterdir():
+    for file_count, source_path in enumerate(testcase_dir_path.iterdir()):
         if source_path.is_dir():
             for source_code in source_path.iterdir():
                 # Ignoring _listen_socket tests because they hang
@@ -115,6 +115,7 @@ def testCwe(testcase: tuple):
 
                 group_key = match.group(1)
                 grouped_tests[group_key].append(source_code) 
+                print(f"[DEBUGGING]: ({file_count, source_code})")
 
         # if not source_path.is_file():
         #     continue
