@@ -48,9 +48,9 @@ A Python wrapper, `reach-wrapper.py`, provides a convenient command-line interfa
 ```bash
 cd resolve/
 make install-deps             # Install necessary dependencies
-make build                          # Builds compiler pass plugins, reach tool, and libresolve runtime library
-make install                        # Installs executables and libraries into opt/resolve unless specified by user
-make test                           # Runs resolve remediation and libresolve test suites 
+make build                    # Builds compiler pass plugins, reach tool, and libresolve runtime library
+make install                  # Installs executables and libraries into opt/resolve unless specified by user
+make test                     # Runs resolve remediation and libresolve test suites 
 ```
 
 ## EXAMPLES
