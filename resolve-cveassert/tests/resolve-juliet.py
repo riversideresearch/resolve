@@ -219,6 +219,7 @@ def testCwe(testcase: tuple):
                 compile_cmd,
                 env=env_var,
                 capture_output=True,
+                check=True,
                 text=True
             )
 
@@ -227,28 +228,29 @@ def testCwe(testcase: tuple):
                 print(f"\nCompilation failed for: {testcase_exe_path}")
                 print(process.stderr)
                 failed_to_compile += 1
+                continue
 
-            else:
-                # Execute the compiled binary
-                executed_binary = subprocess.run(
-                    [str(testcase_exe_path)],
-                    input="",
-                    capture_output=True,
-                    timeout=30,
-                    text=True
-                )
+            
+            # Execute the compiled binary
+            executed_binary = subprocess.run(
+                [str(testcase_exe_path)],
+                input="",
+                capture_output=True,
+                timeout=30,
+                text=True
+            )
 
-                # Check if binary exits with remediation code
-                if executed_binary.returncode == 3:
-                    correct_exit_code += 1
-                
-                # Check if the binary terminates with signal SIGSEV
-                elif executed_binary.returncode == -11:
-                    signal_segfault += 1
+            # Check if binary exits with remediation code
+            if executed_binary.returncode == 3:
+                correct_exit_code += 1
+            
+            # Check if the binary terminates with signal SIGSEV
+            elif executed_binary.returncode == -11:
+                signal_segfault += 1
 
-                # Check if the binary retcode is 0
-                elif executed_binary.returncode == 0:
-                    incorrect_exit_code += 1 
+            # Check if the binary retcode is 0
+            elif executed_binary.returncode == 0:
+                incorrect_exit_code += 1 
         
         except Exception as e:
             print("Compilation failed: ", e)
