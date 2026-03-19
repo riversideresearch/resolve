@@ -28,6 +28,7 @@ PKGS="build-essential \
     unzip \
     pkg-config \
     python3-pip \
+    python3-venv \
     python3-zstd \
     zstd \
     llvm-dev \
@@ -49,11 +50,11 @@ eval "$UPDATE_CMD"
 echo "[*] Installing dependencies"
 eval "$INSTALL_CMD $PKGS"
 
-# Install python packages
-python3 -m pip install lit wllvm univers --break-system-packages
-
 # Install uv
 curl -LsSf https://astral.sh/uv/0.10.9/install.sh | env UV_INSTALL_DIR="/usr/local/bin" sh
+
+# Install python packages
+uvx pipx install --global wllvm lit
 
 # Install rust
 if ! command -v rustc >/dev/null 2>&1; then
