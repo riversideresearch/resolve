@@ -100,6 +100,10 @@ def testCwe(testcase: tuple):
     for source_path in testcase_dir_path.iterdir():
         if source_path.is_dir():
             for source_code in source_path.iterdir():
+                # Ignoring _listen_socket tests because they hang
+                # forever waiting for socket connection
+                # We assume they are redundant to other easier
+                # to integrate test for our purposes
                 if "_listen_socket_" in source_code.name:
                     continue
 
