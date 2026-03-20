@@ -65,10 +65,10 @@ def compile_io_c(obj_file: Path):
 
     return obj_file
 
-def find_matching_file_contents(source_files: list[Path], pattern: re.Pattern) -> list[tuple]:
+def find_matching_file_contents(source_files: list[Path], pattern: re.Pattern) -> list[tuple[Path, re.Match]]:
     """ 
     Finds the first match group of `pattern` in each file in `source_files`
-    Returns a list of pairs of the form (<matched_file>, match.group(1))
+    Returns a list of pairs of the form (<file-path>, match)
     Files with no matches are not included in the return file 
     """
     matched_files = []
@@ -83,10 +83,8 @@ def find_matching_file_contents(source_files: list[Path], pattern: re.Pattern) -
             for line in f:
                 match = pattern.search(line)
                 if match:
-                    # get the full function name
-                    function_name = match.group(1)
-                    # add the path the list
-                    matched_files.append((path, function_name))
+                    # add the path and the match to the list
+                    matched_files.append((path, match))
                     break # stop scanning file once matched 
 
     return matched_files
@@ -100,7 +98,8 @@ def findBad(source_files: list[Path]) -> list[tuple]:
         r"^\s*(?:static\s+)?(?:void|int)\s+(\w+_bad)\s*\(",
     re.VERBOSE)
 
-    bad_files = find_matching_file_contents(source_files, bad_pattern)
+    # Function name is group(1) match 
+    bad_files = [path, match.group(1) for path, match in find_matching_file_contents(source_files, bad_pattern)]
 
     return bad_files
 
@@ -111,7 +110,7 @@ def findGood(source_files: list[Path]) -> list[tuple]:
     """ 
 
     cwe_good_pattern = re.compile(
-    r"^\s*(?:static\s+)?(?:void|int)\s+(\w+_good)\s*\(",
+    r"^\s*(?:static\s+)?(?:void|int)\s+(\w+_?good)\s*\(",
     re.VERBOSE)
 
     # Find G\d+B\d* (G2B, G2B1, G2B2)
@@ -124,10 +123,8 @@ def findGood(source_files: list[Path]) -> list[tuple]:
     \s*\(                               # opening parenthesis
     """, re.VERBOSE)
 
-    #TODO: Add regular expression for good?
-
-    matching_cwe_pattern_files = find_matching_file_contents(source_files, cwe_good_pattern)
-    matching_g_b_pattern_files = find_matching_file_contents(source_files, good_g_b_flow_pattern)
+    matching_cwe_pattern_files = [path, match.group(1) for path, match in find_matching_file_contents(source_files, cwe_good_pattern)]
+    matching_g_b_pattern_files = [path, match.group(1) for path, match in find_matching_file_contents(source_files, good_g_b_flow_pattern)]
     
     # Return both lists as a combined list
     return matching_cwe_pattern_files + matching_g_b_pattern_files 
