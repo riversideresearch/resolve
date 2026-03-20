@@ -18,6 +18,7 @@
 #include "Vulnerability.hpp"
 #include "helpers.hpp"
 
+#include <cassert>
 #include <map>
 #include <unordered_set>
 
