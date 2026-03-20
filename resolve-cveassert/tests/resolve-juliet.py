@@ -35,7 +35,7 @@ class CouldNotFindFunctionSuffixInFile(Exception):
             "Cannot find a function in the source code that matches the good and bad regex."
         )
 
-def compile_to_objfile(obj_file: Path):
+def compile_io_c(obj_file: Path):
     """
     Compile io.c into obj file 
     for linking
