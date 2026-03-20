@@ -541,10 +541,8 @@ void instrumentAlloca(Function *F) {
 
     allocaInst->replaceAllUsesWith(paddedAlloca);
 
-    // This is probably always true unless we are given malformed input.
-    assert(hasStart == hasEnd);
-
     // Instrument allocas that don't have lifetime markers
+    // Not all llvm-ir produced hasStart == hasEnd
     if (!hasStart) {
       if (auto *inst = dyn_cast<Instruction>(typedPtr)) {
         builder.SetInsertPoint(inst->getNextNode());
@@ -552,7 +550,8 @@ void instrumentAlloca(Function *F) {
         { typedPtr, ConstantInt::get(size_ty, typeSize )});
       }
     }
-    toFreeList.push_back(paddedAlloca);
+
+    if (!hasEnd) { toFreeList.push_back(paddedAlloca); }
     allocaInst->eraseFromParent();
   };
 
