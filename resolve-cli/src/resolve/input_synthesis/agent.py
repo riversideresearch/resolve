@@ -56,7 +56,7 @@ def run_dialectic(
     tmp_dir: Path,
     model: str | None = None,
 ) -> None:
-    """Run a thesis/antithesis/synthesis dialectic, writing results to tmp_dir."""
+    """Run a MAD-like debate and write the results to tmp_dir."""
     thesis_prompt = f"""
 {preamble}
 
@@ -99,7 +99,7 @@ def run_critique(
     output_path: Path,
     model: str | None = None,
 ) -> None:
-    """Critique an existing claim (the preamble) and produce an improved version at output_path."""
+    """Run a challenge-and-revise loop on an existing claim and write the revision to output_path."""
     critique_prompt = f"""
 {preamble}
 

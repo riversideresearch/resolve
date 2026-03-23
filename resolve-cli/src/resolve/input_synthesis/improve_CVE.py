@@ -14,7 +14,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     prog = os.path.basename(sys.argv[0])
 
     parser = argparse.ArgumentParser(
-        description="Run an iterative CVE-improvement pipeline with a coding agent. All intermediate artifacts are written under a unique /tmp workspace and final results are copied to output_path.",
+        description="Run a CVE-improvement pipeline with a coding agent. The pipeline uses a debate pass plus challenge/revise passes. All intermediate artifacts are written under a unique /tmp workspace and final results are copied to output_path.",
         epilog=f"""Examples:
   {prog} codex cve.json out/improve_cve
   {prog} claude cve.json out/improve_cve""",
@@ -61,7 +61,7 @@ def refine_conditions(
     role: str,
     model: str | None,
 ) -> None:
-    """Critique each condition in source_dir, writing revised conditions to dest_dir."""
+    """Challenge each condition in source_dir and write any revised versions to dest_dir."""
     dest_dir.mkdir(parents=True, exist_ok=True)
 
     if role == "necessary":
