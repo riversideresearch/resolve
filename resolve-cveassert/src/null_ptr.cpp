@@ -82,7 +82,7 @@ getOrCreateNullPtrLoadSanitizer(Module *M, LLVMContext &Ctx, Type *ty,
 
   raw_ostream &out = errs();
   out << *sanitizeNullPtrLdFn;
-  if (verifyFunction(*S, &out)) {
+  if (verifyFunction(*sanitizeNullPtrLdFn, &out)) {
   }
 
   return sanitizeNullPtrLdFn;
