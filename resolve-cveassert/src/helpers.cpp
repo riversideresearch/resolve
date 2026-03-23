@@ -210,7 +210,6 @@ getOrCreateRemediationBehavior(Module *M,
   Builder.CreateRetVoid();
 
   resolveRemedBehaviorFn->setMetadata("resolve.noinstrument", MDNode::get(Ctx, {}));
-
   raw_ostream &out = errs();
   out << *resolveRemedBehaviorFn;
   if (verifyFunction(*resolveRemedBehaviorFn, &out)) {
