@@ -173,8 +173,7 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
 
     raw_ostream &out = errs();
 
-    if (vuln.TargetFunctionName.empty() ||
-        (demangledName.find(vuln.TargetFunctionName) == std::string::npos &&
+    if (vuln.TargetFunctionName != "" && (demangledName.find(vuln.TargetFunctionName) == std::string::npos &&
          F.getName().str().find(vuln.TargetFunctionName) ==
              std::string::npos)) {
       return result;
