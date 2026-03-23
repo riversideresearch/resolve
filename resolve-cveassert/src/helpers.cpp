@@ -99,6 +99,8 @@ Function *getOrCreateIsHeap(Module *M, LLVMContext &Ctx) {
   auto result = Builder.CreateNot(Builder.CreateOr({is_stack, is_static}));
   Builder.CreateRet(result);
 
+  sanitizeFn->setMetadata("resolve.noinstrument", MDNode::get(Ctx, {}));
+
   raw_ostream &out = errs();
   out << *sanitizeFn;
   if (verifyFunction(*sanitizeFn, &out)) {
@@ -117,22 +119,25 @@ Function *getOrCreateResolveReportSanitizerTriggered(Module *M) {
     if (!F->isDeclaration())
       return F;
 
-  Function *resolve_report_fn =
+  Function *resolveReportFn =
       Function::Create(resolve_report_fn_ty, GlobalValue::WeakAnyLinkage,
                        "resolve_report_sanitizer_triggered", M);
 
-  BasicBlock *EntryBB = BasicBlock::Create(Ctx, "", resolve_report_fn);
+  BasicBlock *EntryBB = BasicBlock::Create(Ctx, "", resolveReportFn);
   IRBuilder<> builder(EntryBB);
   builder.CreateRetVoid();
 
+  resolveReportFn->setMetadata("resolve.noinstrument", MDNode::get(Ctx, {}));
   raw_ostream &out = errs();
-  out << *resolve_report_fn;
-  if (verifyFunction(*resolve_report_fn, &out)) {
+  out << *resolveReportFn;
+  if (verifyFunction(*resolveReportFn, &out)) {
   }
-  return resolve_report_fn;
+  return resolveReportFn;
 }
 
 Function *getOrCreateRecoverBufferFunction(Module *M) {
+  LLVMContext &Ctx = M->getContext();
+
   if (Function *F = M->getFunction("resolve_get_recover_longjmp_buf"))
     if (!F->isDeclaration())
       return F;
@@ -141,21 +146,22 @@ Function *getOrCreateRecoverBufferFunction(Module *M) {
   FunctionType *resolve_recover_buf_fn_ty =
       FunctionType::get(ptr_ty, {}, false);
 
-  auto recover_buf_fn =
+  auto resolveRecoverFn =
       Function::Create(resolve_recover_buf_fn_ty, GlobalValue::WeakAnyLinkage,
                        "resolve_get_recover_longjmp_buf", M);
 
-  BasicBlock *EntryBB = BasicBlock::Create(M->getContext(), "", recover_buf_fn);
+  BasicBlock *EntryBB = BasicBlock::Create(M->getContext(), "", resolveRecoverFn);
   IRBuilder<> builder(EntryBB);
   builder.SetInsertPoint(EntryBB);
   builder.CreateRet(Constant::getNullValue(ptr_ty));
 
+  resolveRecoverFn->setMetadata("resolve.noinstrument", MDNode::get(Ctx, {}));
   raw_ostream &out = errs();
-  out << *recover_buf_fn;
-  if (verifyFunction(*recover_buf_fn, &out)) {
+  out << *resolveRecoverFn;
+  if (verifyFunction(*resolveRecoverFn, &out)) {
   }
 
-  return recover_buf_fn;
+  return resolveRecoverFn;
 }
 
 // getOrCreateRemediateBehavior: helper function to apply remediation strategies
@@ -173,11 +179,11 @@ getOrCreateRemediationBehavior(Module *M,
     if (!F->isDeclaration())
       return F;
 
-  Function *resolve_remed_behavior =
+  Function *resolveRemedBehaviorFn =
       Function::Create(resolve_remed_behavior_ty, GlobalValue::InternalLinkage,
                        "resolve_remediation_behavior", M);
 
-  BasicBlock *BB = BasicBlock::Create(Ctx, "", resolve_remed_behavior);
+  BasicBlock *BB = BasicBlock::Create(Ctx, "", resolveRemedBehaviorFn);
   IRBuilder<> Builder(BB);
 
   if (strategy == Vulnerability::RemediationStrategies::EXIT) {
@@ -195,17 +201,17 @@ getOrCreateRemediationBehavior(Module *M,
         "longjmp", FunctionType::get(void_ty, {ptr_ty, i32_ty}, false));
 
     // NOTE: resolve_get_recover_longjmp_buf must exist in C source code
-    Function *resolve_recover_buf_fn = getOrCreateRecoverBufferFunction(M);
+    Function *resolveRecoverFn = getOrCreateRecoverBufferFunction(M);
 
-    Value *resolve_longjmp_ptr = Builder.CreateCall(resolve_recover_buf_fn);
+    Value *resolve_longjmp_ptr = Builder.CreateCall(resolveRecoverFn);
     Value *longjmpVal = ConstantInt::get(i32_ty, 42);
     Builder.CreateCall(longjmpFn, {resolve_longjmp_ptr, longjmpVal});
   }
   Builder.CreateRetVoid();
 
   raw_ostream &out = errs();
-  out << *resolve_remed_behavior;
-  if (verifyFunction(*resolve_remed_behavior, &out)) {
+  out << *resolveRemedBehaviorFn;
+  if (verifyFunction(*resolveRemedBehaviorFn, &out)) {
   }
-  return resolve_remed_behavior;
+  return resolveRemedBehaviorFn;
 }

@@ -98,6 +98,7 @@ static Function *getOrCreateResolveAccessOk(Module *M) {
   builder.SetInsertPoint(FalseBB);
   builder.CreateRet(ConstantInt::getFalse(Ctx));
 
+  resolveAccessOkFn->setMetadata("resolve.noinstrument", MDNode::get(Ctx, {}));
   raw_ostream &out = errs();
   out << *resolveAccessOkFn;
   if (verifyFunction(*resolveAccessOkFn, &out)) {
@@ -147,6 +148,7 @@ static Function *getOrCreateBoundsCheckLoadSanitizer(
   builder.CreateCall(getOrCreateRemediationBehavior(M, strategy));
   builder.CreateRet(Constant::getNullValue(ty));
 
+  sanitizeLoadFn->setMetadata("resolve.noinstrument", MDNode::get(Ctx, {}));
   // DEBUGGING
   raw_ostream &out = errs();
   out << *sanitizeLoadFn;
@@ -201,6 +203,7 @@ static Function *getOrCreateBoundsCheckStoreSanitizer(
   builder.CreateCall(getOrCreateRemediationBehavior(M, strategy));
   builder.CreateRetVoid();
 
+  sanitizeStoreFn->setMetadata("resolve.noinstrument", MDNode::get(Ctx, {}));
   // DEBUGGING
   raw_ostream &out = errs();
   out << *sanitizeStoreFn;
@@ -264,6 +267,7 @@ static Function *getOrCreateBoundsCheckMemcpySanitizer(
   builder.CreateCall(getOrCreateRemediationBehavior(M, strategy));
   builder.CreateRet(dst_ptr);
 
+  sanitizeMemcpyFn->setMetadata("resolve.noinstrument", MDNode::get(Ctx, {}));
   // DEBUGGING
   raw_ostream &out = errs();
   out << *sanitizeMemcpyFn;
@@ -323,6 +327,7 @@ static Function *getOrCreateBoundsCheckMemsetSanitizer(
   builder.CreateCall(getOrCreateRemediationBehavior(M, strategy));
   builder.CreateRet(basePtr);
 
+  sanitizeMemsetFn->setMetadata("resolve.noinstrument", MDNode::get(Ctx, {}));
   // DEBUGGING
   raw_ostream &out = errs();
   out << *sanitizeMemsetFn;
@@ -395,6 +400,7 @@ static Function *getOrCreateResolveGep(Module *M) {
   Value *onePastPtr = builder.CreateIntToPtr(onePastInt, ptr_ty);
   builder.CreateRet(onePastPtr);
 
+  resolveGepFn->setMetadata("resolve.noinstrument", MDNode::get(Ctx, {}));
   // DEBUGGING
   raw_ostream &out = errs();
   out << *resolveGepFn;
