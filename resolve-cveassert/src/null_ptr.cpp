@@ -37,8 +37,8 @@ getOrCreateNullPtrLoadSanitizer(Module *M, LLVMContext &Ctx, Type *ty,
 
   BasicBlock *Entry = BasicBlock::Create(Ctx, "entry", sanitizeNullPtrLdFn);
   BasicBlock *SanitizeBlock =
-      BasicBlock::Create(Ctx, "sanitize_block", sanitizeNullPtrStFn);
-  BasicBlock *LoadBlock = BasicBlock::Create(Ctx, "load_block", sanitizeNullPtrLdFn;
+      BasicBlock::Create(Ctx, "sanitize_block", sanitizeNullPtrLdFn);
+  BasicBlock *LoadBlock = BasicBlock::Create(Ctx, "load_block", sanitizeNullPtrLdFn);
 
   // Set insertion point to entry block
   Builder.SetInsertPoint(Entry);
