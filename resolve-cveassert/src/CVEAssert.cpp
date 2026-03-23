@@ -166,7 +166,7 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
     std::string demangledName(demangledNamePtr ?: "");
     auto result = PreservedAnalyses::all();
 
-    if (F.getMetadata("resolve.noinstrument")) { return status; }
+    if (F.getMetadata("resolve.noinstrument")) { return result; }
 
     if (CVE_ASSERT_DEBUG) {
       errs() << "[CVEAssert] Trying fn " << F.getName()
