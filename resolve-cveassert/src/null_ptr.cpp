@@ -81,7 +81,7 @@ getOrCreateNullPtrLoadSanitizer(Module *M, LLVMContext &Ctx, Type *ty,
   sanitizeNullPtrLdFn->setMetadata("resolve.noinstrument", MDNode::get(Ctx, {}));
 
   raw_ostream &out = errs();
-  out << *sanitizeNullPtrLdFn
+  out << *sanitizeNullPtrLdFn;
   if (verifyFunction(*S, &out)) {
   }
 
