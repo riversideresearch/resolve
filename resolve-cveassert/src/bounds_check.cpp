@@ -44,12 +44,9 @@ static FunctionCallee getResolveBaseAndLimit(Module *M) {
 }
 
 static Function *getOrCreateResolveAccessOk(Module *M) {
-  Twine handlerName = "resolve_access_ok";
+  std::string handlerName = "resolve_access_ok";
   SmallVector<char> handlerNameStr;
   LLVMContext &Ctx = M->getContext();
-
-  if (auto handler = M->getFunction(handlerName.toStringRef(handlerNameStr)))
-    return handler;
 
   IRBuilder<> builder(Ctx);
 
@@ -60,8 +57,7 @@ static Function *getOrCreateResolveAccessOk(Module *M) {
   FunctionType *resolveAccessOkFnTy =
       FunctionType::get(bool_ty, {ptr_ty, size_ty}, false);
 
-  Function *resolveAccessOkFn = Function::Create(
-      resolveAccessOkFnTy, Function::InternalLinkage, handlerName, M);
+  Function *resolveAccessOkFn = getOrCreateResolveHelper(M, handlerName, resolveAccessOkFnTy);
 
   // Adding an attribute to always inline this function
   resolveAccessOkFn->addFnAttr(Attribute::AlwaysInline);
@@ -98,9 +94,7 @@ static Function *getOrCreateResolveAccessOk(Module *M) {
   builder.SetInsertPoint(FalseBB);
   builder.CreateRet(ConstantInt::getFalse(Ctx));
 
-  resolveAccessOkFn->setMetadata("resolve.noinstrument", MDNode::get(Ctx, {}));
   validateFunctionIR(resolveAccessOkFn);
-
   return resolveAccessOkFn;
 }
 
@@ -109,18 +103,13 @@ static Function *getOrCreateBoundsCheckLoadSanitizer(
     Vulnerability::RemediationStrategies strategy) {
   std::string handlerName = "resolve_bounds_check_ld_" + getLLVMType(ty);
 
-  if (auto handler = M->getFunction(handlerName)) {
-    return handler;
-  }
-
   IRBuilder<> builder(Ctx);
 
   auto ptr_ty = PointerType::get(Ctx, 0);
 
   FunctionType *sanitizeLoadFnTy = FunctionType::get(ty, {ptr_ty}, false);
 
-  Function *sanitizeLoadFn = Function::Create(
-      sanitizeLoadFnTy, Function::InternalLinkage, handlerName, M);
+  Function *sanitizeLoadFn = getOrCreateResolveHelper(M, handlerName, sanitizeLoadFnTy);
 
   BasicBlock *EntryBB = BasicBlock::Create(Ctx, "", sanitizeLoadFn);
   BasicBlock *NormalLoadBB = BasicBlock::Create(Ctx, "", sanitizeLoadFn);
@@ -145,7 +134,6 @@ static Function *getOrCreateBoundsCheckLoadSanitizer(
   builder.CreateCall(getOrCreateRemediationBehavior(M, strategy));
   builder.CreateRet(Constant::getNullValue(ty));
 
-  sanitizeLoadFn->setMetadata("resolve.noinstrument", MDNode::get(Ctx, {}));
   // DEBUGGING
   validateFunctionIR(sanitizeLoadFn);
   return sanitizeLoadFn;
@@ -156,10 +144,6 @@ static Function *getOrCreateBoundsCheckStoreSanitizer(
     Vulnerability::RemediationStrategies strategy) {
   std::string handlerName = "resolve_bounds_check_st_" + getLLVMType(ty);
 
-  if (auto handler = M->getFunction(handlerName)) {
-    return handler;
-  }
-
   IRBuilder<> builder(Ctx);
 
   // TODO: handle address spaces other than 0
@@ -169,8 +153,7 @@ static Function *getOrCreateBoundsCheckStoreSanitizer(
   FunctionType *sanitizeStoreFnTy =
       FunctionType::get(void_ty, {ptr_ty, ty}, false);
 
-  Function *sanitizeStoreFn = Function::Create(
-      sanitizeStoreFnTy, Function::InternalLinkage, handlerName, M);
+  Function *sanitizeStoreFn = getOrCreateResolveHelper(M, handlerName, sanitizeStoreFnTy);
 
   BasicBlock *EntryBB = BasicBlock::Create(Ctx, "", sanitizeStoreFn);
   BasicBlock *NormalStoreBB = BasicBlock::Create(Ctx, "", sanitizeStoreFn);
@@ -196,21 +179,15 @@ static Function *getOrCreateBoundsCheckStoreSanitizer(
   builder.CreateCall(getOrCreateRemediationBehavior(M, strategy));
   builder.CreateRetVoid();
 
-  sanitizeStoreFn->setMetadata("resolve.noinstrument", MDNode::get(Ctx, {}));
   // DEBUGGING
   validateFunctionIR(sanitizeStoreFn);
-
   return sanitizeStoreFn;
 }
 
 static Function *getOrCreateBoundsCheckMemcpySanitizer(
     Module *M, Vulnerability::RemediationStrategies strategy) {
-  Twine handlerName = "resolve_bounds_check_memcpy";
-  SmallVector<char> handlerNameStr;
+  std::string handlerName = "resolve_bounds_check_memcpy";
   LLVMContext &Ctx = M->getContext();
-
-  if (auto handler = M->getFunction(handlerName.toStringRef(handlerNameStr)))
-    return handler;
 
   IRBuilder<> builder(Ctx);
 
@@ -220,8 +197,7 @@ static Function *getOrCreateBoundsCheckMemcpySanitizer(
   FunctionType *sanitizeMemcpyFnTy =
       FunctionType::get(ptr_ty, {ptr_ty, ptr_ty, size_ty}, false);
 
-  Function *sanitizeMemcpyFn = Function::Create(
-      sanitizeMemcpyFnTy, Function::InternalLinkage, handlerName, M);
+  Function *sanitizeMemcpyFn = getOrCreateResolveHelper(M, handlerName, sanitizeMemcpyFnTy);
 
   BasicBlock *EntryBB = BasicBlock::Create(Ctx, "", sanitizeMemcpyFn);
   BasicBlock *NormalBB = BasicBlock::Create(Ctx, "", sanitizeMemcpyFn);
@@ -257,21 +233,15 @@ static Function *getOrCreateBoundsCheckMemcpySanitizer(
   builder.CreateCall(getOrCreateRemediationBehavior(M, strategy));
   builder.CreateRet(dst_ptr);
 
-  sanitizeMemcpyFn->setMetadata("resolve.noinstrument", MDNode::get(Ctx, {}));
   // DEBUGGING
   validateFunctionIR(sanitizeMemcpyFn);
-
   return sanitizeMemcpyFn;
 }
 
 static Function *getOrCreateBoundsCheckMemsetSanitizer(
     Module *M, Vulnerability::RemediationStrategies strategy) {
-  Twine handlerName = "resolve_bounds_check_memset";
-  SmallVector<char> handlerNameStr;
+  std::string handlerName = "resolve_bounds_check_memset";
   LLVMContext &Ctx = M->getContext();
-
-  if (auto handler = M->getFunction(handlerName.toStringRef(handlerNameStr)))
-    return handler;
 
   IRBuilder<> builder(Ctx);
 
@@ -282,8 +252,7 @@ static Function *getOrCreateBoundsCheckMemsetSanitizer(
   FunctionType *sanitizeMemsetFnTy =
       FunctionType::get(ptr_ty, {ptr_ty, i32_ty, size_ty}, false);
 
-  Function *sanitizeMemsetFn = Function::Create(
-      sanitizeMemsetFnTy, Function::InternalLinkage, handlerName, M);
+  Function *sanitizeMemsetFn = getOrCreateResolveHelper(M, handlerName, sanitizeMemsetFnTy);
 
   BasicBlock *EntryBB = BasicBlock::Create(Ctx, "", sanitizeMemsetFn);
   BasicBlock *NormalBB = BasicBlock::Create(Ctx, "", sanitizeMemsetFn);
@@ -315,20 +284,14 @@ static Function *getOrCreateBoundsCheckMemsetSanitizer(
   builder.CreateCall(getOrCreateRemediationBehavior(M, strategy));
   builder.CreateRet(basePtr);
 
-  sanitizeMemsetFn->setMetadata("resolve.noinstrument", MDNode::get(Ctx, {}));
   // DEBUGGING
   validateFunctionIR(sanitizeMemsetFn);
-
   return sanitizeMemsetFn;
 }
 
 static Function *getOrCreateResolveGep(Module *M) {
-  Twine handlerName = "resolve_gep";
-  SmallVector<char> handlerNameStr;
+  std::string handlerName = "resolve_gep";
   LLVMContext &Ctx = M->getContext();
-
-  if (auto handler = M->getFunction(handlerName.toStringRef(handlerNameStr)))
-    return handler;
 
   IRBuilder<> builder(Ctx);
 
@@ -338,8 +301,7 @@ static Function *getOrCreateResolveGep(Module *M) {
   FunctionType *resolveGepFnTy =
       FunctionType::get(ptr_ty, {ptr_ty, ptr_ty}, false);
 
-  Function *resolveGepFn = Function::Create(
-      resolveGepFnTy, Function::InternalLinkage, handlerName, M);
+  Function *resolveGepFn = getOrCreateResolveHelper(M, handlerName, resolveGepFnTy);
 
   // Adding attribute to always inline
   resolveGepFn->addFnAttr(Attribute::AlwaysInline);
