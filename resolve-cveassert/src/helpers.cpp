@@ -65,12 +65,12 @@ std::string getLLVMType(Type *ty) {
   return escapeTypeToIdent(canon);
 }
 
-Function* getOrCreateResolveHelper(Module *M, std::string fn_name, FunctionType *fn_type) {
+Function* getOrCreateResolveHelper(Module *M, std::string fn_name, FunctionType *fn_type, GlobalValue::LinkageTypes link_type = Function::InternalLinkage) {
   LLVMContext &Ctx = M->getContext();
   if (auto handler = M->getFunction(fn_name))
     return handler;
 
-  Function *resolveHelperFn = Function::Create(fn_type, Function::InternalLinkage, fn_name, M);
+  Function *resolveHelperFn = Function::Create(fn_type, link_type, fn_name, M);
   resolveHelperFn->setMetadata("resolve.noinstrument", MDNode::get(Ctx, {}));
   return resolveHelperFn;
 }
@@ -122,15 +122,7 @@ Function *getOrCreateResolveReportSanitizerTriggered(Module *M) {
 
   FunctionType *resolveReportFnTy = FunctionType::get(void_ty, {}, false);
 
-  Function *resolveReportFn = getOrCreateResolveHelper(M, "resolve_report_sanitizer_triggered", resolveReportFnTy);
-
-  // if (Function *F = M->getFunction("resolve_report_sanitizer_triggered"))
-  //   if (!F->isDeclaration())
-  //     return F;
-
-  // Function *resolveReportFn =
-  //     Function::Create(resolveReportFnTy, GlobalValue::WeakAnyLinkage,
-  //                      "resolve_report_sanitizer_triggered", M);
+  Function *resolveReportFn = getOrCreateResolveHelper(M, "resolve_report_sanitizer_triggered", resolveReportFnTy, GlobalValue::WeakAnyLinkage);
 
   BasicBlock *EntryBB = BasicBlock::Create(Ctx, "", resolveReportFn);
   IRBuilder<> builder(EntryBB);
@@ -151,9 +143,8 @@ Function *getOrCreateRecoverBufferFunction(Module *M) {
   FunctionType *resolve_recover_buf_fn_ty =
       FunctionType::get(ptr_ty, {}, false);
 
-  auto resolveRecoverFn =
-      Function::Create(resolve_recover_buf_fn_ty, GlobalValue::WeakAnyLinkage,
-                       "resolve_get_recover_longjmp_buf", M);
+  auto resolveRecoverFn = getOrCreateResolveHelper(M, "resolve_get_recover_longjmp_buf", 
+  resolve_recover_buf_fn_ty, GlobalValue::WeakAnyLinkage);
 
   BasicBlock *EntryBB = BasicBlock::Create(M->getContext(), "", resolveRecoverFn);
   IRBuilder<> builder(EntryBB);
