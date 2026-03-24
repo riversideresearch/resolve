@@ -111,7 +111,7 @@ Function *getOrCreateIsHeap(Module *M, LLVMContext &Ctx) {
   // return !(is_stack || is_static);
   auto result = Builder.CreateNot(Builder.CreateOr({is_stack, is_static}));
   Builder.CreateRet(result);
-  
+
   validateFunctionIR(resolveIsHeapFn);
   return resolveIsHeapFn;
 }
@@ -120,25 +120,23 @@ Function *getOrCreateResolveReportSanitizerTriggered(Module *M) {
   auto &Ctx = M->getContext();
   auto void_ty = Type::getVoidTy(Ctx);
 
-  FunctionType *resolve_report_fn_ty = FunctionType::get(void_ty, {}, false);
+  FunctionType *resolveReportFnTy = FunctionType::get(void_ty, {}, false);
 
-  if (Function *F = M->getFunction("resolve_report_sanitizer_triggered"))
-    if (!F->isDeclaration())
-      return F;
+  Function *resolveReportFn = getOrCreateResolveHelper(M, "resolve_report_sanitizer_triggered", resolveReportFnTy);
 
-  Function *resolveReportFn =
-      Function::Create(resolve_report_fn_ty, GlobalValue::WeakAnyLinkage,
-                       "resolve_report_sanitizer_triggered", M);
+  // if (Function *F = M->getFunction("resolve_report_sanitizer_triggered"))
+  //   if (!F->isDeclaration())
+  //     return F;
+
+  // Function *resolveReportFn =
+  //     Function::Create(resolveReportFnTy, GlobalValue::WeakAnyLinkage,
+  //                      "resolve_report_sanitizer_triggered", M);
 
   BasicBlock *EntryBB = BasicBlock::Create(Ctx, "", resolveReportFn);
   IRBuilder<> builder(EntryBB);
   builder.CreateRetVoid();
 
-  resolveReportFn->setMetadata("resolve.noinstrument", MDNode::get(Ctx, {}));
-  raw_ostream &out = errs();
-  out << *resolveReportFn;
-  if (verifyFunction(*resolveReportFn, &out)) {
-  }
+  validateFunctionIR(resolveReportFn);
   return resolveReportFn;
 }
 
@@ -163,10 +161,7 @@ Function *getOrCreateRecoverBufferFunction(Module *M) {
   builder.CreateRet(Constant::getNullValue(ptr_ty));
 
   resolveRecoverFn->setMetadata("resolve.noinstrument", MDNode::get(Ctx, {}));
-  raw_ostream &out = errs();
-  out << *resolveRecoverFn;
-  if (verifyFunction(*resolveRecoverFn, &out)) {
-  }
+  validateFunctionIR(resolveRecoverFn);
 
   return resolveRecoverFn;
 }
@@ -180,15 +175,10 @@ getOrCreateRemediationBehavior(Module *M,
   auto void_ty = Type::getVoidTy(Ctx);
   auto i32_ty = Type::getInt32Ty(Ctx);
 
-  FunctionType *resolve_remed_behavior_ty =
+  FunctionType *resolveRemedBehaviorFnTy =
       FunctionType::get(void_ty, {}, false);
-  if (Function *F = M->getFunction("resolve_remediation_behavior"))
-    if (!F->isDeclaration())
-      return F;
-
-  Function *resolveRemedBehaviorFn =
-      Function::Create(resolve_remed_behavior_ty, GlobalValue::InternalLinkage,
-                       "resolve_remediation_behavior", M);
+  
+  Function *resolveRemedBehaviorFn = getOrCreateResolveHelper(M, "resolve_remediation_behavior", resolveRemedBehaviorFnTy);
 
   BasicBlock *BB = BasicBlock::Create(Ctx, "", resolveRemedBehaviorFn);
   IRBuilder<> Builder(BB);
@@ -216,7 +206,6 @@ getOrCreateRemediationBehavior(Module *M,
   }
   Builder.CreateRetVoid();
 
-  resolveRemedBehaviorFn->setMetadata("resolve.noinstrument", MDNode::get(Ctx, {}));
   validateFunctionIR(resolveRemedBehaviorFn);
   return resolveRemedBehaviorFn;
 }
