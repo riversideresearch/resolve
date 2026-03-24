@@ -21,8 +21,6 @@
 
 using namespace llvm;
 
-// Think about how to modify CVEAssert arch to make sanitizer instrumentation conditional 
-
 void validateFunctionIR(Function *F) {
   raw_ostream &out = errs();
   out << *F;
