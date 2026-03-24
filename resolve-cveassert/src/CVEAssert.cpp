@@ -87,21 +87,21 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
     auto ptr_ty = PointerType::get(Ctx, 0);
 
     // TODO: write this in asm as some kind of sanitzer_rt?
-    FunctionType *SanitizeFnTy =
+    FunctionType *resolveFreeNonHeapFnTy =
         FunctionType::get(Type::getVoidTy(Ctx), {ptr_ty}, false);
-    Function *SanitizeFn = Function::Create(
-        SanitizeFnTy, Function::InternalLinkage, handlerName, M);
+    Function *resolveFreeNonHeapFn = Function::Create(
+        resolveFreeNonHeapFnTy, Function::InternalLinkage, handlerName, M);
 
-    BasicBlock *Entry = BasicBlock::Create(Ctx, "entry", SanitizeFn);
+    BasicBlock *Entry = BasicBlock::Create(Ctx, "entry", resolveFreeNonHeapFn);
     BasicBlock *SanitizeBlock =
-        BasicBlock::Create(Ctx, "sanitize_block", SanitizeFn);
-    BasicBlock *FreeBlock = BasicBlock::Create(Ctx, "free_block", SanitizeFn);
+        BasicBlock::Create(Ctx, "sanitize_block", resolveFreeNonHeapFn);
+    BasicBlock *FreeBlock = BasicBlock::Create(Ctx, "free_block", resolveFreeNonHeapFn);
 
     // Set insertion point to entry block
     builder.SetInsertPoint(Entry);
 
     // Get function argument
-    Argument *InputPtr = SanitizeFn->getArg(0);
+    Argument *InputPtr = resolveFreeNonHeapFn->getArg(0);
 
     // Call Is Heap Func
     // Branch if True
@@ -121,8 +121,8 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
     builder.CreateCall(M->getFunction("free"), {InputPtr});
     builder.CreateRetVoid();
 
-    validateFunctionIR(SanitizeFn);
-    return SanitizeFn;
+    validateFunctionIR(resolveFreeNonHeapFn);
+    return resolveFreeNonHeapFn;
   }
 
   void sanitizeFreeOfNonHeap(Function *F,
