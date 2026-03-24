@@ -80,11 +80,7 @@ getOrCreateNullPtrLoadSanitizer(Module *M, LLVMContext &Ctx, Type *ty,
 
   sanitizeNullPtrLdFn->setMetadata("resolve.noinstrument", MDNode::get(Ctx, {}));
 
-  raw_ostream &out = errs();
-  out << *sanitizeNullPtrLdFn;
-  if (verifyFunction(*sanitizeNullPtrLdFn, &out)) {
-  }
-
+  validateFunctionIR(sanitizeNullPtrLdFn);
   return sanitizeNullPtrLdFn;
 }
 
@@ -155,11 +151,7 @@ static Function *getOrCreateNullPtrStoreSanitizer(
 
 
   sanitizeNullPtrStFn->setMetadata("resolve.noinstrument", MDNode::get(Ctx, {}));
-  raw_ostream &out = errs();
-  out << *sanitizeNullPtrStFn;
-  if (verifyFunction(*sanitizeNullPtrStFn, &out)) {
-  }
-
+  validateFunctionIR(sanitizeNullPtrStFn);
   return sanitizeNullPtrStFn;
 }
 

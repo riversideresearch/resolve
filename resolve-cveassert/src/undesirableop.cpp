@@ -11,6 +11,7 @@
 #include "llvm/Support/raw_ostream.h"
 
 #include "undesirableop.hpp"
+#include "helpers.hpp"
 
 #include <optional>
 #include <string>
@@ -57,10 +58,7 @@ static Function *replaceUndesirableFunction(Module *M, CallInst *call,
   builder.CreateRet(resolveSanitizedFn->getArg(argNum));
 
   // DEBUGGING
-  raw_ostream &out = errs();
-  out << *resolveSanitizedFn;
-  if (verifyFunction(*resolveSanitizedFn, &out)) {
-  }
+  validateFunctionIR(resolveSanitizedFn);
   return resolveSanitizedFn;
 }
 

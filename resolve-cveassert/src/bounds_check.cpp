@@ -99,10 +99,7 @@ static Function *getOrCreateResolveAccessOk(Module *M) {
   builder.CreateRet(ConstantInt::getFalse(Ctx));
 
   resolveAccessOkFn->setMetadata("resolve.noinstrument", MDNode::get(Ctx, {}));
-  raw_ostream &out = errs();
-  out << *resolveAccessOkFn;
-  if (verifyFunction(*resolveAccessOkFn, &out)) {
-  }
+  validateFunctionIR(resolveAccessOkFn);
 
   return resolveAccessOkFn;
 }
@@ -150,11 +147,7 @@ static Function *getOrCreateBoundsCheckLoadSanitizer(
 
   sanitizeLoadFn->setMetadata("resolve.noinstrument", MDNode::get(Ctx, {}));
   // DEBUGGING
-  raw_ostream &out = errs();
-  out << *sanitizeLoadFn;
-  if (verifyFunction(*sanitizeLoadFn, &out)) {
-  }
-
+  validateFunctionIR(sanitizeLoadFn);
   return sanitizeLoadFn;
 }
 
@@ -205,10 +198,7 @@ static Function *getOrCreateBoundsCheckStoreSanitizer(
 
   sanitizeStoreFn->setMetadata("resolve.noinstrument", MDNode::get(Ctx, {}));
   // DEBUGGING
-  raw_ostream &out = errs();
-  out << *sanitizeStoreFn;
-  if (verifyFunction(*sanitizeStoreFn, &out)) {
-  }
+  validateFunctionIR(sanitizeStoreFn);
 
   return sanitizeStoreFn;
 }
@@ -269,10 +259,8 @@ static Function *getOrCreateBoundsCheckMemcpySanitizer(
 
   sanitizeMemcpyFn->setMetadata("resolve.noinstrument", MDNode::get(Ctx, {}));
   // DEBUGGING
-  raw_ostream &out = errs();
-  out << *sanitizeMemcpyFn;
-  if (verifyFunction(*sanitizeMemcpyFn, &out)) {
-  }
+  validateFunctionIR(sanitizeMemcpyFn);
+
   return sanitizeMemcpyFn;
 }
 
@@ -329,10 +317,8 @@ static Function *getOrCreateBoundsCheckMemsetSanitizer(
 
   sanitizeMemsetFn->setMetadata("resolve.noinstrument", MDNode::get(Ctx, {}));
   // DEBUGGING
-  raw_ostream &out = errs();
-  out << *sanitizeMemsetFn;
-  if (verifyFunction(*sanitizeMemsetFn, &out)) {
-  }
+  validateFunctionIR(sanitizeMemsetFn);
+
   return sanitizeMemsetFn;
 }
 
@@ -402,10 +388,7 @@ static Function *getOrCreateResolveGep(Module *M) {
 
   resolveGepFn->setMetadata("resolve.noinstrument", MDNode::get(Ctx, {}));
   // DEBUGGING
-  raw_ostream &out = errs();
-  out << *resolveGepFn;
-  if (verifyFunction(*resolveGepFn, &out)) {
-  }
+  validateFunctionIR(resolveGepFn);
   return resolveGepFn;
 }
 

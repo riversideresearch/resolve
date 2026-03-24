@@ -121,11 +121,7 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
     builder.CreateCall(M->getFunction("free"), {InputPtr});
     builder.CreateRetVoid();
 
-    raw_ostream &out = errs();
-    out << *SanitizeFn;
-    if (verifyFunction(*SanitizeFn, &out)) {
-    }
-
+    validateFunctionIR(SanitizeFn);
     return SanitizeFn;
   }
 

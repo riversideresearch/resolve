@@ -21,6 +21,12 @@
 
 using namespace llvm;
 
+void validateFunctionIR(Function *F) {
+  raw_ostream &out = errs();
+  out << *F;
+  if (verifyFunction(*F, &out)) { return; }
+}
+
 std::string getLLVMType(Type *ty) {
   // TODO: This is going to be super slow, may want to cache the computed
   // strings
@@ -210,9 +216,6 @@ getOrCreateRemediationBehavior(Module *M,
   Builder.CreateRetVoid();
 
   resolveRemedBehaviorFn->setMetadata("resolve.noinstrument", MDNode::get(Ctx, {}));
-  raw_ostream &out = errs();
-  out << *resolveRemedBehaviorFn;
-  if (verifyFunction(*resolveRemedBehaviorFn, &out)) {
-  }
+  validateFunctionIR(resolveRemedBehaviorFn);
   return resolveRemedBehaviorFn;
 }
