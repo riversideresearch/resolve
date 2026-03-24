@@ -18,5 +18,5 @@ llvm::Function *getOrCreateResolveReportSanitizerTriggered(llvm::Module *M);
 llvm::Function *
 getOrCreateRemediationBehavior(llvm::Module *M,
                                Vulnerability::RemediationStrategies strategy);
-llvm::Function *getOrCreateResolveFunction(std::string funct_name, llvm::FunctionType fn_type);
+llvm::Function *getOrCreateResolveHelper(llvm::Module *M, std::string funct_name, llvm::FunctionType fn_type);
 void validateFunctionIR(llvm::Function *F);

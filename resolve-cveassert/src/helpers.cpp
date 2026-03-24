@@ -21,6 +21,8 @@
 
 using namespace llvm;
 
+// Think about how to modify CVEAssert arch to make sanitizer instrumentation conditional 
+
 void validateFunctionIR(Function *F) {
   raw_ostream &out = errs();
   out << *F;
@@ -63,22 +65,26 @@ std::string getLLVMType(Type *ty) {
   return escapeTypeToIdent(canon);
 }
 
-Function *getOrCreateIsHeap(Module *M, LLVMContext &Ctx) {
-  std::string handlerName = "resolve_is_heap";
-
-  if (auto handler = M->getFunction(handlerName))
+Function* getOrCreateResolveHelper(Module *M, std::string fn_name, FunctionType *fn_type) {
+  if (auto handler = M->getFunction(fn_name))
     return handler;
 
-  IRBuilder<> Builder(Ctx);
+  Function *resolveHelperFn = Function::Create(fn_type, Function::InternalLinkage, fn_name, M);
+  resolveHelperFn->setMetadata("resolve.noinstrument");
+  return resolveHelperFn;
+}
+
+Function *getOrCreateIsHeap(Module *M, LLVMContext &Ctx) {
   // TODO: handle address spaces other than 0
   auto ptr_ty = PointerType::get(Ctx, 0);
 
   // TODO: write this in asm as some kind of sanitzer_rt?
-  FunctionType *FuncType =
+  FunctionType *resolveIsHeapFnTy =
       FunctionType::get(Type::getIntNTy(Ctx, 1), {ptr_ty}, false);
-  Function *sanitizeFn =
-      Function::Create(FuncType, Function::InternalLinkage, handlerName, M);
+  
+  Function* resolveIsHeapFn = getOrCreateResolveHelper(M, "resolve_is_heap", resolveIsHeapFnTy); 
 
+  IRBuilder<> Builder(Ctx);
   BasicBlock *Entry = BasicBlock::Create(Ctx, "entry", sanitizeFn);
   Builder.SetInsertPoint(Entry);
 
@@ -107,11 +113,7 @@ Function *getOrCreateIsHeap(Module *M, LLVMContext &Ctx) {
 
   sanitizeFn->setMetadata("resolve.noinstrument", MDNode::get(Ctx, {}));
 
-  raw_ostream &out = errs();
-  out << *sanitizeFn;
-  if (verifyFunction(*sanitizeFn, &out)) {
-  }
-
+  validateFunctionIR(sanitizeFn);
   return sanitizeFn;
 }
 
