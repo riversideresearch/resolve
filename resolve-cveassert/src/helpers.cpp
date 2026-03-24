@@ -66,11 +66,12 @@ std::string getLLVMType(Type *ty) {
 }
 
 Function* getOrCreateResolveHelper(Module *M, std::string fn_name, FunctionType *fn_type) {
+  LLVMContext &Ctx = M->getContext();
   if (auto handler = M->getFunction(fn_name))
     return handler;
 
   Function *resolveHelperFn = Function::Create(fn_type, Function::InternalLinkage, fn_name, M);
-  resolveHelperFn->setMetadata("resolve.noinstrument");
+  resolveHelperFn->setMetadata("resolve.noinstrument", MDNode::get(Ctx, {}));
   return resolveHelperFn;
 }
 
@@ -85,11 +86,11 @@ Function *getOrCreateIsHeap(Module *M, LLVMContext &Ctx) {
   Function* resolveIsHeapFn = getOrCreateResolveHelper(M, "resolve_is_heap", resolveIsHeapFnTy); 
 
   IRBuilder<> Builder(Ctx);
-  BasicBlock *Entry = BasicBlock::Create(Ctx, "entry", sanitizeFn);
+  BasicBlock *Entry = BasicBlock::Create(Ctx, "entry", resolveIsHeapFn);
   Builder.SetInsertPoint(Entry);
 
   // Get function argument
-  Argument *InputPtr = sanitizeFn->getArg(0);
+  Argument *InputPtr = resolveIsHeapFn->getArg(0);
 
   FunctionType *AsmType = FunctionType::get(ptr_ty, {});
   auto read_sp_asm = InlineAsm::get(AsmType, "mov %rsp, $0",
@@ -110,11 +111,9 @@ Function *getOrCreateIsHeap(Module *M, LLVMContext &Ctx) {
   // return !(is_stack || is_static);
   auto result = Builder.CreateNot(Builder.CreateOr({is_stack, is_static}));
   Builder.CreateRet(result);
-
-  sanitizeFn->setMetadata("resolve.noinstrument", MDNode::get(Ctx, {}));
-
-  validateFunctionIR(sanitizeFn);
-  return sanitizeFn;
+  
+  validateFunctionIR(resolveIsHeapFn);
+  return resolveIsHeapFn;
 }
 
 Function *getOrCreateResolveReportSanitizerTriggered(Module *M) {
