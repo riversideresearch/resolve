@@ -21,9 +21,6 @@ getOrCreateNullPtrLoadSanitizer(Module *M, LLVMContext &Ctx, Type *ty,
                                 Vulnerability::RemediationStrategies strategy) {
   std::string handlerName = "resolve_sanitize_null_ptr_ld_" + getLLVMType(ty);
 
-  if (auto handler = M->getFunction(handlerName))
-    return handler;
-
   IRBuilder<> Builder(Ctx);
   // TODO: handle address spaces other than 0
   auto ptr_ty = PointerType::get(Ctx, 0);
@@ -31,9 +28,8 @@ getOrCreateNullPtrLoadSanitizer(Module *M, LLVMContext &Ctx, Type *ty,
   auto void_ty = Type::getVoidTy(Ctx);
 
   // TODO: write this in asm as some kind of sanitzer_rt?
-  FunctionType *FuncType = FunctionType::get(ty, {ptr_ty}, false);
-  Function *resolveNullPtrLdFn =
-      Function::Create(FuncType, Function::InternalLinkage, handlerName, M);
+  FunctionType *resolveNullPtrLdFnTy = FunctionType::get(ty, {ptr_ty}, false);
+  Function *resolveNullPtrLdFn = getOrCreateResolveHelper(M, handlerName, resolveNullPtrLdFnTy);
 
   BasicBlock *Entry = BasicBlock::Create(Ctx, "entry", resolveNullPtrLdFn);
   BasicBlock *SanitizeBlock =
@@ -78,8 +74,6 @@ getOrCreateNullPtrLoadSanitizer(Module *M, LLVMContext &Ctx, Type *ty,
   Value *ld = Builder.CreateLoad(ty, InputPtr);
   Builder.CreateRet(ld);
 
-  resolveNullPtrLdFn->setMetadata("resolve.noinstrument", MDNode::get(Ctx, {}));
-
   validateFunctionIR(resolveNullPtrLdFn);
   return resolveNullPtrLdFn;
 }
@@ -89,9 +83,6 @@ static Function *getOrCreateNullPtrStoreSanitizer(
     Vulnerability::RemediationStrategies strategy) {
   std::string handlerName = "resolve_sanitize_null_ptr_st_" + getLLVMType(ty);
 
-  if (auto handler = M->getFunction(handlerName))
-    return handler;
-
   IRBuilder<> Builder(Ctx);
   // TODO: handle address spaces other than 0
   auto ptr_ty = PointerType::get(Ctx, 0);
@@ -99,10 +90,9 @@ static Function *getOrCreateNullPtrStoreSanitizer(
   auto void_ty = Type::getVoidTy(Ctx);
 
   // TODO: write this in asm as some kind of sanitzer_rt?
-  FunctionType *FuncType =
+  FunctionType *resolveNullPtrStFnTy =
       FunctionType::get(Type::getVoidTy(Ctx), {ptr_ty, ty}, false);
-  Function *resolveNullPtrStFn =
-      Function::Create(FuncType, Function::InternalLinkage, handlerName, M);
+  Function *resolveNullPtrStFn = getOrCreateResolveHelper(M, handlerName, resolveNullPtrStFnTy);
 
   BasicBlock *Entry = BasicBlock::Create(Ctx, "entry", resolveNullPtrStFn);
   BasicBlock *SanitizeBlock =
@@ -149,8 +139,6 @@ static Function *getOrCreateNullPtrStoreSanitizer(
   Builder.CreateStore(InputVal, InputPtr);
   Builder.CreateRetVoid();
 
-
-  resolveNullPtrStFn->setMetadata("resolve.noinstrument", MDNode::get(Ctx, {}));
   validateFunctionIR(resolveNullPtrStFn);
   return resolveNullPtrStFn;
 }
