@@ -32,19 +32,19 @@ getOrCreateNullPtrLoadSanitizer(Module *M, LLVMContext &Ctx, Type *ty,
 
   // TODO: write this in asm as some kind of sanitzer_rt?
   FunctionType *FuncType = FunctionType::get(ty, {ptr_ty}, false);
-  Function *sanitizeNullPtrLdFn =
+  Function *resolveNullPtrLdFn =
       Function::Create(FuncType, Function::InternalLinkage, handlerName, M);
 
-  BasicBlock *Entry = BasicBlock::Create(Ctx, "entry", sanitizeNullPtrLdFn);
+  BasicBlock *Entry = BasicBlock::Create(Ctx, "entry", resolveNullPtrLdFn);
   BasicBlock *SanitizeBlock =
-      BasicBlock::Create(Ctx, "sanitize_block", sanitizeNullPtrLdFn);
-  BasicBlock *LoadBlock = BasicBlock::Create(Ctx, "load_block", sanitizeNullPtrLdFn);
+      BasicBlock::Create(Ctx, "sanitize_block", resolveNullPtrLdFn);
+  BasicBlock *LoadBlock = BasicBlock::Create(Ctx, "load_block", resolveNullPtrLdFn);
 
   // Set insertion point to entry block
   Builder.SetInsertPoint(Entry);
 
   // Get function argument
-  Argument *InputPtr = sanitizeNullPtrLdFn->getArg(0);
+  Argument *InputPtr = resolveNullPtrLdFn->getArg(0);
 
   // Compare pointer with null (opaque ptrs use generic ptr type)
   // TODO: Sanitize other invalid pointers
@@ -78,10 +78,10 @@ getOrCreateNullPtrLoadSanitizer(Module *M, LLVMContext &Ctx, Type *ty,
   Value *ld = Builder.CreateLoad(ty, InputPtr);
   Builder.CreateRet(ld);
 
-  sanitizeNullPtrLdFn->setMetadata("resolve.noinstrument", MDNode::get(Ctx, {}));
+  resolveNullPtrLdFn->setMetadata("resolve.noinstrument", MDNode::get(Ctx, {}));
 
-  validateFunctionIR(sanitizeNullPtrLdFn);
-  return sanitizeNullPtrLdFn;
+  validateFunctionIR(resolveNullPtrLdFn);
+  return resolveNullPtrLdFn;
 }
 
 static Function *getOrCreateNullPtrStoreSanitizer(
@@ -101,20 +101,20 @@ static Function *getOrCreateNullPtrStoreSanitizer(
   // TODO: write this in asm as some kind of sanitzer_rt?
   FunctionType *FuncType =
       FunctionType::get(Type::getVoidTy(Ctx), {ptr_ty, ty}, false);
-  Function *sanitizeNullPtrStFn =
+  Function *resolveNullPtrStFn =
       Function::Create(FuncType, Function::InternalLinkage, handlerName, M);
 
-  BasicBlock *Entry = BasicBlock::Create(Ctx, "entry", sanitizeNullPtrStFn);
+  BasicBlock *Entry = BasicBlock::Create(Ctx, "entry", resolveNullPtrStFn);
   BasicBlock *SanitizeBlock =
-      BasicBlock::Create(Ctx, "sanitize_block", sanitizeNullPtrStFn);
-  BasicBlock *StoreBlock = BasicBlock::Create(Ctx, "store_block", sanitizeNullPtrStFn);
+      BasicBlock::Create(Ctx, "sanitize_block", resolveNullPtrStFn);
+  BasicBlock *StoreBlock = BasicBlock::Create(Ctx, "store_block", resolveNullPtrStFn);
 
   // Set insertion point to entry block
   Builder.SetInsertPoint(Entry);
 
   // Get function argument
-  Argument *InputPtr = sanitizeNullPtrStFn->getArg(0);
-  Argument *InputVal = sanitizeNullPtrStFn->getArg(1);
+  Argument *InputPtr = resolveNullPtrStFn->getArg(0);
+  Argument *InputVal = resolveNullPtrStFn->getArg(1);
 
   // Compare pointer with null (opaque ptrs use generic ptr type)
   // TODO: Sanitize other invalid pointers
@@ -150,9 +150,9 @@ static Function *getOrCreateNullPtrStoreSanitizer(
   Builder.CreateRetVoid();
 
 
-  sanitizeNullPtrStFn->setMetadata("resolve.noinstrument", MDNode::get(Ctx, {}));
-  validateFunctionIR(sanitizeNullPtrStFn);
-  return sanitizeNullPtrStFn;
+  resolveNullPtrStFn->setMetadata("resolve.noinstrument", MDNode::get(Ctx, {}));
+  validateFunctionIR(resolveNullPtrStFn);
+  return resolveNullPtrStFn;
 }
 
 void sanitizeNullPointers(Function *f,
