@@ -45,7 +45,6 @@ static FunctionCallee getResolveBaseAndLimit(Module *M) {
 
 static Function *getOrCreateResolveAccessOk(Module *M) {
   std::string handlerName = "resolve_access_ok";
-  SmallVector<char> handlerNameStr;
   LLVMContext &Ctx = M->getContext();
 
   IRBuilder<> builder(Ctx);
