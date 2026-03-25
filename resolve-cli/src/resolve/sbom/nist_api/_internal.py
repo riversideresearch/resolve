@@ -460,16 +460,11 @@ class CvssV30(BaseModel):
     exploitabilityScore: DefSubscore | None = None
     impactScore: DefSubscore | None = None
 
+    def get_base_score(self):
+        return self.cvssData.baseScore.root
 
-class CvssV31(BaseModel):
-    model_config = ConfigDict(
-        extra='forbid',
-    )
-    source: str
-    type: Type
+class CvssV31(CvssV30):
     cvssData: Field1
-    exploitabilityScore: DefSubscore | None = None
-    impactScore: DefSubscore | None = None
 
 
 class CvssV40(BaseModel):
@@ -492,6 +487,16 @@ class Metrics(BaseModel):
     cvssMetricV31: list[CvssV31] | None = Field(None, description='CVSS V3.1 score.')
     cvssMetricV30: list[CvssV30] | None = Field(None, description='CVSS V3.0 score.')
     cvssMetricV2: list[CvssV2] | None = Field(None, description='CVSS V2.0 score.')
+    
+    def get_v3_base_score(self) -> float | None:
+        subject = None
+        if self.cvssMetricV31:
+            subject = self.cvssMetricV31
+        elif self.cvssMetricV30:
+            subject = self.cvssMetricV30
+        else:
+            return None
+        return subject[0].get_base_score()
 
 
 class CveItem(BaseModel):
