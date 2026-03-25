@@ -219,7 +219,8 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
       return result;
     }
 
-    switch (vuln.WeaknessID) {
+    uint32_t cwe_id = static_cast<uint32_t>(std::stoi(vuln.WeaknessID));
+    switch (cwe_id) {
     case VulnID::STACK_BASED_BUF_OVERFLOW: /* Stack-based buffer overflow */
     case VulnID::HEAP_BASED_BUF_OVERFLOW:  /* Heap-base buffer overflow */
     case VulnID::OOB_WRITE:                /* OOB Write */
@@ -289,7 +290,8 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
         continue;
       }
 
-      switch (vuln.WeaknessID) {
+      uint32_t cwe_id = static_cast<uint32_t>(std::stoi(vuln.WeaknessID));
+      switch (cwe_id) {
       // 121 stack-based
       case VulnID::STACK_BASED_BUF_OVERFLOW:
         instrument_mem_inst.instrumentAlloca = true;
