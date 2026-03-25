@@ -121,7 +121,7 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
     builder.CreateCall(M->getFunction("free"), {InputPtr});
     builder.CreateRetVoid();
 
-    validateFunctionIR(resolveFreeNonHeapFn);
+    validateIR(resolveFreeNonHeapFn);
     return resolveFreeNonHeapFn;
   }
 
