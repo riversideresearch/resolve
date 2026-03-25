@@ -182,7 +182,7 @@ getOrCreateRemediationBehavior(Module *M,
       M, "resolve_remediation_behavior", resolveRemedBehaviorFnTy);
   if (!resolveRemedBehaviorFn->empty()) { return resolveRemedBehaviorFn; }
 
-  BasicBlock *BB = BasicBlock::Create(Ctx, "", resolveRemedBehaviorFn);
+  BasicBlock *BB = BasicBlock::Create(Ctx, "entry", resolveRemedBehaviorFn);
   IRBuilder<> Builder(BB);
 
   if (strategy == Vulnerability::RemediationStrategies::EXIT) {

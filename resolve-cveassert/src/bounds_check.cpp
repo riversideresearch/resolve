@@ -63,10 +63,10 @@ static Function *getOrCreateResolveAccessOk(Module *M) {
   // Adding an attribute to always inline this function
   resolveAccessOkFn->addFnAttr(Attribute::AlwaysInline);
 
-  BasicBlock *EntryBB = BasicBlock::Create(Ctx, "", resolveAccessOkFn);
-  BasicBlock *CheckAccessBB = BasicBlock::Create(Ctx, "", resolveAccessOkFn);
-  BasicBlock *TrueBB = BasicBlock::Create(Ctx, "", resolveAccessOkFn);
-  BasicBlock *FalseBB = BasicBlock::Create(Ctx, "", resolveAccessOkFn);
+  BasicBlock *EntryBB = BasicBlock::Create(Ctx, "entry", resolveAccessOkFn);
+  BasicBlock *CheckAccessBB = BasicBlock::Create(Ctx, "check_access", resolveAccessOkFn);
+  BasicBlock *TrueBB = BasicBlock::Create(Ctx, "return_true", resolveAccessOkFn);
+  BasicBlock *FalseBB = BasicBlock::Create(Ctx, "return_false", resolveAccessOkFn);
 
   builder.SetInsertPoint(EntryBB);
 
@@ -114,9 +114,9 @@ static Function *getOrCreateBoundsCheckLoadSanitizer(
 
   if (!resolveLoadFn->empty()) { return resolveLoadFn; }
 
-  BasicBlock *EntryBB = BasicBlock::Create(Ctx, "", resolveLoadFn);
-  BasicBlock *NormalLoadBB = BasicBlock::Create(Ctx, "", resolveLoadFn);
-  BasicBlock *SanitizeLoadBB = BasicBlock::Create(Ctx, "", resolveLoadFn);
+  BasicBlock *EntryBB = BasicBlock::Create(Ctx, "entry", resolveLoadFn);
+  BasicBlock *NormalLoadBB = BasicBlock::Create(Ctx, "normal load", resolveLoadFn);
+  BasicBlock *SanitizeLoadBB = BasicBlock::Create(Ctx, "sanitize load", resolveLoadFn);
 
   Value *basePtr = resolveLoadFn->getArg(0);
 
@@ -158,9 +158,9 @@ static Function *getOrCreateBoundsCheckStoreSanitizer(
   Function *resolveStoreFn = getOrCreateResolveHelper(M, handlerName, resolveStoreFnTy);
   if (!resolveStoreFn->empty()) { return resolveStoreFn; }
 
-  BasicBlock *EntryBB = BasicBlock::Create(Ctx, "", resolveStoreFn);
-  BasicBlock *NormalStoreBB = BasicBlock::Create(Ctx, "", resolveStoreFn);
-  BasicBlock *SanitizeStoreBB = BasicBlock::Create(Ctx, "", resolveStoreFn);
+  BasicBlock *EntryBB = BasicBlock::Create(Ctx, "entry", resolveStoreFn);
+  BasicBlock *NormalStoreBB = BasicBlock::Create(Ctx, "normal_store", resolveStoreFn);
+  BasicBlock *SanitizeStoreBB = BasicBlock::Create(Ctx, "sanitize_store", resolveStoreFn);
 
   Value *basePtr = resolveStoreFn->getArg(0);
   Value *storedVal = resolveStoreFn->getArg(1);
@@ -202,9 +202,9 @@ static Function *getOrCreateBoundsCheckMemcpySanitizer(
   Function *resolveMemcpyFn = getOrCreateResolveHelper(M, handlerName, resolveMemcpyFnTy);
   if (!resolveMemcpyFn->empty()) { return resolveMemcpyFn; }
 
-  BasicBlock *EntryBB = BasicBlock::Create(Ctx, "", resolveMemcpyFn);
-  BasicBlock *NormalBB = BasicBlock::Create(Ctx, "", resolveMemcpyFn);
-  BasicBlock *SanitizeMemcpyBB = BasicBlock::Create(Ctx, "", resolveMemcpyFn);
+  BasicBlock *EntryBB = BasicBlock::Create(Ctx, "entry", resolveMemcpyFn);
+  BasicBlock *NormalBB = BasicBlock::Create(Ctx, "safe_memcpy", resolveMemcpyFn);
+  BasicBlock *SanitizeMemcpyBB = BasicBlock::Create(Ctx, "sanitize_memcpy", resolveMemcpyFn);
 
   // EntryBB: Call resolve_access_ok
   // to verify correct bounds of allocation
@@ -257,9 +257,9 @@ static Function *getOrCreateBoundsCheckMemsetSanitizer(
   Function *resolveMemsetFn = getOrCreateResolveHelper(M, handlerName, resolveMemsetFnTy);
   if (!resolveMemsetFn->empty()) { return resolveMemsetFn; } 
 
-  BasicBlock *EntryBB = BasicBlock::Create(Ctx, "", resolveMemsetFn);
-  BasicBlock *NormalBB = BasicBlock::Create(Ctx, "", resolveMemsetFn);
-  BasicBlock *SanitizeMemsetBB = BasicBlock::Create(Ctx, "", resolveMemsetFn);
+  BasicBlock *EntryBB = BasicBlock::Create(Ctx, "entry", resolveMemsetFn);
+  BasicBlock *NormalBB = BasicBlock::Create(Ctx, "safe_memset", resolveMemsetFn);
+  BasicBlock *SanitizeMemsetBB = BasicBlock::Create(Ctx, "sanitize_memset", resolveMemsetFn);
 
   builder.SetInsertPoint(EntryBB);
 
@@ -309,10 +309,10 @@ static Function *getOrCreateResolveGep(Module *M) {
   // Adding attribute to always inline
   resolveGepFn->addFnAttr(Attribute::AlwaysInline);
 
-  BasicBlock *EntryBB = BasicBlock::Create(Ctx, "", resolveGepFn);
-  BasicBlock *CheckComputedPtrBB = BasicBlock::Create(Ctx, "", resolveGepFn);
-  BasicBlock *NormalBB = BasicBlock::Create(Ctx, "", resolveGepFn);
-  BasicBlock *OnePastBB = BasicBlock::Create(Ctx, "", resolveGepFn);
+  BasicBlock *EntryBB = BasicBlock::Create(Ctx, "entry", resolveGepFn);
+  BasicBlock *CheckComputedPtrBB = BasicBlock::Create(Ctx, "check_access", resolveGepFn);
+  BasicBlock *NormalBB = BasicBlock::Create(Ctx, "return_normal_ptr", resolveGepFn);
+  BasicBlock *OnePastBB = BasicBlock::Create(Ctx, "return_tainted_ptr", resolveGepFn);
 
   // EntryBB: Call libresolve get_base_and_limit
   // to retrieve the last valid byte address of obj

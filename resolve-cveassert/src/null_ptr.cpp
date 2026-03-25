@@ -34,8 +34,8 @@ getOrCreateNullPtrLoadSanitizer(Module *M, LLVMContext &Ctx, Type *ty,
 
   BasicBlock *Entry = BasicBlock::Create(Ctx, "entry", resolveNullPtrLdFn);
   BasicBlock *SanitizeBlock =
-      BasicBlock::Create(Ctx, "sanitize_block", resolveNullPtrLdFn);
-  BasicBlock *LoadBlock = BasicBlock::Create(Ctx, "load_block", resolveNullPtrLdFn);
+      BasicBlock::Create(Ctx, "sanitize_null_ptr", resolveNullPtrLdFn);
+  BasicBlock *LoadBlock = BasicBlock::Create(Ctx, "safe_load", resolveNullPtrLdFn);
 
   // Set insertion point to entry block
   Builder.SetInsertPoint(Entry);
@@ -98,8 +98,8 @@ static Function *getOrCreateNullPtrStoreSanitizer(
 
   BasicBlock *Entry = BasicBlock::Create(Ctx, "entry", resolveNullPtrStFn);
   BasicBlock *SanitizeBlock =
-      BasicBlock::Create(Ctx, "sanitize_block", resolveNullPtrStFn);
-  BasicBlock *StoreBlock = BasicBlock::Create(Ctx, "store_block", resolveNullPtrStFn);
+      BasicBlock::Create(Ctx, "sanitize_null_ptr", resolveNullPtrStFn);
+  BasicBlock *StoreBlock = BasicBlock::Create(Ctx, "safe_store", resolveNullPtrStFn);
 
   // Set insertion point to entry block
   Builder.SetInsertPoint(Entry);
