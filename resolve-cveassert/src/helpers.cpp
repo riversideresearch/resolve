@@ -21,6 +21,8 @@
 
 using namespace llvm;
 
+/// This helper fn reduces redundant code
+/// in the getOrCreate* functions
 void validateFunctionIR(Function *F) {
   raw_ostream &out = errs();
   out << *F;
