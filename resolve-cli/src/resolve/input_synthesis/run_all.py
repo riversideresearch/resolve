@@ -13,7 +13,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     prog = os.path.basename(sys.argv[0])
 
     parser = argparse.ArgumentParser(
-        description="Run the full CVE analysis pipeline: setup, CVE improvement, reachability analysis, and input synthesis.",
+        description="Run the full CVE analysis pipeline: setup, CVE improvement, reachability analysis, and input synthesis. The reasoning stages use debate and challenge/revise passes.",
         epilog=f"""Examples:
   {prog} claude cve.json out/
   {prog} codex cve.json out/""",

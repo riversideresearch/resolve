@@ -17,11 +17,11 @@ python3 -m resolve.input_synthesis reachability claude cve.json out/improve_cve 
 
 ## Overview
 
-The scripts work by delegating reasoning to coding agents (Claude, Codex, or OpenCode) through carefully structured prompts. Two key patterns from `agent.py` are used throughout:
+The scripts work by delegating reasoning to coding agents (Claude, Codex, or OpenCode) through carefully structured prompts. Two patterns from `agent.py` are used throughout:
 
-**Dialectic** (`run_dialectic`): Three-step process for analyzing a claim from scratch. A thesis argues one side, an antithesis argues the opposite (without seeing the thesis), and a synthesis resolves contradictions between them. The thesis and antithesis are kept independent to avoid anchoring bias.
+**Debate** (`run_dialectic`): A variant of the multi-agent debate (MAD) pattern for analyzing a claim from scratch. One pass argues that the claim is correct, another argues that it is incorrect without seeing the first answer, and a final pass reconciles the two.
 
-**Critique** (`run_critique`): Two-step process for improving an existing document. A critique argues against the document's conclusions, then an improve step evaluates which points in the critique are valid and produces a revised version. This is lighter than the full dialectic since the original document already serves as the "thesis."
+**Challenge and revise** (`run_critique`): A lighter pattern for improving an existing document. One pass assumes the document's conclusions are wrong and tries to show why, and a second pass updates the document based on the valid points.
 
 ## Prerequisites
 
@@ -60,15 +60,15 @@ python3 -m resolve.input_synthesis improve_CVE <agent> <cve_path> <output_path> 
 ```
 
 Steps:
-1. **CVE improvement**: Runs a dialectic on the original CVE (is it correct? is it incorrect?) then synthesizes an improved CVE description.
+1. **CVE improvement**: Runs a debate over the original CVE, then rewrites it as an improved CVE description.
 2. **Necessary condition inference**: Identifies conditions that must all be true for the vulnerability to trigger (conjunctive).
-3. **Necessary condition refinement**: Critiques each necessary condition individually to weed out conditions that aren't truly necessary.
+3. **Necessary condition refinement**: Challenges each necessary condition individually and revises it if needed.
 4. **Sufficient condition inference**: Identifies conditions where any single one being true guarantees the vulnerability triggers (disjunctive).
-5. **Sufficient condition refinement**: Critiques each sufficient condition individually to weed out conditions that aren't truly sufficient.
+5. **Sufficient condition refinement**: Challenges each sufficient condition individually and revises it if needed.
 
 Notes:
 - If no necessary or sufficient conditions are inferred, the script prints a warning and continues.
-- Internal scratch data used during critique is not copied into the final output directory.
+- Internal scratch data used during challenge passes is not copied into the final output directory.
 - If `<output_path>` already exists, the script fails unless `--overwrite` is provided.
 
 Output directory contains:
@@ -90,7 +90,7 @@ If `<output_path>` already exists, the script fails unless `--overwrite` is prov
 
 Steps:
 1. **Reachability analysis**: Checks whether the necessary conditions are simultaneously satisfiable via user input, then whether any sufficient condition is satisfiable. Concludes "triggerable", "not triggerable", or "inconclusive".
-2. **Reachability critique**: Critiques the reachability analysis and produces a revised version.
+2. **Reachability challenge**: Challenges the reachability analysis and produces a revised version.
 3. **Input synthesis and conclusion**: If triggerable or inconclusive, attempts to synthesize a concrete input that triggers the vulnerability. Writes a summary to `conclusion.md`.
 
 Output directory contains:
