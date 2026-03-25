@@ -133,7 +133,6 @@ static Function *getOrCreateBoundsCheckLoadSanitizer(
   builder.CreateCall(getOrCreateRemediationBehavior(M, strategy));
   builder.CreateRet(Constant::getNullValue(ty));
 
-  // DEBUGGING
   validateFunctionIR(sanitizeLoadFn);
   return sanitizeLoadFn;
 }
@@ -178,7 +177,6 @@ static Function *getOrCreateBoundsCheckStoreSanitizer(
   builder.CreateCall(getOrCreateRemediationBehavior(M, strategy));
   builder.CreateRetVoid();
 
-  // DEBUGGING
   validateFunctionIR(sanitizeStoreFn);
   return sanitizeStoreFn;
 }
@@ -232,7 +230,6 @@ static Function *getOrCreateBoundsCheckMemcpySanitizer(
   builder.CreateCall(getOrCreateRemediationBehavior(M, strategy));
   builder.CreateRet(dst_ptr);
 
-  // DEBUGGING
   validateFunctionIR(sanitizeMemcpyFn);
   return sanitizeMemcpyFn;
 }
@@ -283,7 +280,6 @@ static Function *getOrCreateBoundsCheckMemsetSanitizer(
   builder.CreateCall(getOrCreateRemediationBehavior(M, strategy));
   builder.CreateRet(basePtr);
 
-  // DEBUGGING
   validateFunctionIR(sanitizeMemsetFn);
   return sanitizeMemsetFn;
 }
@@ -347,8 +343,6 @@ static Function *getOrCreateResolveGep(Module *M) {
   Value *onePastPtr = builder.CreateIntToPtr(onePastInt, ptr_ty);
   builder.CreateRet(onePastPtr);
 
-  resolveGepFn->setMetadata("resolve.noinstrument", MDNode::get(Ctx, {}));
-  // DEBUGGING
   validateFunctionIR(resolveGepFn);
   return resolveGepFn;
 }
