@@ -57,7 +57,6 @@ static Function *replaceUndesirableFunction(Module *M, CallInst *call,
   builder.SetInsertPoint(EntryBB);
   builder.CreateRet(resolveSanitizedFn->getArg(argNum));
 
-  // DEBUGGING
   validateFunctionIR(resolveSanitizedFn);
   return resolveSanitizedFn;
 }
