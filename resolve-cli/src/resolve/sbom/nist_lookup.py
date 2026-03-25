@@ -3,9 +3,7 @@ from resolve.sbom import nist_api
 import asyncio
 import aiohttp
 from aiohttp import ClientSession
-import nist_api
-from cpe_api import Cpe, JsonSchemaForNvdCommonProductEnumerationCpeApiVersion20
-import sys
+from resolve.sbom.cpe_api import Cpe, JsonSchemaForNvdCommonProductEnumerationCpeApiVersion20
 import pdb
 
 CVE_API_BASE_PATH = "https://services.nvd.nist.gov/rest/json/cves/2.0"
@@ -22,7 +20,7 @@ async def fuzzy_find_cpe(session: ClientSession, dep: str) -> str:
     cpes: list[Cpe] = [prod.cpe for prod in body.products]
     if len(cpes) > 1:
         # todo: manual intervention / selection here
-        print(f"WARNING: more than one CPE returned for query ({[cpe.cpeName for cpe in cpes]}), assuming first")
+        print("WARNING: more than one CPE returned for query, assuming first.")
     elif not len(cpes):
         raise FileNotFoundError # TODO custom error type
     return cpes[0].cpeName
@@ -49,8 +47,7 @@ async def get_cves_by_dep(session: ClientSession, dep: str) -> dict[str, list[Cv
 
 def filter_cves(cves: list[CveItem], min_base_score_v3: float = 0.0, allow_no_v3_score: bool = False, allow_disputed: bool = True, allow_deferred: bool = True, allow_rejected: bool = False):
     out = []
-    if not min_base_score_v3:
-        allow_no_v3_score = True
+    # pdb.set_trace()
     for cve in cves:
         v3_score = cve.metrics.get_v3_base_score()
         if (not allow_no_v3_score and not v3_score) or (v3_score and v3_score < min_base_score_v3):
@@ -59,36 +56,26 @@ def filter_cves(cves: list[CveItem], min_base_score_v3: float = 0.0, allow_no_v3
             continue
         if not allow_deferred and cve.vulnStatus.lower() == 'deferred':
             continue
-        if not allow_deferred and cve.vulnStatus.lower() == 'rejected':
+        if not allow_rejected and cve.vulnStatus.lower() == 'rejected':
             continue
         out.append(cve)
     return out
 
-async def dep_lookup(deps: list[str]) -> dict[str, list[nist_api.CveItem]]:
+async def dep_lookup(deps: list[str], cpe_literal: bool = False, **kwargs) -> dict[str, list[nist_api.CveItem]]:
     requests: list[Coroutine] = []
     async with ClientSession() as session:
         for dep in deps:
-            requests.append(get_cves_by_dep(session, dep))
+            rqst = get_cves(session, {'cpeName': dep}) if cpe_literal else get_cves_by_dep(session, dep)
+            requests.append(rqst)
         results: list[BaseException | dict[str, list[CveItem]]] = await asyncio.gather(*requests, return_exceptions=True)
     out: dict[str, list[CveItem]] = {}
     for r in results:
         if isinstance(r, dict):
+            for cve in r:
+                r[cve] = filter_cves(r[cve], **kwargs)
             out.update(r)
         else:
             print(f"WARNING: lookup failed with {r}")
             pdb.set_trace()
     print(f"{len(out)}/{len(deps)} lookups succeeded.")
     return out
-
-# TODO remove, for testing only
-def main(argv: list[str] | None = None) -> int:
-    args = sys.argv[1:]
-    res: dict[str, list[CveItem]] = asyncio.run(dep_lookup(args))
-    for r in res:
-        print(f"{r} Known CVEs:")
-        for cve in res[r]:
-            print(f"\t- {cve.id.root} [{cve.metrics.get_v3_base_score()}]")
-    return 0
-
-if __name__ == "__main__":
-    raise SystemExit(main())
