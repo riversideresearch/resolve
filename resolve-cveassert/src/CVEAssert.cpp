@@ -212,11 +212,11 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
     /// Check if the Weakness ID is *, which means apply all automatic sanitizers  
     /// NOTE: Excludes operation mask sanitizer
     if (vuln.WeaknessID == "*") {
-      sanitizeAllAutomtic(&F, vuln.Strategy);
+      sanitizeAllAutomatic(&F, vuln.Strategy);
       return result;
     }
 
-    uint32_t cwe_id = static_cast<uint32_t>(vuln.WeaknessID);
+    uint32_t cwe_id = static_cast<uint32_t>(stoi(vuln.WeaknessID));
     switch (cwe_id) {
     case VulnID::STACK_BASED_BUF_OVERFLOW: /* Stack-based buffer overflow */
     case VulnID::HEAP_BASED_BUF_OVERFLOW:  /* Heap-base buffer overflow */
@@ -285,7 +285,8 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
         continue;
       }
 
-      switch (vuln.WeaknessID) {
+      uint32_t cwe_id = static_cast<uint32_t>(stoi(vuln.WeaknessID));
+      switch (cwe_id) {
       // 121 stack-based
       case VulnID::STACK_BASED_BUF_OVERFLOW:
         instrument_mem_inst.instrumentAlloca = true;
