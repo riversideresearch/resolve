@@ -166,52 +166,52 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
     sanitizeNullPointers(F, strategy);
   }
 
-  void applySanitizerToID(VulnID vulnID, Function *F) {
-    switch(vulnID) {
-      case VulnID::STACK_BASED_BUF_OVERFLOW: /* Stack-based buffer overflow */
-      case VulnID::HEAP_BASED_BUF_OVERFLOW:  /* Heap-base buffer overflow */
-      case VulnID::OOB_WRITE:                /* OOB Write */
-      case VulnID::WRITE_WHAT_WHERE:
-        sanitizeMemInstBounds(&F, vuln.Strategy);
-      break;
+  // void applySanitizerToID(VulnID vulnID, Function *F) {
+  //   switch(vulnID) {
+  //     case VulnID::STACK_BASED_BUF_OVERFLOW: /* Stack-based buffer overflow */
+  //     case VulnID::HEAP_BASED_BUF_OVERFLOW:  /* Heap-base buffer overflow */
+  //     case VulnID::OOB_WRITE:                /* OOB Write */
+  //     case VulnID::WRITE_WHAT_WHERE:
+  //       sanitizeMemInstBounds(&F, vuln.Strategy);
+  //     break;
 
-    case VulnID::OOB_READ: /* OOB Read; found in stb-resize, lamartine challenge
-                              problems */
-    case VulnID::INCORRECT_BUF_SIZE: /* Incorrect buffer size calculation; found
-                                        in analyze-image */
-      sanitizeMemInstBounds(&F, vuln.Strategy);
-      break;
+  //   case VulnID::OOB_READ: /* OOB Read; found in stb-resize, lamartine challenge
+  //                             problems */
+  //   case VulnID::INCORRECT_BUF_SIZE: /* Incorrect buffer size calculation; found
+  //                                       in analyze-image */
+  //     sanitizeMemInstBounds(&F, vuln.Strategy);
+  //     break;
 
-    case VulnID::DIVIDE_BY_ZERO: /* Divide by Zero; found in ros2 and
-                                    analyze-image */
-      /* Workaround for ambiguous CWE description in analyze-image */
-      sanitizeDivideByZero(&F, vuln.Strategy);
-      result = PreservedAnalyses::none();
-      break;
+  //   case VulnID::DIVIDE_BY_ZERO: /* Divide by Zero; found in ros2 and
+  //                                   analyze-image */
+  //     /* Workaround for ambiguous CWE description in analyze-image */
+  //     sanitizeDivideByZero(&F, vuln.Strategy);
+  //     result = PreservedAnalyses::none();
+  //     break;
 
-    case VulnID::INT_OVERFLOW: /* Integer Overflow */
-      sanitizeIntOverflow(&F, vuln.Strategy);
-      result = PreservedAnalyses::none();
-      break;
+  //   case VulnID::INT_OVERFLOW: /* Integer Overflow */
+  //     sanitizeIntOverflow(&F, vuln.Strategy);
+  //     result = PreservedAnalyses::none();
+  //     break;
 
-    case VulnID::NULL_PTR_DEREF: /* Null Pointer Dereference; Found in openalpr,
-                                    nasa-cfs, stb-convert*/
-      sanitizeNullPointers(&F, vuln.Strategy);
-      result = PreservedAnalyses::none();
-      break;
+  //   case VulnID::NULL_PTR_DEREF: /* Null Pointer Dereference; Found in openalpr,
+  //                                   nasa-cfs, stb-convert*/
+  //     sanitizeNullPointers(&F, vuln.Strategy);
+  //     result = PreservedAnalyses::none();
+  //     break;
 
-    case VulnID::STACK_FREE: /* Stack free;  Found in nasa-cfs */
-      sanitizeFreeOfNonHeap(&F, vuln.Strategy);
-      result = PreservedAnalyses::none();
-      break;
+  //   case VulnID::STACK_FREE: /* Stack free;  Found in nasa-cfs */
+  //     sanitizeFreeOfNonHeap(&F, vuln.Strategy);
+  //     result = PreservedAnalyses::none();
+  //     break;
 
-    default:
-      errs() << "[CVEAssert] Error: CWE " << vuln.WeaknessID
-             << " not implemented\n";
-      break;
-    }
-    return;
-  }
+  //   default:
+  //     errs() << "[CVEAssert] Error: CWE " << vuln.WeaknessID
+  //            << " not implemented\n";
+  //     break;
+  //   }
+  //   return;
+  // }
 
   /// For each function, if it matches the target function name, insert calls to
   /// the vulnerability handlers as specified in the JSON. Each call receives
