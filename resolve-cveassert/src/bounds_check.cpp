@@ -58,6 +58,8 @@ static Function *getOrCreateResolveAccessOk(Module *M) {
 
   Function *resolveAccessOkFn = getOrCreateResolveHelper(M, handlerName, resolveAccessOkFnTy);
 
+  if (!resolveAccessOkFn->empty()) { return resolveAccessOkFn; }
+
   // Adding an attribute to always inline this function
   resolveAccessOkFn->addFnAttr(Attribute::AlwaysInline);
 
@@ -106,9 +108,11 @@ static Function *getOrCreateBoundsCheckLoadSanitizer(
 
   auto ptr_ty = PointerType::get(Ctx, 0);
 
-  FunctionType *sanitizeLoadFnTy = FunctionType::get(ty, {ptr_ty}, false);
+  FunctionType *resolveLoadFnTy = FunctionType::get(ty, {ptr_ty}, false);
 
-  Function *sanitizeLoadFn = getOrCreateResolveHelper(M, handlerName, sanitizeLoadFnTy);
+  Function *resolveLoadFn = getOrCreateResolveHelper(M, handlerName, resolveLoadFnTy);
+
+  if (!resolveLoadFn->empty()) { return resolveLoadFn; }
 
   BasicBlock *EntryBB = BasicBlock::Create(Ctx, "", sanitizeLoadFn);
   BasicBlock *NormalLoadBB = BasicBlock::Create(Ctx, "", sanitizeLoadFn);
@@ -148,17 +152,17 @@ static Function *getOrCreateBoundsCheckStoreSanitizer(
   auto ptr_ty = PointerType::get(Ctx, 0);
   auto void_ty = Type::getVoidTy(Ctx);
 
-  FunctionType *sanitizeStoreFnTy =
+  FunctionType *resolveStoreFnTy =
       FunctionType::get(void_ty, {ptr_ty, ty}, false);
 
-  Function *sanitizeStoreFn = getOrCreateResolveHelper(M, handlerName, sanitizeStoreFnTy);
+  Function *resolveStoreFn = getOrCreateResolveHelper(M, handlerName, resolveStoreFnTy);
 
-  BasicBlock *EntryBB = BasicBlock::Create(Ctx, "", sanitizeStoreFn);
-  BasicBlock *NormalStoreBB = BasicBlock::Create(Ctx, "", sanitizeStoreFn);
-  BasicBlock *SanitizeStoreBB = BasicBlock::Create(Ctx, "", sanitizeStoreFn);
+  BasicBlock *EntryBB = BasicBlock::Create(Ctx, "", resolveStoreFn);
+  BasicBlock *NormalStoreBB = BasicBlock::Create(Ctx, "", resolveStoreFn);
+  BasicBlock *SanitizeStoreBB = BasicBlock::Create(Ctx, "", resolveStoreFn);
 
-  Value *basePtr = sanitizeStoreFn->getArg(0);
-  Value *storedVal = sanitizeStoreFn->getArg(1);
+  Value *basePtr = resolveStoreFn->getArg(0);
+  Value *storedVal = resolveStoreFn->getArg(1);
   builder.SetInsertPoint(EntryBB);
 
   Value *withinBounds = builder.CreateCall(
@@ -177,8 +181,8 @@ static Function *getOrCreateBoundsCheckStoreSanitizer(
   builder.CreateCall(getOrCreateRemediationBehavior(M, strategy));
   builder.CreateRetVoid();
 
-  validateFunctionIR(sanitizeStoreFn);
-  return sanitizeStoreFn;
+  validateFunctionIR(resolveStoreFn);
+  return resolveStoreFn;
 }
 
 static Function *getOrCreateBoundsCheckMemcpySanitizer(
@@ -191,23 +195,24 @@ static Function *getOrCreateBoundsCheckMemcpySanitizer(
   auto ptr_ty = PointerType::get(Ctx, 0);
   auto size_ty = Type::getInt64Ty(Ctx);
 
-  FunctionType *sanitizeMemcpyFnTy =
+  FunctionType *resolveMemcpyFnTy =
       FunctionType::get(ptr_ty, {ptr_ty, ptr_ty, size_ty}, false);
 
-  Function *sanitizeMemcpyFn = getOrCreateResolveHelper(M, handlerName, sanitizeMemcpyFnTy);
+  Function *resolveMemcpyFn = getOrCreateResolveHelper(M, handlerName, resolveMemcpyFnTy);
+  if (!resolveMemcpyFn->empty()) { return resolveMemcpyFn; }
 
-  BasicBlock *EntryBB = BasicBlock::Create(Ctx, "", sanitizeMemcpyFn);
-  BasicBlock *NormalBB = BasicBlock::Create(Ctx, "", sanitizeMemcpyFn);
-  BasicBlock *SanitizeMemcpyBB = BasicBlock::Create(Ctx, "", sanitizeMemcpyFn);
+  BasicBlock *EntryBB = BasicBlock::Create(Ctx, "", resolveMemcpyFn);
+  BasicBlock *NormalBB = BasicBlock::Create(Ctx, "", resolveMemcpyFn);
+  BasicBlock *SanitizeMemcpyBB = BasicBlock::Create(Ctx, "", resolveMemcpyFn);
 
   // EntryBB: Call resolve_access_ok
   // to verify correct bounds of allocation
   builder.SetInsertPoint(EntryBB);
 
   // Extract dst, src, size arguments from function
-  Value *dst_ptr = sanitizeMemcpyFn->getArg(0);
-  Value *src_ptr = sanitizeMemcpyFn->getArg(1);
-  Value *size_arg = sanitizeMemcpyFn->getArg(2);
+  Value *dst_ptr = resolveMemcpyFn->getArg(0);
+  Value *src_ptr = resolveMemcpyFn->getArg(1);
+  Value *size_arg = resolveMemcpyFn->getArg(2);
 
   Value *check_src_bd =
       builder.CreateCall(getOrCreateResolveAccessOk(M), {src_ptr, size_arg});
@@ -230,8 +235,8 @@ static Function *getOrCreateBoundsCheckMemcpySanitizer(
   builder.CreateCall(getOrCreateRemediationBehavior(M, strategy));
   builder.CreateRet(dst_ptr);
 
-  validateFunctionIR(sanitizeMemcpyFn);
-  return sanitizeMemcpyFn;
+  validateFunctionIR(resolveMemcpyFn);
+  return resolveMemcpyFn;
 }
 
 static Function *getOrCreateBoundsCheckMemsetSanitizer(
@@ -245,21 +250,22 @@ static Function *getOrCreateBoundsCheckMemsetSanitizer(
   auto i32_ty = Type::getInt32Ty(Ctx);
   auto size_ty = Type::getInt64Ty(Ctx);
 
-  FunctionType *sanitizeMemsetFnTy =
+  FunctionType *resolveMemsetFnTy =
       FunctionType::get(ptr_ty, {ptr_ty, i32_ty, size_ty}, false);
 
-  Function *sanitizeMemsetFn = getOrCreateResolveHelper(M, handlerName, sanitizeMemsetFnTy);
+  Function *resolveMemsetFn = getOrCreateResolveHelper(M, handlerName, resolveMemsetFnTy);
+  if (!resolveMemsetFn->empty()) { return resolveMemsetFn; } 
 
-  BasicBlock *EntryBB = BasicBlock::Create(Ctx, "", sanitizeMemsetFn);
-  BasicBlock *NormalBB = BasicBlock::Create(Ctx, "", sanitizeMemsetFn);
-  BasicBlock *SanitizeMemsetBB = BasicBlock::Create(Ctx, "", sanitizeMemsetFn);
+  BasicBlock *EntryBB = BasicBlock::Create(Ctx, "", resolveMemsetFn);
+  BasicBlock *NormalBB = BasicBlock::Create(Ctx, "", resolveMemsetFn);
+  BasicBlock *SanitizeMemsetBB = BasicBlock::Create(Ctx, "", resolveMemsetFn);
 
   builder.SetInsertPoint(EntryBB);
 
   // Extract arguments for memset
-  Value *basePtr = sanitizeMemsetFn->getArg(0);
-  Value *valueArg = sanitizeMemsetFn->getArg(1);
-  Value *accessSize = sanitizeMemsetFn->getArg(2);
+  Value *basePtr = resolveMemsetFn->getArg(0);
+  Value *valueArg = resolveMemsetFn->getArg(1);
+  Value *accessSize = resolveMemsetFn->getArg(2);
 
   Value *check_dst_bd =
       builder.CreateCall(getOrCreateResolveAccessOk(M), {basePtr, accessSize});
@@ -280,8 +286,8 @@ static Function *getOrCreateBoundsCheckMemsetSanitizer(
   builder.CreateCall(getOrCreateRemediationBehavior(M, strategy));
   builder.CreateRet(basePtr);
 
-  validateFunctionIR(sanitizeMemsetFn);
-  return sanitizeMemsetFn;
+  validateFunctionIR(resolveMemsetFn);
+  return resolveMemsetFn;
 }
 
 static Function *getOrCreateResolveGep(Module *M) {
@@ -297,6 +303,7 @@ static Function *getOrCreateResolveGep(Module *M) {
       FunctionType::get(ptr_ty, {ptr_ty, ptr_ty}, false);
 
   Function *resolveGepFn = getOrCreateResolveHelper(M, handlerName, resolveGepFnTy);
+  if (!resolveGepFn->empty()) { return resolveGepFn; }
 
   // Adding attribute to always inline
   resolveGepFn->addFnAttr(Attribute::AlwaysInline);
