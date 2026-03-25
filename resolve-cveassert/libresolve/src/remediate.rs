@@ -4,7 +4,7 @@ use libc::{
     c_char, c_void, calloc, free, malloc, realloc, strdup, strlen, strndup, strnlen,
 };
 
-use crate::shadowobjs::{ALIVE_OBJ_LIST, AllocType, FREED_OBJ_LIST, Vaddr};
+use crate::shadowobjs::{ALIVE_OBJ_LIST, AllocType, FREED_OBJ_LIST, STACK_OBJ_LIST, Vaddr};
 
 use log::{info, warn};
 
@@ -17,8 +17,9 @@ use log::{info, warn};
 pub extern "C" fn resolve_stack_obj(ptr: *mut c_void, size: usize) -> () {
     let base = ptr as Vaddr;
     {
-        let mut obj_list = ALIVE_OBJ_LIST.lock();
-        obj_list.add_shadow_object(AllocType::Stack, base, size);
+        STACK_OBJ_LIST.with_borrow_mut(|obj| {
+            obj.add_shadow_object(AllocType::Stack, base, size);
+        });
     }
 
     info!("[STACK] Object allocated with size: {size}, address: 0x{base:x}");
@@ -29,8 +30,9 @@ pub extern "C" fn resolve_invalidate_stack(base: *mut c_void) {
     let base = base as Vaddr;
 
     {
-        let mut obj_list = ALIVE_OBJ_LIST.lock();
-        obj_list.invalidate_at(base);
+        STACK_OBJ_LIST.with_borrow_mut(|obj| {
+            obj.invalidate_at(base);
+        });   
     }
 
     info!("[STACK] Free addr 0x{base:x}");
@@ -295,7 +297,7 @@ pub extern "C" fn resolve_obj_type(base_ptr: *mut c_void) -> AllocType {
  */
 #[unsafe(no_mangle)]
 pub extern "C" fn resolve_report_sanitize_mem_inst_triggered(ptr: *mut c_void) {
-    info!(
+    error!(
         "[SANITIZE] Applying sanitizer to address 0x{:x}",
         ptr as Vaddr
     );
