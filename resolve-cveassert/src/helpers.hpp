@@ -20,4 +20,4 @@ getOrCreateRemediationBehavior(llvm::Module *M,
                                Vulnerability::RemediationStrategies strategy);
 llvm::Function *getOrCreateResolveHelper(llvm::Module *M, std::string fn_name, llvm::FunctionType* fn_type,
     llvm::GlobalValue::LinkageTypes link_type = llvm::Function::InternalLinkage);
-void validateFunctionIR(llvm::Function *F);
+void validateIR(llvm::Function *F);
