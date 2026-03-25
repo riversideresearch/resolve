@@ -64,8 +64,7 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
     NULL_PTR_DEREF = 476, /* NOTE: This ID has been found in OpenALPR, NASA CFS,
                              stb-convert CPs */
     STACK_FREE =
-        590 /* NOTE: This ID has been found in NASA CFS challenge problem */,
-    ALL = 999 /* NOTE: This ID corresponds to '*' which means use all sanitizers */
+        590 /* NOTE: This ID has been found in NASA CFS challenge problem */
   };
 
   LabelCVEPass() {
@@ -167,6 +166,53 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
     sanitizeNullPointers(F, strategy);
   }
 
+  void applySanitizerToID(VulnID vulnID, Function *F) {
+    switch(vulnID) {
+      case VulnID::STACK_BASED_BUF_OVERFLOW: /* Stack-based buffer overflow */
+      case VulnID::HEAP_BASED_BUF_OVERFLOW:  /* Heap-base buffer overflow */
+      case VulnID::OOB_WRITE:                /* OOB Write */
+      case VulnID::WRITE_WHAT_WHERE:
+        sanitizeMemInstBounds(&F, vuln.Strategy);
+      break;
+
+    case VulnID::OOB_READ: /* OOB Read; found in stb-resize, lamartine challenge
+                              problems */
+    case VulnID::INCORRECT_BUF_SIZE: /* Incorrect buffer size calculation; found
+                                        in analyze-image */
+      sanitizeMemInstBounds(&F, vuln.Strategy);
+      break;
+
+    case VulnID::DIVIDE_BY_ZERO: /* Divide by Zero; found in ros2 and
+                                    analyze-image */
+      /* Workaround for ambiguous CWE description in analyze-image */
+      sanitizeDivideByZero(&F, vuln.Strategy);
+      result = PreservedAnalyses::none();
+      break;
+
+    case VulnID::INT_OVERFLOW: /* Integer Overflow */
+      sanitizeIntOverflow(&F, vuln.Strategy);
+      result = PreservedAnalyses::none();
+      break;
+
+    case VulnID::NULL_PTR_DEREF: /* Null Pointer Dereference; Found in openalpr,
+                                    nasa-cfs, stb-convert*/
+      sanitizeNullPointers(&F, vuln.Strategy);
+      result = PreservedAnalyses::none();
+      break;
+
+    case VulnID::STACK_FREE: /* Stack free;  Found in nasa-cfs */
+      sanitizeFreeOfNonHeap(&F, vuln.Strategy);
+      result = PreservedAnalyses::none();
+      break;
+
+    default:
+      errs() << "[CVEAssert] Error: CWE " << vuln.WeaknessID
+             << " not implemented\n";
+      break;
+    }
+    return;
+  }
+
   /// For each function, if it matches the target function name, insert calls to
   /// the vulnerability handlers as specified in the JSON. Each call receives
   /// the triggering argument parsed from the JSON.
@@ -209,8 +255,6 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
       return result;
     }
 
-    /// Check if the Weakness ID is *, which means apply all automatic sanitizers  
-    /// NOTE: Excludes operation mask sanitizer
     if (vuln.WeaknessID == "*") {
       sanitizeAllAutomatic(&F, vuln.Strategy);
       return result;
@@ -285,7 +329,9 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
         continue;
       }
 
-      uint32_t cwe_id = static_cast<uint32_t>(stoi(vuln.WeaknessID));
+      if (vuln.WeaknessID == "*") { continue; }
+
+      uint32_t cwe_id = static_cast<uint32_t>(std::stoi(vuln.WeaknessID));
       switch (cwe_id) {
       // 121 stack-based
       case VulnID::STACK_BASED_BUF_OVERFLOW:
