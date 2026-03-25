@@ -7,7 +7,7 @@ from __future__ import annotations
 from enum import Enum
 from uuid import UUID
 
-from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, constr
+from pydantic import NaiveDatetime, BaseModel, ConfigDict, Field, constr
 
 
 class DefTitle(BaseModel):
@@ -54,8 +54,8 @@ class Cpe(BaseModel):
     deprecated: bool
     cpeName: str
     cpeNameId: UUID
-    created: AwareDatetime
-    lastModified: AwareDatetime
+    created: NaiveDatetime
+    lastModified: NaiveDatetime
     titles: list[DefTitle] | None = None
     refs: list[DefReference] | None = None
     deprecatedBy: list[DeprecatedByItem] | None = None
@@ -78,5 +78,5 @@ class JsonSchemaForNvdCommonProductEnumerationCpeApiVersion20(BaseModel):
     totalResults: int
     format: str
     version: str
-    timestamp: AwareDatetime
+    timestamp: NaiveDatetime
     products: list[DefCpe] = Field(..., description='NVD feed array of CPE')
