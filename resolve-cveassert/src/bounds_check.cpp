@@ -114,11 +114,11 @@ static Function *getOrCreateBoundsCheckLoadSanitizer(
 
   if (!resolveLoadFn->empty()) { return resolveLoadFn; }
 
-  BasicBlock *EntryBB = BasicBlock::Create(Ctx, "", sanitizeLoadFn);
-  BasicBlock *NormalLoadBB = BasicBlock::Create(Ctx, "", sanitizeLoadFn);
-  BasicBlock *SanitizeLoadBB = BasicBlock::Create(Ctx, "", sanitizeLoadFn);
+  BasicBlock *EntryBB = BasicBlock::Create(Ctx, "", resolveLoadFn);
+  BasicBlock *NormalLoadBB = BasicBlock::Create(Ctx, "", resolveLoadFn);
+  BasicBlock *SanitizeLoadBB = BasicBlock::Create(Ctx, "", resolveLoadFn);
 
-  Value *basePtr = sanitizeLoadFn->getArg(0);
+  Value *basePtr = resolveLoadFn->getArg(0);
 
   builder.SetInsertPoint(EntryBB);
   Value *withinBounds = builder.CreateCall(
@@ -137,8 +137,8 @@ static Function *getOrCreateBoundsCheckLoadSanitizer(
   builder.CreateCall(getOrCreateRemediationBehavior(M, strategy));
   builder.CreateRet(Constant::getNullValue(ty));
 
-  validateFunctionIR(sanitizeLoadFn);
-  return sanitizeLoadFn;
+  validateFunctionIR(resolveLoadFn);
+  return resolveLoadFn;
 }
 
 static Function *getOrCreateBoundsCheckStoreSanitizer(
@@ -156,6 +156,7 @@ static Function *getOrCreateBoundsCheckStoreSanitizer(
       FunctionType::get(void_ty, {ptr_ty, ty}, false);
 
   Function *resolveStoreFn = getOrCreateResolveHelper(M, handlerName, resolveStoreFnTy);
+  if (!resolveStoreFn->empty()) { return resolveStoreFn; }
 
   BasicBlock *EntryBB = BasicBlock::Create(Ctx, "", resolveStoreFn);
   BasicBlock *NormalStoreBB = BasicBlock::Create(Ctx, "", resolveStoreFn);
