@@ -21,9 +21,6 @@ getOrCreateNullPtrLoadSanitizer(Module *M, LLVMContext &Ctx, Type *ty,
                                 Vulnerability::RemediationStrategies strategy) {
   std::string handlerName = "resolve_sanitize_null_ptr_ld_" + getLLVMType(ty);
 
-  if (auto handler = M->getFunction(handlerName))
-    return handler;
-
   IRBuilder<> Builder(Ctx);
   // TODO: handle address spaces other than 0
   auto ptr_ty = PointerType::get(Ctx, 0);
@@ -31,20 +28,19 @@ getOrCreateNullPtrLoadSanitizer(Module *M, LLVMContext &Ctx, Type *ty,
   auto void_ty = Type::getVoidTy(Ctx);
 
   // TODO: write this in asm as some kind of sanitzer_rt?
-  FunctionType *FuncType = FunctionType::get(ty, {ptr_ty}, false);
-  Function *SanitizeFunc =
-      Function::Create(FuncType, Function::InternalLinkage, handlerName, M);
+  FunctionType *resolveNullPtrLdFnTy = FunctionType::get(ty, {ptr_ty}, false);
+  Function *resolveNullPtrLdFn = getOrCreateResolveHelper(M, handlerName, resolveNullPtrLdFnTy);
 
-  BasicBlock *Entry = BasicBlock::Create(Ctx, "entry", SanitizeFunc);
+  BasicBlock *Entry = BasicBlock::Create(Ctx, "entry", resolveNullPtrLdFn);
   BasicBlock *SanitizeBlock =
-      BasicBlock::Create(Ctx, "sanitize_block", SanitizeFunc);
-  BasicBlock *LoadBlock = BasicBlock::Create(Ctx, "load_block", SanitizeFunc);
+      BasicBlock::Create(Ctx, "sanitize_block", resolveNullPtrLdFn);
+  BasicBlock *LoadBlock = BasicBlock::Create(Ctx, "load_block", resolveNullPtrLdFn);
 
   // Set insertion point to entry block
   Builder.SetInsertPoint(Entry);
 
   // Get function argument
-  Argument *InputPtr = SanitizeFunc->getArg(0);
+  Argument *InputPtr = resolveNullPtrLdFn->getArg(0);
 
   // Compare pointer with null (opaque ptrs use generic ptr type)
   // TODO: Sanitize other invalid pointers
@@ -56,10 +52,10 @@ getOrCreateNullPtrLoadSanitizer(Module *M, LLVMContext &Ctx, Type *ty,
   Builder.CreateCondBr(IsNull, SanitizeBlock, LoadBlock);
 
   Builder.SetInsertPoint(SanitizeBlock);
-  FunctionType *LogMemInstFuncTy = FunctionType::get(void_ty, {ptr_ty}, false);
-  FunctionCallee LogMemInstFunc = M->getOrInsertFunction(
-      "resolve_report_sanitize_mem_inst_triggered", LogMemInstFuncTy);
-  Builder.CreateCall(LogMemInstFunc, {InputPtr});
+  FunctionType *logMemInstFuncTy = FunctionType::get(void_ty, {ptr_ty}, false);
+  FunctionCallee logMemInstFunc = M->getOrInsertFunction(
+      "resolve_report_sanitize_mem_inst_triggered", logMemInstFuncTy);
+  Builder.CreateCall(logMemInstFunc, {InputPtr});
 
   switch (strategy) {
   case Vulnerability::RemediationStrategies::CONTINUE: {
@@ -78,21 +74,14 @@ getOrCreateNullPtrLoadSanitizer(Module *M, LLVMContext &Ctx, Type *ty,
   Value *ld = Builder.CreateLoad(ty, InputPtr);
   Builder.CreateRet(ld);
 
-  raw_ostream &out = errs();
-  out << *SanitizeFunc;
-  if (verifyFunction(*SanitizeFunc, &out)) {
-  }
-
-  return SanitizeFunc;
+  validateFunctionIR(resolveNullPtrLdFn);
+  return resolveNullPtrLdFn;
 }
 
 static Function *getOrCreateNullPtrStoreSanitizer(
     Module *M, LLVMContext &Ctx, Type *ty,
     Vulnerability::RemediationStrategies strategy) {
   std::string handlerName = "resolve_sanitize_null_ptr_st_" + getLLVMType(ty);
-
-  if (auto handler = M->getFunction(handlerName))
-    return handler;
 
   IRBuilder<> Builder(Ctx);
   // TODO: handle address spaces other than 0
@@ -101,22 +90,21 @@ static Function *getOrCreateNullPtrStoreSanitizer(
   auto void_ty = Type::getVoidTy(Ctx);
 
   // TODO: write this in asm as some kind of sanitzer_rt?
-  FunctionType *FuncType =
+  FunctionType *resolveNullPtrStFnTy =
       FunctionType::get(Type::getVoidTy(Ctx), {ptr_ty, ty}, false);
-  Function *SanitizeFunc =
-      Function::Create(FuncType, Function::InternalLinkage, handlerName, M);
+  Function *resolveNullPtrStFn = getOrCreateResolveHelper(M, handlerName, resolveNullPtrStFnTy);
 
-  BasicBlock *Entry = BasicBlock::Create(Ctx, "entry", SanitizeFunc);
+  BasicBlock *Entry = BasicBlock::Create(Ctx, "entry", resolveNullPtrStFn);
   BasicBlock *SanitizeBlock =
-      BasicBlock::Create(Ctx, "sanitize_block", SanitizeFunc);
-  BasicBlock *StoreBlock = BasicBlock::Create(Ctx, "store_block", SanitizeFunc);
+      BasicBlock::Create(Ctx, "sanitize_block", resolveNullPtrStFn);
+  BasicBlock *StoreBlock = BasicBlock::Create(Ctx, "store_block", resolveNullPtrStFn);
 
   // Set insertion point to entry block
   Builder.SetInsertPoint(Entry);
 
   // Get function argument
-  Argument *InputPtr = SanitizeFunc->getArg(0);
-  Argument *InputVal = SanitizeFunc->getArg(1);
+  Argument *InputPtr = resolveNullPtrStFn->getArg(0);
+  Argument *InputVal = resolveNullPtrStFn->getArg(1);
 
   // Compare pointer with null (opaque ptrs use generic ptr type)
   // TODO: Sanitize other invalid pointers
@@ -129,10 +117,10 @@ static Function *getOrCreateNullPtrStoreSanitizer(
   Builder.CreateCondBr(IsNull, SanitizeBlock, StoreBlock);
 
   Builder.SetInsertPoint(SanitizeBlock);
-  FunctionType *LogMemInstFuncTy = FunctionType::get(void_ty, {ptr_ty}, false);
-  FunctionCallee LogMemInstFunc = M->getOrInsertFunction(
-      "resolve_report_sanitize_mem_inst_triggered", LogMemInstFuncTy);
-  Builder.CreateCall(LogMemInstFunc, {InputPtr});
+  FunctionType *logMemInstFuncTy = FunctionType::get(void_ty, {ptr_ty}, false);
+  FunctionCallee logMemInstFunc = M->getOrInsertFunction(
+      "resolve_report_sanitize_mem_inst_triggered", logMemInstFuncTy);
+  Builder.CreateCall(logMemInstFunc, {InputPtr});
 
   switch (strategy) {
   case Vulnerability::RemediationStrategies::CONTINUE: {
@@ -151,12 +139,8 @@ static Function *getOrCreateNullPtrStoreSanitizer(
   Builder.CreateStore(InputVal, InputPtr);
   Builder.CreateRetVoid();
 
-  raw_ostream &out = errs();
-  out << *SanitizeFunc;
-  if (verifyFunction(*SanitizeFunc, &out)) {
-  }
-
-  return SanitizeFunc;
+  validateFunctionIR(resolveNullPtrStFn);
+  return resolveNullPtrStFn;
 }
 
 void sanitizeNullPointers(Function *f,
