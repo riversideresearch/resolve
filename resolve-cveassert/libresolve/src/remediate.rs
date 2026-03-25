@@ -297,7 +297,7 @@ pub extern "C" fn resolve_obj_type(base_ptr: *mut c_void) -> AllocType {
  */
 #[unsafe(no_mangle)]
 pub extern "C" fn resolve_report_sanitize_mem_inst_triggered(ptr: *mut c_void) {
-    error!(
+    info!(
         "[SANITIZE] Applying sanitizer to address 0x{:x}",
         ptr as Vaddr
     );
