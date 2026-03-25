@@ -30,6 +30,7 @@ getOrCreateNullPtrLoadSanitizer(Module *M, LLVMContext &Ctx, Type *ty,
   // TODO: write this in asm as some kind of sanitzer_rt?
   FunctionType *resolveNullPtrLdFnTy = FunctionType::get(ty, {ptr_ty}, false);
   Function *resolveNullPtrLdFn = getOrCreateResolveHelper(M, handlerName, resolveNullPtrLdFnTy);
+  if (!resolveNullPtrLdFn->empty()) { return resolveNullPtrLdFn; }
 
   BasicBlock *Entry = BasicBlock::Create(Ctx, "entry", resolveNullPtrLdFn);
   BasicBlock *SanitizeBlock =
@@ -93,6 +94,7 @@ static Function *getOrCreateNullPtrStoreSanitizer(
   FunctionType *resolveNullPtrStFnTy =
       FunctionType::get(Type::getVoidTy(Ctx), {ptr_ty, ty}, false);
   Function *resolveNullPtrStFn = getOrCreateResolveHelper(M, handlerName, resolveNullPtrStFnTy);
+  if (!resolveNullPtrStFn->empty()) { return resolveNullPtrStFn; }
 
   BasicBlock *Entry = BasicBlock::Create(Ctx, "entry", resolveNullPtrStFn);
   BasicBlock *SanitizeBlock =
