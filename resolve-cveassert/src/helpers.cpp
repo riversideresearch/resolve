@@ -157,7 +157,6 @@ Function *getOrCreateRecoverBufferFunction(Module *M) {
   return resolveRecoverFn;
 }
 
-// getOrCreateRemediateBehavior: helper function to apply remediation strategies
 Function *
 getOrCreateRemediationBehavior(Module *M,
                                Vulnerability::RemediationStrategies strategy) {
