@@ -95,7 +95,7 @@ static Function *getOrCreateResolveAccessOk(Module *M) {
   builder.SetInsertPoint(FalseBB);
   builder.CreateRet(ConstantInt::getFalse(Ctx));
 
-  validateFunctionIR(resolveAccessOkFn);
+  validateIR(resolveAccessOkFn);
   return resolveAccessOkFn;
 }
 
@@ -137,7 +137,7 @@ static Function *getOrCreateBoundsCheckLoadSanitizer(
   builder.CreateCall(getOrCreateRemediationBehavior(M, strategy));
   builder.CreateRet(Constant::getNullValue(ty));
 
-  validateFunctionIR(resolveLoadFn);
+  validateIR(resolveLoadFn);
   return resolveLoadFn;
 }
 
@@ -182,7 +182,7 @@ static Function *getOrCreateBoundsCheckStoreSanitizer(
   builder.CreateCall(getOrCreateRemediationBehavior(M, strategy));
   builder.CreateRetVoid();
 
-  validateFunctionIR(resolveStoreFn);
+  validateIR(resolveStoreFn);
   return resolveStoreFn;
 }
 
@@ -236,7 +236,7 @@ static Function *getOrCreateBoundsCheckMemcpySanitizer(
   builder.CreateCall(getOrCreateRemediationBehavior(M, strategy));
   builder.CreateRet(dst_ptr);
 
-  validateFunctionIR(resolveMemcpyFn);
+  validateIR(resolveMemcpyFn);
   return resolveMemcpyFn;
 }
 
@@ -287,7 +287,7 @@ static Function *getOrCreateBoundsCheckMemsetSanitizer(
   builder.CreateCall(getOrCreateRemediationBehavior(M, strategy));
   builder.CreateRet(basePtr);
 
-  validateFunctionIR(resolveMemsetFn);
+  validateIR(resolveMemsetFn);
   return resolveMemsetFn;
 }
 
@@ -351,7 +351,7 @@ static Function *getOrCreateResolveGep(Module *M) {
   Value *onePastPtr = builder.CreateIntToPtr(onePastInt, ptr_ty);
   builder.CreateRet(onePastPtr);
 
-  validateFunctionIR(resolveGepFn);
+  validateIR(resolveGepFn);
   return resolveGepFn;
 }
 

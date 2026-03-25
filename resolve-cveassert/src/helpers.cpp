@@ -23,7 +23,7 @@ using namespace llvm;
 
 /// This helper fn reduces redundant code
 /// in the getOrCreate* functions
-void validateFunctionIR(Function *F) {
+void validateIR(Function *F) {
   raw_ostream &out = errs();
   out << *F;
   if (verifyFunction(*F, &out)) {
@@ -119,7 +119,7 @@ Function *getOrCreateIsHeap(Module *M, LLVMContext &Ctx) {
   auto result = Builder.CreateNot(Builder.CreateOr({is_stack, is_static}));
   Builder.CreateRet(result);
 
-  validateFunctionIR(resolveIsHeapFn);
+  validateIR(resolveIsHeapFn);
   return resolveIsHeapFn;
 }
 
@@ -138,7 +138,7 @@ Function *getOrCreateResolveReportSanitizerTriggered(Module *M) {
   IRBuilder<> builder(EntryBB);
   builder.CreateRetVoid();
 
-  validateFunctionIR(resolveReportFn);
+  validateIR(resolveReportFn);
   return resolveReportFn;
 }
 
@@ -162,7 +162,7 @@ Function *getOrCreateRecoverBufferFunction(Module *M) {
   builder.CreateRet(Constant::getNullValue(ptr_ty));
 
   resolveRecoverFn->setMetadata("resolve.noinstrument", MDNode::get(Ctx, {}));
-  validateFunctionIR(resolveRecoverFn);
+  validateIR(resolveRecoverFn);
 
   return resolveRecoverFn;
 }
@@ -208,6 +208,6 @@ getOrCreateRemediationBehavior(Module *M,
   }
   Builder.CreateRetVoid();
 
-  validateFunctionIR(resolveRemedBehaviorFn);
+  validateIR(resolveRemedBehaviorFn);
   return resolveRemedBehaviorFn;
 }

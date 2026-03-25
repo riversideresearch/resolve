@@ -75,7 +75,7 @@ getOrCreateNullPtrLoadSanitizer(Module *M, LLVMContext &Ctx, Type *ty,
   Value *ld = Builder.CreateLoad(ty, InputPtr);
   Builder.CreateRet(ld);
 
-  validateFunctionIR(resolveNullPtrLdFn);
+  validateIR(resolveNullPtrLdFn);
   return resolveNullPtrLdFn;
 }
 
@@ -141,7 +141,7 @@ static Function *getOrCreateNullPtrStoreSanitizer(
   Builder.CreateStore(InputVal, InputPtr);
   Builder.CreateRetVoid();
 
-  validateFunctionIR(resolveNullPtrStFn);
+  validateIR(resolveNullPtrStFn);
   return resolveNullPtrStFn;
 }
 
