@@ -1,26 +1,21 @@
 #!/usr/bin/env python3
-import argparse, os, re, subprocess, pathlib, json, tempfile
+from signal import Signals
+from typing import Mapping
+import argparse
+import json
+import os
+import re
+import subprocess
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
-from subprocess import CalledProcessError
+from subprocess import CalledProcessError, CompletedProcess
 
-juliet_testsuite_root_dir = Path(__file__).parent
+juliet_testsuite_root = Path(__file__).parent
+juliet_testcases_dir = juliet_testsuite_root / "testcases"
+juliet_testcase_support_headers = juliet_testsuite_root / "testcasesupport"
 
-# Packages test name, number, with its result (pass, fail, exception)
-# The exit_code field will be an enum that represents all the possible outcomes
-# Outcomes:
-# 
-
-@dataclass
-class Result:
-    test_name: str
-    test_number: str
-    exit_code: int
-
-    def __repr__(self) -> str:
-        return f"Test name: {self.test_name}, Test number: {self.test_number}, Exit code: {self.exit_code}"
-
+resolve_cc = "resolvecc"
 
 # Custom Error handling class when no affected functions can be found
 class CouldNotFindFunctionSuffixInFile(Exception):
@@ -35,15 +30,13 @@ class CouldNotFindFunctionSuffixInFile(Exception):
             "Cannot find a function in the source code that matches the good and bad regex."
         )
 
-def compile_io_c(obj_file: Path):
+def compile_io_c(out_dir: Path):
+    """Compile io.c into obj file for linking
+
+    Returns the path to the compiled object file
     """
-    Compile io.c into obj file 
-    for linking
-    """
-    # TODO: Ask Jackson if we should do a static library
-    # Compile io.c dependency to object file 
-    juliet_testcase_support_headers = juliet_testsuite_root_dir / "testcasesupport"
     io_file = juliet_testcase_support_headers / "io.c"
+    obj_file = out_dir / "io.o"
 
     if obj_file.exists():
         return obj_file
@@ -98,8 +91,11 @@ def findBad(source_files: list[Path]) -> list[tuple]:
         r"^\s*(?:static\s+)?(?:void|int)\s+(\w+_bad)\s*\(",
     re.VERBOSE)
 
-    # Function name is group(1) match 
-    bad_files = [path, match.group(1) for path, match in find_matching_file_contents(source_files, bad_pattern)]
+    # Function name is group(1) match
+    bad_files = [
+        (path, match.group(1))
+        for path, match in find_matching_file_contents(source_files, bad_pattern)
+    ]
 
     return bad_files
 
@@ -123,246 +119,255 @@ def findGood(source_files: list[Path]) -> list[tuple]:
     \s*\(                               # opening parenthesis
     """, re.VERBOSE)
 
-    matching_cwe_pattern_files = [path, match.group(1) for path, match in find_matching_file_contents(source_files, cwe_good_pattern)]
-    matching_g_b_pattern_files = [path, match.group(1) for path, match in find_matching_file_contents(source_files, good_g_b_flow_pattern)]
+    matching_cwe_pattern_files = [
+        (path, match.group(1))
+        for path, match in find_matching_file_contents(source_files, cwe_good_pattern)
+    ]
+    matching_g_b_pattern_files = [
+        (path, match.group(1))
+        for path, match in find_matching_file_contents(
+            source_files, good_g_b_flow_pattern
+        )
+    ]
     
     # Return both lists as a combined list
     return matching_cwe_pattern_files + matching_g_b_pattern_files 
 
-def testCwe(testcase: tuple):
-    print("\n>>> ENTERING testCwe() <<<")
-    cwe_id, testcase_dir_path = testcase
+@dataclass
+class CWETestDir:
+    id: int
+    dir: Path
+    name: str
 
-    print(f"[DEBUGGING] Path: {testcase_dir_path}")
+    @classmethod
+    def from_dir(cls, dir: Path) -> "CWETestDir | None":
+        """Create a `CWETestDir` from a path of the form CWEXXX_*"""
+        match = re.search(r"^CWE(\d+)_(.*)", dir.name)
+        if match is None:
+            return None
+        id, name = match.groups()
+        return cls(id=int(id), name=name, dir=dir)
 
-    # A mapping from a testcase id to all of its source files
-    test_src_files = defaultdict(list)
+    @classmethod
+    def all_in_dir(cls, dir: Path):
+        """Find all `CWETestDir`'s in `dir
 
-    # NOTE: Look into generators in python
-    def iterate_test_case_dir(testcase_dir_path: Path):
-        for source_path in testcase_dir_path.iterdir():
-            # Juliet testsuite CWE directory structure varies
-            # some dirs contain subdirs while others contain src files
+        Skip directories that don't match.
+        """
+        for dir in dir.iterdir():
+            # TODO: Warn if no match
+            if test := CWETestDir.from_dir(dir):
+                yield test
+
+    def iterdir(self):
+        """Iterate over sources in `self.dir`
+
+        Some juliet testsuite CWE directories have their source files
+        grouped into subdirs while others just contain all the src files.
+        """
+        for source_path in self.dir.iterdir():
             if source_path.is_dir():
                 yield from source_path.iterdir()
             else:
                 yield source_path
 
-    for src_path in iterate_test_case_dir(testcase_dir_path):
-        # Extract group key from stem
-        stem = source_path.stem
-        match = re.search(r"^(.*_\d+)", stem)
+    def collect_tests(self) -> Mapping[str, list[Path]]:
+        """Collect tests in `self`
 
-        if not match:
-            continue
+        Each test may contain multiple sources.
+        """
+        # Map test name to all of its source files
+        test_src_files: defaultdict[str, list[Path]] = defaultdict(list)
 
-        
-        testcase_name = match.group(1)
-        print(f"Group key value: {testcase_name}")
-        test_src_files[testcase_name].append(source_path)
-    
-    print(f"Group test: {test_src_files}")
+        # Group source files according to name (words followed by an index)
+        for source_path in self.iterdir():
+            # Extract group key from stem
+            stem = source_path.stem
+            match = re.search(r"^(.*_\d+)", stem)
 
-    results: list[Result] = []
-    
-    # Keeps track of total number of tests
-    total_tests = 0
+            if not match:
+                # TODO: Warn if no match
+                continue
 
-    # Counter keeps track of failed compilations 
-    # that contain C source files
-    failed_to_compile_c_build = 0
-    
-    # Counter keeps track of failed compilations
-    # that contain CPP source files
-    failed_to_compile_cpp_build = 0
-    
-    # Counter keeps track of the binaries executed that
-    # exits with code 0 (in the bad case)
-    # This will change based on the context 
-    incorrect_exit_code_for_bad_testcase = 0
+            testcase_name = match.group(1)
+            test_src_files[testcase_name].append(source_path)
 
-    # Counter keeps track of binaries executed that 
-    # exit with codes that need manual inspection
-    unexpected_exit_code = 0
-
-    # Counter keeps track of the binaries executed that
-    # signal a segmentation fault
-    signal_segfault = 0
- 
-    # Compile the io dependency needed for juliet test I/O
-    io_obj = compile_to_objfile(Path("/tmp/io.o"))
-
-    for test_key, test_files in sorted(test_src_files.items()):
-        
-        total_tests+= 1
-
-        # Binary path to compiled testcase executable
-        testcase_exe_path = Path("/tmp") / f"{cwe_id}_{test_files[0].stem}"
-        # Create the JSON-formatted CVE description
-        cve_descriptions = getCveDescription(cwe_id, test_files)
-
-        try:
-
-            # Set the environment variable
-            env_var = os.environ.copy()
-            env_var["RESOLVE_LABEL_CVE"] = cve_descriptions
-
-            # Determine which compiler to use based on extensions
-            use_cpp_compiler = any(f.suffix == ".cpp" for f in test_files)
-            compiler = "clang++" if use_cpp_compiler else "clang"
-
-            # NOTE: Do NOT compile a binary and its source in the same directory
-            compile_cmd = [
-                compiler,
-                "-fpass-plugin=/opt/resolve/lib/libCVEAssert.so",
-                "-L/opt/resolve/lib",
-                "-lresolve",
-                "-Wl,-rpath=/opt/resolve/lib",
-                "-DOMITGOOD",
-                "-DINCLUDEMAIN",
-                "-I", str(testsupport_dir),
-                *[str(f) for f in test_files],
-                str(io_obj),
-                "-o", str(testcase_exe_path)
-            ]
-
-            # Compile source files with CVE description
-            process = subprocess.run(
-                compile_cmd,
-                env=env_var,
-                capture_output=True,
-                check=True,         # If the compilation fails then a CalledProcessError exception is raised
-                text=True
-            )
-            
-            # Execute the compiled binary
-            executed_binary = subprocess.run(
-                [str(testcase_exe_path)],
-                input="",
-                capture_output=True,
-                timeout=30,
-                text=True
-            )
-        
-        # Handle exception for failed compilation
-        except CalledProcessError as compilation_error:
-            print("[ERROR] Compilation failed: ", compilation_error)
-            # Determine the reason for the error
-            # If the cpp compiler is used when the error occurs then report it 
-            # Non-zero exit code signifies error in compilation
-            if use_cpp_compiler and compilation_error.returncode:
-                # Increment the counter
-                print(f"[FAILURE] Failed to compile CPP source code for {testcase_exe_path}.")
-                failed_to_compile_cpp_build += 1
+        return test_src_files
 
 
-            elif compilation_error.returncode:
-                print(f"[FAILURE] Failed to compile C source code for {testcase_exe_path}.")
-                failed_to_compile_c_build += 1
+@dataclass
+class CWETest:
+    id: int
+    name: str
+    source_paths: list[Path]
 
-            # Record the result
-            results.append(Result(test_name, test_number, compilation_error.returncode))
-            
-            # Once the program enters a failed build state, move onto the next test 
-            continue
+    def get_cve_description(self):
+        """
+        Creates a CVE description by locating affected functions
+        within files per a particular test
+        """
 
-        # Handle runtime exception
-        except Exception as execution_error:
-            print("[ERROR] Execution failed: ", execution_error)
-            if execution_error.returncode == 0:
-                print(f"[FAILURE] Failed to remediate program. Remediation did not detect vulnerability pattern. Exiting program with incorrect exit code.")
-                incorrect_exit_code_for_bad_testcase += 1
-            
-            # NOTE: The negative value indicates that the program has been signaled 
-            elif execution_error.returncode == -11: # SIGSEGV
-                print(f"[FAILURE] Segmentation fault occurred. Remediation failed.")
-                signal_segfault += 1
+        affected_functions = findBad(self.source_paths) + findGood(self.source_paths)
 
-            # NOTE: Might need to add better handling of exit codes and signals.
-            else:
-                print(f"[FAILURE] Failed to remediate program. Manual inspection of signal or error code required.")
-                unexpected_exit_code += 1
-            
-            results.append(Result(test_name, test_number, execution_error.returncode))
-            continue
+        if len(affected_functions) == 0:
+            return None
 
-    print("-----------------------------------------------------------------")
-    print(f"Total testcases: {total_tests}\n")
-    print(f"Number of cases exit with remediated code (exit code 3): {correct_exit_code}\n")
-    print(f"Number of cases exit with incorrect code (exit with code 0): {incorrect_exit_code}\n")
-    print(f"Number of cases exit with unexpected exit code: {unexpected_exit_code}")
-    print(f"Number of cases that terminate with segmentation faults: {signal_segfault}\n")
-    print(f"Number of cases failed to compile: {failed_to_compile}\n")
-    print(f"Number of cases failed to compile (Require C++ support): {failed_to_compile_cpp_build}\n")
-    print(f"Percentage of CWE{cwe_id} directory covered: { (correct_exit_code / total_tests) * 100:.2f}%")
-    print("-----------------------------------------------------------------")
+        # Build JSON
+        vulnerabilities = [
+            {
+                "cwe-id": str(self.id),
+                "affected-function": func,
+                "affected-file": str(file),
+                "remediation-strategy": "exit",
+            }
+            for file, func in affected_functions
+        ]
 
-    
-def testAllCwes(cwe_ids: set):
-    """
-    Matches cwe id of the directory with user specified.
-    """
-    
-    testcases = juliet_testsuite_root_dir / "testcases"
+        return {"vulnerabilities": vulnerabilities}
 
-    # DEBUGGING: print the ids
-    print("[DEBUGGING] CWE-ids:", cwe_ids)
 
-    # Loop over every relevant file in testcases/ that has a matching ID
-    matching_cwedirs = []
+@dataclass
+class Result:
+    """The outcome of a single test
 
-    for cwe_dir in testcases.iterdir():
-        match = re.search(r"^CWE(\d+)_*", cwe_dir.name)
-        if match:
-            
-            parsed_cwe_id = int(match.group(1))
-
-            if parsed_cwe_id in cwe_ids:
-                print("DIR FOUND:", repr(cwe_dir.name))
-                matching_cwedirs.append(tuple([parsed_cwe_id, cwe_dir]))
-
-    # Stores the paths of the matching cwe directories
-    print(f"[DEBUGGING] matching cwe-dirs: {matching_cwedirs}")
-
-    for cwe_dir_path in matching_cwedirs:
-        testCwe(cwe_dir_path)
-
-def getCveDescription(cwe_id: int, test_files: list[Path]):
-    """ 
-    Creates a CVE description by locating affected functions 
-    within files per a particular test 
+    Possible outcomes: Exit, Signal, CompilationFailure
     """
 
-    affected_functions = findBad(test_files) + findGood(test_files)
-    
-    if not affected_functions:
-        print("No affected function found!") # replace with error handler
-        raise CouldNotFindFunctionSuffixInFile(affected_functions)
 
-    # Build JSON
-    vulnerabilities = [
-        {
-            "cwe-id": str(cwe_id),
-            "affected-function": func,
-            "affected-file": str(file),
-            "remediation-strategy": "exit"
-        }
-        for file, func in affected_functions
+@dataclass
+class ResultExit(Result):
+    exit_code: int
+
+
+@dataclass
+class ResultSignal(Result):
+    signal: int
+
+    def get_signal_name(self):
+        return Signals(self.signal).name
+
+
+@dataclass
+class ResultCompilationFailure(Result):
+    called_process: CompletedProcess[str]
+
+
+def do_test(test: CWETest, io_obj: Path, out_dir: Path) -> Result:
+    # Binary path to compiled testcase executable
+    testcase_exe_path = out_dir / test.name
+
+    # Create the JSON-formatted CVE description
+    cve_description_path = out_dir / f"{test.name}.json"
+    with cve_description_path.open("w") as f:
+        json.dump(test.get_cve_description(), f, indent=4)
+
+    # Set the environment variable
+    env_var = os.environ.copy()
+    env_var["RESOLVE_LABEL_CVE"] = str(cve_description_path)
+
+    compile_cmd = [
+        resolve_cc,
+        "-DOMITGOOD",
+        "-DINCLUDEMAIN",
+        "-I",
+        str(juliet_testcase_support_headers),
+        *[str(f) for f in test.source_paths],
+        str(io_obj),
+        "-o",
+        str(testcase_exe_path),
     ]
 
-    json_obj = {"vulnerabilities" : vulnerabilities }
+    # Compile source files with CVE description
+    compile_process = subprocess.run(
+        compile_cmd, env=env_var, capture_output=True, text=True
+    )
 
-    json_path = Path("/tmp") / f"{test_files[0].stem}.json" 
+    if compile_process.returncode != 0:
+        return ResultCompilationFailure(compile_process)
 
-    with json_path.open("w") as f:
-        json.dump(json_obj, f, indent=4)
+    # Execute the compiled binary
+    executed_binary = subprocess.run(
+        [str(testcase_exe_path)], input="", capture_output=True, timeout=30, text=True
+    )
 
-    return json_path
+    match executed_binary.returncode:
+        case i if i > 0:
+            return ResultExit(i)
+        case signal:
+            return ResultSignal(-signal)
 
+
+def test_cwe(test_dir: CWETestDir, io_obj: Path, out_dir: Path):
+    tests = [
+        CWETest(test_dir.id, name, source_paths)
+        for name, source_paths in test_dir.collect_tests().items()
+    ]
+
+    results = [do_test(test, io_obj, out_dir) for test in tests]
+
+    correct_exit_code = 0
+    incorrect_exit_code = 0
+    zero_exit_code = 0
+    unexpected_exit_code = 0
+    failed_signal = 0
+    signal_segfault = 0
+    failed_to_compile = 0
+    failed_to_compile_cpp = 0
+
+    for t, r in zip(tests, results):
+        match r:
+            case ResultCompilationFailure():
+                failed_to_compile += 1
+                if ".cpp" in t.source_paths[0]:
+                    failed_to_compile_cpp += 1
+            case ResultSignal(signal):
+                failed_signal += 1
+                if signal == 11:
+                    signal_segfault += 1
+            case ResultExit(3):
+                correct_exit_code += 1
+            case ResultExit(code):
+                incorrect_exit_code += 1
+                if code == 0:
+                    zero_exit_code += 1
+                else:
+                    unexpected_exit_code += 1
+
+    # fmt: off
+    print("-----------------------------------------------------------------")
+    print(f"Testing: {test_dir!r}")
+    print(f"Total testcases: {len(tests)}")
+    print(f"PASS: Number of cases with remediated exit code (exit code 3): {correct_exit_code}")
+    print(f"\nFAIL: Number of cases with incorrect exit code (exit code != 3): {incorrect_exit_code}")
+    print(f"      Number of cases exiting normally (exit code 0): {incorrect_exit_code}")
+    print(f"      Number of cases exit with unexpected exit code: {unexpected_exit_code}")
+    print(f"\nFAIL: Number of cases that terminate with signal: {failed_signal}")
+    print(f"      Number of cases that terminate with segmentation faults: {signal_segfault}")
+    print(f"\nFAIL: Number of cases failed to compile: {failed_to_compile}")
+    print(f"      Number of cases failed to compile (Require C++ support): {failed_to_compile_cpp}")
+    print(f"\nPercentage of CWE{test_dir.id} directory covered: {(correct_exit_code / len(tests)) * 100:.2f}%")
+    print("-----------------------------------------------------------------")
+    # fmt: on
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "CWEs", metavar="N", type=int, nargs="*", help="a CWE number to target"
+    )
+    args = parser.parse_args()
+
+    cwe_ids: set[int] = set(args.CWEs)
+
+    # Compile the io dependency needed for juliet test I/O
+    io_obj = compile_io_c(Path("/tmp/io.o"))
+
+    out_dir = Path.cwd() / "resolve_juliet_outputs"
+    out_dir.mkdir()
+
+    for test in CWETestDir.all_in_dir(juliet_testcases_dir):
+        if test.id in cwe_ids:
+            test_cwe(test, io_obj, out_dir)
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("CWEs", metavar="N", type=int, nargs="*", help="a CWE number to target")
-    args = parser.parse_args()
-    args.CWEs = set(args.CWEs)
-    testAllCwes(args.CWEs)
+    main()
