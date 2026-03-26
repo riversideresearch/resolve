@@ -231,7 +231,6 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
   PreservedAnalyses runOnFunction(Function &F, ModuleAnalysisManager &MAM,
                                   Vulnerability &vuln) {
     auto result = PreservedAnalyses::all();
-    raw_ostream &out = errs();
 
     if (F.getMetadata("resolve.noinstrument")) { return result; }
 
