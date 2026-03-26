@@ -79,9 +79,6 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
     std::string handlerName = "resolve_sanitize_non_heap_free";
     LLVMContext &Ctx = M->getContext();
 
-    if (auto handler = M->getFunction(handlerName))
-      return handler;
-
     IRBuilder<> builder(Ctx);
     // TODO: handle address spaces other than 0
     auto ptr_ty = PointerType::get(Ctx, 0);
