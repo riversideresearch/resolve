@@ -174,7 +174,7 @@ static Function *getOrCreateBoundsCheckStoreSanitizer(
   if (!resolveStoreFn->empty()) { return resolveStoreFn; }
 
   BasicBlock *EntryBB = BasicBlock::Create(Ctx, "entry", resolveStoreFn);
-  BasicBlock *CheckAccessBB = BasicBlock::Create(Ctx, "check_aceess", resolveStoreFn);
+  BasicBlock *CheckAccessBB = BasicBlock::Create(Ctx, "check_access", resolveStoreFn);
   BasicBlock *NormalStoreBB = BasicBlock::Create(Ctx, "normal_store", resolveStoreFn);
   BasicBlock *SanitizeStoreBB = BasicBlock::Create(Ctx, "sanitize_store", resolveStoreFn);
 
@@ -190,6 +190,7 @@ static Function *getOrCreateBoundsCheckStoreSanitizer(
   Value *isZero = builder.CreateICmpEQ(mapValue, ConstantInt::get(i1_ty, 0));
   builder.CreateCondBr(isZero, NormalStoreBB, CheckAccessBB);
 
+  builder.SetInsertPoint(CheckAccessBB);
   Value *withinBounds = builder.CreateCall(
       getOrCreateResolveAccessOk(M), {basePtr, ConstantExpr::getSizeOf(ty)});
 
