@@ -7,4 +7,4 @@
 // Set value to true to get more verbose printouts
 extern bool CVE_ASSERT_DEBUG;
 
-llvm::Constant* initSanitizerMap(llvm::Module *M);
+llvm::GlobalVariable* initSanitizerMap(llvm::Module *M);

@@ -40,16 +40,22 @@ using namespace llvm;
 bool CVE_ASSERT_DEBUG; 
 
 
-Constant* initSanitizerMap(Module *M) {
+GlobalVariable* initSanitizerMap(Module *M) {
     LLVMContext &Ctx = M->getContext();
     ArrayType *arrty = ArrayType::get(Type::getInt1Ty(Ctx), 7);
-    auto sanitizer_map = M->getOrInsertGlobal("sanitizer_map", arrty);
-
+    
+    M->getOrInsertGlobal("sanitizer_map", arrty);
     GlobalVariable *gSanitizerMap = M->getNamedGlobal("sanitizer_map");
+    
     gSanitizerMap->setLinkage(GlobalValue::ExternalLinkage);
-    gSanitizerMap->setInitializer(ConstantArray::get(arrty, 0));
     gSanitizerMap->setConstant(false);
-    return sanitizer_map; 
+
+    if (!gSanitizerMap->hasInitializer()) {
+      std::vector<Constant *> elems(7, ConstantInt::get(Type::getInt1Ty(Ctx), 0));
+      gSanitizerMap->setInitializer(ConstantArray::get(arrty, elems));
+    }
+
+    return gSanitizerMap;
 }
 
 namespace {
