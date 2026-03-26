@@ -131,6 +131,11 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
     return false;
   }
 
+  void dumpIR(Function &F, raw_ostream &out, const std::string msg = "") {
+    out << msg;
+    out << F;
+  }
+
   Function *getOrCreateFreeOfNonHeapSanitizer(
       Module *M, Vulnerability::RemediationStrategies strategy) {
     std::string handlerName = "resolve_sanitize_non_heap_free";
@@ -241,8 +246,9 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
       return result;
     }
 
-    out << "[CVEAssert] === Pre Instrumented IR === \n";
-    out << F;
+    // out << "[CVEAssert] === Pre Instrumented IR === \n";
+    // out << F;
+    dumpIR(F, out, "[CVEAssert] === Pre Instrumented IR === \n");
 
     if (matchUndesirableField(F, vuln)) {
       result = PreservedAnalyses::none();
