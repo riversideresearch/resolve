@@ -246,15 +246,11 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
       return result;
     }
 
-    // out << "[CVEAssert] === Pre Instrumented IR === \n";
-    // out << F;
-    dumpIR(F, out, "[CVEAssert] === Pre Instrumented IR === \n");
+    validateIR(&F, "[CVEAssert] === Pre Instrumented IR === ");
 
     if (matchUndesirableField(F, vuln)) {
       result = PreservedAnalyses::none();
-      out << "[CVEAssert] === Post Instrumented IR for undesirable operation "
-              "=== \n";
-      out << F;
+      validateIR(&F, "[CVEAssert] === Post Instrumented IR for undesirable operation === \n");
     }
 
     if (matchRemediationStrategy(vuln)) {
@@ -315,12 +311,7 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
       break;
     }
 
-    out << "[CVEAssert] === Post Instrumented IR === \n";
-    out << F;
-
-    if (verifyFunction(F, &out)) {
-      report_fatal_error("[CVEAssert] We broke something");
-    }
+    validateIR(&F, "[CVEAssert] === Post Instrumented IR === \n");
 
     errs() << "[CVEAssert] Inserted vulnerability handler calls in function "
            << vuln.TargetFileName << ":" << vuln.TargetFunctionName << "\n";
