@@ -30,11 +30,12 @@ getOrCreateNullPtrLoadSanitizer(Module *M, LLVMContext &Ctx, Type *ty,
   // TODO: write this in asm as some kind of sanitzer_rt?
   FunctionType *resolveNullPtrLdFnTy = FunctionType::get(ty, {ptr_ty}, false);
   Function *resolveNullPtrLdFn = getOrCreateResolveHelper(M, handlerName, resolveNullPtrLdFnTy);
+  if (!resolveNullPtrLdFn->empty()) { return resolveNullPtrLdFn; }
 
   BasicBlock *Entry = BasicBlock::Create(Ctx, "entry", resolveNullPtrLdFn);
   BasicBlock *SanitizeBlock =
-      BasicBlock::Create(Ctx, "sanitize_block", resolveNullPtrLdFn);
-  BasicBlock *LoadBlock = BasicBlock::Create(Ctx, "load_block", resolveNullPtrLdFn);
+      BasicBlock::Create(Ctx, "sanitize_null_ptr", resolveNullPtrLdFn);
+  BasicBlock *LoadBlock = BasicBlock::Create(Ctx, "safe_load", resolveNullPtrLdFn);
 
   // Set insertion point to entry block
   Builder.SetInsertPoint(Entry);
@@ -74,7 +75,7 @@ getOrCreateNullPtrLoadSanitizer(Module *M, LLVMContext &Ctx, Type *ty,
   Value *ld = Builder.CreateLoad(ty, InputPtr);
   Builder.CreateRet(ld);
 
-  validateFunctionIR(resolveNullPtrLdFn);
+  validateIR(resolveNullPtrLdFn);
   return resolveNullPtrLdFn;
 }
 
@@ -93,11 +94,12 @@ static Function *getOrCreateNullPtrStoreSanitizer(
   FunctionType *resolveNullPtrStFnTy =
       FunctionType::get(Type::getVoidTy(Ctx), {ptr_ty, ty}, false);
   Function *resolveNullPtrStFn = getOrCreateResolveHelper(M, handlerName, resolveNullPtrStFnTy);
+  if (!resolveNullPtrStFn->empty()) { return resolveNullPtrStFn; }
 
   BasicBlock *Entry = BasicBlock::Create(Ctx, "entry", resolveNullPtrStFn);
   BasicBlock *SanitizeBlock =
-      BasicBlock::Create(Ctx, "sanitize_block", resolveNullPtrStFn);
-  BasicBlock *StoreBlock = BasicBlock::Create(Ctx, "store_block", resolveNullPtrStFn);
+      BasicBlock::Create(Ctx, "sanitize_null_ptr", resolveNullPtrStFn);
+  BasicBlock *StoreBlock = BasicBlock::Create(Ctx, "safe_store", resolveNullPtrStFn);
 
   // Set insertion point to entry block
   Builder.SetInsertPoint(Entry);
@@ -139,7 +141,7 @@ static Function *getOrCreateNullPtrStoreSanitizer(
   Builder.CreateStore(InputVal, InputPtr);
   Builder.CreateRetVoid();
 
-  validateFunctionIR(resolveNullPtrStFn);
+  validateIR(resolveNullPtrStFn);
   return resolveNullPtrStFn;
 }
 

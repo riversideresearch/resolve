@@ -42,22 +42,20 @@ static Function *replaceUndesirableFunction(Module *M, CallInst *call,
   std::string handlerName =
       "resolve_sanitized_" + call->getCalledFunction()->getName().str();
 
-  if (Function *existingFn = M->getFunction(handlerName)) {
-    return existingFn;
-  }
-
   FunctionType *resolveSanitizedFnTy =
       call->getCalledFunction()->getFunctionType();
 
-  Function *resolveSanitizedFn = Function::Create(
-      resolveSanitizedFnTy, Function::InternalLinkage, handlerName, M);
+  Function *resolveSanitizedFn = getOrCreateResolveHelper(M, handlerName,
+    resolveSanitizedFnTy);
+
+  if (!resolveSanitizedFn->empty()) { return resolveSanitizedFn; }
 
   BasicBlock *EntryBB = BasicBlock::Create(Ctx, "", resolveSanitizedFn);
   // Insert a return instruction here.
   builder.SetInsertPoint(EntryBB);
   builder.CreateRet(resolveSanitizedFn->getArg(argNum));
 
-  validateFunctionIR(resolveSanitizedFn);
+  validateIR(resolveSanitizedFn);
   return resolveSanitizedFn;
 }
 

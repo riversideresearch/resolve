@@ -23,7 +23,7 @@ using namespace llvm;
 
 /// This helper fn reduces redundant code
 /// in the getOrCreate* functions
-void validateFunctionIR(Function *F) {
+void validateIR(Function *F) {
   raw_ostream &out = errs();
   out << *F;
   if (verifyFunction(*F, &out)) {
@@ -89,6 +89,8 @@ Function *getOrCreateIsHeap(Module *M, LLVMContext &Ctx) {
 
   Function *resolveIsHeapFn =
       getOrCreateResolveHelper(M, "resolve_is_heap", resolveIsHeapFnTy);
+  
+  if (!resolveIsHeapFn->empty()) { return resolveIsHeapFn; }
 
   IRBuilder<> Builder(Ctx);
   BasicBlock *Entry = BasicBlock::Create(Ctx, "entry", resolveIsHeapFn);
@@ -117,7 +119,7 @@ Function *getOrCreateIsHeap(Module *M, LLVMContext &Ctx) {
   auto result = Builder.CreateNot(Builder.CreateOr({is_stack, is_static}));
   Builder.CreateRet(result);
 
-  validateFunctionIR(resolveIsHeapFn);
+  validateIR(resolveIsHeapFn);
   return resolveIsHeapFn;
 }
 
@@ -130,21 +132,18 @@ Function *getOrCreateResolveReportSanitizerTriggered(Module *M) {
   Function *resolveReportFn =
       getOrCreateResolveHelper(M, "resolve_report_sanitizer_triggered",
                                resolveReportFnTy, GlobalValue::WeakAnyLinkage);
+  if (!resolveReportFn->empty()) { return resolveReportFn; }
 
   BasicBlock *EntryBB = BasicBlock::Create(Ctx, "", resolveReportFn);
   IRBuilder<> builder(EntryBB);
   builder.CreateRetVoid();
 
-  validateFunctionIR(resolveReportFn);
+  validateIR(resolveReportFn);
   return resolveReportFn;
 }
 
 Function *getOrCreateRecoverBufferFunction(Module *M) {
   LLVMContext &Ctx = M->getContext();
-
-  if (Function *F = M->getFunction("resolve_get_recover_longjmp_buf"))
-    if (!F->isDeclaration())
-      return F;
 
   auto ptr_ty = PointerType::get(M->getContext(), 0);
   FunctionType *resolve_recover_buf_fn_ty =
@@ -153,6 +152,8 @@ Function *getOrCreateRecoverBufferFunction(Module *M) {
   auto resolveRecoverFn = getOrCreateResolveHelper(
       M, "resolve_get_recover_longjmp_buf", resolve_recover_buf_fn_ty,
       GlobalValue::WeakAnyLinkage);
+  if (!resolveRecoverFn->empty()) { return resolveRecoverFn; }
+  
 
   BasicBlock *EntryBB =
       BasicBlock::Create(M->getContext(), "", resolveRecoverFn);
@@ -161,7 +162,7 @@ Function *getOrCreateRecoverBufferFunction(Module *M) {
   builder.CreateRet(Constant::getNullValue(ptr_ty));
 
   resolveRecoverFn->setMetadata("resolve.noinstrument", MDNode::get(Ctx, {}));
-  validateFunctionIR(resolveRecoverFn);
+  validateIR(resolveRecoverFn);
 
   return resolveRecoverFn;
 }
@@ -179,8 +180,9 @@ getOrCreateRemediationBehavior(Module *M,
 
   Function *resolveRemedBehaviorFn = getOrCreateResolveHelper(
       M, "resolve_remediation_behavior", resolveRemedBehaviorFnTy);
+  if (!resolveRemedBehaviorFn->empty()) { return resolveRemedBehaviorFn; }
 
-  BasicBlock *BB = BasicBlock::Create(Ctx, "", resolveRemedBehaviorFn);
+  BasicBlock *BB = BasicBlock::Create(Ctx, "entry", resolveRemedBehaviorFn);
   IRBuilder<> Builder(BB);
 
   if (strategy == Vulnerability::RemediationStrategies::EXIT) {
@@ -206,6 +208,6 @@ getOrCreateRemediationBehavior(Module *M,
   }
   Builder.CreateRetVoid();
 
-  validateFunctionIR(resolveRemedBehaviorFn);
+  validateIR(resolveRemedBehaviorFn);
   return resolveRemedBehaviorFn;
 }

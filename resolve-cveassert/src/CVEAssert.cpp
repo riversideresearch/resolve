@@ -79,9 +79,6 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
     std::string handlerName = "resolve_sanitize_non_heap_free";
     LLVMContext &Ctx = M->getContext();
 
-    if (auto handler = M->getFunction(handlerName))
-      return handler;
-
     IRBuilder<> builder(Ctx);
     // TODO: handle address spaces other than 0
     auto ptr_ty = PointerType::get(Ctx, 0);
@@ -89,8 +86,10 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
     // TODO: write this in asm as some kind of sanitzer_rt?
     FunctionType *resolveFreeNonHeapFnTy =
         FunctionType::get(Type::getVoidTy(Ctx), {ptr_ty}, false);
-    Function *resolveFreeNonHeapFn = Function::Create(
-        resolveFreeNonHeapFnTy, Function::InternalLinkage, handlerName, M);
+    Function *resolveFreeNonHeapFn = getOrCreateResolveHelper(
+      M, handlerName, resolveFreeNonHeapFnTy);
+    if (!resolveFreeNonHeapFn->empty()) { return resolveFreeNonHeapFn; }
+    
 
     BasicBlock *Entry = BasicBlock::Create(Ctx, "entry", resolveFreeNonHeapFn);
     BasicBlock *SanitizeBlock =
@@ -121,7 +120,7 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
     builder.CreateCall(M->getFunction("free"), {InputPtr});
     builder.CreateRetVoid();
 
-    validateFunctionIR(resolveFreeNonHeapFn);
+    validateIR(resolveFreeNonHeapFn);
     return resolveFreeNonHeapFn;
   }
 
