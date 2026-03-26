@@ -37,7 +37,20 @@
 using namespace llvm;
 
 // Global env var
-bool CVE_ASSERT_DEBUG;
+bool CVE_ASSERT_DEBUG; 
+
+
+Constant* initSanitizerMap(Module *M) {
+    LLVMContext &Ctx = M->getContext();
+    ArrayType *arrty = ArrayType::get(Type::getInt1Ty(Ctx), 7);
+    auto sanitizer_map = M->getOrInsertGlobal("sanitizer_map", arrty);
+
+    GlobalVariable *gSanitizerMap = M->getNamedGlobal("sanitizer_map");
+    gSanitizerMap->setLinkage(GlobalValue::ExternalLinkage);
+    gSanitizerMap->setInitializer(ConstantArray::get(arrty, 0));
+    gSanitizerMap->setConstant(false);
+    return sanitizer_map; 
+}
 
 namespace {
 
@@ -259,6 +272,8 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
   PreservedAnalyses run(Module &M, ModuleAnalysisManager &MAM) {
     auto result = PreservedAnalyses::all();
     InstrumentMemInst instrument_mem_inst;
+
+    initSanitizerMap(&M);
 
     for (auto &vuln : vulnerabilities) {
       // Also skip instrumentation for skipped vulnerabilities
