@@ -112,7 +112,24 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
         return false;
       }
     return true;
-  } 
+  }
+  
+  bool matchUndesirableField(Function &F, Vulnerability &vuln) {
+    if (vuln.UndesirableFunction.has_value()) {
+      // Using '0' as a temporary value this will be updated in future PRs
+      sanitizeUndesirableOperationInFunction(&F, *vuln.UndesirableFunction, 0);
+      return true;
+    }
+
+    return false;
+  }
+  
+  bool matchRemediationStrategy(Vulnerability &vuln) {
+    if (vuln.Strategy == Vulnerability::RemediationStrategies::NONE) {
+      return true;
+    }
+    return false;
+  }
 
   Function *getOrCreateFreeOfNonHeapSanitizer(
       Module *M, Vulnerability::RemediationStrategies strategy) {
@@ -210,7 +227,7 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
                                   Vulnerability &vuln) {
     auto result = PreservedAnalyses::all();
     raw_ostream &out = errs();
-    
+
     if (F.getMetadata("resolve.noinstrument")) { return result; }
 
     std::string demangledFnName = demangleFunctionName(F); 
@@ -227,17 +244,14 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
     out << "[CVEAssert] === Pre Instrumented IR === \n";
     out << F;
 
-    if (vuln.UndesirableFunction.has_value()) {
-      /* NOTE: We are using '0' as a temporary this will be updated future PRs
-       */
-      sanitizeUndesirableOperationInFunction(&F, *vuln.UndesirableFunction, 0);
+    if (matchUndesirableField(F, vuln)) {
       result = PreservedAnalyses::none();
-      out << "[CVEAssert] === Post Sanitization of Undesirable Operation IR "
-             "=== \n";
+      out << "[CVEAssert] === Post Instrumented IR for undesirable operation "
+              "=== \n";
       out << F;
     }
 
-    if (vuln.Strategy == Vulnerability::RemediationStrategies::NONE) {
+    if (matchRemediationStrategy(vuln)) {
       errs() << "[CVEAssert] NONE strategy selected for " << vuln.TargetFileName
              << ":" << vuln.TargetFunctionName << "...\n";
       errs() << "[CVEAssert] Skipping remediation\n";
