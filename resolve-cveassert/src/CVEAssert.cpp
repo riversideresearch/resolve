@@ -95,6 +95,25 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
     vulnerabilities = Vulnerability::parseVulnerabilityFile();
   }
 
+  std::string demangleFunctionName(Function &F) {
+    std::string demangledName = "";
+    char *demangledNamePtr = llvm::itaniumDemangle(F.getName().str(), false);
+    if (demangledNamePtr) {
+      demangledName = demangledNamePtr;
+    }
+
+    return demangledName;
+  }
+
+  bool matchTargetFunctionName(std::string fn_name, Function &F, Vulnerability &vuln) {
+    if (vuln.TargetFunctionName.empty() ||
+      (fn_name.find(vuln.TargetFunctionName) == std::string::npos &&
+      F.getName().str().find(vuln.TargetFunctionName) == std::string::npos)) {
+        return false;
+      }
+    return true;
+  } 
+
   Function *getOrCreateFreeOfNonHeapSanitizer(
       Module *M, Vulnerability::RemediationStrategies strategy) {
     std::string handlerName = "resolve_sanitize_non_heap_free";
@@ -189,23 +208,19 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
   /// the triggering argument parsed from the JSON.
   PreservedAnalyses runOnFunction(Function &F, ModuleAnalysisManager &MAM,
                                   Vulnerability &vuln) {
-    char *demangledNamePtr = llvm::itaniumDemangle(F.getName().str(), false);
-    std::string demangledName(demangledNamePtr ?: "");
     auto result = PreservedAnalyses::all();
-
+    raw_ostream &out = errs();
+    
     if (F.getMetadata("resolve.noinstrument")) { return result; }
+
+    std::string demangledFnName = demangleFunctionName(F); 
 
     if (CVE_ASSERT_DEBUG) {
       errs() << "[CVEAssert] Trying fn " << F.getName()
-             << " Demangled name: " << demangledName << "\n";
+             << " Demangled name: " << demangledFnName << "\n";
     }
 
-    raw_ostream &out = errs();
-
-    if (vuln.TargetFunctionName.empty() ||
-        (demangledName.find(vuln.TargetFunctionName) == std::string::npos &&
-         F.getName().str().find(vuln.TargetFunctionName) ==
-             std::string::npos)) {
+    if (!matchTargetFunctionName(demangledFnName, F, vuln)) {
       return result;
     }
 
