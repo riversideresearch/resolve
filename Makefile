@@ -17,6 +17,9 @@ test: configure
 install: build
 	cmake --install build
 
+install-local: build
+	cmake --install build --prefix install
+
 clean:
 	rm -rf build/
 
