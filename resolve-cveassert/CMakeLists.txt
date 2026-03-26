@@ -11,11 +11,12 @@ add_subdirectory(libresolve)
 
 # Build Targets
 add_library(CVEAssert SHARED 
-  src/CVEAssert.cpp
-  src/bounds_check.cpp
-  src/null_ptr.cpp
   src/arith_san.cpp
+  src/bounds_check.cpp
+  src/CVEAssert.cpp
   src/helpers.cpp
+  src/instrument.cpp
+  src/null_ptr.cpp
   src/undesirableop.cpp
 )
 

@@ -30,6 +30,7 @@
 #include "arith_san.hpp"
 #include "bounds_check.hpp"
 #include "helpers.hpp"
+#include "instrument.hpp"
 #include "null_ptr.hpp"
 #include "undesirableop.hpp"
 
@@ -293,12 +294,7 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
       }
 
       if (instrument_mem_inst.instrumentMemAllocator) {
-        instrumentMalloc(&F);
-        instrumentRealloc(&F);
-        instrumentCalloc(&F);
-        instrumentStrdup(&F);
-        instrumentStrndup(&F);
-        instrumentFree(&F);
+        instrumentLibraryAllocations(&F);
       }
     }
 
