@@ -89,8 +89,10 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
     // TODO: write this in asm as some kind of sanitzer_rt?
     FunctionType *resolveFreeNonHeapFnTy =
         FunctionType::get(Type::getVoidTy(Ctx), {ptr_ty}, false);
-    Function *resolveFreeNonHeapFn = Function::Create(
-        resolveFreeNonHeapFnTy, Function::InternalLinkage, handlerName, M);
+    Function *resolveFreeNonHeapFn = getOrCreateResolveHelper(
+      M, handlerName, resolveFreeNonHeapFnTy);
+    if (!resolveFreeNonHeapFn->empty()) { return resolveFreeNonHeapFn; }
+    
 
     BasicBlock *Entry = BasicBlock::Create(Ctx, "entry", resolveFreeNonHeapFn);
     BasicBlock *SanitizeBlock =
