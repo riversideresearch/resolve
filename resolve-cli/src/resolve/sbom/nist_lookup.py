@@ -1,9 +1,11 @@
-from resolve.sbom.nist_api import CveItem
-from resolve.sbom import nist_api
+from pydantic import ValidationError
+import aiohttp
+from resolve.sbom.schema.nist_api import CveItem, CWE
+from resolve.sbom.schema import nist_api
 import asyncio
 import aiohttp
 from aiohttp import ClientSession
-from resolve.sbom.cpe_api import Cpe, JsonSchemaForNvdCommonProductEnumerationCpeApiVersion20
+from resolve.sbom.schema.cpe_api import Cpe, JsonSchemaForNvdCommonProductEnumerationCpeApiVersion20
 import pdb
 
 CVE_API_BASE_PATH = "https://services.nvd.nist.gov/rest/json/cves/2.0"
@@ -25,6 +27,29 @@ async def fuzzy_find_cpe(session: ClientSession, dep: str) -> str:
         raise FileNotFoundError # TODO custom error type
     return cpes[0].cpeName
 
+async def get_cwe(session: aiohttp.ClientSession, id: str):
+    known_bad_patterns = ["NVD-CWE-Other", "NVD-CWE-noinfo"]
+    if id in known_bad_patterns: 
+        return None
+    try:
+        id_num = int(id.lstrip("CWE-"))
+    except ValueError:
+        print(f"Could not convert CWE ID {id}")
+        return None
+    async with session.get(f"https://cwe-api.mitre.org/api/v1/cwe/weakness/{id_num}") as resp:
+        if not resp.ok: return None
+        body = await resp.json()
+        entry = body.get("Weaknesses")
+        if not entry or not len(entry):
+            return None
+        entry = entry[0]
+        try:
+            return CWE(id=entry.get("ID"), name=entry.get("Name"))
+        except ValidationError:
+            print(f"Could not parse data from CWE API: {entry}")
+            return None
+
+
 async def get_cves(session: aiohttp.ClientSession, params: dict[str, str]) -> list[CveItem]:
     CVEs: list[nist_api.CveItem] = []
     while True:
@@ -32,6 +57,19 @@ async def get_cves(session: aiohttp.ClientSession, params: dict[str, str]) -> li
             resp.raise_for_status()
             json = await resp.json()
         data = nist_api.JsonSchemaForNvdVulnerabilityDataApiVersion223.model_validate(json)
+        for v in data.vulnerabilities:
+            cve = v.cve
+            for weakness in cve.weaknesses:
+                cwe = None
+                if weakness.type == 'Primary':
+                    # description should be of format description=[LangString(lang='en', value='CWE-79')]
+                    for desc in weakness.description:
+                        if desc.lang == 'en' and 'CWE' in desc.value:
+                            cwe = await get_cwe(session, desc.value)
+                if isinstance(cwe, CWE):
+                    weakness.set_cwe(cwe)
+
+            CVEs.append(cve)
         CVEs.extend([item.cve for item in data.vulnerabilities]) # NIST API has unnecessary wrapper around cve object
         if len(CVEs) >= data.totalResults:
             break
@@ -47,7 +85,6 @@ async def get_cves_by_dep(session: ClientSession, dep: str) -> dict[str, list[Cv
 
 def filter_cves(cves: list[CveItem], min_base_score_v3: float = 0.0, allow_no_v3_score: bool = False, allow_disputed: bool = True, allow_deferred: bool = True, allow_rejected: bool = False):
     out = []
-    # pdb.set_trace()
     for cve in cves:
         v3_score = cve.metrics.get_v3_base_score()
         if (not allow_no_v3_score and not v3_score) or (v3_score and v3_score < min_base_score_v3):
@@ -76,6 +113,5 @@ async def dep_lookup(deps: list[str], cpe_literal: bool = False, **kwargs) -> di
             out.update(r)
         else:
             print(f"WARNING: lookup failed with {r}")
-            pdb.set_trace()
     print(f"{len(out)}/{len(deps)} lookups succeeded.")
     return out

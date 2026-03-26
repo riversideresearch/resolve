@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from datetime import date
 from enum import Enum
-from typing import Literal
+from typing import Literal, Annotated
 from uuid import UUID
 
 from pydantic import (
@@ -398,6 +398,9 @@ class VendorComment(BaseModel):
     comment: str
     lastModified: NaiveDatetime
 
+class CWE(BaseModel):
+    id: Annotated[str, Field(pattern=r"^\d+$")]
+    name: str
 
 class Weakness(BaseModel):
     model_config = ConfigDict(
@@ -406,6 +409,10 @@ class Weakness(BaseModel):
     source: str
     type: str
     description: list[LangString] = Field(..., min_length=0)
+    cwe: CWE | None = None
+
+    def set_cwe(self, cwe: CWE):
+        self.cwe = cwe
 
 
 class Operator(Enum):
