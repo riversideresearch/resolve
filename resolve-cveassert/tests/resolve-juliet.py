@@ -341,6 +341,8 @@ def test_cwe(test_dir: CWETestDir, io_obj: Path, out_dir: Path, test_limit: int)
     print(f"Percentage of CWE{test_dir.cwe} directory covered: {success_percent:.2f}%")
     print(flush=True)
 
+    return pass_count, total_tests
+
 
 def main():
     parser = argparse.ArgumentParser()
@@ -406,8 +408,21 @@ def main():
         n = sum(1 for _ in test_dir.iterdir())
         print(f"Testing: {test_dir} ({n} tests...)")
     print(flush=True)
+
+    total_pass_count = 0
+    total_tests = 0
     for test_dir in test_dirs:
-        test_cwe(test_dir, io_obj, out_dir, test_limit)
+        pass_count, tests = test_cwe(test_dir, io_obj, out_dir, test_limit)
+
+        total_pass_count += pass_count
+        total_tests += tests
+
+    success_percent = (total_pass_count / total_tests) * 100
+
+    print("-----------------------------------------------------------------")
+    print(f"Total pass: {total_pass_count}")
+    print(f"Total testcases: {total_tests}")
+    print(f"Percentage covered: {success_percent:.2f}%")
 
 if __name__ == "__main__":
     main()
