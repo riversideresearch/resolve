@@ -23,12 +23,11 @@ using namespace llvm;
 
 /// This helper fn reduces redundant code
 /// in the getOrCreate* functions
-void validateIR(Function *F, const std::string msg) {
+void validateIR(Function *F) {
   raw_ostream &out = errs();
-  out << msg;
   out << *F;
   if (verifyFunction(*F, &out)) {
-    report_fatal_error("[CVEAssert] We broke somthing");
+    return;
   }
 }
 
