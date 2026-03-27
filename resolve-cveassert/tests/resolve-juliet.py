@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 import shutil
 from signal import Signals
-from typing import Mapping
 import argparse
 import json
 import os
@@ -85,19 +84,19 @@ class CWETestDir:
             else:
                 yield source_path
 
-    def collect_tests(self) -> Mapping[str, list[Path]]:
+    def collect_tests(self) -> "list[CWETest]":
         """Collect tests in `self`
 
         Each test may contain multiple sources.
         """
         # Map test name to all of its source files
-        test_src_files: defaultdict[str, list[Path]] = defaultdict(list)
+        test_src_files: defaultdict[tuple[int, str], list[Path]] = defaultdict(list)
 
         # Group source files according to name (words followed by an index)
         for source_path in self.iterdir():
             # Extract group key from stem
             stem = source_path.stem
-            match = re.search(r"^(.*_\d+)", stem)
+            match = re.search(r"^.*_(\d+)", stem)
 
             if not match:
                 print(
@@ -105,15 +104,21 @@ class CWETestDir:
                 )
                 continue
 
-            testcase_name = match.group(1)
-            test_src_files[testcase_name].append(source_path)
+            testcase_name = match.group(0)
+            testcase_idx = int(match.group(1))
+            test_src_files[(testcase_idx, testcase_name)].append(source_path)
 
-        return test_src_files
+        tests = [
+            CWETest(self.id, idx, name, source_paths)
+            for (idx, name), source_paths in test_src_files.items()
+        ]
+        return sorted(tests, key=lambda t: t.idx)
 
 
 @dataclass
 class CWETest:
     id: int
+    idx: int
     name: str
     source_paths: list[Path]
 
@@ -262,10 +267,7 @@ def do_test(test: CWETest, io_obj: Path, out_dir: Path) -> Result:
 
 
 def test_cwe(test_dir: CWETestDir, io_obj: Path, out_dir: Path):
-    tests = [
-        CWETest(test_dir.id, name, source_paths)
-        for name, source_paths in test_dir.collect_tests().items()
-    ]
+    tests = test_dir.collect_tests()
 
     results = [do_test(test, io_obj, out_dir) for test in tests]
 
