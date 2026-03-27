@@ -48,7 +48,7 @@ def compile_io_c(out_dir: Path):
 
 @dataclass
 class CWETestDir:
-    id: int
+    cwe: int
     dir: Path
     name: str
 
@@ -58,8 +58,8 @@ class CWETestDir:
         match = re.search(r"^CWE(\d+)_(.*)", dir.name)
         if match is None:
             return None
-        id, name = match.groups()
-        return cls(id=int(id), name=name, dir=dir)
+        cwe, name = match.groups()
+        return cls(cwe=int(cwe), name=name, dir=dir)
 
     @classmethod
     def all_in_dir(cls, dir: Path):
@@ -109,7 +109,7 @@ class CWETestDir:
             test_src_files[(testcase_idx, testcase_name)].append(source_path)
 
         tests = [
-            CWETest(self.id, idx, name, source_paths)
+            CWETest(self.cwe, idx, name, source_paths)
             for (idx, name), source_paths in test_src_files.items()
         ]
         return sorted(tests, key=lambda t: t.idx)
@@ -117,7 +117,7 @@ class CWETestDir:
 
 @dataclass
 class CWETest:
-    id: int
+    cwe: int
     idx: int
     name: str
     source_paths: list[Path]
@@ -167,7 +167,7 @@ class CWETest:
         # Build JSON
         vulnerabilities = [
             {
-                "cwe-id": str(self.id),
+                "cwe-id": str(self.cwe),
                 "affected-function": func,
                 "affected-file": str(file),
                 "remediation-strategy": "exit",
