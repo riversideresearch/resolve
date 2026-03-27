@@ -357,15 +357,37 @@ def main():
     parser.add_argument(
         "CWEs", metavar="N", type=int, nargs="*", help="a CWE number to target"
     )
+    parser.add_argument(
+        "--force",
+        "-f",
+        action="store_true",
+        help="Replace the existing output directory if it exists",
+    )
+    parser.add_argument(
+        "--out_dir",
+        type=Path,
+        default=Path.cwd() / "resolve_juliet_outputs",
+        help="Directory to write intermediate and output files to",
+    )
     args = parser.parse_args()
 
+    out_dir: Path = args.out_dir
     cwe_ids: set[int] = set(args.CWEs)
+    overwrite_dir = args.force
+
+    try:
+        out_dir.mkdir()
+    except FileExistsError:
+        if overwrite_dir:
+            shutil.rmtree(out_dir)
+            out_dir.mkdir()
+        else:
+            parser.exit(
+                message=f"ERROR: Output dir {out_dir} exists...\nRename it, or try again with -f/--force\n"
+            )
 
     # Compile the io dependency needed for juliet test I/O
-    io_obj = compile_io_c(Path("/tmp/io.o"))
-
-    out_dir = Path.cwd() / "resolve_juliet_outputs"
-    out_dir.mkdir()
+    io_obj = compile_io_c(out_dir)
 
     for test in CWETestDir.all_in_dir(juliet_testcases_dir):
         if test.id in cwe_ids:
