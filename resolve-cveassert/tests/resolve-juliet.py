@@ -371,8 +371,21 @@ def main():
     )
     args = parser.parse_args()
 
+    DEFAULT_CWEs = (
+        121,  # STACK_BASED_BUF_OVERFLOW
+        122,  # HEAP_BASED_BUF_OVERFLOW
+        123,  # WRITE_WHAT_WHERE
+        787,  # OOB_WRITE
+        125,  # OOB_READ
+        131,  # INCORRECT_BUF_SIZE
+        369,  # DIVIDE_BY_ZERO
+        190,  # INT_OVERFLOW
+        476,  # NULL_PTR_DEREF
+        590,  # STACK_FREE
+    )
+
+    cwe_ids: set[int] = set(args.CWEs if args.CWEs else DEFAULT_CWEs)
     out_dir: Path = args.out_dir
-    cwe_ids: set[int] = set(args.CWEs)
     overwrite_dir = args.force
 
     try:
