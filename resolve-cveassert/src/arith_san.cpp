@@ -62,14 +62,14 @@ void sanitizeBitShift(Function *F,
     }
   }
 
-  for (auto *binary_instr : worklist) {
+  for (auto *binary_inst : worklist) {
     Value *IsNegative = nullptr;
     Value *IsGreaterThanBitWidth = nullptr;
     Value *CheckShiftAmtCond = nullptr;
 
-    builder.SetInsertPoint(binary_instr);
-    Value *shifted_value = binary_instr->getOperand(0);
-    Value *shift_amt = binary_instr->getOperand(1);
+    builder.SetInsertPoint(binary_inst);
+    Value *shifted_value = binary_inst->getOperand(0);
+    Value *shift_amt = binary_inst->getOperand(1);
     unsigned BitWidth = shifted_value->getType()->getIntegerBitWidth();
 
     IsNegative = builder.CreateICmpULT(
@@ -78,10 +78,10 @@ void sanitizeBitShift(Function *F,
         shift_amt, ConstantInt::get(shift_amt->getType(), BitWidth));
     CheckShiftAmtCond = builder.CreateOr(IsNegative, IsGreaterThanBitWidth);
 
-    BasicBlock *originalBB = binary_instr->getParent();
-    BasicBlock *contExeBB = originalBB->splitBasicBlock(binary_instr);
-    BasicBlock *preserveShiftBB = BasicBlock::Create(Ctx, "", F, contExeBB);
-    BasicBlock *remedShiftBB = BasicBlock::Create(Ctx, "", F, contExeBB);
+    BasicBlock *originalBB = binary_inst->getParent();
+    BasicBlock *joinResultBB = originalBB->splitBasicBlock(binary_inst);
+    BasicBlock *preserveShiftBB = BasicBlock::Create(Ctx, "", F, joinResultBB);
+    BasicBlock *remedShiftBB = BasicBlock::Create(Ctx, "", F, joinResultBB);
 
     // originalBB: Branch if the shift amount is negative or greater than
     // bitwidth
@@ -96,7 +96,7 @@ void sanitizeBitShift(Function *F,
     Value *safeShift = nullptr;
     Value *safeShiftAmt;
 
-    switch (binary_instr->getOpcode()) {
+    switch (binary_inst->getOpcode()) {
     case Instruction::Shl:
       safeShiftAmt = ConstantInt::get(shift_amt->getType(), 0);
       safeShift = builder.CreateShl(shifted_value, safeShiftAmt);
@@ -113,40 +113,40 @@ void sanitizeBitShift(Function *F,
       break;
     }
 
-    builder.CreateBr(contExeBB);
+    builder.CreateBr(joinResultBB);
 
     // preserveShiftBB: Preserve shift operation if unaffected
     builder.SetInsertPoint(preserveShiftBB);
     Value *normalResult = nullptr;
 
-    switch (binary_instr->getOpcode()) {
+    switch (binary_inst->getOpcode()) {
     case Instruction::Shl:
       normalResult = builder.CreateShl(shifted_value, shift_amt);
-      builder.CreateBr(contExeBB);
+      builder.CreateBr(joinResultBB);
       break;
 
     case Instruction::AShr:
       normalResult = builder.CreateAShr(shifted_value, shift_amt);
-      builder.CreateBr(contExeBB);
+      builder.CreateBr(joinResultBB);
       break;
 
     case Instruction::LShr:
       normalResult = builder.CreateLShr(shifted_value, shift_amt);
-      builder.CreateBr(contExeBB);
+      builder.CreateBr(joinResultBB);
       break;
     }
 
-    // contExeBB: Collect results from control flow using phi
-    builder.SetInsertPoint(&*contExeBB->begin());
-    PHINode *phi_instr = builder.CreatePHI(binary_instr->getType(), 2);
+    // joinResultBB: Collect results from control flow using phi
+    builder.SetInsertPoint(&*joinResultBB->begin());
+    PHINode *phi_instr = builder.CreatePHI(binary_inst->getType(), 2);
     phi_instr->addIncoming(safeShift, remedShiftBB);
     phi_instr->addIncoming(normalResult, preserveShiftBB);
 
     // Replace all shift operations with phi
-    binary_instr->replaceAllUsesWith(phi_instr);
+    binary_inst->replaceAllUsesWith(phi_instr);
 
     // Erase old shift operation
-    binary_instr->eraseFromParent();
+    binary_inst->eraseFromParent();
   }
 }
 
@@ -154,6 +154,7 @@ void sanitizeDivideByZero(Function *F,
                           Vulnerability::RemediationStrategies strategy) {
   Module *M = F->getParent();
   auto &Ctx = M->getContext();
+  auto usize_ty = Type::getInt64Ty(Ctx);
   IRBuilder<> builder(Ctx);
   std::vector<Instruction *> worklist;
 
@@ -191,45 +192,51 @@ void sanitizeDivideByZero(Function *F,
   }
 
   // Loop over each instruction in the list
-  for (auto *binary_instr : worklist) {
+  for (auto *binary_inst : worklist) {
     Value *dividend;
     Value *divisor;
     Value *isZero;
 
-    // Set the insertion point at the div instruction
-    builder.SetInsertPoint(binary_instr);
+    // checkMapEntryBB
+    // checkZeroBB
+    // preserveDivBB
+    // remedDivBB
+    // joinResultBB
+
+    BasicBlock *checkMapEntryBB = binary_inst->getParent();
+    BasicBlock *joinResultBB = checkMapEntryBB->splitBasicBlock(binary_inst);
+    BasicBlock *checkZeroBB = BasicBlock::Create(Ctx, "check_zero", F);
+    BasicBlock *preserveDivBB = BasicBlock::Create(Ctx, "preserve_division", F, joinResultBB);
+    BasicBlock *remedDivBB = BasicBlock::Create(Ctx, "remediate_division", F, joinResultBB);
+
+    checkMapEntryBB->getTerminator()->eraseFromParent();
+    builder.SetInsertPoint(checkMapEntryBB);
+    Value *mapEntry = builder.CreateCall(getOrCreateSanitizerMapEntry(M), { ConstantInt::get(usize_ty, 3)});
+    Value *isMapEntryZero = builder.CreateICmpEQ(mapEntry, ConstantInt::get(usize_ty, 0));
+    builder.CreateCondBr(isZero, preserveDivBB, checkZeroBB);
+
+    builder.SetInsertPoint(checkZeroBB);
 
     // Extract dividend and divisor
-    dividend = binary_instr->getOperand(0);
-    divisor = binary_instr->getOperand(1);
+    dividend = binary_inst->getOperand(0);
+    divisor = binary_inst->getOperand(1);
 
     // Check opcode of instruction
-    switch (binary_instr->getOpcode()) {
+    switch (binary_inst->getOpcode()) {
     case Instruction::SDiv:
     case Instruction::UDiv:
     case Instruction::SRem:
-    case Instruction::URem: {
+    case Instruction::URem:
       isZero = builder.CreateICmpEQ(divisor,
                                     ConstantInt::get(divisor->getType(), 0));
       break;
-    }
     case Instruction::FDiv:
-    case Instruction::FRem: {
+    case Instruction::FRem:
       isZero = builder.CreateFCmpOEQ(divisor,
                                      ConstantFP::get(divisor->getType(), 0.0));
       break;
     }
-    }
 
-    // Split the basic block to insert control flow for div checking.
-    BasicBlock *originalBB = binary_instr->getParent();
-    BasicBlock *contExeBB = originalBB->splitBasicBlock(binary_instr);
-    BasicBlock *preserveDivBB = BasicBlock::Create(Ctx, "", F, contExeBB);
-    BasicBlock *remedDivBB = BasicBlock::Create(Ctx, "", F, contExeBB);
-
-    // originalBB: Branch if the divisor is zero
-    originalBB->getTerminator()->eraseFromParent();
-    builder.SetInsertPoint(originalBB);
     builder.CreateCondBr(isZero, remedDivBB, preserveDivBB);
 
     // remedDivBB: Perform safe division
@@ -240,7 +247,7 @@ void sanitizeDivideByZero(Function *F,
     Value *safeIntDivisor;
     Value *safeFpDivisor;
 
-    switch (binary_instr->getOpcode()) {
+    switch (binary_inst->getOpcode()) {
     case Instruction::UDiv:
       safeIntDivisor = ConstantInt::get(divisor->getType(), 1);
       safeDiv = builder.CreateUDiv(dividend, safeIntDivisor);
@@ -252,7 +259,7 @@ void sanitizeDivideByZero(Function *F,
       break;
 
     case Instruction::FDiv:
-      safeFpDivisor = ConstantFP::get(binary_instr->getType(), 1.0);
+      safeFpDivisor = ConstantFP::get(binary_inst->getType(), 1.0);
       safeDiv = builder.CreateFDiv(dividend, safeFpDivisor);
       break;
 
@@ -272,55 +279,55 @@ void sanitizeDivideByZero(Function *F,
       break;
     }
 
-    builder.CreateBr(contExeBB);
+    builder.CreateBr(joinResultBB);
 
     // Build preserveDivBB: Preserve division if case is unaffected
     builder.SetInsertPoint(preserveDivBB);
     Value *normalResult = nullptr;
 
-    switch (binary_instr->getOpcode()) {
+    switch (binary_inst->getOpcode()) {
     case Instruction::SDiv:
       normalResult = builder.CreateSDiv(dividend, divisor);
-      builder.CreateBr(contExeBB);
+      builder.CreateBr(joinResultBB);
       break;
 
     case Instruction::UDiv:
       normalResult = builder.CreateUDiv(dividend, divisor);
-      builder.CreateBr(contExeBB);
+      builder.CreateBr(joinResultBB);
       break;
 
     case Instruction::FDiv:
       normalResult = builder.CreateFDiv(dividend, divisor);
-      builder.CreateBr(contExeBB);
+      builder.CreateBr(joinResultBB);
       break;
 
     case Instruction::SRem:
       normalResult = builder.CreateSRem(dividend, divisor);
-      builder.CreateBr(contExeBB);
+      builder.CreateBr(joinResultBB);
       break;
 
     case Instruction::URem:
       normalResult = builder.CreateURem(dividend, divisor);
-      builder.CreateBr(contExeBB);
+      builder.CreateBr(joinResultBB);
       break;
 
     case Instruction::FRem:
       normalResult = builder.CreateFRem(dividend, divisor);
-      builder.CreateBr(contExeBB);
+      builder.CreateBr(joinResultBB);
       break;
     }
 
-    // contExeBB: Collect results from both control flow branchs using phi
-    builder.SetInsertPoint(&*contExeBB->begin());
-    PHINode *phi_instr = builder.CreatePHI(binary_instr->getType(), 2);
+    // joinResultBB: Collect results from both control flow branchs using phi
+    builder.SetInsertPoint(&*joinResultBB->begin());
+    PHINode *phi_instr = builder.CreatePHI(binary_inst->getType(), 2);
     phi_instr->addIncoming(safeDiv, remedDivBB);
     phi_instr->addIncoming(normalResult, preserveDivBB);
 
     // Replace uses of original division with phi
-    binary_instr->replaceAllUsesWith(phi_instr);
+    binary_inst->replaceAllUsesWith(phi_instr);
 
     // Erase old division
-    binary_instr->eraseFromParent();
+    binary_inst->eraseFromParent();
   }
 }
 
@@ -395,6 +402,8 @@ void sanitizeIntOverflow(Function *F,
   Module *M = F->getParent();
   auto &Ctx = M->getContext();
   IRBuilder<> builder(Ctx);
+
+  auto usize_ty = Type::getInt64Ty(Ctx);
 
   switch (strategy) {
   case Vulnerability::RemediationStrategies::WIDEN:
@@ -526,23 +535,33 @@ void sanitizeIntOverflow(Function *F,
     auto [safeResult, isOverflow] = insertSafeOp(binary_inst, op1, op2);
     auto satResult = insertSatOp(binary_inst, op1, op2);
 
-    BasicBlock *originalBB = binary_inst->getParent();
-    BasicBlock *contExeBB = originalBB->splitBasicBlock(satResult);
-    BasicBlock *remedOverflowBB = BasicBlock::Create(Ctx, "", F, contExeBB);
+    // checkMapEntryBB
+    // checkZeroBB
+    // preserveDivBB
+    // remedDivBB
+    // joinResultBB
+    BasicBlock *checkMapEntryBB = binary_inst->getParent();
+    BasicBlock *joinResultBB = checkMapEntryBB->splitBasicBlock(binary_inst);
+    BasicBlock *checkOverflowBB = BasicBlock::Create(Ctx, "check_overflow", F);
+    BasicBlock *remedOverflowBB = BasicBlock::Create(Ctx, "remediate_overflow", F, joinResultBB);
 
-    // originalBB: Branch if overflow flag is set
-    originalBB->getTerminator()->eraseFromParent();
-    builder.SetInsertPoint(originalBB);
-    builder.CreateCondBr(isOverflow, remedOverflowBB, contExeBB);
+    checkMapEntryBB->getTerminator()->eraseFromParent();
+    builder.SetInsertPoint(checkMapEntryBB);
+    Value *mapEntry = builder.CreateCall(getOrCreateSanitizerMapEntry(M), { ConstantInt::get(usize_ty, 3)});
+    Value *isMapEntryZero = builder.CreateICmpEQ(mapEntry, ConstantInt::get(usize_ty, 0));
+    builder.CreateCondBr(isMapEntryZero, joinResultBB, checkOverflowBB);
+
+    builder.SetInsertPoint(checkOverflowBB);
+    builder.CreateCondBr(isOverflow, remedOverflowBB, joinResultBB);
 
     // remedOverflowBB: Call resolve_remediation_behavior
     builder.SetInsertPoint(remedOverflowBB);
     builder.CreateCall(getOrCreateResolveReportSanitizerTriggered(M));
     builder.CreateCall(getOrCreateRemediationBehavior(M, strategy));
-    builder.CreateBr(contExeBB);
+    builder.CreateBr(joinResultBB);
 
-    // contExeBB: resume control flow execution
-    builder.SetInsertPoint(&*contExeBB->begin());
+    // joinResultBB: resume control flow execution
+    builder.SetInsertPoint(&*joinResultBB->begin());
     if (strategy == Vulnerability::RemediationStrategies::SAT) {
       binary_inst->replaceAllUsesWith(satResult);
     } else {
