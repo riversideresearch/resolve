@@ -95,47 +95,6 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
     vulnerabilities = Vulnerability::parseVulnerabilityFile();
   }
 
-  std::string demangleFunctionName(Function &F) {
-    std::string demangledName = "";
-    char *demangledNamePtr = llvm::itaniumDemangle(F.getName().str(), false);
-    if (demangledNamePtr) {
-      demangledName = demangledNamePtr;
-    }
-
-    return demangledName;
-  }
-
-  bool matchTargetFunctionName(std::string fn_name, Function &F, Vulnerability &vuln) {
-    if (vuln.TargetFunctionName.empty() ||
-      (fn_name.find(vuln.TargetFunctionName) == std::string::npos &&
-      F.getName().str().find(vuln.TargetFunctionName) == std::string::npos)) {
-        return false;
-      }
-    return true;
-  }
-  
-  bool matchUndesirableField(Function &F, Vulnerability &vuln) {
-    if (vuln.UndesirableFunction.has_value()) {
-      // Using '0' as a temporary value this will be updated in future PRs
-      sanitizeUndesirableOperationInFunction(&F, *vuln.UndesirableFunction, 0);
-      return true;
-    }
-
-    return false;
-  }
-  
-  bool matchRemediationStrategy(Vulnerability &vuln) {
-    if (vuln.Strategy == Vulnerability::RemediationStrategies::NONE) {
-      return true;
-    }
-    return false;
-  }
-
-  void dumpIR(Function &F, raw_ostream &out, const std::string msg = "") {
-    out << msg;
-    out << F;
-  }
-
   Function *getOrCreateFreeOfNonHeapSanitizer(
       Module *M, Vulnerability::RemediationStrategies strategy) {
     std::string handlerName = "resolve_sanitize_non_heap_free";
@@ -225,6 +184,47 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
     sanitizeIntOverflow(&F, strategy);
   }
 
+  /// Return true if F's name (raw or demangled) contains `targetName
+  ///
+  /// Always returns true if targetName is empty
+  bool nameMatches(Function &F, const std::string &demangledName,
+                   const std::string &targetName) {
+    // Empty function name matches all functions
+    if (targetName.empty()) {
+      return true;
+    }
+
+    // First check demangled name
+    if (demangledName.find(targetName) != std::string::npos) {
+      return true;
+    }
+
+    // Next fallback to raw symbols
+    if (F.getName().str().find(targetName) != std::string::npos) {
+      return true;
+    }
+
+    return false;
+  }
+
+  /// Return true if `F` meets instrumentation critera for vuln
+  bool shouldInstrument(Function &F, Vulnerability &vuln) {
+    // Skip noinstrument functions
+    if (F.getMetadata("resolve.noinstrument")) {
+      return false;
+    }
+
+    char *demangledNamePtr = llvm::itaniumDemangle(F.getName().str(), false);
+    std::string demangledName(demangledNamePtr ?: "");
+
+    if (CVE_ASSERT_DEBUG) {
+      errs() << "[CVEAssert] Trying fn " << F.getName()
+             << " Demangled name: " << demangledName << "\n";
+    }
+
+    return nameMatches(F, demangledName, vuln.TargetFunctionName);
+  }
+
   /// For each function, if it matches the target function name, insert calls to
   /// the vulnerability handlers as specified in the JSON. Each call receives
   /// the triggering argument parsed from the JSON.
@@ -232,30 +232,29 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
                                   Vulnerability &vuln) {
     auto result = PreservedAnalyses::all();
 
-    if (F.getMetadata("resolve.noinstrument")) { return result; }
-
-    std::string demangledFnName = demangleFunctionName(F); 
-
-    if (CVE_ASSERT_DEBUG) {
-      errs() << "[CVEAssert] Trying fn " << F.getName()
-             << " Demangled name: " << demangledFnName << "\n";
-    }
-
-    if (!matchTargetFunctionName(demangledFnName, F, vuln)) {
+    if (!shouldInstrument(F, vuln)) {
       return result;
     }
 
-    validateIR(&F, "[CVEAssert] === Pre Instrumented IR === ");
+    raw_ostream &out = errs();
 
-    if (matchUndesirableField(F, vuln)) {
+    out << "[CVEAssert] === Pre Instrumented IR === \n";
+    out << F;
+
+    if (vuln.UndesirableFunction.has_value()) {
+      /* NOTE: We are using '0' as a temporary this will be updated future PRs
+       */
+      sanitizeUndesirableOperationInFunction(&F, *vuln.UndesirableFunction, 0);
       result = PreservedAnalyses::none();
-      validateIR(&F, "[CVEAssert] === Post Instrumented IR for undesirable operation === \n");
+      out << "[CVEAssert] === Post Sanitization of Undesirable Operation IR "
+             "=== \n";
+      out << F;
     }
 
-    if (matchRemediationStrategy(vuln)) {
-      errs() << "[CVEAssert] NONE strategy selected for " << vuln.TargetFileName
-             << ":" << vuln.TargetFunctionName << "...\n";
-      errs() << "[CVEAssert] Skipping remediation\n";
+    if (vuln.Strategy == Vulnerability::RemediationStrategies::NONE) {
+      out << "[CVEAssert] NONE strategy selected for " << vuln.TargetFileName
+          << ":" << vuln.TargetFunctionName << "...\n";
+      out << "[CVEAssert] Skipping remediation\n";
       return result;
     }
 
@@ -305,15 +304,16 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
       break;
 
     default:
-      errs() << "[CVEAssert] Error: CWE " << vuln.WeaknessID
-             << " not implemented\n";
+      out << "[CVEAssert] Error: CWE " << vuln.WeaknessID
+          << " not implemented\n";
       break;
     }
 
-    validateIR(&F, "[CVEAssert] === Post Instrumented IR === \n");
+    out << "[CVEAssert] === Post Instrumented IR === \n";
+    validateIR(&F);
 
-    errs() << "[CVEAssert] Inserted vulnerability handler calls in function "
-           << vuln.TargetFileName << ":" << vuln.TargetFunctionName << "\n";
+    out << "[CVEAssert] Inserted vulnerability handler calls in function "
+        << vuln.TargetFileName << ":" << vuln.TargetFunctionName << "\n";
     return result;
   }
 
