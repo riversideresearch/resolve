@@ -329,6 +329,7 @@ def test_cwe(test_dir: CWETestDir, io_obj: Path, out_dir: Path):
     show_result("FAIL", fail_results)
     print("-----------------------------------------------------------------")
     print(f"Percentage of CWE{test_dir.cwe} directory covered: {success_percent:.2f}%")
+    print(flush=True)
 
 def main():
     parser = argparse.ArgumentParser()
@@ -380,9 +381,15 @@ def main():
     # Compile the io dependency needed for juliet test I/O
     io_obj = compile_io_c(out_dir)
 
-    for test in CWETestDir.all_in_dir(juliet_testcases_dir):
-        if test.id in cwe_ids:
-            test_cwe(test, io_obj, out_dir)
+    test_dirs = [
+        t for t in CWETestDir.all_in_dir(juliet_testcases_dir) if t.cwe in cwe_ids
+    ]
+    for test_dir in test_dirs:
+        n = sum(1 for _ in test_dir.iterdir())
+        print(f"Testing: {test_dir} ({n} tests...)")
+    print(flush=True)
+    for test_dir in test_dirs:
+        test_cwe(test_dir, io_obj, out_dir)
 
 if __name__ == "__main__":
     main()
