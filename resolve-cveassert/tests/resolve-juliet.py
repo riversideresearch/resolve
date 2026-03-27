@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+from abc import ABC
+from itertools import groupby
 import shutil
 from signal import Signals
 import argparse
@@ -51,6 +53,9 @@ class CWETestDir:
     cwe: int
     dir: Path
     name: str
+
+    def __str__(self):
+        return f"{self.cwe}: {self.name}"
 
     @classmethod
     def from_dir(cls, dir: Path) -> "CWETestDir | None":
@@ -122,6 +127,9 @@ class CWETest:
     name: str
     source_paths: list[Path]
 
+    def __str__(self):
+        return self.name
+
     @staticmethod
     def match_function_name_in_file(path: Path, name_pattern: str) -> str | None:
         """Given a regex in `name_pattern`, tries to find a matching function in `file` using a naive regex"""
@@ -180,38 +188,56 @@ class CWETest:
 
 
 @dataclass
-class Result:
-    """The outcome of a single test
+class Result(ABC):
+    """The outcome of a single test"""
 
-    Possible outcomes: Exit, Signal, CompilationFailure
-    """
+    exit_code = None
+    exit_signal = None
+    timeout = False
+    skip_reason = None
+    failed_compilation_process = None
 
+    def get_signal_name(self):
+        if self.exit_signal is not None:
+            return Signals(self.exit_signal).name or f"signal {self.exit_signal}"
+        else:
+            return None
 
 @dataclass
 class ResultExit(Result):
     exit_code: int
 
+    def __str__(self) -> str:
+        return f"exit {self.exit_code}"
 
 @dataclass
 class ResultSignal(Result):
-    signal: int
+    exit_signal: int
 
-    def get_signal_name(self):
-        return Signals(self.signal).name
+    def __str__(self) -> str:
+        return f"exit {self.get_signal_name()}"
 
 @dataclass
 class ResultTimeout(Result):
-    pass
+    timeout = True
+
+    def __str__(self) -> str:
+        return "timeout"
+
 
 @dataclass
 class ResultSkipped(Result):
     skip_reason: str
 
-
+    def __str__(self) -> str:
+        return f"skipped: {self.skip_reason}"
 
 @dataclass
 class ResultCompilationFailure(Result):
-    called_process: CompletedProcess[str]
+    failed_compilation_process: CompletedProcess[str]
+
+    def __str__(self) -> str:
+        return "failed_to_compile"
 
 
 def do_test(test: CWETest, io_obj: Path, out_dir: Path) -> Result:
@@ -268,53 +294,41 @@ def do_test(test: CWETest, io_obj: Path, out_dir: Path) -> Result:
 
 def test_cwe(test_dir: CWETestDir, io_obj: Path, out_dir: Path):
     tests = test_dir.collect_tests()
+    results = [(test, do_test(test, io_obj, out_dir)) for test in tests]
 
-    results = [do_test(test, io_obj, out_dir) for test in tests]
+    pass_results = [(t, r) for t, r in results if r.exit_code == 3]
+    fail_results = [(t, r) for t, r in results if r.exit_code != 3]
 
-    correct_exit_code = 0
-    incorrect_exit_code = 0
-    zero_exit_code = 0
-    unexpected_exit_code = 0
-    failed_signal = 0
-    signal_segfault = 0
-    failed_to_compile = 0
-    failed_to_compile_cpp = 0
+    def summarize_results(results: list[tuple[CWETest, Result]]):
+        SUMMARY_LEN = 10
 
-    for t, r in zip(tests, results):
-        match r:
-            case ResultCompilationFailure():
-                failed_to_compile += 1
-                if ".cpp" in t.source_paths[0]:
-                    failed_to_compile_cpp += 1
-            case ResultSignal(signal):
-                failed_signal += 1
-                if signal == 11:
-                    signal_segfault += 1
-            case ResultExit(3):
-                correct_exit_code += 1
-            case ResultExit(code):
-                incorrect_exit_code += 1
-                if code == 0:
-                    zero_exit_code += 1
-                else:
-                    unexpected_exit_code += 1
+        def key(results: tuple[CWETest, Result]):
+            return str(results[1])
 
-    # fmt: off
+        grouped = groupby(sorted(results, key=key), key=key)
+        for g, gr in grouped:
+            group_results = list(gr)
+            print(f"{g} ({len(group_results)} tests...)")
+            print("\n".join(f"  {t.name}" for t, _ in group_results[:SUMMARY_LEN]))
+            if len(group_results) > SUMMARY_LEN:
+                print("  ...")
+
+    def show_result(label: str, results: list[tuple[CWETest, Result]]):
+        print(f"{label}: {len(results)}")
+        if len(results):
+            summarize_results(results)
+
+    pass_count = len(pass_results)
+    total_tests = len(tests)
+    success_percent = (pass_count / total_tests) * 100
+
     print("-----------------------------------------------------------------")
-    print(f"Testing: {test_dir!r}")
+    print(f"Testing: {test_dir}")
     print(f"Total testcases: {len(tests)}")
-    print(f"PASS: Number of cases with remediated exit code (exit code 3): {correct_exit_code}")
-    print(f"\nFAIL: Number of cases with incorrect exit code (exit code != 3): {incorrect_exit_code}")
-    print(f"      Number of cases exiting normally (exit code 0): {incorrect_exit_code}")
-    print(f"      Number of cases exit with unexpected exit code: {unexpected_exit_code}")
-    print(f"\nFAIL: Number of cases that terminate with signal: {failed_signal}")
-    print(f"      Number of cases that terminate with segmentation faults: {signal_segfault}")
-    print(f"\nFAIL: Number of cases failed to compile: {failed_to_compile}")
-    print(f"      Number of cases failed to compile (Require C++ support): {failed_to_compile_cpp}")
-    print(f"\nPercentage of CWE{test_dir.id} directory covered: {(correct_exit_code / len(tests)) * 100:.2f}%")
+    show_result("PASS", pass_results)
+    show_result("FAIL", fail_results)
     print("-----------------------------------------------------------------")
-    # fmt: on
-
+    print(f"Percentage of CWE{test_dir.cwe} directory covered: {success_percent:.2f}%")
 
 def main():
     parser = argparse.ArgumentParser()
