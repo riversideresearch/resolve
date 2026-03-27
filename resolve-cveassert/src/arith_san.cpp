@@ -214,7 +214,7 @@ void sanitizeDivideByZero(Function *F,
     builder.SetInsertPoint(checkMapEntryBB);
     Value *mapEntry = builder.CreateCall(getOrCreateSanitizerMapEntry(M), { ConstantInt::get(usize_ty, 3)});
     Value *isMapEntryZero = builder.CreateICmpEQ(mapEntry, ConstantInt::get(i1_ty, 0));
-    builder.CreateCondBr(isZero, preserveDivBB, checkZeroBB);
+    builder.CreateCondBr(isMapEntryZero, preserveDivBB, checkZeroBB);
 
     builder.SetInsertPoint(checkZeroBB);
 
