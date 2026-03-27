@@ -31,6 +31,38 @@ void validateIR(Function *F) {
   }
 }
 
+Function *getOrCreateSanitizerMapEntry(Module *M) {
+  LLVMContext &Ctx = M->getContext();
+  auto i1_ty = Type::getInt1Ty(Ctx);
+  auto usize_ty = Type::getInt64Ty(Ctx);
+  GlobalVariable *gSanitizerMap = M->getNamedGlobal("sanitizer_map");
+
+  FunctionType *sanitizerMapIdxFnTy = 
+    FunctionType::get(i1_ty, { usize_ty }, false);
+
+  Function *sanitizerMapIdxFn = getOrCreateResolveHelper(M, "resolve_get_sanitizer_flag", sanitizerMapIdxFnTy);
+  if (!sanitizerMapIdxFn->empty()) { return sanitizerMapIdxFn; }
+
+  IRBuilder<> builder(Ctx);
+
+  // When indexing an array use two indices
+  // 1. First index step from the global ptr
+  // 2. Second index: the actual element index 
+  Value *zero = builder.getInt64(0);
+  Value *idx = sanitizerMapIdxFn->getArg(0);
+  BasicBlock *EntryBB = BasicBlock::Create(Ctx, "entry", sanitizerMapIdxFn);
+  builder.SetInsertPoint(EntryBB);
+
+  Value* sanitizerMapPtr = builder.CreateGEP(ArrayType::get((i1_ty), 7),
+   gSanitizerMap, { zero, idx }
+  );
+  Value* mapValue = builder.CreateLoad(i1_ty, sanitizerMapPtr);
+  builder.CreateRet(mapValue);
+
+  validateIR(sanitizerMapIdxFn);
+  return sanitizerMapIdxFn;
+} 
+
 std::string getLLVMType(Type *ty) {
   // TODO: This is going to be super slow, may want to cache the computed
   // strings
@@ -82,10 +114,11 @@ Function *getOrCreateResolveHelper(Module *M, std::string fn_name,
 Function *getOrCreateIsHeap(Module *M, LLVMContext &Ctx) {
   // TODO: handle address spaces other than 0
   auto ptr_ty = PointerType::get(Ctx, 0);
+  auto i1_ty = Type::getInt1Ty(Ctx);
 
   // TODO: write this in asm as some kind of sanitzer_rt?
   FunctionType *resolveIsHeapFnTy =
-      FunctionType::get(Type::getIntNTy(Ctx, 1), {ptr_ty}, false);
+      FunctionType::get(i1_ty, {ptr_ty}, false);
 
   Function *resolveIsHeapFn =
       getOrCreateResolveHelper(M, "resolve_is_heap", resolveIsHeapFnTy);
