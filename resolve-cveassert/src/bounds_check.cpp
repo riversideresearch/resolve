@@ -125,9 +125,13 @@ static Function *getOrCreateBoundsCheckLoadSanitizer(
 
   builder.SetInsertPoint(EntryBB);
 
+  // When indexing an array use two indices
+  // 1. First index step from the global ptr
+  // 2. Second index: the actual element index 
+  Value *zero = builder.getInt64(0);
   Value *idx = builder.getInt64(0);
   Value* sanitizerMapPtr = builder.CreateGEP(ArrayType::get((i1_ty), 7),
-   initSanitizerMap(M), { idx }
+   initSanitizerMap(M), { zero, idx }
   );
   Value* mapValue = builder.CreateLoad(i1_ty, sanitizerMapPtr);
   Value *isZero = builder.CreateICmpEQ(mapValue, ConstantInt::get(i1_ty, 0));
@@ -182,9 +186,10 @@ static Function *getOrCreateBoundsCheckStoreSanitizer(
   Value *storedVal = resolveStoreFn->getArg(1);
   builder.SetInsertPoint(EntryBB);
 
+  Value *zero = builder.getInt64(0);
   Value *idx = builder.getInt64(0);
   Value* sanitizerMapPtr = builder.CreateGEP(ArrayType::get((i1_ty), 7),
-   initSanitizerMap(M), { idx }
+   initSanitizerMap(M), { zero, idx }
   );
   Value* mapValue = builder.CreateLoad(i1_ty, sanitizerMapPtr);
   Value *isZero = builder.CreateICmpEQ(mapValue, ConstantInt::get(i1_ty, 0));
@@ -242,9 +247,10 @@ static Function *getOrCreateBoundsCheckMemcpySanitizer(
   Value *src_ptr = resolveMemcpyFn->getArg(1);
   Value *size_arg = resolveMemcpyFn->getArg(2);
 
+  Value *zero = builder.getInt64(0);
   Value *idx = builder.getInt64(0);
   Value* sanitizerMapPtr = builder.CreateGEP(ArrayType::get((i1_ty), 7),
-   initSanitizerMap(M), { idx }
+   initSanitizerMap(M), { zero, idx }
   );
   Value* mapValue = builder.CreateLoad(i1_ty, sanitizerMapPtr);
   Value *isZero = builder.CreateICmpEQ(mapValue, ConstantInt::get(i1_ty, 0));
@@ -306,9 +312,10 @@ static Function *getOrCreateBoundsCheckMemsetSanitizer(
   Value *valueArg = resolveMemsetFn->getArg(1);
   Value *accessSize = resolveMemsetFn->getArg(2);
 
+  Value *zero = builder.getInt64(0);
   Value *idx = builder.getInt64(0);
   Value* sanitizerMapPtr = builder.CreateGEP(ArrayType::get((i1_ty), 7),
-   initSanitizerMap(M), { idx }
+   initSanitizerMap(M), { zero, idx }
   );
   Value* mapValue = builder.CreateLoad(i1_ty, sanitizerMapPtr);
   Value *isZero = builder.CreateICmpEQ(mapValue, ConstantInt::get(i1_ty, 0));
@@ -371,9 +378,10 @@ static Function *getOrCreateResolveGep(Module *M) {
   Value *basePtr = resolveGepFn->getArg(0);
   Value *derivedPtr = resolveGepFn->getArg(1);
 
+  Value *zero = builder.getInt64(0);
   Value *idx = builder.getInt64(0);
   Value* sanitizerMapPtr = builder.CreateGEP(ArrayType::get((i1_ty), 7),
-   initSanitizerMap(M), { idx }
+   initSanitizerMap(M), { zero, idx }
   );
   Value* mapValue = builder.CreateLoad(i1_ty, sanitizerMapPtr);
   Value *isZero = builder.CreateICmpEQ(mapValue, ConstantInt::get(i1_ty, 0));
