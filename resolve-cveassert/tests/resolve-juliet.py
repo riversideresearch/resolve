@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import shutil
 from signal import Signals
 from typing import Mapping
 import argparse
