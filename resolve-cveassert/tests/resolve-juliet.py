@@ -89,7 +89,7 @@ class CWETestDir:
             else:
                 yield source_path
 
-    def collect_tests(self) -> "list[CWETest]":
+    def collect_tests(self, test_limit: int) -> "list[CWETest]":
         """Collect tests in `self`
 
         Each test may contain multiple sources.
@@ -111,6 +111,16 @@ class CWETestDir:
 
             testcase_name = match.group(0)
             testcase_idx = int(match.group(1))
+            if (
+                len(test_src_files) == test_limit
+                and (testcase_idx, testcase_name) not in test_src_files
+            ):
+                print(
+                    f"WARN: Skipping remaining tests in {self.name} after {test_limit} tests",
+                    file=sys.stderr,
+                )
+                break
+
             test_src_files[(testcase_idx, testcase_name)].append(source_path)
 
         tests = [
@@ -292,8 +302,8 @@ def do_test(test: CWETest, io_obj: Path, out_dir: Path) -> Result:
             return ResultSignal(-signal)
 
 
-def test_cwe(test_dir: CWETestDir, io_obj: Path, out_dir: Path):
-    tests = test_dir.collect_tests()
+def test_cwe(test_dir: CWETestDir, io_obj: Path, out_dir: Path, test_limit: int):
+    tests = test_dir.collect_tests(test_limit)
     results = [(test, do_test(test, io_obj, out_dir)) for test in tests]
 
     pass_results = [(t, r) for t, r in results if r.exit_code == 3]
@@ -331,6 +341,7 @@ def test_cwe(test_dir: CWETestDir, io_obj: Path, out_dir: Path):
     print(f"Percentage of CWE{test_dir.cwe} directory covered: {success_percent:.2f}%")
     print(flush=True)
 
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -341,6 +352,12 @@ def main():
         "-f",
         action="store_true",
         help="Replace the existing output directory if it exists",
+    )
+    parser.add_argument(
+        "--limit",
+        type=int,
+        default=50,
+        help="Limit the number of tests processed per CWE",
     )
     parser.add_argument(
         "--out_dir",
@@ -366,6 +383,7 @@ def main():
     cwe_ids: set[int] = set(args.CWEs if args.CWEs else DEFAULT_CWEs)
     out_dir: Path = args.out_dir
     overwrite_dir = args.force
+    test_limit = args.limit
 
     try:
         out_dir.mkdir()
@@ -389,7 +407,7 @@ def main():
         print(f"Testing: {test_dir} ({n} tests...)")
     print(flush=True)
     for test_dir in test_dirs:
-        test_cwe(test_dir, io_obj, out_dir)
+        test_cwe(test_dir, io_obj, out_dir, test_limit)
 
 if __name__ == "__main__":
     main()
