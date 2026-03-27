@@ -129,50 +129,26 @@ def findGood(source_files: list[Path]) -> list[tuple]:
     # Return both lists as a combined list
     return matching_cwe_pattern_files + matching_g_b_pattern_files 
 
-def find_matching_file_identifier(source_path: Path):
-    """
-    Finds all source files in CWE directory that have
-    matching identifiers. 
-
-    Ex.
-        CWE123_Write_What_Where_Condition_connect_socket_22a.c
-        CWE123_Write_What_Where_Condition_connect_socket_22b.c
-
-    """
-    
-    # Check if the path provided is a file or a directory
-    # if source_path.is_dir():
-    pass
-
 def testCwe(testcase: tuple):
     print("\n>>> ENTERING testCwe() <<<")
     cwe_id, testcase_dir_path = testcase
 
     print(f"[DEBUGGING] Path: {testcase_dir_path}")
 
-    grouped_tests = defaultdict(list)
+    # A mapping from a testcase id to all of its source files
+    test_src_files = defaultdict(list)
 
-    # Check to see if the source path is a directory or a file
-    for file_count, source_path in enumerate(testcase_dir_path.iterdir()):
-        if source_path.is_dir():
-            for source_code in source_path.iterdir():
-                # Ignoring _listen_socket tests because they hang
-                # forever waiting for socket connection
-                # We assume they are redundant to other easier
-                # to integrate test for our purposes
-                if "_listen_socket_" in source_code.name:
-                    continue
+    # NOTE: Look into generators in python
+    def iterate_test_case_dir(testcase_dir_path: Path):
+        for source_path in testcase_dir_path.iterdir():
+            # Juliet testsuite CWE directory structure varies
+            # some dirs contain subdirs while others contain src files
+            if source_path.is_dir():
+                yield from source_path.iterdir()
+            else:
+                yield source_path
 
-                stem = source_code.stem
-                match = re.search(r"^(.*_\d+)", stem)
-                
-                if not match:
-                    continue
-
-                group_key = match.group(1)
-                grouped_tests[group_key].append(source_code) 
-                print(f"[DEBUGGING]: ({file_count, source_code})")
-    
+    for src_path in iterate_test_case_dir(testcase_dir_path):
         # Extract group key from stem
         stem = source_path.stem
         match = re.search(r"^(.*_\d+)", stem)
@@ -180,10 +156,13 @@ def testCwe(testcase: tuple):
         if not match:
             continue
 
-        group_key = match.group(1)
-        grouped_tests[group_key].append(source_path)
         
-    # Loop over all the testcases and store results in list
+        testcase_name = match.group(1)
+        print(f"Group key value: {testcase_name}")
+        test_src_files[testcase_name].append(source_path)
+    
+    print(f"Group test: {test_src_files}")
+
     results: list[Result] = []
     
     # Keeps track of total number of tests
@@ -213,7 +192,7 @@ def testCwe(testcase: tuple):
     # Compile the io dependency needed for juliet test I/O
     io_obj = compile_to_objfile(Path("/tmp/io.o"))
 
-    for test_key, test_files in sorted(grouped_tests.items()):
+    for test_key, test_files in sorted(test_src_files.items()):
         
         total_tests+= 1
 
