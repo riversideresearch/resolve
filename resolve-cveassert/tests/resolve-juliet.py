@@ -17,18 +17,6 @@ juliet_testcase_support_headers = juliet_testsuite_root / "testcasesupport"
 
 resolve_cc = "resolvecc"
 
-# Custom Error handling class when no affected functions can be found
-class CouldNotFindFunctionSuffixInFile(Exception):
-    """
-    Custom exception when there are no
-    functions in testcase source files
-    that match the good and bad regex.
-    """
-    def __init__(self, lst):
-        self.lst = lst
-        super().__init__(
-            "Cannot find a function in the source code that matches the good and bad regex."
-        )
 
 def compile_io_c(out_dir: Path):
     """Compile io.c into obj file for linking
