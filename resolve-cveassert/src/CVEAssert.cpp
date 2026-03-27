@@ -51,7 +51,7 @@ GlobalVariable* initSanitizerMap(Module *M) {
     gSanitizerMap->setConstant(false);
 
     if (!gSanitizerMap->hasInitializer()) {
-      std::vector<Constant *> elems(7, ConstantInt::get(Type::getInt1Ty(Ctx), 0));
+      std::vector<Constant *> elems(7, ConstantInt::get(Type::getInt1Ty(Ctx), 1));
       gSanitizerMap->setInitializer(ConstantArray::get(arrty, elems));
     }
 
