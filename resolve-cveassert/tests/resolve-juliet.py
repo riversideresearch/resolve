@@ -44,80 +44,6 @@ def compile_io_c(out_dir: Path):
 
     return obj_file
 
-def find_matching_file_contents(source_files: list[Path], pattern: re.Pattern) -> list[tuple[Path, re.Match]]:
-    """ 
-    Finds the first match group of `pattern` in each file in `source_files`
-    Returns a list of pairs of the form (<file-path>, match)
-    Files with no matches are not included in the return file 
-    """
-    matched_files = []
-
-    for path in source_files:
-        if not path.is_file():
-            continue
-
-        # open the file for reading
-        with path.open("r") as f:
-            # scan each line
-            for line in f:
-                match = pattern.search(line)
-                if match:
-                    # add the path and the match to the list
-                    matched_files.append((path, match))
-                    break # stop scanning file once matched 
-
-    return matched_files
-
-def findBad(source_files: list[Path]) -> list[tuple]:
-    """ 
-    Given a list of source files, return the files
-    that contain a CWE bad function defintion and the function name.
-    """
-    bad_pattern = re.compile(
-        r"^\s*(?:static\s+)?(?:void|int)\s+(\w+_bad)\s*\(",
-    re.VERBOSE)
-
-    # Function name is group(1) match
-    bad_files = [
-        (path, match.group(1))
-        for path, match in find_matching_file_contents(source_files, bad_pattern)
-    ]
-
-    return bad_files
-
-def findGood(source_files: list[Path]) -> list[tuple]:
-    """
-    Given a list of source files, return the files
-    that contain a CWE good function defintion.
-    """ 
-
-    cwe_good_pattern = re.compile(
-    r"^\s*(?:static\s+)?(?:void|int)\s+(\w+_?good)\s*\(",
-    re.VERBOSE)
-
-    # Find G\d+B\d* (G2B, G2B1, G2B2)
-    # Find B\d+G\d* (B2G, B2G1, B2G2)
-    good_g_b_flow_pattern = re.compile(r"""
-    ^\s*
-    (?:static\s+)?                      # optional static and return type
-    (?:void|int)\s+                     # optional return value type 
-    (good(?:G\d+B\d*|B\d+G\d*))         # capture just 'goodG2B*' or goodB2G*' 
-    \s*\(                               # opening parenthesis
-    """, re.VERBOSE)
-
-    matching_cwe_pattern_files = [
-        (path, match.group(1))
-        for path, match in find_matching_file_contents(source_files, cwe_good_pattern)
-    ]
-    matching_g_b_pattern_files = [
-        (path, match.group(1))
-        for path, match in find_matching_file_contents(
-            source_files, good_g_b_flow_pattern
-        )
-    ]
-    
-    # Return both lists as a combined list
-    return matching_cwe_pattern_files + matching_g_b_pattern_files 
 
 @dataclass
 class CWETestDir:
@@ -187,13 +113,44 @@ class CWETest:
     name: str
     source_paths: list[Path]
 
+    @staticmethod
+    def match_function_name_in_file(path: Path, name_pattern: str) -> str | None:
+        """Given a regex in `name_pattern`, tries to find a matching function in `file` using a naive regex"""
+        pattern = re.compile(
+            r"^\s*(?:static\s+)?(?:void|int)\s+(" + name_pattern + r")\s*\("
+        )
+
+        with path.open("r") as f:
+            for line in f:
+                match = pattern.search(line)
+                if match:
+                    return match.group(1)
+
+    def find_matching_function_names(self, name_pattern: str):
+        """Given a regex in `name_pattern`, tries to find a matching function in each `file` using a naive regex"""
+
+        matches: defaultdict[str, list[Path]] = defaultdict(list)
+
+        for path in self.source_paths:
+            if match := self.match_function_name_in_file(path, name_pattern):
+                matches[match].append(path)
+
+        return matches
+
     def get_cve_description(self):
         """
         Creates a CVE description by locating affected functions
         within files per a particular test
         """
 
-        affected_functions = findBad(self.source_paths) + findGood(self.source_paths)
+        bad_functions = self.find_matching_function_names(r"\w+_bad")
+        good_functions = self.find_matching_function_names(r"good(?:G\d+B\d*|B\d+G\d*)")
+        # only try _good if there is not a more specific goodGXBX version
+        # good usually delegates to one of those if that is the case
+        if len(good_functions) == 0:
+            good_functions = self.find_matching_function_names(r"\w+_?good")
+
+        affected_functions = [*bad_functions.items(), *good_functions.items()]
 
         if len(affected_functions) == 0:
             return None
@@ -206,7 +163,8 @@ class CWETest:
                 "affected-file": str(file),
                 "remediation-strategy": "exit",
             }
-            for file, func in affected_functions
+            for func, files in affected_functions
+            for file in files
         ]
 
         return {"vulnerabilities": vulnerabilities}
