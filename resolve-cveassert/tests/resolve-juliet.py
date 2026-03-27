@@ -11,6 +11,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
 from subprocess import CompletedProcess, TimeoutExpired
+import sys
 
 juliet_testsuite_root = Path(__file__).parent
 juliet_testcases_dir = juliet_testsuite_root / "testcases"
@@ -99,7 +100,9 @@ class CWETestDir:
             match = re.search(r"^(.*_\d+)", stem)
 
             if not match:
-                # TODO: Warn if no match
+                print(
+                    f"WARN: No test matching file {source_path.name}", file=sys.stderr
+                )
                 continue
 
             testcase_name = match.group(1)
