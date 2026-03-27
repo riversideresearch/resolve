@@ -126,7 +126,7 @@ static Function *getOrCreateBoundsCheckLoadSanitizer(
 
   builder.SetInsertPoint(EntryBB);
 
-  Value* mapValue = builder.CreateCall(getOrCreateSanitizeMapEntry(M), { ConstantInt::get(usize_ty, 0)});
+  Value* mapValue = builder.CreateCall(getOrCreateSanitizerMapEntry(M), { ConstantInt::get(usize_ty, 0)});
   Value *isZero = builder.CreateICmpEQ(mapValue, ConstantInt::get(i1_ty, 0));
   builder.CreateCondBr(isZero, NormalLoadBB, CheckAccessBB);
 
@@ -180,7 +180,7 @@ static Function *getOrCreateBoundsCheckStoreSanitizer(
   Value *storedVal = resolveStoreFn->getArg(1);
   builder.SetInsertPoint(EntryBB);
 
-  Value* mapValue = builder.CreateCall(getOrCreateSanitizeMapEntry(M), { ConstantInt::get(usize_ty, 0)});
+  Value* mapValue = builder.CreateCall(getOrCreateSanitizerMapEntry(M), { ConstantInt::get(usize_ty, 0)});
   Value *isZero = builder.CreateICmpEQ(mapValue, ConstantInt::get(i1_ty, 0));
   builder.CreateCondBr(isZero, NormalStoreBB, CheckAccessBB);
 
@@ -236,7 +236,7 @@ static Function *getOrCreateBoundsCheckMemcpySanitizer(
   Value *src_ptr = resolveMemcpyFn->getArg(1);
   Value *size_arg = resolveMemcpyFn->getArg(2);
 
-  Value* mapValue = builder.CreateCall(getOrCreateSanitizeMapEntry(M), { ConstantInt::get(size_ty, 0)});
+  Value* mapValue = builder.CreateCall(getOrCreateSanitizerMapEntry(M), { ConstantInt::get(size_ty, 0)});
   Value *isZero = builder.CreateICmpEQ(mapValue, ConstantInt::get(i1_ty, 0));
   builder.CreateCondBr(isZero, NormalBB, CheckAccessBB);
 
@@ -296,7 +296,7 @@ static Function *getOrCreateBoundsCheckMemsetSanitizer(
   Value *valueArg = resolveMemsetFn->getArg(1);
   Value *accessSize = resolveMemsetFn->getArg(2);
 
-  Value* mapValue = builder.CreateCall(getOrCreateSanitizeMapEntry(M), { ConstantInt::get(size_ty, 0)});
+  Value* mapValue = builder.CreateCall(getOrCreateSanitizerMapEntry(M), { ConstantInt::get(size_ty, 0)});
   Value *isZero = builder.CreateICmpEQ(mapValue, ConstantInt::get(i1_ty, 0));
   builder.CreateCondBr(isZero, NormalBB, CheckAccessBB);
   
@@ -357,7 +357,7 @@ static Function *getOrCreateResolveGep(Module *M) {
   Value *basePtr = resolveGepFn->getArg(0);
   Value *derivedPtr = resolveGepFn->getArg(1);
 
-  Value* mapValue = builder.CreateCall(getOrCreateSanitizeMapEntry(M), { ConstantInt::get(size_ty, 0)});
+  Value* mapValue = builder.CreateCall(getOrCreateSanitizerMapEntry(M), { ConstantInt::get(size_ty, 0)});
   Value *isZero = builder.CreateICmpEQ(mapValue, ConstantInt::get(i1_ty, 0));
   builder.CreateCondBr(isZero, NormalBB, GetBaseAndLimitBB);
 
