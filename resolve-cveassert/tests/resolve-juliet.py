@@ -9,7 +9,7 @@ import subprocess
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
-from subprocess import CalledProcessError, CompletedProcess
+from subprocess import CompletedProcess, TimeoutExpired
 
 juliet_testsuite_root = Path(__file__).parent
 juliet_testcases_dir = juliet_testsuite_root / "testcases"
@@ -232,6 +232,10 @@ class ResultSignal(Result):
     def get_signal_name(self):
         return Signals(self.signal).name
 
+@dataclass
+class ResultTimeout(Result):
+    pass
+
 
 @dataclass
 class ResultCompilationFailure(Result):
@@ -263,18 +267,22 @@ def do_test(test: CWETest, io_obj: Path, out_dir: Path) -> Result:
         str(testcase_exe_path),
     ]
 
-    # Compile source files with CVE description
     compile_process = subprocess.run(
         compile_cmd, env=env_var, capture_output=True, text=True
     )
-
     if compile_process.returncode != 0:
         return ResultCompilationFailure(compile_process)
 
-    # Execute the compiled binary
-    executed_binary = subprocess.run(
-        [str(testcase_exe_path)], input="", capture_output=True, timeout=30, text=True
-    )
+    try:
+        executed_binary = subprocess.run(
+            [str(testcase_exe_path)], 
+            input="", # don't share stdin
+            capture_output=True, 
+            timeout=30, # detect hangs (i.e., networking tests)
+            cwd=out_dir, # Run in out dir, attempt to contain log files
+        )
+    except TimeoutExpired:
+        return ResultTimeout()
 
     match executed_binary.returncode:
         case i if i >= 0:
