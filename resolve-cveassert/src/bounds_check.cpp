@@ -189,7 +189,6 @@ static Function *getOrCreateBoundsCheckStoreSanitizer(
 
   builder.CreateCondBr(withinBounds, NormalStoreBB, SanitizeStoreBB);
 
-  // NormalStoreBB: Store value @ addr
   builder.SetInsertPoint(NormalStoreBB);
   builder.CreateStore(storedVal, basePtr);
   builder.CreateRetVoid();
@@ -226,10 +225,7 @@ static Function *getOrCreateBoundsCheckMemcpySanitizer(
   BasicBlock *NormalBB = BasicBlock::Create(Ctx, "safe_memcpy", resolveMemcpyFn);
   BasicBlock *SanitizeMemcpyBB = BasicBlock::Create(Ctx, "sanitize_memcpy", resolveMemcpyFn);
 
-  // EntryBB: Call resolve_access_ok
-  // to verify correct bounds of allocation
   builder.SetInsertPoint(EntryBB);
-
   // Extract dst, src, size arguments from function
   Value *dst_ptr = resolveMemcpyFn->getArg(0);
   Value *src_ptr = resolveMemcpyFn->getArg(1);
@@ -289,7 +285,6 @@ static Function *getOrCreateBoundsCheckMemsetSanitizer(
   BasicBlock *SanitizeMemsetBB = BasicBlock::Create(Ctx, "sanitize_memset", resolveMemsetFn);
 
   builder.SetInsertPoint(EntryBB);
-
   // Extract arguments for memset
   Value *basePtr = resolveMemsetFn->getArg(0);
   Value *valueArg = resolveMemsetFn->getArg(1);
@@ -348,10 +343,7 @@ static Function *getOrCreateResolveGep(Module *M) {
   BasicBlock *NormalBB = BasicBlock::Create(Ctx, "return_normal_ptr", resolveGepFn);
   BasicBlock *OnePastBB = BasicBlock::Create(Ctx, "return_tainted_ptr", resolveGepFn);
 
-  // EntryBB: Call libresolve get_base_and_limit
-  // to retrieve the last valid byte address of obj
   builder.SetInsertPoint(EntryBB);
-
   // Extract the base and derived pointer
   Value *basePtr = resolveGepFn->getArg(0);
   Value *derivedPtr = resolveGepFn->getArg(1);
