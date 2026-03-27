@@ -1,0 +1,267 @@
+Testing: 190: Integer_Overflow (6695 tests...)
+Testing: 123: Write_What_Where_Condition (251 tests...)
+Testing: 121: Stack_Based_Buffer_Overflow (8222 tests...)
+Testing: 590: Free_Memory_Not_on_Heap (4380 tests...)
+Testing: 122: Heap_Based_Buffer_Overflow (10171 tests...)
+Testing: 476: NULL_Pointer_Dereference (549 tests...)
+Testing: 369: Divide_by_Zero (1558 tests...)
+
+-----------------------------------------------------------------
+Testing: 190: Integer_Overflow
+Total testcases: 50
+PASS: 0
+FAIL: 50
+exit 0 (21 tests...)
+  CWE190_Integer_Overflow__unsigned_int_fscanf_preinc_01
+  CWE190_Integer_Overflow__int_rand_preinc_01
+  CWE190_Integer_Overflow__int_fgets_preinc_02
+  CWE190_Integer_Overflow__short_rand_preinc_04
+  CWE190_Integer_Overflow__unsigned_int_fscanf_preinc_06
+  CWE190_Integer_Overflow__short_rand_preinc_06
+  CWE190_Integer_Overflow__int64_t_max_preinc_07
+  CWE190_Integer_Overflow__int_fgets_preinc_08
+  CWE190_Integer_Overflow__short_fscanf_preinc_08
+  CWE190_Integer_Overflow__char_rand_preinc_08
+  ...
+failed_to_compile (22 tests...)
+  CWE190_Integer_Overflow__char_rand_preinc_22
+  CWE190_Integer_Overflow__int64_t_fscanf_preinc_22
+  CWE190_Integer_Overflow__char_max_preinc_51
+  CWE190_Integer_Overflow__int_fscanf_preinc_51
+  CWE190_Integer_Overflow__short_fscanf_preinc_52
+  CWE190_Integer_Overflow__int_fgets_preinc_52
+  CWE190_Integer_Overflow__short_max_preinc_52
+  CWE190_Integer_Overflow__short_rand_preinc_53
+  CWE190_Integer_Overflow__unsigned_int_rand_preinc_54
+  CWE190_Integer_Overflow__short_fscanf_preinc_54
+  ...
+skipped: socket (7 tests...)
+  CWE190_Integer_Overflow__int_connect_socket_preinc_02
+  CWE190_Integer_Overflow__int_listen_socket_preinc_04
+  CWE190_Integer_Overflow__int_connect_socket_preinc_12
+  CWE190_Integer_Overflow__int_connect_socket_preinc_15
+  CWE190_Integer_Overflow__int_listen_socket_preinc_44
+  CWE190_Integer_Overflow__int_connect_socket_preinc_53
+  CWE190_Integer_Overflow__int_connect_socket_preinc_54
+-----------------------------------------------------------------
+Percentage of CWE190 directory covered: 0.00%
+
+-----------------------------------------------------------------
+Testing: 123: Write_What_Where_Condition
+Total testcases: 50
+PASS: 0
+FAIL: 50
+exit 1 (7 tests...)
+  CWE123_Write_What_Where_Condition__fgets_02
+  CWE123_Write_What_Where_Condition__fgets_03
+  CWE123_Write_What_Where_Condition__fgets_08
+  CWE123_Write_What_Where_Condition__fgets_14
+  CWE123_Write_What_Where_Condition__fgets_18
+  CWE123_Write_What_Where_Condition__fgets_33
+  CWE123_Write_What_Where_Condition__fgets_41
+failed_to_compile (11 tests...)
+  CWE123_Write_What_Where_Condition__fgets_22
+  CWE123_Write_What_Where_Condition__fgets_52
+  CWE123_Write_What_Where_Condition__fgets_53
+  CWE123_Write_What_Where_Condition__fgets_54
+  CWE123_Write_What_Where_Condition__fgets_61
+  CWE123_Write_What_Where_Condition__fgets_62
+  CWE123_Write_What_Where_Condition__fgets_64
+  CWE123_Write_What_Where_Condition__fgets_74
+  CWE123_Write_What_Where_Condition__fgets_81
+  CWE123_Write_What_Where_Condition__fgets_82
+  ...
+skipped: socket (32 tests...)
+  CWE123_Write_What_Where_Condition__listen_socket_01
+  CWE123_Write_What_Where_Condition__listen_socket_03
+  CWE123_Write_What_Where_Condition__listen_socket_06
+  CWE123_Write_What_Where_Condition__listen_socket_08
+  CWE123_Write_What_Where_Condition__listen_socket_10
+  CWE123_Write_What_Where_Condition__listen_socket_11
+  CWE123_Write_What_Where_Condition__connect_socket_14
+  CWE123_Write_What_Where_Condition__listen_socket_15
+  CWE123_Write_What_Where_Condition__connect_socket_16
+  CWE123_Write_What_Where_Condition__listen_socket_22
+  ...
+-----------------------------------------------------------------
+Percentage of CWE123 directory covered: 0.00%
+
+-----------------------------------------------------------------
+Testing: 121: Stack_Based_Buffer_Overflow
+Total testcases: 50
+PASS: 0
+FAIL: 50
+exit 0 (8 tests...)
+  CWE121_Stack_Based_Buffer_Overflow__CWE806_char_declare_snprintf_06
+  CWE121_Stack_Based_Buffer_Overflow__CWE806_wchar_t_declare_ncpy_07
+  CWE121_Stack_Based_Buffer_Overflow__CWE806_wchar_t_declare_loop_07
+  CWE121_Stack_Based_Buffer_Overflow__CWE806_wchar_t_declare_ncpy_09
+  CWE121_Stack_Based_Buffer_Overflow__CWE806_wchar_t_declare_ncpy_16
+  CWE121_Stack_Based_Buffer_Overflow__CWE806_wchar_t_declare_loop_16
+  CWE121_Stack_Based_Buffer_Overflow__CWE806_wchar_t_declare_memcpy_34
+  CWE121_Stack_Based_Buffer_Overflow__CWE806_char_declare_snprintf_42
+exit SIGSEGV (6 tests...)
+  CWE121_Stack_Based_Buffer_Overflow__CWE806_wchar_t_alloca_loop_04
+  CWE121_Stack_Based_Buffer_Overflow__CWE806_wchar_t_alloca_memmove_05
+  CWE121_Stack_Based_Buffer_Overflow__CWE806_wchar_t_alloca_ncpy_09
+  CWE121_Stack_Based_Buffer_Overflow__CWE806_wchar_t_alloca_memmove_14
+  CWE121_Stack_Based_Buffer_Overflow__CWE806_wchar_t_alloca_ncpy_16
+  CWE121_Stack_Based_Buffer_Overflow__CWE806_wchar_t_alloca_loop_43
+failed_to_compile (36 tests...)
+  CWE121_Stack_Based_Buffer_Overflow__CWE806_wchar_t_alloca_snprintf_52
+  CWE121_Stack_Based_Buffer_Overflow__CWE806_wchar_t_alloca_memcpy_52
+  CWE121_Stack_Based_Buffer_Overflow__CWE806_wchar_t_declare_memmove_52
+  CWE121_Stack_Based_Buffer_Overflow__CWE806_wchar_t_declare_loop_52
+  CWE121_Stack_Based_Buffer_Overflow__CWE806_wchar_t_declare_ncpy_53
+  CWE121_Stack_Based_Buffer_Overflow__CWE806_wchar_t_alloca_ncpy_53
+  CWE121_Stack_Based_Buffer_Overflow__CWE806_wchar_t_declare_memmove_54
+  CWE121_Stack_Based_Buffer_Overflow__CWE806_wchar_t_declare_ncat_54
+  CWE121_Stack_Based_Buffer_Overflow__CWE806_wchar_t_alloca_snprintf_54
+  CWE121_Stack_Based_Buffer_Overflow__CWE806_char_declare_snprintf_54
+  ...
+-----------------------------------------------------------------
+Percentage of CWE121 directory covered: 0.00%
+
+-----------------------------------------------------------------
+Testing: 590: Free_Memory_Not_on_Heap
+Total testcases: 50
+PASS: 0
+FAIL: 50
+failed_to_compile (50 tests...)
+  CWE590_Free_Memory_Not_on_Heap__delete_array_struct_alloca_01
+  CWE590_Free_Memory_Not_on_Heap__delete_class_alloca_03
+  CWE590_Free_Memory_Not_on_Heap__delete_class_static_04
+  CWE590_Free_Memory_Not_on_Heap__delete_char_declare_05
+  CWE590_Free_Memory_Not_on_Heap__delete_array_struct_declare_07
+  CWE590_Free_Memory_Not_on_Heap__delete_array_wchar_t_declare_07
+  CWE590_Free_Memory_Not_on_Heap__delete_array_wchar_t_alloca_08
+  CWE590_Free_Memory_Not_on_Heap__delete_char_placement_new_09
+  CWE590_Free_Memory_Not_on_Heap__delete_char_placement_new_10
+  CWE590_Free_Memory_Not_on_Heap__delete_class_placement_new_13
+  ...
+-----------------------------------------------------------------
+Percentage of CWE590 directory covered: 0.00%
+
+-----------------------------------------------------------------
+Testing: 122: Heap_Based_Buffer_Overflow
+Total testcases: 50
+PASS: 0
+FAIL: 50
+exit 0 (18 tests...)
+  CWE122_Heap_Based_Buffer_Overflow__c_CWE193_wchar_t_memmove_01
+  CWE122_Heap_Based_Buffer_Overflow__c_CWE805_char_loop_01
+  CWE122_Heap_Based_Buffer_Overflow__c_CWE193_wchar_t_memcpy_03
+  CWE122_Heap_Based_Buffer_Overflow__c_CWE193_char_ncpy_04
+  CWE122_Heap_Based_Buffer_Overflow__c_CWE805_char_ncat_05
+  CWE122_Heap_Based_Buffer_Overflow__c_CWE805_char_memmove_06
+  CWE122_Heap_Based_Buffer_Overflow__c_CWE193_wchar_t_ncpy_06
+  CWE122_Heap_Based_Buffer_Overflow__c_CWE193_wchar_t_loop_10
+  CWE122_Heap_Based_Buffer_Overflow__c_CWE193_wchar_t_ncpy_11
+  CWE122_Heap_Based_Buffer_Overflow__c_CWE193_char_ncpy_17
+  ...
+failed_to_compile (32 tests...)
+  CWE122_Heap_Based_Buffer_Overflow__c_CWE805_char_loop_22
+  CWE122_Heap_Based_Buffer_Overflow__c_CWE193_wchar_t_memmove_51
+  CWE122_Heap_Based_Buffer_Overflow__c_CWE193_wchar_t_loop_52
+  CWE122_Heap_Based_Buffer_Overflow__c_CWE193_wchar_t_ncpy_52
+  CWE122_Heap_Based_Buffer_Overflow__c_CWE805_char_loop_52
+  CWE122_Heap_Based_Buffer_Overflow__c_CWE193_char_ncpy_52
+  CWE122_Heap_Based_Buffer_Overflow__c_CWE805_char_loop_53
+  CWE122_Heap_Based_Buffer_Overflow__c_CWE193_wchar_t_memcpy_53
+  CWE122_Heap_Based_Buffer_Overflow__c_CWE193_wchar_t_loop_53
+  CWE122_Heap_Based_Buffer_Overflow__c_CWE193_wchar_t_loop_54
+  ...
+-----------------------------------------------------------------
+Percentage of CWE122 directory covered: 0.00%
+
+-----------------------------------------------------------------
+Testing: 476: NULL_Pointer_Dereference
+Total testcases: 50
+PASS: 0
+FAIL: 50
+exit 0 (4 tests...)
+  CWE476_NULL_Pointer_Dereference__null_check_after_deref_01
+  CWE476_NULL_Pointer_Dereference__struct_12
+  CWE476_NULL_Pointer_Dereference__int64_t_12
+  CWE476_NULL_Pointer_Dereference__null_check_after_deref_17
+exit SIGSEGV (21 tests...)
+  CWE476_NULL_Pointer_Dereference__deref_after_check_01
+  CWE476_NULL_Pointer_Dereference__long_06
+  CWE476_NULL_Pointer_Dereference__int_06
+  CWE476_NULL_Pointer_Dereference__struct_08
+  CWE476_NULL_Pointer_Dereference__char_09
+  CWE476_NULL_Pointer_Dereference__char_10
+  CWE476_NULL_Pointer_Dereference__int64_t_11
+  CWE476_NULL_Pointer_Dereference__binary_if_14
+  CWE476_NULL_Pointer_Dereference__int64_t_14
+  CWE476_NULL_Pointer_Dereference__struct_14
+  ...
+failed_to_compile (25 tests...)
+  CWE476_NULL_Pointer_Dereference__class_01
+  CWE476_NULL_Pointer_Dereference__int_22
+  CWE476_NULL_Pointer_Dereference__long_51
+  CWE476_NULL_Pointer_Dereference__wchar_t_51
+  CWE476_NULL_Pointer_Dereference__class_51
+  CWE476_NULL_Pointer_Dereference__long_52
+  CWE476_NULL_Pointer_Dereference__int64_t_52
+  CWE476_NULL_Pointer_Dereference__class_53
+  CWE476_NULL_Pointer_Dereference__char_54
+  CWE476_NULL_Pointer_Dereference__int_54
+  ...
+-----------------------------------------------------------------
+Percentage of CWE476 directory covered: 0.00%
+
+-----------------------------------------------------------------
+Testing: 369: Divide_by_Zero
+Total testcases: 50
+PASS: 0
+FAIL: 50
+exit 0 (12 tests...)
+  CWE369_Divide_by_Zero__int_fscanf_modulo_02
+  CWE369_Divide_by_Zero__int_fscanf_modulo_03
+  CWE369_Divide_by_Zero__int_fscanf_modulo_05
+  CWE369_Divide_by_Zero__int_rand_divide_12
+  CWE369_Divide_by_Zero__int_zero_modulo_12
+  CWE369_Divide_by_Zero__int_rand_modulo_15
+  CWE369_Divide_by_Zero__int_rand_modulo_17
+  CWE369_Divide_by_Zero__int_fscanf_modulo_18
+  CWE369_Divide_by_Zero__int_rand_modulo_41
+  CWE369_Divide_by_Zero__int_fscanf_modulo_42
+  ...
+exit SIGFPE (6 tests...)
+  CWE369_Divide_by_Zero__int_zero_divide_01
+  CWE369_Divide_by_Zero__int_zero_modulo_04
+  CWE369_Divide_by_Zero__int_zero_divide_10
+  CWE369_Divide_by_Zero__int_zero_divide_11
+  CWE369_Divide_by_Zero__int_zero_modulo_61
+  CWE369_Divide_by_Zero__int_zero_divide_62
+failed_to_compile (22 tests...)
+  CWE369_Divide_by_Zero__int_zero_divide_51
+  CWE369_Divide_by_Zero__int_zero_modulo_52
+  CWE369_Divide_by_Zero__int_fscanf_modulo_53
+  CWE369_Divide_by_Zero__int_zero_divide_54
+  CWE369_Divide_by_Zero__int_zero_modulo_54
+  CWE369_Divide_by_Zero__int_fscanf_modulo_61
+  CWE369_Divide_by_Zero__int_rand_divide_62
+  CWE369_Divide_by_Zero__int_rand_modulo_63
+  CWE369_Divide_by_Zero__int_rand_modulo_65
+  CWE369_Divide_by_Zero__int_rand_divide_66
+  ...
+skipped: socket (10 tests...)
+  CWE369_Divide_by_Zero__int_listen_socket_modulo_12
+  CWE369_Divide_by_Zero__int_listen_socket_modulo_22
+  CWE369_Divide_by_Zero__int_listen_socket_divide_61
+  CWE369_Divide_by_Zero__int_listen_socket_divide_62
+  CWE369_Divide_by_Zero__int_listen_socket_modulo_63
+  CWE369_Divide_by_Zero__int_listen_socket_modulo_66
+  CWE369_Divide_by_Zero__int_listen_socket_modulo_68
+  CWE369_Divide_by_Zero__int_listen_socket_modulo_72
+  CWE369_Divide_by_Zero__int_listen_socket_divide_83
+  CWE369_Divide_by_Zero__int_listen_socket_divide_84
+-----------------------------------------------------------------
+Percentage of CWE369 directory covered: 0.00%
+
+-----------------------------------------------------------------
+Total pass: 0
+Total testcases: 350
+Percentage covered: 0.00%

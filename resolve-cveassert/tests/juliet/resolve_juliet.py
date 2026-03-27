@@ -387,6 +387,10 @@ def main():
     overwrite_dir = args.force
     test_limit = args.limit
 
+    if not juliet_testcases_dir.exists():
+        tar_file = juliet_testcases_dir.with_suffix(".tar.xz")
+        subprocess.run(["tar", "-xf", str(tar_file)], check=True)
+
     try:
         out_dir.mkdir()
     except FileExistsError:
