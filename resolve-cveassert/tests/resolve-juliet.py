@@ -29,20 +29,18 @@ def compile_io_c(out_dir: Path):
     if obj_file.exists():
         return obj_file
 
-    try:
-        subprocess.run(
-            [
-                "clang",
-                "-c",
-                "-I", str(juliet_testcase_support_headers),
-                str(io_file),
-                "-o", str(obj_file)
-            ],
-            check=True
-        )
-
-    except CalledProcessError as compilation_error:
-        print(f"[ERROR] Failed to compile io.o: {compilation_error}")
+    subprocess.run(
+        [
+            "clang",
+            "-c",
+            "-I",
+            str(juliet_testcase_support_headers),
+            str(io_file),
+            "-o",
+            str(obj_file),
+        ],
+        check=True,
+    )
 
     return obj_file
 
