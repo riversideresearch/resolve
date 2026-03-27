@@ -236,6 +236,11 @@ class ResultSignal(Result):
 class ResultTimeout(Result):
     pass
 
+@dataclass
+class ResultSkipped(Result):
+    skip_reason: str
+
+
 
 @dataclass
 class ResultCompilationFailure(Result):
@@ -243,6 +248,9 @@ class ResultCompilationFailure(Result):
 
 
 def do_test(test: CWETest, io_obj: Path, out_dir: Path) -> Result:
+    if "socket" in test.name:
+        return ResultSkipped("socket")
+
     # Binary path to compiled testcase executable
     testcase_exe_path = out_dir / test.name
 
