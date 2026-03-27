@@ -125,9 +125,8 @@ static Function *getOrCreateBoundsCheckLoadSanitizer(
   Value *basePtr = resolveLoadFn->getArg(0);
 
   builder.SetInsertPoint(EntryBB);
-
-  Value* mapValue = builder.CreateCall(getOrCreateSanitizerMapEntry(M), { ConstantInt::get(usize_ty, 0)});
-  Value *isZero = builder.CreateICmpEQ(mapValue, ConstantInt::get(i1_ty, 0));
+  Value* mapEntry = builder.CreateCall(getOrCreateSanitizerMapEntry(M), { ConstantInt::get(usize_ty, 0)});
+  Value *isZero = builder.CreateICmpEQ(mapEntry, ConstantInt::get(i1_ty, 0));
   builder.CreateCondBr(isZero, NormalLoadBB, CheckAccessBB);
 
   builder.SetInsertPoint(CheckAccessBB);
@@ -180,8 +179,8 @@ static Function *getOrCreateBoundsCheckStoreSanitizer(
   Value *storedVal = resolveStoreFn->getArg(1);
   builder.SetInsertPoint(EntryBB);
 
-  Value* mapValue = builder.CreateCall(getOrCreateSanitizerMapEntry(M), { ConstantInt::get(usize_ty, 0)});
-  Value *isZero = builder.CreateICmpEQ(mapValue, ConstantInt::get(i1_ty, 0));
+  Value* mapEntry = builder.CreateCall(getOrCreateSanitizerMapEntry(M), { ConstantInt::get(usize_ty, 0)});
+  Value *isZero = builder.CreateICmpEQ(mapEntry, ConstantInt::get(i1_ty, 0));
   builder.CreateCondBr(isZero, NormalStoreBB, CheckAccessBB);
 
   builder.SetInsertPoint(CheckAccessBB);
@@ -236,8 +235,8 @@ static Function *getOrCreateBoundsCheckMemcpySanitizer(
   Value *src_ptr = resolveMemcpyFn->getArg(1);
   Value *size_arg = resolveMemcpyFn->getArg(2);
 
-  Value* mapValue = builder.CreateCall(getOrCreateSanitizerMapEntry(M), { ConstantInt::get(size_ty, 0)});
-  Value *isZero = builder.CreateICmpEQ(mapValue, ConstantInt::get(i1_ty, 0));
+  Value* mapEntry = builder.CreateCall(getOrCreateSanitizerMapEntry(M), { ConstantInt::get(size_ty, 0)});
+  Value *isZero = builder.CreateICmpEQ(mapEntry, ConstantInt::get(i1_ty, 0));
   builder.CreateCondBr(isZero, NormalBB, CheckAccessBB);
 
   builder.SetInsertPoint(CheckAccessBB);
@@ -296,8 +295,8 @@ static Function *getOrCreateBoundsCheckMemsetSanitizer(
   Value *valueArg = resolveMemsetFn->getArg(1);
   Value *accessSize = resolveMemsetFn->getArg(2);
 
-  Value* mapValue = builder.CreateCall(getOrCreateSanitizerMapEntry(M), { ConstantInt::get(size_ty, 0)});
-  Value *isZero = builder.CreateICmpEQ(mapValue, ConstantInt::get(i1_ty, 0));
+  Value* mapEntry = builder.CreateCall(getOrCreateSanitizerMapEntry(M), { ConstantInt::get(size_ty, 0)});
+  Value *isZero = builder.CreateICmpEQ(mapEntry, ConstantInt::get(i1_ty, 0));
   builder.CreateCondBr(isZero, NormalBB, CheckAccessBB);
   
   builder.SetInsertPoint(CheckAccessBB);
@@ -357,8 +356,8 @@ static Function *getOrCreateResolveGep(Module *M) {
   Value *basePtr = resolveGepFn->getArg(0);
   Value *derivedPtr = resolveGepFn->getArg(1);
 
-  Value* mapValue = builder.CreateCall(getOrCreateSanitizerMapEntry(M), { ConstantInt::get(size_ty, 0)});
-  Value *isZero = builder.CreateICmpEQ(mapValue, ConstantInt::get(i1_ty, 0));
+  Value* mapEntry = builder.CreateCall(getOrCreateSanitizerMapEntry(M), { ConstantInt::get(size_ty, 0)});
+  Value *isZero = builder.CreateICmpEQ(mapEntry, ConstantInt::get(i1_ty, 0));
   builder.CreateCondBr(isZero, NormalBB, GetBaseAndLimitBB);
 
   builder.SetInsertPoint(GetBaseAndLimitBB);
