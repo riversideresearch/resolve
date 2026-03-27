@@ -109,6 +109,7 @@ static Function *getOrCreateBoundsCheckLoadSanitizer(
 
   auto ptr_ty = PointerType::get(Ctx, 0);
   auto i1_ty = Type::getInt1Ty(Ctx);
+  auto usize_ty = Type::getInt64Ty(Ctx);
 
   FunctionType *resolveLoadFnTy = FunctionType::get(ty, {ptr_ty}, false);
 
@@ -125,15 +126,7 @@ static Function *getOrCreateBoundsCheckLoadSanitizer(
 
   builder.SetInsertPoint(EntryBB);
 
-  // When indexing an array use two indices
-  // 1. First index step from the global ptr
-  // 2. Second index: the actual element index 
-  Value *zero = builder.getInt64(0);
-  Value *idx = builder.getInt64(0);
-  Value* sanitizerMapPtr = builder.CreateGEP(ArrayType::get((i1_ty), 7),
-   initSanitizerMap(M), { zero, idx }
-  );
-  Value* mapValue = builder.CreateLoad(i1_ty, sanitizerMapPtr);
+  Value* mapValue = builder.CreateCall(getOrCreateSanitizeMapEntry(M), { ConstantInt::get(usize_ty, 0)});
   Value *isZero = builder.CreateICmpEQ(mapValue, ConstantInt::get(i1_ty, 0));
   builder.CreateCondBr(isZero, NormalLoadBB, CheckAccessBB);
 
@@ -170,6 +163,7 @@ static Function *getOrCreateBoundsCheckStoreSanitizer(
   auto ptr_ty = PointerType::get(Ctx, 0);
   auto void_ty = Type::getVoidTy(Ctx);
   auto i1_ty = Type::getInt1Ty(Ctx);
+  auto usize_ty = Type::getInt64Ty(Ctx);
 
   FunctionType *resolveStoreFnTy =
       FunctionType::get(void_ty, {ptr_ty, ty}, false);
@@ -186,12 +180,7 @@ static Function *getOrCreateBoundsCheckStoreSanitizer(
   Value *storedVal = resolveStoreFn->getArg(1);
   builder.SetInsertPoint(EntryBB);
 
-  Value *zero = builder.getInt64(0);
-  Value *idx = builder.getInt64(0);
-  Value* sanitizerMapPtr = builder.CreateGEP(ArrayType::get((i1_ty), 7),
-   initSanitizerMap(M), { zero, idx }
-  );
-  Value* mapValue = builder.CreateLoad(i1_ty, sanitizerMapPtr);
+  Value* mapValue = builder.CreateCall(getOrCreateSanitizeMapEntry(M), { ConstantInt::get(usize_ty, 0)});
   Value *isZero = builder.CreateICmpEQ(mapValue, ConstantInt::get(i1_ty, 0));
   builder.CreateCondBr(isZero, NormalStoreBB, CheckAccessBB);
 
@@ -247,12 +236,7 @@ static Function *getOrCreateBoundsCheckMemcpySanitizer(
   Value *src_ptr = resolveMemcpyFn->getArg(1);
   Value *size_arg = resolveMemcpyFn->getArg(2);
 
-  Value *zero = builder.getInt64(0);
-  Value *idx = builder.getInt64(0);
-  Value* sanitizerMapPtr = builder.CreateGEP(ArrayType::get((i1_ty), 7),
-   initSanitizerMap(M), { zero, idx }
-  );
-  Value* mapValue = builder.CreateLoad(i1_ty, sanitizerMapPtr);
+  Value* mapValue = builder.CreateCall(getOrCreateSanitizeMapEntry(M), { ConstantInt::get(size_ty, 0)});
   Value *isZero = builder.CreateICmpEQ(mapValue, ConstantInt::get(i1_ty, 0));
   builder.CreateCondBr(isZero, NormalBB, CheckAccessBB);
 
@@ -312,12 +296,7 @@ static Function *getOrCreateBoundsCheckMemsetSanitizer(
   Value *valueArg = resolveMemsetFn->getArg(1);
   Value *accessSize = resolveMemsetFn->getArg(2);
 
-  Value *zero = builder.getInt64(0);
-  Value *idx = builder.getInt64(0);
-  Value* sanitizerMapPtr = builder.CreateGEP(ArrayType::get((i1_ty), 7),
-   initSanitizerMap(M), { zero, idx }
-  );
-  Value* mapValue = builder.CreateLoad(i1_ty, sanitizerMapPtr);
+  Value* mapValue = builder.CreateCall(getOrCreateSanitizeMapEntry(M), { ConstantInt::get(size_ty, 0)});
   Value *isZero = builder.CreateICmpEQ(mapValue, ConstantInt::get(i1_ty, 0));
   builder.CreateCondBr(isZero, NormalBB, CheckAccessBB);
   
@@ -378,12 +357,7 @@ static Function *getOrCreateResolveGep(Module *M) {
   Value *basePtr = resolveGepFn->getArg(0);
   Value *derivedPtr = resolveGepFn->getArg(1);
 
-  Value *zero = builder.getInt64(0);
-  Value *idx = builder.getInt64(0);
-  Value* sanitizerMapPtr = builder.CreateGEP(ArrayType::get((i1_ty), 7),
-   initSanitizerMap(M), { zero, idx }
-  );
-  Value* mapValue = builder.CreateLoad(i1_ty, sanitizerMapPtr);
+  Value* mapValue = builder.CreateCall(getOrCreateSanitizeMapEntry(M), { ConstantInt::get(size_ty, 0)});
   Value *isZero = builder.CreateICmpEQ(mapValue, ConstantInt::get(i1_ty, 0));
   builder.CreateCondBr(isZero, NormalBB, GetBaseAndLimitBB);
 
