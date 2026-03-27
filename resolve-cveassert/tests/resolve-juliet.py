@@ -277,7 +277,7 @@ def do_test(test: CWETest, io_obj: Path, out_dir: Path) -> Result:
     )
 
     match executed_binary.returncode:
-        case i if i > 0:
+        case i if i >= 0:
             return ResultExit(i)
         case signal:
             return ResultSignal(-signal)
