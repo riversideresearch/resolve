@@ -155,6 +155,7 @@ void sanitizeDivideByZero(Function *F,
   Module *M = F->getParent();
   auto &Ctx = M->getContext();
   auto usize_ty = Type::getInt64Ty(Ctx);
+  auto i1_ty = Type::getInt1Ty(Ctx);
   IRBuilder<> builder(Ctx);
   std::vector<Instruction *> worklist;
 
@@ -212,7 +213,7 @@ void sanitizeDivideByZero(Function *F,
     checkMapEntryBB->getTerminator()->eraseFromParent();
     builder.SetInsertPoint(checkMapEntryBB);
     Value *mapEntry = builder.CreateCall(getOrCreateSanitizerMapEntry(M), { ConstantInt::get(usize_ty, 3)});
-    Value *isMapEntryZero = builder.CreateICmpEQ(mapEntry, ConstantInt::get(usize_ty, 0));
+    Value *isMapEntryZero = builder.CreateICmpEQ(mapEntry, ConstantInt::get(i1_ty, 0));
     builder.CreateCondBr(isZero, preserveDivBB, checkZeroBB);
 
     builder.SetInsertPoint(checkZeroBB);
@@ -404,6 +405,7 @@ void sanitizeIntOverflow(Function *F,
   IRBuilder<> builder(Ctx);
 
   auto usize_ty = Type::getInt64Ty(Ctx);
+  auto i1_ty = Type::getInt1Ty(Ctx);
 
   switch (strategy) {
   case Vulnerability::RemediationStrategies::WIDEN:
@@ -548,7 +550,7 @@ void sanitizeIntOverflow(Function *F,
     checkMapEntryBB->getTerminator()->eraseFromParent();
     builder.SetInsertPoint(checkMapEntryBB);
     Value *mapEntry = builder.CreateCall(getOrCreateSanitizerMapEntry(M), { ConstantInt::get(usize_ty, 3)});
-    Value *isMapEntryZero = builder.CreateICmpEQ(mapEntry, ConstantInt::get(usize_ty, 0));
+    Value *isMapEntryZero = builder.CreateICmpEQ(mapEntry, ConstantInt::get(i1_ty, 0));
     builder.CreateCondBr(isMapEntryZero, joinResultBB, checkOverflowBB);
 
     builder.SetInsertPoint(checkOverflowBB);
