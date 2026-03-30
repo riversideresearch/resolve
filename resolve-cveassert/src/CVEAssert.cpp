@@ -175,6 +175,7 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
     }
   }
 
+<<<<<<< HEAD
   void applyAutomaticSanitizers(Function &F, Vulnerability::RemediationStrategies strategy) {
     /// applies all automatic sanitizers (operation masking excluded)
     sanitizeFreeOfNonHeap(&F, strategy);
@@ -184,6 +185,8 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
     sanitizeIntOverflow(&F, strategy);
   }
 
+=======
+>>>>>>> 46eba94 (CVEAssert.cpp: I don't know why Git decided to remove Jackson's work after I tried to fix a space but I am putting it back now.)
   /// Return true if F's name (raw or demangled) contains `targetName
   ///
   /// Always returns true if targetName is empty
@@ -214,6 +217,7 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
       return false;
     }
 
+<<<<<<< HEAD
     char *demangledNamePtr = llvm::itaniumDemangle(F.getName().str(), false);
     std::string demangledName(demangledNamePtr ?: "");
 
@@ -230,25 +234,31 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
   /// the triggering argument parsed from the JSON.
   PreservedAnalyses runOnFunction(Function &F, ModuleAnalysisManager &MAM,
                                   Vulnerability &vuln) {
+=======
+>>>>>>> 46eba94 (CVEAssert.cpp: I don't know why Git decided to remove Jackson's work after I tried to fix a space but I am putting it back now.)
     char *demangledNamePtr = llvm::itaniumDemangle(F.getName().str(), false);
     std::string demangledName(demangledNamePtr ?: "");
-    auto result = PreservedAnalyses::all();
-
-    if (F.getMetadata("resolve.noinstrument")) { return result; }
 
     if (CVE_ASSERT_DEBUG) {
       errs() << "[CVEAssert] Trying fn " << F.getName()
              << " Demangled name: " << demangledName << "\n";
     }
 
-    raw_ostream &out = errs();
+    return nameMatches(F, demangledName, vuln.TargetFunctionName);
+  }
 
-    if (vuln.TargetFunctionName.empty() ||
-        (demangledName.find(vuln.TargetFunctionName) == std::string::npos &&
-         F.getName().str().find(vuln.TargetFunctionName) ==
-             std::string::npos)) {
+  /// For each function, if it matches the target function name, insert calls to
+  /// the vulnerability handlers as specified in the JSON. Each call receives
+  /// the triggering argument parsed from the JSON.
+  PreservedAnalyses runOnFunction(Function &F, ModuleAnalysisManager &MAM,
+                                  Vulnerability &vuln) {
+    auto result = PreservedAnalyses::all();
+
+    if (!shouldInstrument(F, vuln)) {
       return result;
     }
+
+    raw_ostream &out = errs();
 
     out << "[CVEAssert] === Pre Instrumented IR === \n";
     out << F;
@@ -264,9 +274,9 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
     }
 
     if (vuln.Strategy == Vulnerability::RemediationStrategies::NONE) {
-      errs() << "[CVEAssert] NONE strategy selected for " << vuln.TargetFileName
-             << ":" << vuln.TargetFunctionName << "...\n";
-      errs() << "[CVEAssert] Skipping remediation\n";
+      out << "[CVEAssert] NONE strategy selected for " << vuln.TargetFileName
+          << ":" << vuln.TargetFunctionName << "...\n";
+      out << "[CVEAssert] Skipping remediation\n";
       return result;
     }
 
@@ -316,20 +326,16 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
       break;
 
     default:
-      errs() << "[CVEAssert] Error: CWE " << vuln.WeaknessID
-             << " not implemented\n";
+      out << "[CVEAssert] Error: CWE " << vuln.WeaknessID
+          << " not implemented\n";
       break;
     }
 
     out << "[CVEAssert] === Post Instrumented IR === \n";
-    out << F;
+    validateIR(&F);
 
-    if (verifyFunction(F, &out)) {
-      report_fatal_error("[CVEAssert] We broke something");
-    }
-
-    errs() << "[CVEAssert] Inserted vulnerability handler calls in function "
-           << vuln.TargetFileName << ":" << vuln.TargetFunctionName << "\n";
+    out << "[CVEAssert] Inserted vulnerability handler calls in function "
+        << vuln.TargetFileName << ":" << vuln.TargetFunctionName << "\n";
     return result;
   }
 
