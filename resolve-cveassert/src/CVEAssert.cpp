@@ -96,7 +96,7 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
   }
 
   Function *getOrCreateFreeOfNonHeapSanitizer(
-      Module *M, Vulnerability::RemediationStrategies strategy) {
+    Module *M, Vulnerability::RemediationStrategies strategy) {
     std::string handlerName = "resolve_sanitize_non_heap_free";
     LLVMContext &Ctx = M->getContext();
 
