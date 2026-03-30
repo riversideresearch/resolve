@@ -69,6 +69,7 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
   std::vector<Vulnerability> vulnerabilities;
 
   enum VulnID {
+    ALL = 0,
     STACK_BASED_BUF_OVERFLOW = 121,
     HEAP_BASED_BUF_OVERFLOW = 122,
     WRITE_WHAT_WHERE = 123,
@@ -84,8 +85,7 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
     NULL_PTR_DEREF = 476, /* NOTE: This ID has been found in OpenALPR, NASA CFS,
                              stb-convert CPs */
     STACK_FREE =
-        590, /* NOTE: This ID has been found in NASA CFS challenge problem */
-    ALL = 999,
+        590 /* NOTE: This ID has been found in NASA CFS challenge problem */
   };
 
   LabelCVEPass() {
