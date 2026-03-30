@@ -37,7 +37,26 @@
 using namespace llvm;
 
 // Global env var
-bool CVE_ASSERT_DEBUG;
+bool CVE_ASSERT_DEBUG; 
+
+
+GlobalVariable* initSanitizerMap(Module *M) {
+    LLVMContext &Ctx = M->getContext();
+    ArrayType *arrty = ArrayType::get(Type::getInt1Ty(Ctx), 7);
+    
+    M->getOrInsertGlobal("sanitizer_map", arrty);
+    GlobalVariable *gSanitizerMap = M->getNamedGlobal("sanitizer_map");
+    
+    gSanitizerMap->setLinkage(GlobalValue::ExternalLinkage);
+    gSanitizerMap->setConstant(false);
+
+    if (!gSanitizerMap->hasInitializer()) {
+      std::vector<Constant *> elems(7, ConstantInt::get(Type::getInt1Ty(Ctx), 1));
+      gSanitizerMap->setInitializer(ConstantArray::get(arrty, elems));
+    }
+
+    return gSanitizerMap;
+}
 
 namespace {
 
@@ -83,6 +102,7 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
     IRBuilder<> builder(Ctx);
     // TODO: handle address spaces other than 0
     auto ptr_ty = PointerType::get(Ctx, 0);
+    auto usize_ty = Type::getInt64Ty(Ctx);
 
     // TODO: write this in asm as some kind of sanitzer_rt?
     FunctionType *resolveFreeNonHeapFnTy =
@@ -92,33 +112,34 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
     if (!resolveFreeNonHeapFn->empty()) { return resolveFreeNonHeapFn; }
     
 
-    BasicBlock *Entry = BasicBlock::Create(Ctx, "entry", resolveFreeNonHeapFn);
-    BasicBlock *SanitizeBlock =
-        BasicBlock::Create(Ctx, "sanitize_block", resolveFreeNonHeapFn);
-    BasicBlock *FreeBlock = BasicBlock::Create(Ctx, "free_block", resolveFreeNonHeapFn);
+    BasicBlock *EntryBB = BasicBlock::Create(Ctx, "entry", resolveFreeNonHeapFn);
+    BasicBlock *CheckOnHeapBB = BasicBlock::Create(Ctx, "check_heap", resolveFreeNonHeapFn);
+    BasicBlock *SanitizeNonHeapBB =
+        BasicBlock::Create(Ctx, "sanitize_nonheap", resolveFreeNonHeapFn);
+    BasicBlock *FreeHeapBB = BasicBlock::Create(Ctx, "free_heap", resolveFreeNonHeapFn);
 
     // Set insertion point to entry block
-    builder.SetInsertPoint(Entry);
+    builder.SetInsertPoint(EntryBB);
+    Argument *inputPtr = resolveFreeNonHeapFn->getArg(0);
 
-    // Get function argument
-    Argument *InputPtr = resolveFreeNonHeapFn->getArg(0);
+    Value *mapEntry = builder.CreateCall(getOrCreateSanitizerMapEntry(M), { ConstantInt::get(usize_ty, 2)});
+    Value *isZero = builder.CreateICmpEQ(mapEntry, ConstantInt::get(usize_ty, 0));
+    builder.CreateCondBr(isZero, FreeHeapBB, CheckOnHeapBB);
 
     // Call Is Heap Func
     // Branch if True
-    Function *isHeapFunc = getOrCreateIsHeap(M, Ctx);
-    Value *IsHeap = builder.CreateCall(isHeapFunc, {InputPtr});
-
-    // Conditional branch
-    builder.CreateCondBr(IsHeap, FreeBlock, SanitizeBlock);
+    builder.SetInsertPoint(CheckOnHeapBB);
+    Value *IsHeap = builder.CreateCall(getOrCreateIsHeap(M, Ctx), {inputPtr});
+    builder.CreateCondBr(IsHeap, FreeHeapBB, SanitizeNonHeapBB);
 
     // Sanitize Block: Call getOrCreateRemediationBehavior
-    builder.SetInsertPoint(SanitizeBlock);
+    builder.SetInsertPoint(SanitizeNonHeapBB);
     builder.CreateCall(getOrCreateRemediationBehavior(M, strategy), {});
     builder.CreateRetVoid();
 
     // Free Block: call Free
-    builder.SetInsertPoint(FreeBlock);
-    builder.CreateCall(M->getFunction("free"), {InputPtr});
+    builder.SetInsertPoint(FreeHeapBB);
+    builder.CreateCall(M->getFunction("free"), {inputPtr});
     builder.CreateRetVoid();
 
     validateIR(resolveFreeNonHeapFn);
@@ -259,6 +280,8 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
   PreservedAnalyses run(Module &M, ModuleAnalysisManager &MAM) {
     auto result = PreservedAnalyses::all();
     InstrumentMemInst instrument_mem_inst;
+
+    initSanitizerMap(&M);
 
     for (auto &vuln : vulnerabilities) {
       // Also skip instrumentation for skipped vulnerabilities

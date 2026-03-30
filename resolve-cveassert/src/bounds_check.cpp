@@ -15,6 +15,7 @@
 #include "llvm/Support/ModRef.h"
 #include "llvm/Support/raw_ostream.h"
 
+#include "CVEAssert.hpp"
 #include "Vulnerability.hpp"
 #include "helpers.hpp"
 
@@ -107,6 +108,8 @@ static Function *getOrCreateBoundsCheckLoadSanitizer(
   IRBuilder<> builder(Ctx);
 
   auto ptr_ty = PointerType::get(Ctx, 0);
+  auto i1_ty = Type::getInt1Ty(Ctx);
+  auto usize_ty = Type::getInt64Ty(Ctx);
 
   FunctionType *resolveLoadFnTy = FunctionType::get(ty, {ptr_ty}, false);
 
@@ -115,15 +118,22 @@ static Function *getOrCreateBoundsCheckLoadSanitizer(
   if (!resolveLoadFn->empty()) { return resolveLoadFn; }
 
   BasicBlock *EntryBB = BasicBlock::Create(Ctx, "entry", resolveLoadFn);
-  BasicBlock *NormalLoadBB = BasicBlock::Create(Ctx, "normal load", resolveLoadFn);
-  BasicBlock *SanitizeLoadBB = BasicBlock::Create(Ctx, "sanitize load", resolveLoadFn);
+  BasicBlock *CheckAccessBB = BasicBlock::Create(Ctx, "check_access", resolveLoadFn);
+  BasicBlock *NormalLoadBB = BasicBlock::Create(Ctx, "normal_load", resolveLoadFn);
+  BasicBlock *SanitizeLoadBB = BasicBlock::Create(Ctx, "sanitize_load", resolveLoadFn);
 
   Value *basePtr = resolveLoadFn->getArg(0);
 
   builder.SetInsertPoint(EntryBB);
-  Value *withinBounds = builder.CreateCall(
-      getOrCreateResolveAccessOk(M), {basePtr, ConstantExpr::getSizeOf(ty)});
+  Value* mapEntry = builder.CreateCall(getOrCreateSanitizerMapEntry(M), { ConstantInt::get(usize_ty, 0)});
+  Value *isZero = builder.CreateICmpEQ(mapEntry, ConstantInt::get(i1_ty, 0));
+  builder.CreateCondBr(isZero, NormalLoadBB, CheckAccessBB);
 
+  builder.SetInsertPoint(CheckAccessBB);
+  Value *withinBounds = builder.CreateCall(
+    getOrCreateResolveAccessOk(M), { basePtr, ConstantExpr::getSizeOf(ty)}
+  );
+ 
   builder.CreateCondBr(withinBounds, NormalLoadBB, SanitizeLoadBB);
 
   // NormalLoadBB: Return the loaded value.
@@ -151,6 +161,8 @@ static Function *getOrCreateBoundsCheckStoreSanitizer(
   // TODO: handle address spaces other than 0
   auto ptr_ty = PointerType::get(Ctx, 0);
   auto void_ty = Type::getVoidTy(Ctx);
+  auto i1_ty = Type::getInt1Ty(Ctx);
+  auto usize_ty = Type::getInt64Ty(Ctx);
 
   FunctionType *resolveStoreFnTy =
       FunctionType::get(void_ty, {ptr_ty, ty}, false);
@@ -159,6 +171,7 @@ static Function *getOrCreateBoundsCheckStoreSanitizer(
   if (!resolveStoreFn->empty()) { return resolveStoreFn; }
 
   BasicBlock *EntryBB = BasicBlock::Create(Ctx, "entry", resolveStoreFn);
+  BasicBlock *CheckAccessBB = BasicBlock::Create(Ctx, "check_access", resolveStoreFn);
   BasicBlock *NormalStoreBB = BasicBlock::Create(Ctx, "normal_store", resolveStoreFn);
   BasicBlock *SanitizeStoreBB = BasicBlock::Create(Ctx, "sanitize_store", resolveStoreFn);
 
@@ -166,12 +179,16 @@ static Function *getOrCreateBoundsCheckStoreSanitizer(
   Value *storedVal = resolveStoreFn->getArg(1);
   builder.SetInsertPoint(EntryBB);
 
+  Value* mapEntry = builder.CreateCall(getOrCreateSanitizerMapEntry(M), { ConstantInt::get(usize_ty, 0)});
+  Value *isZero = builder.CreateICmpEQ(mapEntry, ConstantInt::get(i1_ty, 0));
+  builder.CreateCondBr(isZero, NormalStoreBB, CheckAccessBB);
+
+  builder.SetInsertPoint(CheckAccessBB);
   Value *withinBounds = builder.CreateCall(
       getOrCreateResolveAccessOk(M), {basePtr, ConstantExpr::getSizeOf(ty)});
 
   builder.CreateCondBr(withinBounds, NormalStoreBB, SanitizeStoreBB);
 
-  // NormalStoreBB: Store value @ addr
   builder.SetInsertPoint(NormalStoreBB);
   builder.CreateStore(storedVal, basePtr);
   builder.CreateRetVoid();
@@ -195,6 +212,7 @@ static Function *getOrCreateBoundsCheckMemcpySanitizer(
 
   auto ptr_ty = PointerType::get(Ctx, 0);
   auto size_ty = Type::getInt64Ty(Ctx);
+  auto i1_ty = Type::getInt1Ty(Ctx);
 
   FunctionType *resolveMemcpyFnTy =
       FunctionType::get(ptr_ty, {ptr_ty, ptr_ty, size_ty}, false);
@@ -203,18 +221,21 @@ static Function *getOrCreateBoundsCheckMemcpySanitizer(
   if (!resolveMemcpyFn->empty()) { return resolveMemcpyFn; }
 
   BasicBlock *EntryBB = BasicBlock::Create(Ctx, "entry", resolveMemcpyFn);
+  BasicBlock *CheckAccessBB = BasicBlock::Create(Ctx, "check_access", resolveMemcpyFn);
   BasicBlock *NormalBB = BasicBlock::Create(Ctx, "safe_memcpy", resolveMemcpyFn);
   BasicBlock *SanitizeMemcpyBB = BasicBlock::Create(Ctx, "sanitize_memcpy", resolveMemcpyFn);
 
-  // EntryBB: Call resolve_access_ok
-  // to verify correct bounds of allocation
   builder.SetInsertPoint(EntryBB);
-
   // Extract dst, src, size arguments from function
   Value *dst_ptr = resolveMemcpyFn->getArg(0);
   Value *src_ptr = resolveMemcpyFn->getArg(1);
   Value *size_arg = resolveMemcpyFn->getArg(2);
 
+  Value* mapEntry = builder.CreateCall(getOrCreateSanitizerMapEntry(M), { ConstantInt::get(size_ty, 0)});
+  Value *isZero = builder.CreateICmpEQ(mapEntry, ConstantInt::get(i1_ty, 0));
+  builder.CreateCondBr(isZero, NormalBB, CheckAccessBB);
+
+  builder.SetInsertPoint(CheckAccessBB);
   Value *check_src_bd =
       builder.CreateCall(getOrCreateResolveAccessOk(M), {src_ptr, size_arg});
   Value *check_dst_bd =
@@ -249,6 +270,7 @@ static Function *getOrCreateBoundsCheckMemsetSanitizer(
 
   auto ptr_ty = PointerType::get(Ctx, 0);
   auto i32_ty = Type::getInt32Ty(Ctx);
+  auto i1_ty = Type::getInt1Ty(Ctx);
   auto size_ty = Type::getInt64Ty(Ctx);
 
   FunctionType *resolveMemsetFnTy =
@@ -258,16 +280,21 @@ static Function *getOrCreateBoundsCheckMemsetSanitizer(
   if (!resolveMemsetFn->empty()) { return resolveMemsetFn; } 
 
   BasicBlock *EntryBB = BasicBlock::Create(Ctx, "entry", resolveMemsetFn);
+  BasicBlock *CheckAccessBB = BasicBlock::Create(Ctx, "check_access", resolveMemsetFn);
   BasicBlock *NormalBB = BasicBlock::Create(Ctx, "safe_memset", resolveMemsetFn);
   BasicBlock *SanitizeMemsetBB = BasicBlock::Create(Ctx, "sanitize_memset", resolveMemsetFn);
 
   builder.SetInsertPoint(EntryBB);
-
   // Extract arguments for memset
   Value *basePtr = resolveMemsetFn->getArg(0);
   Value *valueArg = resolveMemsetFn->getArg(1);
   Value *accessSize = resolveMemsetFn->getArg(2);
 
+  Value* mapEntry = builder.CreateCall(getOrCreateSanitizerMapEntry(M), { ConstantInt::get(size_ty, 0)});
+  Value *isZero = builder.CreateICmpEQ(mapEntry, ConstantInt::get(i1_ty, 0));
+  builder.CreateCondBr(isZero, NormalBB, CheckAccessBB);
+  
+  builder.SetInsertPoint(CheckAccessBB);
   Value *check_dst_bd =
       builder.CreateCall(getOrCreateResolveAccessOk(M), {basePtr, accessSize});
   builder.CreateCondBr(check_dst_bd, NormalBB, SanitizeMemsetBB);
@@ -299,6 +326,7 @@ static Function *getOrCreateResolveGep(Module *M) {
 
   auto ptr_ty = PointerType::get(Ctx, 0);
   auto size_ty = Type::getInt64Ty(Ctx);
+  auto i1_ty = Type::getInt1Ty(Ctx);
 
   FunctionType *resolveGepFnTy =
       FunctionType::get(ptr_ty, {ptr_ty, ptr_ty}, false);
@@ -310,18 +338,21 @@ static Function *getOrCreateResolveGep(Module *M) {
   resolveGepFn->addFnAttr(Attribute::AlwaysInline);
 
   BasicBlock *EntryBB = BasicBlock::Create(Ctx, "entry", resolveGepFn);
+  BasicBlock *GetBaseAndLimitBB = BasicBlock::Create(Ctx, "get_base_and_limit", resolveGepFn);
   BasicBlock *CheckComputedPtrBB = BasicBlock::Create(Ctx, "check_access", resolveGepFn);
   BasicBlock *NormalBB = BasicBlock::Create(Ctx, "return_normal_ptr", resolveGepFn);
   BasicBlock *OnePastBB = BasicBlock::Create(Ctx, "return_tainted_ptr", resolveGepFn);
 
-  // EntryBB: Call libresolve get_base_and_limit
-  // to retrieve the last valid byte address of obj
   builder.SetInsertPoint(EntryBB);
-
   // Extract the base and derived pointer
   Value *basePtr = resolveGepFn->getArg(0);
   Value *derivedPtr = resolveGepFn->getArg(1);
 
+  Value* mapEntry = builder.CreateCall(getOrCreateSanitizerMapEntry(M), { ConstantInt::get(size_ty, 0)});
+  Value *isZero = builder.CreateICmpEQ(mapEntry, ConstantInt::get(i1_ty, 0));
+  builder.CreateCondBr(isZero, NormalBB, GetBaseAndLimitBB);
+
+  builder.SetInsertPoint(GetBaseAndLimitBB);
   Value *baseAndLimit =
       builder.CreateCall(getResolveBaseAndLimit(M), {basePtr});
   Value *baseValue = builder.CreateExtractValue(baseAndLimit, 0);
