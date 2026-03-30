@@ -402,6 +402,9 @@ class CWE(BaseModel):
     id: Annotated[str, Field(pattern=r"^\d+$")]
     name: str
 
+    def __str__(self):
+        return f"CWE-{self.id} - {self.name}"
+
 class Weakness(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
