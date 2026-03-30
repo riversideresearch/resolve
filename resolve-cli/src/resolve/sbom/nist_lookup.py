@@ -6,6 +6,7 @@ import asyncio
 import aiohttp
 from aiohttp import ClientSession
 from resolve.sbom.schema.cpe_api import Cpe, JsonSchemaForNvdCommonProductEnumerationCpeApiVersion20
+from resolve.sbom.dependancies import SoftwareDependancy
 import pdb
 
 CVE_API_BASE_PATH = "https://services.nvd.nist.gov/rest/json/cves/2.0"
@@ -68,9 +69,8 @@ async def get_cves(session: aiohttp.ClientSession, params: dict[str, str]) -> li
                             cwe = await get_cwe(session, desc.value)
                 if isinstance(cwe, CWE):
                     weakness.set_cwe(cwe)
-
             CVEs.append(cve)
-        CVEs.extend([item.cve for item in data.vulnerabilities]) # NIST API has unnecessary wrapper around cve object
+
         if len(CVEs) >= data.totalResults:
             break
         ## More results, request next page
@@ -78,10 +78,15 @@ async def get_cves(session: aiohttp.ClientSession, params: dict[str, str]) -> li
         print(f"Multi-part query: requestind index {params['startIndex']}")
     return CVEs
 
-async def get_cves_by_dep(session: ClientSession, dep: str) -> dict[str, list[CveItem]]:
+async def get_cve_fuzzy(session: ClientSession, dep: str) -> dict[str, list[CveItem]]:
     cpe = await fuzzy_find_cpe(session, dep)
     CVEs = await get_cves(session, {'cpeName': cpe})
     return {cpe: CVEs}
+
+async def get_cve_by_dep(session: ClientSession, dep: SoftwareDependancy, **kwargs):
+    cves = await get_cves(session, dep.as_query())
+    dep.set_cves(filter_cves(cves, **kwargs))
+    return dep
 
 def filter_cves(cves: list[CveItem], min_base_score_v3: float = 0.0, allow_no_v3_score: bool = False, allow_disputed: bool = True, allow_deferred: bool = True, allow_rejected: bool = False):
     out = []
@@ -98,20 +103,16 @@ def filter_cves(cves: list[CveItem], min_base_score_v3: float = 0.0, allow_no_v3
         out.append(cve)
     return out
 
-async def dep_lookup(deps: list[str], cpe_literal: bool = False, **kwargs) -> dict[str, list[nist_api.CveItem]]:
+async def dep_lookup(deps: list[SoftwareDependancy], **kwargs) -> dict[str, list[nist_api.CveItem]]:
     requests: list[Coroutine] = []
     async with ClientSession() as session:
         for dep in deps:
-            rqst = get_cves(session, {'cpeName': dep}) if cpe_literal else get_cves_by_dep(session, dep)
+            rqst = get_cve_by_dep(session, dep, **kwargs)
             requests.append(rqst)
-        results: list[BaseException | dict[str, list[CveItem]]] = await asyncio.gather(*requests, return_exceptions=True)
-    out: dict[str, list[CveItem]] = {}
+        results: list[BaseException | SoftwareDependancy] = await asyncio.gather(*requests, return_exceptions=True)
+
     for r in results:
-        if isinstance(r, dict):
-            for cve in r:
-                r[cve] = filter_cves(r[cve], **kwargs)
-            out.update(r)
-        else:
-            print(f"WARNING: lookup failed with {r}")
-    print(f"{len(out)}/{len(deps)} lookups succeeded.")
-    return out
+        if isinstance(r, Exception):
+            print(f"Lookup failure: {r}")
+
+    return deps
