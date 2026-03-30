@@ -96,7 +96,7 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
   }
 
   Function *getOrCreateFreeOfNonHeapSanitizer(
-    Module *M, Vulnerability::RemediationStrategies strategy) {
+      Module *M, Vulnerability::RemediationStrategies strategy) {
     std::string handlerName = "resolve_sanitize_non_heap_free";
     LLVMContext &Ctx = M->getContext();
 
@@ -230,13 +230,25 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
   /// the triggering argument parsed from the JSON.
   PreservedAnalyses runOnFunction(Function &F, ModuleAnalysisManager &MAM,
                                   Vulnerability &vuln) {
+    char *demangledNamePtr = llvm::itaniumDemangle(F.getName().str(), false);
+    std::string demangledName(demangledNamePtr ?: "");
     auto result = PreservedAnalyses::all();
 
-    if (!shouldInstrument(F, vuln)) {
-      return result;
+    if (F.getMetadata("resolve.noinstrument")) { return result; }
+
+    if (CVE_ASSERT_DEBUG) {
+      errs() << "[CVEAssert] Trying fn " << F.getName()
+             << " Demangled name: " << demangledName << "\n";
     }
 
     raw_ostream &out = errs();
+
+    if (vuln.TargetFunctionName.empty() ||
+        (demangledName.find(vuln.TargetFunctionName) == std::string::npos &&
+         F.getName().str().find(vuln.TargetFunctionName) ==
+             std::string::npos)) {
+      return result;
+    }
 
     out << "[CVEAssert] === Pre Instrumented IR === \n";
     out << F;
@@ -252,9 +264,9 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
     }
 
     if (vuln.Strategy == Vulnerability::RemediationStrategies::NONE) {
-      out << "[CVEAssert] NONE strategy selected for " << vuln.TargetFileName
-          << ":" << vuln.TargetFunctionName << "...\n";
-      out << "[CVEAssert] Skipping remediation\n";
+      errs() << "[CVEAssert] NONE strategy selected for " << vuln.TargetFileName
+             << ":" << vuln.TargetFunctionName << "...\n";
+      errs() << "[CVEAssert] Skipping remediation\n";
       return result;
     }
 
@@ -304,16 +316,20 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
       break;
 
     default:
-      out << "[CVEAssert] Error: CWE " << vuln.WeaknessID
-          << " not implemented\n";
+      errs() << "[CVEAssert] Error: CWE " << vuln.WeaknessID
+             << " not implemented\n";
       break;
     }
 
     out << "[CVEAssert] === Post Instrumented IR === \n";
-    validateIR(&F);
+    out << F;
 
-    out << "[CVEAssert] Inserted vulnerability handler calls in function "
-        << vuln.TargetFileName << ":" << vuln.TargetFunctionName << "\n";
+    if (verifyFunction(F, &out)) {
+      report_fatal_error("[CVEAssert] We broke something");
+    }
+
+    errs() << "[CVEAssert] Inserted vulnerability handler calls in function "
+           << vuln.TargetFileName << ":" << vuln.TargetFunctionName << "\n";
     return result;
   }
 
