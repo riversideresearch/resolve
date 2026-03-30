@@ -84,7 +84,8 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
     NULL_PTR_DEREF = 476, /* NOTE: This ID has been found in OpenALPR, NASA CFS,
                              stb-convert CPs */
     STACK_FREE =
-        590 /* NOTE: This ID has been found in NASA CFS challenge problem */
+        590, /* NOTE: This ID has been found in NASA CFS challenge problem */
+    ALL = 999,
   };
 
   LabelCVEPass() {
@@ -174,6 +175,15 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
     }
   }
 
+  void applyAutomaticSanitizers(Function &F, Vulnerability::RemediationStrategies strategy) {
+    /// applies all automatic sanitizers (operation masking excluded)
+    sanitizeFreeOfNonHeap(&F, strategy);
+    sanitizeMemInstBounds(&F, strategy);
+    sanitizeNullPointers(&F, strategy);
+    sanitizeDivideByZero(&F, strategy);
+    sanitizeIntOverflow(&F, strategy);
+  }
+
   /// For each function, if it matches the target function name, insert calls to
   /// the vulnerability handlers as specified in the JSON. Each call receives
   /// the triggering argument parsed from the JSON.
@@ -219,8 +229,7 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
       return result;
     }
 
-    uint32_t cwe_id = static_cast<uint32_t>(std::stoi(vuln.WeaknessID));
-    switch (cwe_id) {
+    switch (vuln.WeaknessID) {
     case VulnID::STACK_BASED_BUF_OVERFLOW: /* Stack-based buffer overflow */
     case VulnID::HEAP_BASED_BUF_OVERFLOW:  /* Heap-base buffer overflow */
     case VulnID::OOB_WRITE:                /* OOB Write */
@@ -260,6 +269,11 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
       result = PreservedAnalyses::none();
       break;
 
+    case VulnID::ALL:
+      applyAutomaticSanitizers(F, vuln.Strategy);
+      result = PreservedAnalyses::none();
+      break;
+
     default:
       errs() << "[CVEAssert] Error: CWE " << vuln.WeaknessID
              << " not implemented\n";
@@ -290,8 +304,7 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
         continue;
       }
 
-      uint32_t cwe_id = static_cast<uint32_t>(std::stoi(vuln.WeaknessID));
-      switch (cwe_id) {
+      switch (vuln.WeaknessID) {
       // 121 stack-based
       case VulnID::STACK_BASED_BUF_OVERFLOW:
         instrument_mem_inst.instrumentAlloca = true;
