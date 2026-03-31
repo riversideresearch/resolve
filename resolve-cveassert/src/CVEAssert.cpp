@@ -69,6 +69,7 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
   std::vector<Vulnerability> vulnerabilities;
 
   enum VulnID {
+    ALL = 0,
     STACK_BASED_BUF_OVERFLOW = 121,
     HEAP_BASED_BUF_OVERFLOW = 122,
     WRITE_WHAT_WHERE = 123,
@@ -174,6 +175,15 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
     }
   }
 
+  void applyAutomaticSanitizers(Function &F, Vulnerability::RemediationStrategies strategy) {
+    /// applies all automatic sanitizers (operation masking excluded)
+    sanitizeFreeOfNonHeap(&F, strategy);
+    sanitizeMemInstBounds(&F, strategy);
+    sanitizeNullPointers(&F, strategy);
+    sanitizeDivideByZero(&F, strategy);
+    sanitizeIntOverflow(&F, strategy);
+  }
+
   /// For each function, if it matches the target function name, insert calls to
   /// the vulnerability handlers as specified in the JSON. Each call receives
   /// the triggering argument parsed from the JSON.
@@ -256,6 +266,11 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
 
     case VulnID::STACK_FREE: /* Stack free;  Found in nasa-cfs */
       sanitizeFreeOfNonHeap(&F, vuln.Strategy);
+      result = PreservedAnalyses::none();
+      break;
+
+    case VulnID::ALL:
+      applyAutomaticSanitizers(F, vuln.Strategy);
       result = PreservedAnalyses::none();
       break;
 
