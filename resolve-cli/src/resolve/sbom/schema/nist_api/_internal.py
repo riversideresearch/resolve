@@ -531,6 +531,13 @@ class CveItem(BaseModel):
     weaknesses: list[Weakness] | None = None
     configurations: list[Config] | None = None
     vendorComments: list[VendorComment] | None = None
+    
+    def get_description(self) -> str:
+        for desc in self.descriptions:
+            if desc.lang == 'en':
+                return desc.value
+        print('Failed to find english description, retuning first entry')
+        return self.descriptions[0].value
 
 
 class DefCveItem(BaseModel):
