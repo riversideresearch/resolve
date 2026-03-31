@@ -1,3 +1,4 @@
+from typing import Any
 from pydantic import ValidationError
 import aiohttp
 from resolve.sbom.schema.nist_api import CveItem, CWE
@@ -31,7 +32,7 @@ async def get_cwe(session: aiohttp.ClientSession, id: str):
             print(f"Could not parse data from CWE API: {entry}")
             return None
 
-async def get_cves(session: aiohttp.ClientSession, params: dict[str, str]) -> list[CveItem]:
+async def get_cves(session: aiohttp.ClientSession, params: dict[str, Any]) -> list[CveItem]:
     CVEs: list[nist_api.CveItem] = []
     while True:
         async with session.get(CVE_API_BASE_PATH, params=params) as resp:
@@ -40,15 +41,16 @@ async def get_cves(session: aiohttp.ClientSession, params: dict[str, str]) -> li
         data = nist_api.JsonSchemaForNvdVulnerabilityDataApiVersion223.model_validate(json)
         for v in data.vulnerabilities:
             cve = v.cve
-            for weakness in cve.weaknesses:
-                cwe = None
-                if weakness.type == 'Primary':
-                    # description should be of format description=[LangString(lang='en', value='CWE-79')]
-                    for desc in weakness.description:
-                        if desc.lang == 'en' and 'CWE' in desc.value:
-                            cwe = await get_cwe(session, desc.value)
-                if isinstance(cwe, CWE):
-                    weakness.set_cwe(cwe)
+            if cve.weaknesses:
+                for weakness in cve.weaknesses:
+                    cwe = None
+                    if weakness.type == 'Primary':
+                        # description should be of format description=[LangString(lang='en', value='CWE-79')]
+                        for desc in weakness.description:
+                            if desc.lang == 'en' and 'CWE' in desc.value:
+                                cwe = await get_cwe(session, desc.value)
+                    if isinstance(cwe, CWE):
+                        weakness.set_cwe(cwe)
             CVEs.append(cve)
 
         if len(CVEs) >= data.totalResults:
@@ -66,15 +68,27 @@ async def get_cve_by_dep(session: ClientSession, dep: SoftwareDependancy, **kwar
 def filter_cves(cves: list[CveItem], min_base_score_v3: float = 0.0, allow_no_v3_score: bool = False, allow_disputed: bool = True, allow_deferred: bool = True, allow_rejected: bool = False):
     out = []
     for cve in cves:
-        v3_score = cve.metrics.get_v3_base_score()
+        v3_score = cve.metrics.get_v3_base_score() if cve.metrics else None
         if (not allow_no_v3_score and not v3_score) or (v3_score and v3_score < min_base_score_v3):
             continue
-        if not allow_disputed and 'Disputed' in cve.cveTags:
+        def check_disputed():
+            """Return true if a 'disputed' tag is applied to the CVE"""
+            if cve.cveTags:
+                for tag in cve.cveTags:
+                    if tag.tags:
+                        for t in tag.tags:
+                                if t.value == 'disputed':
+                                    return True
+            return False
+            
+        if not allow_disputed and check_disputed():
             continue
-        if not allow_deferred and cve.vulnStatus.lower() == 'deferred':
-            continue
-        if not allow_rejected and cve.vulnStatus.lower() == 'rejected':
-            continue
+            
+        if isinstance(cve.vulnStatus, str):
+            if not allow_deferred and cve.vulnStatus.lower() == 'deferred':
+                continue
+            if not allow_rejected and cve.vulnStatus.lower() == 'rejected':
+                continue
         out.append(cve)
     return out
 
