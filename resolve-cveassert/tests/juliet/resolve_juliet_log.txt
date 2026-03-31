@@ -11,29 +11,41 @@ Testing: 190: Integer_Overflow
 Total testcases: 50
 PASS: 0
 FAIL: 50
-exit 0 (21 tests...)
+exit 0 (14 tests...)
   CWE190_Integer_Overflow__unsigned_int_fscanf_preinc_01
-  CWE190_Integer_Overflow__int_rand_preinc_01
   CWE190_Integer_Overflow__int_fgets_preinc_02
-  CWE190_Integer_Overflow__short_rand_preinc_04
   CWE190_Integer_Overflow__unsigned_int_fscanf_preinc_06
-  CWE190_Integer_Overflow__short_rand_preinc_06
   CWE190_Integer_Overflow__int64_t_max_preinc_07
   CWE190_Integer_Overflow__int_fgets_preinc_08
   CWE190_Integer_Overflow__short_fscanf_preinc_08
-  CWE190_Integer_Overflow__char_rand_preinc_08
+  CWE190_Integer_Overflow__char_max_preinc_15
+  CWE190_Integer_Overflow__char_fscanf_preinc_17
+  CWE190_Integer_Overflow__int64_t_fscanf_preinc_18
+  CWE190_Integer_Overflow__short_max_preinc_18
   ...
-failed_to_compile (22 tests...)
-  CWE190_Integer_Overflow__char_rand_preinc_22
+failed_to_compile (15 tests...)
   CWE190_Integer_Overflow__int64_t_fscanf_preinc_22
   CWE190_Integer_Overflow__char_max_preinc_51
   CWE190_Integer_Overflow__int_fscanf_preinc_51
   CWE190_Integer_Overflow__short_fscanf_preinc_52
   CWE190_Integer_Overflow__int_fgets_preinc_52
   CWE190_Integer_Overflow__short_max_preinc_52
+  CWE190_Integer_Overflow__short_fscanf_preinc_54
+  CWE190_Integer_Overflow__char_fscanf_preinc_61
+  CWE190_Integer_Overflow__int64_t_fscanf_preinc_61
+  CWE190_Integer_Overflow__unsigned_int_fscanf_preinc_63
+  ...
+skipped: rand (14 tests...)
+  CWE190_Integer_Overflow__int_rand_preinc_01
+  CWE190_Integer_Overflow__short_rand_preinc_04
+  CWE190_Integer_Overflow__short_rand_preinc_06
+  CWE190_Integer_Overflow__char_rand_preinc_08
+  CWE190_Integer_Overflow__char_rand_preinc_22
+  CWE190_Integer_Overflow__int_rand_preinc_32
+  CWE190_Integer_Overflow__int64_t_rand_preinc_44
+  CWE190_Integer_Overflow__short_rand_preinc_45
   CWE190_Integer_Overflow__short_rand_preinc_53
   CWE190_Integer_Overflow__unsigned_int_rand_preinc_54
-  CWE190_Integer_Overflow__short_fscanf_preinc_54
   ...
 skipped: socket (7 tests...)
   CWE190_Integer_Overflow__int_connect_socket_preinc_02
@@ -51,13 +63,14 @@ Testing: 123: Write_What_Where_Condition
 Total testcases: 50
 PASS: 0
 FAIL: 50
-exit 1 (7 tests...)
+exit 0 (5 tests...)
   CWE123_Write_What_Where_Condition__fgets_02
   CWE123_Write_What_Where_Condition__fgets_03
   CWE123_Write_What_Where_Condition__fgets_08
   CWE123_Write_What_Where_Condition__fgets_14
-  CWE123_Write_What_Where_Condition__fgets_18
   CWE123_Write_What_Where_Condition__fgets_33
+exit SIGSEGV (2 tests...)
+  CWE123_Write_What_Where_Condition__fgets_18
   CWE123_Write_What_Where_Condition__fgets_41
 failed_to_compile (11 tests...)
   CWE123_Write_What_Where_Condition__fgets_22
@@ -216,18 +229,13 @@ Testing: 369: Divide_by_Zero
 Total testcases: 50
 PASS: 0
 FAIL: 50
-exit 0 (12 tests...)
+exit 0 (6 tests...)
   CWE369_Divide_by_Zero__int_fscanf_modulo_02
   CWE369_Divide_by_Zero__int_fscanf_modulo_03
   CWE369_Divide_by_Zero__int_fscanf_modulo_05
-  CWE369_Divide_by_Zero__int_rand_divide_12
   CWE369_Divide_by_Zero__int_zero_modulo_12
-  CWE369_Divide_by_Zero__int_rand_modulo_15
-  CWE369_Divide_by_Zero__int_rand_modulo_17
   CWE369_Divide_by_Zero__int_fscanf_modulo_18
-  CWE369_Divide_by_Zero__int_rand_modulo_41
   CWE369_Divide_by_Zero__int_fscanf_modulo_42
-  ...
 exit SIGFPE (6 tests...)
   CWE369_Divide_by_Zero__int_zero_divide_01
   CWE369_Divide_by_Zero__int_zero_modulo_04
@@ -235,13 +243,25 @@ exit SIGFPE (6 tests...)
   CWE369_Divide_by_Zero__int_zero_divide_11
   CWE369_Divide_by_Zero__int_zero_modulo_61
   CWE369_Divide_by_Zero__int_zero_divide_62
-failed_to_compile (22 tests...)
+failed_to_compile (12 tests...)
   CWE369_Divide_by_Zero__int_zero_divide_51
   CWE369_Divide_by_Zero__int_zero_modulo_52
   CWE369_Divide_by_Zero__int_fscanf_modulo_53
   CWE369_Divide_by_Zero__int_zero_divide_54
   CWE369_Divide_by_Zero__int_zero_modulo_54
   CWE369_Divide_by_Zero__int_fscanf_modulo_61
+  CWE369_Divide_by_Zero__int_zero_modulo_68
+  CWE369_Divide_by_Zero__int_zero_divide_72
+  CWE369_Divide_by_Zero__int_zero_modulo_72
+  CWE369_Divide_by_Zero__int_fscanf_modulo_73
+  ...
+skipped: rand (16 tests...)
+  CWE369_Divide_by_Zero__int_rand_divide_12
+  CWE369_Divide_by_Zero__int_rand_modulo_15
+  CWE369_Divide_by_Zero__int_rand_modulo_17
+  CWE369_Divide_by_Zero__int_rand_modulo_41
+  CWE369_Divide_by_Zero__int_rand_modulo_43
+  CWE369_Divide_by_Zero__int_rand_modulo_44
   CWE369_Divide_by_Zero__int_rand_divide_62
   CWE369_Divide_by_Zero__int_rand_modulo_63
   CWE369_Divide_by_Zero__int_rand_modulo_65
