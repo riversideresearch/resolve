@@ -24,11 +24,15 @@ LINK_LIBRESOLVE=true
 # Variable tells resolvecc to include ResolveFacts plugin
 USE_RESOLVE=true
 
-# Variable tells resolvecc to load CVEAssert plugin
-USE_CVEASSERT=false
-
 # Variable stores path of CVE description
-RESOLVE_LABEL_CVE=""
+RESOLVE_LABEL_CVE=${RESOLVE_LABEL_CVE:-}
+
+# Variable tells resolvecc to load CVEAssert plugin
+if [ "${RESOLVE_LABEL_CVE}" ]; then
+    USE_CVEASSERT=true
+else
+    USE_CVEASSERT=false
+fi
 
 # Initialize arrays for flags and arguments
 COMPTIME_FLAGS=()
