@@ -175,7 +175,6 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
     }
   }
 
-<<<<<<< HEAD
   void applyAutomaticSanitizers(Function &F, Vulnerability::RemediationStrategies strategy) {
     /// applies all automatic sanitizers (operation masking excluded)
     sanitizeFreeOfNonHeap(&F, strategy);
@@ -185,8 +184,6 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
     sanitizeIntOverflow(&F, strategy);
   }
 
-=======
->>>>>>> 46eba94 (CVEAssert.cpp: I don't know why Git decided to remove Jackson's work after I tried to fix a space but I am putting it back now.)
   /// Return true if F's name (raw or demangled) contains `targetName
   ///
   /// Always returns true if targetName is empty
