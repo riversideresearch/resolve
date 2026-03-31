@@ -3,30 +3,10 @@ import aiohttp
 from resolve.sbom.schema.nist_api import CveItem, CWE
 from resolve.sbom.schema import nist_api
 import asyncio
-import aiohttp
 from aiohttp import ClientSession
-from resolve.sbom.schema.cpe_api import Cpe, JsonSchemaForNvdCommonProductEnumerationCpeApiVersion20
 from resolve.sbom.dependancies import SoftwareDependancy
-import pdb
 
 CVE_API_BASE_PATH = "https://services.nvd.nist.gov/rest/json/cves/2.0"
-CPE_API_BASE_PATH = "https://services.nvd.nist.gov/rest/json/cpes/2.0"
-
-async def fuzzy_find_cpe(session: ClientSession, dep: str) -> str:
-    """TODO: update to comply with cmake's output format, whatever that is"""
-    # for now just do a keyword search
-    params = {"keywordSearch": dep}
-    async with session.get(CPE_API_BASE_PATH, params=params) as resp:
-        resp.raise_for_status()
-        json = await resp.json()
-    body = JsonSchemaForNvdCommonProductEnumerationCpeApiVersion20.model_validate(json)
-    cpes: list[Cpe] = [prod.cpe for prod in body.products]
-    if len(cpes) > 1:
-        # todo: manual intervention / selection here
-        print("WARNING: more than one CPE returned for query, assuming first.")
-    elif not len(cpes):
-        raise FileNotFoundError # TODO custom error type
-    return cpes[0].cpeName
 
 async def get_cwe(session: aiohttp.ClientSession, id: str):
     known_bad_patterns = ["NVD-CWE-Other", "NVD-CWE-noinfo"]
@@ -38,7 +18,8 @@ async def get_cwe(session: aiohttp.ClientSession, id: str):
         print(f"Could not convert CWE ID {id}")
         return None
     async with session.get(f"https://cwe-api.mitre.org/api/v1/cwe/weakness/{id_num}") as resp:
-        if not resp.ok: return None
+        if not resp.ok: 
+            return None
         body = await resp.json()
         entry = body.get("Weaknesses")
         if not entry or not len(entry):
@@ -49,7 +30,6 @@ async def get_cwe(session: aiohttp.ClientSession, id: str):
         except ValidationError:
             print(f"Could not parse data from CWE API: {entry}")
             return None
-
 
 async def get_cves(session: aiohttp.ClientSession, params: dict[str, str]) -> list[CveItem]:
     CVEs: list[nist_api.CveItem] = []
@@ -78,11 +58,6 @@ async def get_cves(session: aiohttp.ClientSession, params: dict[str, str]) -> li
         print(f"Multi-part query: requestind index {params['startIndex']}")
     return CVEs
 
-async def get_cve_fuzzy(session: ClientSession, dep: str) -> dict[str, list[CveItem]]:
-    cpe = await fuzzy_find_cpe(session, dep)
-    CVEs = await get_cves(session, {'cpeName': cpe})
-    return {cpe: CVEs}
-
 async def get_cve_by_dep(session: ClientSession, dep: SoftwareDependancy, **kwargs):
     cves = await get_cves(session, dep.as_query())
     dep.set_cves(filter_cves(cves, **kwargs))
@@ -103,8 +78,8 @@ def filter_cves(cves: list[CveItem], min_base_score_v3: float = 0.0, allow_no_v3
         out.append(cve)
     return out
 
-async def dep_lookup(deps: list[SoftwareDependancy], **kwargs) -> dict[str, list[nist_api.CveItem]]:
-    requests: list[Coroutine] = []
+async def dep_lookup(deps: list[SoftwareDependancy], **kwargs) -> list[SoftwareDependancy]:
+    requests = []
     async with ClientSession() as session:
         for dep in deps:
             rqst = get_cve_by_dep(session, dep, **kwargs)
