@@ -196,6 +196,7 @@ class Result(ABC):
     timeout = False
     skip_reason = None
     failed_compilation_process = None
+    cpp = None
 
     def get_signal_name(self):
         if self.exit_signal is not None:
@@ -235,9 +236,10 @@ class ResultSkipped(Result):
 @dataclass
 class ResultCompilationFailure(Result):
     failed_compilation_process: CompletedProcess[str]
+    cpp: bool
 
     def __str__(self) -> str:
-        return "failed_to_compile"
+        return "failed_to_compile" + (" (cpp)" if self.cpp else "")
 
 
 def do_test(test: CWETest, io_obj: Path, out_dir: Path) -> Result:
@@ -265,7 +267,9 @@ def do_test(test: CWETest, io_obj: Path, out_dir: Path) -> Result:
 
     compile_process = subprocess.run(compile_cmd, capture_output=True, text=True)
     if compile_process.returncode != 0:
-        return ResultCompilationFailure(compile_process)
+        return ResultCompilationFailure(
+            compile_process, cpp=any(".cpp" == s.suffix for s in test.source_paths)
+        )
 
     try:
         executed_binary = subprocess.run(
