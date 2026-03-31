@@ -249,12 +249,10 @@ def do_test(test: CWETest, io_obj: Path, out_dir: Path) -> Result:
     with cve_description_path.open("w") as f:
         json.dump(test.get_cve_description(), f, indent=4)
 
-    # Set the environment variable
-    env_var = os.environ.copy()
-    env_var["RESOLVE_LABEL_CVE"] = str(cve_description_path)
-
     compile_cmd = [
         resolve_cc,
+        "-fcve-assert",
+        str(cve_description_path),
         "-DOMITGOOD",
         "-DINCLUDEMAIN",
         "-I",
@@ -265,9 +263,7 @@ def do_test(test: CWETest, io_obj: Path, out_dir: Path) -> Result:
         str(testcase_exe_path),
     ]
 
-    compile_process = subprocess.run(
-        compile_cmd, env=env_var, capture_output=True, text=True
-    )
+    compile_process = subprocess.run(compile_cmd, capture_output=True, text=True)
     if compile_process.returncode != 0:
         return ResultCompilationFailure(compile_process)
 
@@ -364,7 +360,7 @@ def main():
     parser.add_argument(
         "--limit",
         type=int,
-        default=50,
+        default=200,
         help="Limit the number of tests processed per CWE",
     )
     parser.add_argument(
