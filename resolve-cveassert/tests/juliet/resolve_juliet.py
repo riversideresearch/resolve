@@ -334,7 +334,7 @@ def test_cwe(test_dir: CWETestDir, io_obj: Path, out_dir: Path, test_limit: int)
             summarize_results(results)
 
     pass_count = len(pass_results)
-    total_tests = len(tests)
+    total_tests = len(results)
     success_percent = (pass_count / total_tests) * 100
 
     print("-----------------------------------------------------------------")
