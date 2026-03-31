@@ -89,7 +89,7 @@ class CWETestDir:
             else:
                 yield source_path
 
-    def collect_tests(self, test_limit: int) -> "list[CWETest]":
+    def collect_tests(self) -> "list[CWETest]":
         """Collect tests in `self`
 
         Each test may contain multiple sources.
@@ -111,16 +111,6 @@ class CWETestDir:
 
             testcase_name = match.group(0)
             testcase_idx = int(match.group(1))
-            if (
-                len(test_src_files) == test_limit
-                and (testcase_idx, testcase_name) not in test_src_files
-            ):
-                print(
-                    f"WARN: Skipping remaining tests in {self.name} after {test_limit} tests",
-                    file=sys.stderr,
-                )
-                break
-
             test_src_files[(testcase_idx, testcase_name)].append(source_path)
 
         tests = [
@@ -251,15 +241,6 @@ class ResultCompilationFailure(Result):
 
 
 def do_test(test: CWETest, io_obj: Path, out_dir: Path) -> Result:
-    if "socket" in test.name:
-        return ResultSkipped("socket")
-
-    if "rand" in test.name:
-        return ResultSkipped("rand")
-
-    if "sizeof_" in test.name:
-        return ResultSkipped("sizeof_")
-
     # Binary path to compiled testcase executable
     testcase_exe_path = out_dir / test.name
 
@@ -307,10 +288,28 @@ def do_test(test: CWETest, io_obj: Path, out_dir: Path) -> Result:
         case signal:
             return ResultSignal(-signal)
 
+def should_skip(test: CWETest, skip_patterns: list[str]):
+    return next((s for s in skip_patterns if s in test.name), None)
 
 def test_cwe(test_dir: CWETestDir, io_obj: Path, out_dir: Path, test_limit: int):
-    tests = test_dir.collect_tests(test_limit)
-    results = [(test, do_test(test, io_obj, out_dir)) for test in tests]
+    SKIP_TESTS = ["socket", "rand", "sizeof_"]
+
+    tests: list[CWETest] = []
+    skipped_results: list[tuple[CWETest, Result]] = []
+
+    for test in test_dir.collect_tests():
+        if skip_patern := should_skip(test, SKIP_TESTS):
+            skipped_results.append((test, ResultSkipped(skip_patern)))
+        else:
+            tests.append(test)
+
+    if len(tests) > test_limit:
+        print(
+            f"WARN: Skipping remaining tests in {test_dir.name} after {test_limit} tests",
+            file=sys.stderr,
+        )
+
+    results = [(test, do_test(test, io_obj, out_dir)) for test in tests[:test_limit]]
 
     pass_results = [(t, r) for t, r in results if r.exit_code == 3]
     fail_results = [(t, r) for t, r in results if r.exit_code != 3]
@@ -340,9 +339,10 @@ def test_cwe(test_dir: CWETestDir, io_obj: Path, out_dir: Path, test_limit: int)
 
     print("-----------------------------------------------------------------")
     print(f"Testing: {test_dir}")
-    print(f"Total testcases: {len(tests)}")
+    print(f"Total testcases: {len(results)} + {len(skipped_results)} skipped")
     show_result("PASS", pass_results)
     show_result("FAIL", fail_results)
+    show_result("SKIPPED", skipped_results)
     print("-----------------------------------------------------------------")
     print(f"Percentage of CWE{test_dir.cwe} directory covered: {success_percent:.2f}%")
     print(flush=True)
