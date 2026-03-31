@@ -214,25 +214,6 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
       return false;
     }
 
-<<<<<<< HEAD
-    char *demangledNamePtr = llvm::itaniumDemangle(F.getName().str(), false);
-    std::string demangledName(demangledNamePtr ?: "");
-
-    if (CVE_ASSERT_DEBUG) {
-      errs() << "[CVEAssert] Trying fn " << F.getName()
-             << " Demangled name: " << demangledName << "\n";
-    }
-
-    return nameMatches(F, demangledName, vuln.TargetFunctionName);
-  }
-
-  /// For each function, if it matches the target function name, insert calls to
-  /// the vulnerability handlers as specified in the JSON. Each call receives
-  /// the triggering argument parsed from the JSON.
-  PreservedAnalyses runOnFunction(Function &F, ModuleAnalysisManager &MAM,
-                                  Vulnerability &vuln) {
-=======
->>>>>>> 46eba94 (CVEAssert.cpp: I don't know why Git decided to remove Jackson's work after I tried to fix a space but I am putting it back now.)
     char *demangledNamePtr = llvm::itaniumDemangle(F.getName().str(), false);
     std::string demangledName(demangledNamePtr ?: "");
 
