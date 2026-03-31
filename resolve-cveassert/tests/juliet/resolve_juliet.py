@@ -292,11 +292,11 @@ def do_test(test: CWETest, io_obj: Path, out_dir: Path) -> Result:
 
     try:
         executed_binary = subprocess.run(
-            [str(testcase_exe_path)], 
-            input="11", # Most testcases are trigged by this input
-            capture_output=True, 
-            timeout=30, # detect hangs (i.e., networking tests)
-            cwd=out_dir, # Run in out dir, attempt to contain log files
+            [str(testcase_exe_path)],
+            input=b"11",  # Most testcases are trigged by this input
+            capture_output=True,
+            timeout=5,  # detect hangs (i.e., networking tests)
+            cwd=out_dir,  # Run in out dir, attempt to contain log files
         )
     except TimeoutExpired:
         return ResultTimeout()
