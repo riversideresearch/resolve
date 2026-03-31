@@ -17,11 +17,6 @@ exit 0 (50 tests...)
   CWE190_Integer_Overflow__unsigned_int_max_preinc_01
   CWE190_Integer_Overflow__short_max_preinc_01
   CWE190_Integer_Overflow__int64_t_fscanf_preinc_01
-  CWE190_Integer_Overflow__int_fgets_preinc_01
-  CWE190_Integer_Overflow__int_fscanf_preinc_01
-  CWE190_Integer_Overflow__int_max_preinc_01
-  CWE190_Integer_Overflow__short_fscanf_preinc_01
-  CWE190_Integer_Overflow__char_max_preinc_01
   ...
 SKIPPED: 1540
 skipped: rand (1100 tests...)
@@ -30,11 +25,6 @@ skipped: rand (1100 tests...)
   CWE190_Integer_Overflow__char_rand_preinc_01
   CWE190_Integer_Overflow__short_rand_preinc_01
   CWE190_Integer_Overflow__unsigned_int_rand_preinc_01
-  CWE190_Integer_Overflow__short_rand_postinc_01
-  CWE190_Integer_Overflow__int64_t_rand_postinc_01
-  CWE190_Integer_Overflow__int_rand_postinc_01
-  CWE190_Integer_Overflow__unsigned_int_rand_postinc_01
-  CWE190_Integer_Overflow__char_rand_postinc_01
   ...
 skipped: socket (440 tests...)
   CWE190_Integer_Overflow__int_listen_socket_preinc_01
@@ -42,11 +32,6 @@ skipped: socket (440 tests...)
   CWE190_Integer_Overflow__int_listen_socket_postinc_01
   CWE190_Integer_Overflow__int_connect_socket_postinc_01
   CWE190_Integer_Overflow__int_connect_socket_square_01
-  CWE190_Integer_Overflow__int_connect_socket_add_01
-  CWE190_Integer_Overflow__int_connect_socket_multiply_01
-  CWE190_Integer_Overflow__int_listen_socket_add_01
-  CWE190_Integer_Overflow__int_listen_socket_square_01
-  CWE190_Integer_Overflow__int_listen_socket_multiply_01
   ...
 -----------------------------------------------------------------
 Percentage of CWE190 directory covered: 0.00%
@@ -56,29 +41,19 @@ Testing: 123: Write_What_Where_Condition
 Total testcases: 48 + 96 skipped
 PASS: 0
 FAIL: 48
-exit 0 (20 tests...)
+exit 0 (22 tests...)
   CWE123_Write_What_Where_Condition__fgets_01
+  CWE123_Write_What_Where_Condition__fgets_05
+  CWE123_Write_What_Where_Condition__fgets_08
+  CWE123_Write_What_Where_Condition__fgets_09
+  CWE123_Write_What_Where_Condition__fgets_10
+  ...
+exit SIGSEGV (19 tests...)
+  CWE123_Write_What_Where_Condition__fgets_02
   CWE123_Write_What_Where_Condition__fgets_03
   CWE123_Write_What_Where_Condition__fgets_04
-  CWE123_Write_What_Where_Condition__fgets_05
-  CWE123_Write_What_Where_Condition__fgets_09
-  CWE123_Write_What_Where_Condition__fgets_12
-  CWE123_Write_What_Where_Condition__fgets_17
-  CWE123_Write_What_Where_Condition__fgets_21
-  CWE123_Write_What_Where_Condition__fgets_32
-  CWE123_Write_What_Where_Condition__fgets_41
-  ...
-exit SIGSEGV (21 tests...)
-  CWE123_Write_What_Where_Condition__fgets_02
   CWE123_Write_What_Where_Condition__fgets_06
   CWE123_Write_What_Where_Condition__fgets_07
-  CWE123_Write_What_Where_Condition__fgets_08
-  CWE123_Write_What_Where_Condition__fgets_10
-  CWE123_Write_What_Where_Condition__fgets_11
-  CWE123_Write_What_Where_Condition__fgets_13
-  CWE123_Write_What_Where_Condition__fgets_14
-  CWE123_Write_What_Where_Condition__fgets_15
-  CWE123_Write_What_Where_Condition__fgets_16
   ...
 failed_to_compile (7 tests...)
   CWE123_Write_What_Where_Condition__fgets_72
@@ -86,8 +61,7 @@ failed_to_compile (7 tests...)
   CWE123_Write_What_Where_Condition__fgets_74
   CWE123_Write_What_Where_Condition__fgets_81
   CWE123_Write_What_Where_Condition__fgets_82
-  CWE123_Write_What_Where_Condition__fgets_83
-  CWE123_Write_What_Where_Condition__fgets_84
+  ...
 SKIPPED: 96
 skipped: socket (96 tests...)
   CWE123_Write_What_Where_Condition__listen_socket_01
@@ -95,11 +69,6 @@ skipped: socket (96 tests...)
   CWE123_Write_What_Where_Condition__listen_socket_02
   CWE123_Write_What_Where_Condition__connect_socket_02
   CWE123_Write_What_Where_Condition__listen_socket_03
-  CWE123_Write_What_Where_Condition__connect_socket_03
-  CWE123_Write_What_Where_Condition__connect_socket_04
-  CWE123_Write_What_Where_Condition__listen_socket_04
-  CWE123_Write_What_Where_Condition__listen_socket_05
-  CWE123_Write_What_Where_Condition__connect_socket_05
   ...
 -----------------------------------------------------------------
 Percentage of CWE123 directory covered: 0.00%
@@ -115,11 +84,6 @@ exit 0 (30 tests...)
   CWE121_Stack_Based_Buffer_Overflow__CWE806_wchar_t_declare_ncat_01
   CWE121_Stack_Based_Buffer_Overflow__CWE806_wchar_t_declare_memmove_01
   CWE121_Stack_Based_Buffer_Overflow__CWE806_char_declare_snprintf_01
-  CWE121_Stack_Based_Buffer_Overflow__CWE806_wchar_t_alloca_snprintf_01
-  CWE121_Stack_Based_Buffer_Overflow__CWE806_wchar_t_declare_ncpy_01
-  CWE121_Stack_Based_Buffer_Overflow__CWE806_char_declare_loop_01
-  CWE121_Stack_Based_Buffer_Overflow__CWE806_char_declare_memmove_01
-  CWE121_Stack_Based_Buffer_Overflow__CWE806_char_declare_ncat_01
   ...
 exit SIGSEGV (17 tests...)
   CWE121_Stack_Based_Buffer_Overflow__CWE806_wchar_t_alloca_ncpy_01
@@ -127,11 +91,6 @@ exit SIGSEGV (17 tests...)
   CWE121_Stack_Based_Buffer_Overflow__CWE806_wchar_t_alloca_loop_01
   CWE121_Stack_Based_Buffer_Overflow__CWE806_wchar_t_alloca_memcpy_01
   CWE121_Stack_Based_Buffer_Overflow__CWE806_wchar_t_alloca_ncat_01
-  CWE121_Stack_Based_Buffer_Overflow__CWE806_char_alloca_loop_01
-  CWE121_Stack_Based_Buffer_Overflow__CWE806_char_alloca_ncpy_01
-  CWE121_Stack_Based_Buffer_Overflow__CWE806_char_alloca_memcpy_01
-  CWE121_Stack_Based_Buffer_Overflow__CWE806_char_alloca_memmove_01
-  CWE121_Stack_Based_Buffer_Overflow__CWE806_char_alloca_ncat_01
   ...
 timeout (3 tests...)
   CWE121_Stack_Based_Buffer_Overflow__CWE805_int64_t_alloca_loop_01
@@ -144,11 +103,6 @@ skipped: rand (48 tests...)
   CWE121_Stack_Based_Buffer_Overflow__CWE129_rand_03
   CWE121_Stack_Based_Buffer_Overflow__CWE129_rand_04
   CWE121_Stack_Based_Buffer_Overflow__CWE129_rand_05
-  CWE121_Stack_Based_Buffer_Overflow__CWE129_rand_06
-  CWE121_Stack_Based_Buffer_Overflow__CWE129_rand_07
-  CWE121_Stack_Based_Buffer_Overflow__CWE129_rand_08
-  CWE121_Stack_Based_Buffer_Overflow__CWE129_rand_09
-  CWE121_Stack_Based_Buffer_Overflow__CWE129_rand_10
   ...
 skipped: socket (96 tests...)
   CWE121_Stack_Based_Buffer_Overflow__CWE129_connect_socket_01
@@ -156,11 +110,6 @@ skipped: socket (96 tests...)
   CWE121_Stack_Based_Buffer_Overflow__CWE129_connect_socket_02
   CWE121_Stack_Based_Buffer_Overflow__CWE129_listen_socket_02
   CWE121_Stack_Based_Buffer_Overflow__CWE129_listen_socket_03
-  CWE121_Stack_Based_Buffer_Overflow__CWE129_connect_socket_03
-  CWE121_Stack_Based_Buffer_Overflow__CWE129_connect_socket_04
-  CWE121_Stack_Based_Buffer_Overflow__CWE129_listen_socket_04
-  CWE121_Stack_Based_Buffer_Overflow__CWE129_listen_socket_05
-  CWE121_Stack_Based_Buffer_Overflow__CWE129_connect_socket_05
   ...
 -----------------------------------------------------------------
 Percentage of CWE121 directory covered: 0.00%
@@ -176,11 +125,6 @@ exit SIGABRT (12 tests...)
   CWE590_Free_Memory_Not_on_Heap__free_char_declare_01
   CWE590_Free_Memory_Not_on_Heap__free_long_alloca_01
   CWE590_Free_Memory_Not_on_Heap__free_int_static_01
-  CWE590_Free_Memory_Not_on_Heap__free_char_alloca_01
-  CWE590_Free_Memory_Not_on_Heap__free_int64_t_alloca_01
-  CWE590_Free_Memory_Not_on_Heap__free_struct_static_01
-  CWE590_Free_Memory_Not_on_Heap__free_wchar_t_alloca_01
-  CWE590_Free_Memory_Not_on_Heap__free_struct_alloca_01
   ...
 exit SIGSEGV (6 tests...)
   CWE590_Free_Memory_Not_on_Heap__free_int64_t_declare_01
@@ -188,18 +132,13 @@ exit SIGSEGV (6 tests...)
   CWE590_Free_Memory_Not_on_Heap__free_int_alloca_01
   CWE590_Free_Memory_Not_on_Heap__free_int_declare_01
   CWE590_Free_Memory_Not_on_Heap__free_wchar_t_declare_01
-  CWE590_Free_Memory_Not_on_Heap__free_struct_declare_01
+  ...
 failed_to_compile (32 tests...)
   CWE590_Free_Memory_Not_on_Heap__delete_array_struct_alloca_01
   CWE590_Free_Memory_Not_on_Heap__delete_char_declare_01
   CWE590_Free_Memory_Not_on_Heap__delete_class_declare_01
   CWE590_Free_Memory_Not_on_Heap__delete_char_placement_new_01
   CWE590_Free_Memory_Not_on_Heap__delete_array_struct_declare_01
-  CWE590_Free_Memory_Not_on_Heap__delete_char_alloca_01
-  CWE590_Free_Memory_Not_on_Heap__delete_class_alloca_01
-  CWE590_Free_Memory_Not_on_Heap__delete_array_wchar_t_static_01
-  CWE590_Free_Memory_Not_on_Heap__delete_class_static_01
-  CWE590_Free_Memory_Not_on_Heap__delete_int64_t_alloca_01
   ...
 SKIPPED: 0
 -----------------------------------------------------------------
@@ -216,11 +155,6 @@ exit 0 (24 tests...)
   CWE122_Heap_Based_Buffer_Overflow__c_CWE193_wchar_t_loop_01
   CWE122_Heap_Based_Buffer_Overflow__c_CWE193_wchar_t_cpy_01
   CWE122_Heap_Based_Buffer_Overflow__c_CWE193_char_memmove_01
-  CWE122_Heap_Based_Buffer_Overflow__c_CWE805_char_ncpy_01
-  CWE122_Heap_Based_Buffer_Overflow__c_CWE805_char_memcpy_01
-  CWE122_Heap_Based_Buffer_Overflow__c_CWE193_wchar_t_memcpy_01
-  CWE122_Heap_Based_Buffer_Overflow__c_CWE193_wchar_t_ncpy_01
-  CWE122_Heap_Based_Buffer_Overflow__c_CWE805_char_memmove_01
   ...
 failed_to_compile (26 tests...)
   CWE122_Heap_Based_Buffer_Overflow__cpp_CWE805_class_loop_01
@@ -228,11 +162,6 @@ failed_to_compile (26 tests...)
   CWE122_Heap_Based_Buffer_Overflow__cpp_CWE805_char_memmove_01
   CWE122_Heap_Based_Buffer_Overflow__cpp_CWE805_char_memcpy_01
   CWE122_Heap_Based_Buffer_Overflow__cpp_CWE805_char_snprintf_01
-  CWE122_Heap_Based_Buffer_Overflow__cpp_CWE193_wchar_t_loop_01
-  CWE122_Heap_Based_Buffer_Overflow__cpp_CWE193_wchar_t_cpy_01
-  CWE122_Heap_Based_Buffer_Overflow__cpp_CWE805_char_ncpy_01
-  CWE122_Heap_Based_Buffer_Overflow__cpp_CWE805_char_loop_01
-  CWE122_Heap_Based_Buffer_Overflow__cpp_CWE193_wchar_t_memmove_01
   ...
 SKIPPED: 432
 skipped: rand (96 tests...)
@@ -241,11 +170,6 @@ skipped: rand (96 tests...)
   CWE122_Heap_Based_Buffer_Overflow__c_CWE129_rand_02
   CWE122_Heap_Based_Buffer_Overflow__cpp_CWE129_rand_02
   CWE122_Heap_Based_Buffer_Overflow__c_CWE129_rand_03
-  CWE122_Heap_Based_Buffer_Overflow__cpp_CWE129_rand_03
-  CWE122_Heap_Based_Buffer_Overflow__c_CWE129_rand_04
-  CWE122_Heap_Based_Buffer_Overflow__cpp_CWE129_rand_04
-  CWE122_Heap_Based_Buffer_Overflow__c_CWE129_rand_05
-  CWE122_Heap_Based_Buffer_Overflow__cpp_CWE129_rand_05
   ...
 skipped: sizeof_ (144 tests...)
   CWE122_Heap_Based_Buffer_Overflow__sizeof_double_01
@@ -253,11 +177,6 @@ skipped: sizeof_ (144 tests...)
   CWE122_Heap_Based_Buffer_Overflow__sizeof_struct_01
   CWE122_Heap_Based_Buffer_Overflow__sizeof_struct_02
   CWE122_Heap_Based_Buffer_Overflow__sizeof_int64_t_02
-  CWE122_Heap_Based_Buffer_Overflow__sizeof_double_02
-  CWE122_Heap_Based_Buffer_Overflow__sizeof_int64_t_03
-  CWE122_Heap_Based_Buffer_Overflow__sizeof_struct_03
-  CWE122_Heap_Based_Buffer_Overflow__sizeof_double_03
-  CWE122_Heap_Based_Buffer_Overflow__sizeof_struct_04
   ...
 skipped: socket (192 tests...)
   CWE122_Heap_Based_Buffer_Overflow__c_CWE129_listen_socket_01
@@ -265,11 +184,6 @@ skipped: socket (192 tests...)
   CWE122_Heap_Based_Buffer_Overflow__cpp_CWE129_connect_socket_01
   CWE122_Heap_Based_Buffer_Overflow__cpp_CWE129_listen_socket_01
   CWE122_Heap_Based_Buffer_Overflow__c_CWE129_listen_socket_02
-  CWE122_Heap_Based_Buffer_Overflow__c_CWE129_connect_socket_02
-  CWE122_Heap_Based_Buffer_Overflow__cpp_CWE129_connect_socket_02
-  CWE122_Heap_Based_Buffer_Overflow__cpp_CWE129_listen_socket_02
-  CWE122_Heap_Based_Buffer_Overflow__c_CWE129_connect_socket_03
-  CWE122_Heap_Based_Buffer_Overflow__c_CWE129_listen_socket_03
   ...
 -----------------------------------------------------------------
 Percentage of CWE122 directory covered: 0.00%
@@ -291,11 +205,6 @@ exit SIGSEGV (40 tests...)
   CWE476_NULL_Pointer_Dereference__int_01
   CWE476_NULL_Pointer_Dereference__int64_t_01
   CWE476_NULL_Pointer_Dereference__char_01
-  CWE476_NULL_Pointer_Dereference__wchar_t_01
-  CWE476_NULL_Pointer_Dereference__struct_01
-  CWE476_NULL_Pointer_Dereference__binary_if_01
-  CWE476_NULL_Pointer_Dereference__int64_t_02
-  CWE476_NULL_Pointer_Dereference__int_02
   ...
 failed_to_compile (5 tests...)
   CWE476_NULL_Pointer_Dereference__class_01
@@ -318,11 +227,6 @@ exit 0 (35 tests...)
   CWE369_Divide_by_Zero__int_fgets_modulo_01
   CWE369_Divide_by_Zero__int_fscanf_divide_01
   CWE369_Divide_by_Zero__float_fgets_01
-  CWE369_Divide_by_Zero__float_fscanf_01
-  CWE369_Divide_by_Zero__int_fgets_divide_01
-  CWE369_Divide_by_Zero__int_fscanf_modulo_02
-  CWE369_Divide_by_Zero__float_fscanf_02
-  CWE369_Divide_by_Zero__int_fgets_divide_02
   ...
 exit SIGFPE (10 tests...)
   CWE369_Divide_by_Zero__int_zero_divide_01
@@ -330,11 +234,7 @@ exit SIGFPE (10 tests...)
   CWE369_Divide_by_Zero__int_zero_modulo_02
   CWE369_Divide_by_Zero__int_zero_divide_02
   CWE369_Divide_by_Zero__int_zero_modulo_03
-  CWE369_Divide_by_Zero__int_zero_divide_03
-  CWE369_Divide_by_Zero__int_zero_modulo_04
-  CWE369_Divide_by_Zero__int_zero_divide_04
-  CWE369_Divide_by_Zero__int_zero_modulo_05
-  CWE369_Divide_by_Zero__int_zero_divide_05
+  ...
 timeout (5 tests...)
   CWE369_Divide_by_Zero__float_listenSocket_01
   CWE369_Divide_by_Zero__float_listenSocket_02
@@ -348,11 +248,6 @@ skipped: rand (144 tests...)
   CWE369_Divide_by_Zero__float_rand_01
   CWE369_Divide_by_Zero__int_rand_modulo_02
   CWE369_Divide_by_Zero__int_rand_divide_02
-  CWE369_Divide_by_Zero__float_rand_02
-  CWE369_Divide_by_Zero__int_rand_divide_03
-  CWE369_Divide_by_Zero__int_rand_modulo_03
-  CWE369_Divide_by_Zero__float_rand_03
-  CWE369_Divide_by_Zero__int_rand_modulo_04
   ...
 skipped: socket (240 tests...)
   CWE369_Divide_by_Zero__int_listen_socket_modulo_01
@@ -360,11 +255,6 @@ skipped: socket (240 tests...)
   CWE369_Divide_by_Zero__float_connect_socket_01
   CWE369_Divide_by_Zero__int_connect_socket_divide_01
   CWE369_Divide_by_Zero__int_connect_socket_modulo_01
-  CWE369_Divide_by_Zero__int_listen_socket_modulo_02
-  CWE369_Divide_by_Zero__int_listen_socket_divide_02
-  CWE369_Divide_by_Zero__float_connect_socket_02
-  CWE369_Divide_by_Zero__int_connect_socket_divide_02
-  CWE369_Divide_by_Zero__int_connect_socket_modulo_02
   ...
 -----------------------------------------------------------------
 Percentage of CWE369 directory covered: 0.00%

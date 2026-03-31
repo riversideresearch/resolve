@@ -315,7 +315,7 @@ def test_cwe(test_dir: CWETestDir, io_obj: Path, out_dir: Path, test_limit: int)
     fail_results = [(t, r) for t, r in results if r.exit_code != 3]
 
     def summarize_results(results: list[tuple[CWETest, Result]]):
-        SUMMARY_LEN = 10
+        SUMMARY_LEN = 5
 
         def key(results: tuple[CWETest, Result]):
             return str(results[1])
