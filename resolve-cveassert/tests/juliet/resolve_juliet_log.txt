@@ -55,26 +55,33 @@ Testing: 123: Write_What_Where_Condition
 Total testcases: 48 + 96 skipped
 PASS: 0
 FAIL: 48
-exit 0 (16 tests...)
-  CWE123_Write_What_Where_Condition__fgets_01
+exit 0 (14 tests...)
   CWE123_Write_What_Where_Condition__fgets_02
+  CWE123_Write_What_Where_Condition__fgets_04
+  CWE123_Write_What_Where_Condition__fgets_07
+  CWE123_Write_What_Where_Condition__fgets_08
+  CWE123_Write_What_Where_Condition__fgets_12
+  ...
+exit SIGSEGV (14 tests...)
+  CWE123_Write_What_Where_Condition__fgets_01
   CWE123_Write_What_Where_Condition__fgets_03
   CWE123_Write_What_Where_Condition__fgets_05
-  CWE123_Write_What_Where_Condition__fgets_07
-  ...
-exit SIGSEGV (12 tests...)
-  CWE123_Write_What_Where_Condition__fgets_04
   CWE123_Write_What_Where_Condition__fgets_06
   CWE123_Write_What_Where_Condition__fgets_09
-  CWE123_Write_What_Where_Condition__fgets_10
-  CWE123_Write_What_Where_Condition__fgets_13
   ...
-failed_to_compile (20 tests...)
+failed_to_compile (12 tests...)
   CWE123_Write_What_Where_Condition__fgets_22
   CWE123_Write_What_Where_Condition__fgets_51
   CWE123_Write_What_Where_Condition__fgets_52
   CWE123_Write_What_Where_Condition__fgets_53
   CWE123_Write_What_Where_Condition__fgets_54
+  ...
+failed_to_compile (cpp) (8 tests...)
+  CWE123_Write_What_Where_Condition__fgets_62
+  CWE123_Write_What_Where_Condition__fgets_72
+  CWE123_Write_What_Where_Condition__fgets_73
+  CWE123_Write_What_Where_Condition__fgets_74
+  CWE123_Write_What_Where_Condition__fgets_81
   ...
 SKIPPED: 96
 skipped: socket (96 tests...)
@@ -136,7 +143,14 @@ Testing: 590: Free_Memory_Not_on_Heap
 Total testcases: 200 + 0 skipped
 PASS: 0
 FAIL: 200
-failed_to_compile (200 tests...)
+failed_to_compile (54 tests...)
+  CWE590_Free_Memory_Not_on_Heap__free_int64_t_static_01
+  CWE590_Free_Memory_Not_on_Heap__free_char_static_01
+  CWE590_Free_Memory_Not_on_Heap__free_int64_t_declare_01
+  CWE590_Free_Memory_Not_on_Heap__free_long_declare_01
+  CWE590_Free_Memory_Not_on_Heap__free_char_declare_01
+  ...
+failed_to_compile (cpp) (146 tests...)
   CWE590_Free_Memory_Not_on_Heap__delete_array_struct_alloca_01
   CWE590_Free_Memory_Not_on_Heap__delete_char_declare_01
   CWE590_Free_Memory_Not_on_Heap__delete_class_declare_01
@@ -176,7 +190,7 @@ exit SIGSEGV (24 tests...)
   CWE122_Heap_Based_Buffer_Overflow__c_src_wchar_t_cpy_01
   CWE122_Heap_Based_Buffer_Overflow__c_CWE806_wchar_t_ncpy_01
   ...
-failed_to_compile (88 tests...)
+failed_to_compile (cpp) (88 tests...)
   CWE122_Heap_Based_Buffer_Overflow__cpp_CWE805_class_loop_01
   CWE122_Heap_Based_Buffer_Overflow__cpp_CWE193_wchar_t_memcpy_01
   CWE122_Heap_Based_Buffer_Overflow__cpp_CWE805_char_memmove_01
@@ -234,7 +248,14 @@ exit SIGSEGV (6 tests...)
   CWE476_NULL_Pointer_Dereference__wchar_t_21
   CWE476_NULL_Pointer_Dereference__char_21
   ...
-failed_to_compile (27 tests...)
+failed_to_compile (6 tests...)
+  CWE476_NULL_Pointer_Dereference__int_22
+  CWE476_NULL_Pointer_Dereference__long_22
+  CWE476_NULL_Pointer_Dereference__int64_t_22
+  CWE476_NULL_Pointer_Dereference__wchar_t_22
+  CWE476_NULL_Pointer_Dereference__struct_22
+  ...
+failed_to_compile (cpp) (21 tests...)
   CWE476_NULL_Pointer_Dereference__class_01
   CWE476_NULL_Pointer_Dereference__class_02
   CWE476_NULL_Pointer_Dereference__class_03
@@ -253,8 +274,8 @@ exit 3 (67 tests...)
   CWE369_Divide_by_Zero__int_zero_divide_01
   CWE369_Divide_by_Zero__int_zero_modulo_01
   CWE369_Divide_by_Zero__float_zero_01
-  CWE369_Divide_by_Zero__float_listenSocket_01
   CWE369_Divide_by_Zero__int_zero_modulo_02
+  CWE369_Divide_by_Zero__int_zero_divide_02
   ...
 FAIL: 133
 exit 0 (120 tests...)
@@ -275,7 +296,7 @@ failed_to_compile (10 tests...)
   CWE369_Divide_by_Zero__float_listenSocket_22
   ...
 timeout (1 tests...)
-  CWE369_Divide_by_Zero__float_listenSocket_02
+  CWE369_Divide_by_Zero__float_listenSocket_01
 SKIPPED: 384
 skipped: rand (144 tests...)
   CWE369_Divide_by_Zero__int_rand_divide_01
