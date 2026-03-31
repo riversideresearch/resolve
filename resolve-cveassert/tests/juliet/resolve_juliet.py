@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 from abc import ABC
+from concurrent.futures import ThreadPoolExecutor
 from itertools import groupby
 import shutil
 from signal import Signals
 import argparse
 import json
-import os
 import re
 import subprocess
 from collections import defaultdict
@@ -287,7 +287,13 @@ def do_test(test: CWETest, io_obj: Path, out_dir: Path) -> Result:
 def should_skip(test: CWETest, skip_patterns: list[str]):
     return next((s for s in skip_patterns if s in test.name), None)
 
-def test_cwe(test_dir: CWETestDir, io_obj: Path, out_dir: Path, test_limit: int):
+def test_cwe(
+    test_dir: CWETestDir,
+    io_obj: Path,
+    out_dir: Path,
+    test_limit: int,
+    executor: ThreadPoolExecutor,
+):
     SKIP_TESTS = ["socket", "rand", "sizeof_"]
 
     tests: list[CWETest] = []
@@ -305,7 +311,10 @@ def test_cwe(test_dir: CWETestDir, io_obj: Path, out_dir: Path, test_limit: int)
             file=sys.stderr,
         )
 
-    results = [(test, do_test(test, io_obj, out_dir)) for test in tests[:test_limit]]
+    def run_test(t: CWETest):
+        return (t, do_test(t, io_obj, out_dir))
+
+    results = list(executor.map(run_test, tests[:test_limit]))
 
     pass_results = [(t, r) for t, r in results if r.exit_code == 3]
     fail_results = [(t, r) for t, r in results if r.exit_code != 3]
@@ -415,10 +424,12 @@ def main():
         print(f"Testing: {test_dir} ({n} tests...)")
     print(flush=True)
 
+    executor = ThreadPoolExecutor(max_workers=25)
+
     total_pass_count = 0
     total_tests = 0
     for test_dir in test_dirs:
-        pass_count, tests = test_cwe(test_dir, io_obj, out_dir, test_limit)
+        pass_count, tests = test_cwe(test_dir, io_obj, out_dir, test_limit, executor)
 
         total_pass_count += pass_count
         total_tests += tests
