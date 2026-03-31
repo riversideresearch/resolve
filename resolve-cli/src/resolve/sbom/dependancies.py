@@ -1,7 +1,7 @@
 from __future__ import annotations
 import json
 import pathlib
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel
 from resolve.sbom.schema.nist_api import CveItem
 
 class SoftwareDependancy(BaseModel):
