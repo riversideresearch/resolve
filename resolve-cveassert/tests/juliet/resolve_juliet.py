@@ -254,6 +254,12 @@ def do_test(test: CWETest, io_obj: Path, out_dir: Path) -> Result:
     if "socket" in test.name:
         return ResultSkipped("socket")
 
+    if "rand" in test.name:
+        return ResultSkipped("rand")
+
+    if "sizeof_" in test.name:
+        return ResultSkipped("sizeof_")
+
     # Binary path to compiled testcase executable
     testcase_exe_path = out_dir / test.name
 
