@@ -420,7 +420,9 @@ def main():
 
     if not juliet_testcases_dir.exists():
         tar_file = juliet_testcases_dir.with_suffix(".tar.xz")
-        subprocess.run(["tar", "-xf", str(tar_file)], check=True)
+        subprocess.run(
+            ["tar", "-C", str(juliet_testsuite_root), "-xf", str(tar_file)], check=True
+        )
 
     try:
         out_dir.mkdir()
