@@ -39,7 +39,7 @@ static FunctionCallee getResolveBaseAndLimit(Module *M) {
   AttributeList attrs =
       AttributeList::get(Ctx, AttributeList::FunctionIndex, FnAttrs);
 
-  return M->getOrInsertFunction("resolve_get_base_and_limit",
+  return M->getOrInsertFunction("__resolve_get_base_and_limit",
                                 FunctionType::get(struct_ty, {ptr_ty}, false),
                                 attrs);
 }

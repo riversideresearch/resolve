@@ -14,7 +14,7 @@ use log::{info, warn};
  * @return - none
  */
 #[unsafe(no_mangle)]
-pub extern "C" fn resolve_stack_obj(ptr: *mut c_void, size: usize) -> () {
+pub extern "C" fn __resolve_alloca(ptr: *mut c_void, size: usize) -> () {
     let base = ptr as Vaddr;
     {
         let mut obj_list = ALIVE_OBJ_LIST.lock();
@@ -25,7 +25,7 @@ pub extern "C" fn resolve_stack_obj(ptr: *mut c_void, size: usize) -> () {
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn resolve_invalidate_stack(base: *mut c_void) {
+pub extern "C" fn __resolve_invalidate_stack(base: *mut c_void) {
     let base = base as Vaddr;
 
     {
@@ -42,7 +42,7 @@ pub extern "C" fn resolve_invalidate_stack(base: *mut c_void) {
  * @return - ptr to the allocation
  */
 #[unsafe(no_mangle)]
-pub extern "C" fn resolve_malloc(size: usize) -> *mut c_void {
+pub extern "C" fn __resolve_malloc(size: usize) -> *mut c_void {
     let ptr = unsafe { malloc(size + 1) };
 
     if ptr.is_null() {
@@ -69,7 +69,7 @@ pub extern "C" fn resolve_malloc(size: usize) -> *mut c_void {
  * @return - none
  */
 #[unsafe(no_mangle)]
-pub extern "C" fn resolve_free(ptr: *mut c_void) -> () {
+pub extern "C" fn __resolve_free(ptr: *mut c_void) -> () {
     // Insert a function to find the object and return the pointer size
     // Do I need to handle if the sobj cannot be found?
 
@@ -121,7 +121,7 @@ pub extern "C" fn resolve_free(ptr: *mut c_void) -> () {
  * @return - none
  */
 #[unsafe(no_mangle)]
-pub extern "C" fn resolve_realloc(ptr: *mut c_void, size: usize) -> *mut c_void {
+pub extern "C" fn __resolve_realloc(ptr: *mut c_void, size: usize) -> *mut c_void {
     // Edge cases
     // 1. returned memory may not be allocated 
     // 2. pointer passed to realloc may be NULL
@@ -159,7 +159,7 @@ pub extern "C" fn resolve_realloc(ptr: *mut c_void, size: usize) -> *mut c_void 
  * @return - none
  */
 #[unsafe(no_mangle)]
-pub extern "C" fn resolve_calloc(n_items: usize, item_size: usize) -> *mut c_void {
+pub extern "C" fn __resolve_calloc(n_items: usize, item_size: usize) -> *mut c_void {
     let ptr = unsafe { calloc(n_items, item_size) };
     let size = n_items * item_size;
 
@@ -187,7 +187,7 @@ pub extern "C" fn resolve_calloc(n_items: usize, item_size: usize) -> *mut c_voi
  * @return - pointer to the copied string
  */
 #[unsafe(no_mangle)]
-pub extern "C" fn resolve_strdup(ptr: *mut c_char) -> *mut c_char {
+pub extern "C" fn __resolve_strdup(ptr: *mut c_char) -> *mut c_char {
     let string_ptr = unsafe { strdup(ptr) };
 
     if string_ptr.is_null() {
@@ -221,7 +221,7 @@ pub extern "C" fn resolve_strdup(ptr: *mut c_char) -> *mut c_char {
  * https://pubs.opengroup.org/onlinepubs/9699919799/functions/strdup.html
  */
 #[unsafe(no_mangle)]
-pub extern "C" fn resolve_strndup(ptr: *mut c_char, size: usize) -> *mut c_char {
+pub extern "C" fn __resolve_strndup(ptr: *mut c_char, size: usize) -> *mut c_char {
     let string_ptr = unsafe { strndup(ptr, size + 1) };
 
     if string_ptr.is_null() {
@@ -263,7 +263,7 @@ pub struct ShadowObjBounds {
  *         shadow object as pointers 
  */
 #[unsafe(no_mangle)]
-pub extern "C" fn resolve_get_base_and_limit(ptr: *mut c_void) -> ShadowObjBounds {
+pub extern "C" fn __resolve_get_base_and_limit(ptr: *mut c_void) -> ShadowObjBounds {
     let sobj_table = ALIVE_OBJ_LIST.lock();
     let Some(sobj) = sobj_table.search_intersection(ptr as Vaddr) else {
         return ShadowObjBounds { base: std::ptr::null_mut(), limit: std::ptr::null_mut() }
@@ -318,7 +318,7 @@ mod tests {
     fn test_malloc_free() {
         resolve_init();
         // Allocation should successfully return a memory block
-        let ptr = resolve_malloc(0x10);
+        let ptr = __resolve_malloc(0x10);
         assert!(!ptr.is_null());
 
         // We should track the obj correctly
@@ -333,7 +333,7 @@ mod tests {
             assert!(obj.alloc_type == AllocType::Heap);
         }
 
-        resolve_free(ptr);
+        __resolve_free(ptr);
 
         // After freeing a block we should track that it has been freed
         {
