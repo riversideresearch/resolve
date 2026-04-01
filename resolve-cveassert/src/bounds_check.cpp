@@ -429,7 +429,7 @@ void instrumentGEP(Function *F) {
 
     builder.SetInsertPoint(derivedPtr->getNextNode());
     auto resolveGepCall =
-        builder.CreateCall(getOrCreateResolveGep(M), {basePtr, derivedPtr});
+        builder.CreateCall(getOrCreateResolveGep(F), {basePtr, derivedPtr});
 
     // Iterate over all the users of the gep instruction and
     // replace their operands with resolve_gep result
@@ -500,7 +500,7 @@ void sanitizeMemcpy(Function *F,
     }
 
     auto memcpyFn =
-        getOrCreateBoundsCheckMemcpySanitizer(F->getParent(), strategy);
+        getOrCreateBoundsCheckMemcpySanitizer(F, strategy);
     auto memcpyCall = builder.CreateCall(memcpyFn, {dstPtr, srcPtr, sizeArg});
     Inst->replaceAllUsesWith(memcpyCall);
     Inst->eraseFromParent();
@@ -568,7 +568,7 @@ void sanitizeMemset(Function *F,
     }
 
     auto memsetFn =
-        getOrCreateBoundsCheckMemsetSanitizer(F->getParent(), strategy);
+        getOrCreateBoundsCheckMemsetSanitizer(F, strategy);
     auto memsetCall =
         builder.CreateCall(memsetFn, {basePtr, valueArg, sizeArg});
     Inst->replaceAllUsesWith(memsetCall);

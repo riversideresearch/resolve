@@ -4,6 +4,7 @@
  */
 
 #include "llvm/Analysis/MemorySSA.h"
+#include "llvm/ADT/DenseMap.h"
 #include "llvm/Demangle/Demangle.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/GlobalAlias.h"
@@ -38,6 +39,7 @@ using namespace llvm;
 
 // Global env var
 bool CVE_ASSERT_DEBUG; 
+DenseMap<Function *, GlobalVariable *> SanitizerMaps;
 
 
 GlobalVariable* initSanitizerMap(Function &F) {
@@ -45,12 +47,15 @@ GlobalVariable* initSanitizerMap(Function &F) {
   LLVMContext &Ctx = M->getContext();
   ArrayType *arrty = ArrayType::get(Type::getInt1Ty(Ctx), 7);
 
-  std::string globalName = GlobalValue::getGlobalIdentifier(F.getName(),
-  GlobalValue::ExternalLinkage, M->getSourceFileName());
+  std::string globalName = F.getName().str() + ".sanmap"; 
 
-  M->getOrInsertGlobal(globalName, arrty);
-  GlobalVariable *gSanitizerMap = M->getNamedGlobal(globalName);
+  // DEBUGGING
+  auto *gSanitizerMap = dyn_cast<GlobalVariable>(
+    M->getOrInsertGlobal(globalName, arrty)
+  );
+  assert(gSanitizerMap && "[ERROR] Expected a GlobalVariable");
 
+  gSanitizerMap->setLinkage(GlobalValue::ExternalLinkage);
   gSanitizerMap->setConstant(false);
 
   if (!gSanitizerMap->hasInitializer()) {
@@ -103,6 +108,8 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
     std::string handlerName = "resolve_sanitize_non_heap_free";
     Module *M = F->getParent();
     LLVMContext &Ctx = M->getContext();
+    GlobalVariable *map = SanitizerMaps[F];
+
 
     IRBuilder<> builder(Ctx);
     // TODO: handle address spaces other than 0
@@ -127,7 +134,12 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
     builder.SetInsertPoint(EntryBB);
     Argument *inputPtr = resolveFreeNonHeapFn->getArg(0);
 
-    Value *mapEntry = builder.CreateCall(getOrCreateSanitizerMapEntry(F), { ConstantInt::get(usize_ty, 2)});
+    Value *mapPtr = builder.CreateGEP(
+      map->getValueType(),
+      map,
+      { builder.getInt64(0), builder.getInt64(0) }
+    );
+    Value *mapEntry = builder.CreateCall(getOrCreateSanitizerMapEntry(M), { mapPtr, ConstantInt::get(usize_ty, 2)});
     Value *isZero = builder.CreateICmpEQ(mapEntry, ConstantInt::get(usize_ty, 0));
     builder.CreateCondBr(isZero, FreeHeapBB, CheckOnHeapBB);
 
@@ -235,12 +247,10 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
   PreservedAnalyses runOnFunction(Function &F, ModuleAnalysisManager &MAM,
                                   Vulnerability &vuln) {
     auto result = PreservedAnalyses::all();
-
+  
     if (!shouldInstrument(F, vuln)) {
       return result;
     }
-
-    initSanitizerMap(F);
 
     raw_ostream &out = errs();
 
@@ -326,6 +336,17 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
   PreservedAnalyses run(Module &M, ModuleAnalysisManager &MAM) {
     auto result = PreservedAnalyses::all();
     InstrumentMemInst instrument_mem_inst;
+  
+    /// Precompute globals before instrumentation
+    for (auto &F : M) {
+      for (auto &vuln : vulnerabilities) {
+        if (F.isDeclaration()) continue;
+
+        if (shouldInstrument(F, vuln)) {
+          SanitizerMaps[&F] = initSanitizerMap(F);
+        }
+      }
+    }
 
 
     for (auto &vuln : vulnerabilities) {

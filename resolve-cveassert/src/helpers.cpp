@@ -31,38 +31,37 @@ void validateIR(Function *F) {
   }
 }
 
-Function *getOrCreateSanitizerMapEntry(Function *F) {
-  Module *M = F->getParent();
+Function *getOrCreateSanitizerMapEntry(Module *M) {
   LLVMContext &Ctx = M->getContext();
   auto i1_ty = Type::getInt1Ty(Ctx);
+  auto ptr_ty = PointerType::get(Ctx, 0);
   auto usize_ty = Type::getInt64Ty(Ctx);
-
-
-  std::string globalName = GlobalValue::getGlobalIdentifier(F->getName(),
-  GlobalValue::ExternalLinkage, M->getSourceFileName());
-  GlobalVariable *gSanitizerMap = M->getNamedGlobal(globalName);
+  auto arr_ty = ArrayType::get(i1_ty, 7);
 
   FunctionType *sanitizerMapIdxFnTy = 
-    FunctionType::get(i1_ty, { usize_ty }, false);
+    FunctionType::get(i1_ty, { ptr_ty, usize_ty }, false);
 
   Function *sanitizerMapIdxFn = getOrCreateResolveHelper(M, "resolve_get_sanitizer_flag", sanitizerMapIdxFnTy);
   if (!sanitizerMapIdxFn->empty()) { return sanitizerMapIdxFn; }
 
   IRBuilder<> builder(Ctx);
 
-  // When indexing an array use two indices
-  // 1. First index step from the global ptr
-  // 2. Second index: the actual element index 
-  Value *zero = builder.getInt64(0);
-  Value *idx = sanitizerMapIdxFn->getArg(0);
   BasicBlock *EntryBB = BasicBlock::Create(Ctx, "entry", sanitizerMapIdxFn);
   builder.SetInsertPoint(EntryBB);
 
-  Value* sanitizerMapPtr = builder.CreateGEP(ArrayType::get((i1_ty), 7),
-   gSanitizerMap, { zero, idx }
+  // When indexing an array use two indices
+  // 1. First index step from the global ptr
+  // 2. Second index: the actual element index 
+  Argument *mapPtr = sanitizerMapIdxFn->getArg(0);
+  Argument *idx = sanitizerMapIdxFn->getArg(1);
+
+  Value *zero = builder.getInt64(0);
+
+  Value* sanitizerMapPtr = builder.CreateGEP(arr_ty,
+   mapPtr, { zero, idx }
   );
-  Value* mapValue = builder.CreateLoad(i1_ty, sanitizerMapPtr);
-  builder.CreateRet(mapValue);
+  Value* flag = builder.CreateLoad(i1_ty, sanitizerMapPtr);
+  builder.CreateRet(flag);
 
   validateIR(sanitizerMapIdxFn);
   return sanitizerMapIdxFn;
@@ -205,8 +204,7 @@ Function *getOrCreateRecoverBufferFunction(Module *M) {
   return resolveRecoverFn;
 }
 
-Function *
-getOrCreateRemediationBehavior(Module *M,
+Function *getOrCreateRemediationBehavior(Module *M,
                                Vulnerability::RemediationStrategies strategy) {
   auto &Ctx = M->getContext();
   auto ptr_ty = PointerType::get(Ctx, 0);
