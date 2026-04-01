@@ -7,7 +7,7 @@
 // RUN: -fpass-plugin=%plugin \
 // RUN: %s -o - | %FileCheck %s 
 // CHECK-LABEL: define dso_local i32 @main
-// CHECK-LABEL: call void @resolve_stack_obj
+// CHECK-LABEL: call void @__resolve_alloca
 // Test that that unremediated case crashes
 // RUN: %clang -fpass-plugin=%plugin %s -o %t.exe 
 // RUN: %t.exe -2; EXIT_CODE=$?; \
