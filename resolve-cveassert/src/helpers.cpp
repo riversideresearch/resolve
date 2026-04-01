@@ -31,11 +31,16 @@ void validateIR(Function *F) {
   }
 }
 
-Function *getOrCreateSanitizerMapEntry(Module *M) {
+Function *getOrCreateSanitizerMapEntry(Function *F) {
+  Module *M = F->getParent();
   LLVMContext &Ctx = M->getContext();
   auto i1_ty = Type::getInt1Ty(Ctx);
   auto usize_ty = Type::getInt64Ty(Ctx);
-  GlobalVariable *gSanitizerMap = M->getNamedGlobal("sanitizer_map");
+
+
+  std::string globalName = GlobalValue::getGlobalIdentifier(F->getName(),
+  GlobalValue::ExternalLinkage, M->getSourceFileName());
+  GlobalVariable *gSanitizerMap = M->getNamedGlobal(globalName);
 
   FunctionType *sanitizerMapIdxFnTy = 
     FunctionType::get(i1_ty, { usize_ty }, false);

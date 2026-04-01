@@ -40,22 +40,25 @@ using namespace llvm;
 bool CVE_ASSERT_DEBUG; 
 
 
-GlobalVariable* initSanitizerMap(Module *M) {
-    LLVMContext &Ctx = M->getContext();
-    ArrayType *arrty = ArrayType::get(Type::getInt1Ty(Ctx), 7);
-    
-    M->getOrInsertGlobal("sanitizer_map", arrty);
-    GlobalVariable *gSanitizerMap = M->getNamedGlobal("sanitizer_map");
-    
-    gSanitizerMap->setLinkage(GlobalValue::ExternalLinkage);
-    gSanitizerMap->setConstant(false);
+GlobalVariable* initSanitizerMap(Function &F) {
+  Module *M = F.getParent();
+  LLVMContext &Ctx = M->getContext();
+  ArrayType *arrty = ArrayType::get(Type::getInt1Ty(Ctx), 7);
 
-    if (!gSanitizerMap->hasInitializer()) {
-      std::vector<Constant *> elems(7, ConstantInt::get(Type::getInt1Ty(Ctx), 1));
-      gSanitizerMap->setInitializer(ConstantArray::get(arrty, elems));
-    }
+  std::string globalName = GlobalValue::getGlobalIdentifier(F.getName(),
+  GlobalValue::ExternalLinkage, M->getSourceFileName());
 
-    return gSanitizerMap;
+  M->getOrInsertGlobal(globalName, arrty);
+  GlobalVariable *gSanitizerMap = M->getNamedGlobal(globalName);
+
+  gSanitizerMap->setConstant(false);
+
+  if (!gSanitizerMap->hasInitializer()) {
+    std::vector<Constant *> elems(7, ConstantInt::get(Type::getInt1Ty(Ctx), 1));
+    gSanitizerMap->setInitializer(ConstantArray::get(arrty, elems));
+  }
+
+  return gSanitizerMap;
 }
 
 namespace {
@@ -96,8 +99,9 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
   }
 
   Function *getOrCreateFreeOfNonHeapSanitizer(
-      Module *M, Vulnerability::RemediationStrategies strategy) {
+      Function *F, Vulnerability::RemediationStrategies strategy) {
     std::string handlerName = "resolve_sanitize_non_heap_free";
+    Module *M = F->getParent();
     LLVMContext &Ctx = M->getContext();
 
     IRBuilder<> builder(Ctx);
@@ -123,7 +127,7 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
     builder.SetInsertPoint(EntryBB);
     Argument *inputPtr = resolveFreeNonHeapFn->getArg(0);
 
-    Value *mapEntry = builder.CreateCall(getOrCreateSanitizerMapEntry(M), { ConstantInt::get(usize_ty, 2)});
+    Value *mapEntry = builder.CreateCall(getOrCreateSanitizerMapEntry(F), { ConstantInt::get(usize_ty, 2)});
     Value *isZero = builder.CreateICmpEQ(mapEntry, ConstantInt::get(usize_ty, 0));
     builder.CreateCondBr(isZero, FreeHeapBB, CheckOnHeapBB);
 
@@ -167,7 +171,7 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
     for (auto call : workList) {
       builder.SetInsertPoint(call);
       auto sanitizerFn =
-          getOrCreateFreeOfNonHeapSanitizer(F->getParent(), strategy);
+          getOrCreateFreeOfNonHeapSanitizer(F, strategy);
 
       builder.CreateCall(sanitizerFn, {call->getArgOperand(0)});
       call->removeFromParent();
@@ -235,6 +239,8 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
     if (!shouldInstrument(F, vuln)) {
       return result;
     }
+
+    initSanitizerMap(F);
 
     raw_ostream &out = errs();
 
@@ -321,7 +327,6 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
     auto result = PreservedAnalyses::all();
     InstrumentMemInst instrument_mem_inst;
 
-    initSanitizerMap(&M);
 
     for (auto &vuln : vulnerabilities) {
       // Also skip instrumentation for skipped vulnerabilities

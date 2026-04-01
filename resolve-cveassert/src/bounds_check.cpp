@@ -101,9 +101,10 @@ static Function *getOrCreateResolveAccessOk(Module *M) {
 }
 
 static Function *getOrCreateBoundsCheckLoadSanitizer(
-    Module *M, LLVMContext &Ctx, Type *ty,
+    Function *F, LLVMContext &Ctx, Type *ty,
     Vulnerability::RemediationStrategies strategy) {
   std::string handlerName = "resolve_bounds_check_ld_" + getLLVMType(ty);
+  Module *M = F->getParent();
 
   IRBuilder<> builder(Ctx);
 
@@ -125,7 +126,7 @@ static Function *getOrCreateBoundsCheckLoadSanitizer(
   Value *basePtr = resolveLoadFn->getArg(0);
 
   builder.SetInsertPoint(EntryBB);
-  Value* mapEntry = builder.CreateCall(getOrCreateSanitizerMapEntry(M), { ConstantInt::get(usize_ty, 0)});
+  Value* mapEntry = builder.CreateCall(getOrCreateSanitizerMapEntry(F), { ConstantInt::get(usize_ty, 0)});
   Value *isZero = builder.CreateICmpEQ(mapEntry, ConstantInt::get(i1_ty, 0));
   builder.CreateCondBr(isZero, NormalLoadBB, CheckAccessBB);
 
@@ -152,9 +153,10 @@ static Function *getOrCreateBoundsCheckLoadSanitizer(
 }
 
 static Function *getOrCreateBoundsCheckStoreSanitizer(
-    Module *M, LLVMContext &Ctx, Type *ty,
+    Function *F, LLVMContext &Ctx, Type *ty,
     Vulnerability::RemediationStrategies strategy) {
   std::string handlerName = "resolve_bounds_check_st_" + getLLVMType(ty);
+  Module *M = F->getParent();
 
   IRBuilder<> builder(Ctx);
 
@@ -179,7 +181,7 @@ static Function *getOrCreateBoundsCheckStoreSanitizer(
   Value *storedVal = resolveStoreFn->getArg(1);
   builder.SetInsertPoint(EntryBB);
 
-  Value* mapEntry = builder.CreateCall(getOrCreateSanitizerMapEntry(M), { ConstantInt::get(usize_ty, 0)});
+  Value* mapEntry = builder.CreateCall(getOrCreateSanitizerMapEntry(F), { ConstantInt::get(usize_ty, 0)});
   Value *isZero = builder.CreateICmpEQ(mapEntry, ConstantInt::get(i1_ty, 0));
   builder.CreateCondBr(isZero, NormalStoreBB, CheckAccessBB);
 
@@ -204,8 +206,9 @@ static Function *getOrCreateBoundsCheckStoreSanitizer(
 }
 
 static Function *getOrCreateBoundsCheckMemcpySanitizer(
-    Module *M, Vulnerability::RemediationStrategies strategy) {
+    Function *F, Vulnerability::RemediationStrategies strategy) {
   std::string handlerName = "resolve_bounds_check_memcpy";
+  Module *M = F->getParent();
   LLVMContext &Ctx = M->getContext();
 
   IRBuilder<> builder(Ctx);
@@ -231,7 +234,7 @@ static Function *getOrCreateBoundsCheckMemcpySanitizer(
   Value *src_ptr = resolveMemcpyFn->getArg(1);
   Value *size_arg = resolveMemcpyFn->getArg(2);
 
-  Value* mapEntry = builder.CreateCall(getOrCreateSanitizerMapEntry(M), { ConstantInt::get(size_ty, 0)});
+  Value* mapEntry = builder.CreateCall(getOrCreateSanitizerMapEntry(F), { ConstantInt::get(size_ty, 0)});
   Value *isZero = builder.CreateICmpEQ(mapEntry, ConstantInt::get(i1_ty, 0));
   builder.CreateCondBr(isZero, NormalBB, CheckAccessBB);
 
@@ -262,8 +265,9 @@ static Function *getOrCreateBoundsCheckMemcpySanitizer(
 }
 
 static Function *getOrCreateBoundsCheckMemsetSanitizer(
-    Module *M, Vulnerability::RemediationStrategies strategy) {
+    Function *F, Vulnerability::RemediationStrategies strategy) {
   std::string handlerName = "resolve_bounds_check_memset";
+  Module *M = F->getParent();
   LLVMContext &Ctx = M->getContext();
 
   IRBuilder<> builder(Ctx);
@@ -290,7 +294,7 @@ static Function *getOrCreateBoundsCheckMemsetSanitizer(
   Value *valueArg = resolveMemsetFn->getArg(1);
   Value *accessSize = resolveMemsetFn->getArg(2);
 
-  Value* mapEntry = builder.CreateCall(getOrCreateSanitizerMapEntry(M), { ConstantInt::get(size_ty, 0)});
+  Value* mapEntry = builder.CreateCall(getOrCreateSanitizerMapEntry(F), { ConstantInt::get(size_ty, 0)});
   Value *isZero = builder.CreateICmpEQ(mapEntry, ConstantInt::get(i1_ty, 0));
   builder.CreateCondBr(isZero, NormalBB, CheckAccessBB);
   
@@ -318,8 +322,9 @@ static Function *getOrCreateBoundsCheckMemsetSanitizer(
   return resolveMemsetFn;
 }
 
-static Function *getOrCreateResolveGep(Module *M) {
+static Function *getOrCreateResolveGep(Function *F) {
   std::string handlerName = "resolve_gep";
+  Module *M = F->getParent();
   LLVMContext &Ctx = M->getContext();
 
   IRBuilder<> builder(Ctx);
@@ -348,7 +353,7 @@ static Function *getOrCreateResolveGep(Module *M) {
   Value *basePtr = resolveGepFn->getArg(0);
   Value *derivedPtr = resolveGepFn->getArg(1);
 
-  Value* mapEntry = builder.CreateCall(getOrCreateSanitizerMapEntry(M), { ConstantInt::get(size_ty, 0)});
+  Value* mapEntry = builder.CreateCall(getOrCreateSanitizerMapEntry(F), { ConstantInt::get(size_ty, 0)});
   Value *isZero = builder.CreateICmpEQ(mapEntry, ConstantInt::get(i1_ty, 0));
   builder.CreateCondBr(isZero, NormalBB, GetBaseAndLimitBB);
 
@@ -616,7 +621,7 @@ void sanitizeLoadStore(Function *F,
     }
 
     auto loadFn = getOrCreateBoundsCheckLoadSanitizer(
-        F->getParent(), F->getContext(), valueTy, strategy);
+        F, F->getContext(), valueTy, strategy);
 
     auto sanitizedLoad = builder.CreateCall(loadFn, {ptr});
     Inst->replaceAllUsesWith(sanitizedLoad);
@@ -637,7 +642,7 @@ void sanitizeLoadStore(Function *F,
     }
 
     auto storeFn = getOrCreateBoundsCheckStoreSanitizer(
-        F->getParent(), F->getContext(), valueTy, strategy);
+        F, F->getContext(), valueTy, strategy);
 
     auto sanitizedStore =
         builder.CreateCall(storeFn, {ptr, Inst->getValueOperand()});
