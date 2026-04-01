@@ -167,7 +167,7 @@ Function *getOrCreateResolveReportSanitizerTriggered(Module *M) {
   FunctionType *resolveReportFnTy = FunctionType::get(void_ty, {}, false);
 
   Function *resolveReportFn =
-      getOrCreateResolveHelper(M, "resolve_report_sanitizer_triggered",
+      getOrCreateResolveHelper(M, "__resolve_report_violation",
                                resolveReportFnTy, GlobalValue::WeakAnyLinkage);
   if (!resolveReportFn->empty()) { return resolveReportFn; }
 

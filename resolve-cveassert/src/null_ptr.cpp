@@ -67,7 +67,7 @@ getOrCreateNullPtrLoadSanitizer(Function *F, Type *ty,
   builder.SetInsertPoint(SanitizeNullPtrBB);
   FunctionType *logMemInstFuncTy = FunctionType::get(void_ty, {ptr_ty}, false);
   FunctionCallee logMemInstFunc = M->getOrInsertFunction(
-      "resolve_report_sanitize_mem_inst_triggered", logMemInstFuncTy);
+      "__resolve_report_invalid_access", logMemInstFuncTy);
   builder.CreateCall(logMemInstFunc, { inputPtr });
 
   switch (strategy) {
@@ -144,7 +144,7 @@ static Function *getOrCreateNullPtrStoreSanitizer(
   builder.SetInsertPoint(SanitizeNullPtrBB);
   FunctionType *logMemInstFuncTy = FunctionType::get(void_ty, {ptr_ty}, false);
   FunctionCallee logMemInstFunc = M->getOrInsertFunction(
-      "resolve_report_sanitize_mem_inst_triggered", logMemInstFuncTy);
+      "__resolve_report_invalid_access", logMemInstFuncTy);
   builder.CreateCall(logMemInstFunc, {inputPtr});
 
   switch (strategy) {

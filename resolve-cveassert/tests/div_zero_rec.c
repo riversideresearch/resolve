@@ -7,7 +7,7 @@
 // RUN: -fpass-plugin=%plugin \
 // RUN: %s -o - | %FileCheck %s 
 // CHECK-LABEL: define dso_local i32 @div_zero_main 
-// CHECK: call void @resolve_report_sanitizer_triggered
+// CHECK: call void @__resolve_report_violation
 // CHECK: call void @__cve_recover
 // CHECK-LABEL: define dso_local i32 @main
 // CHECK: call i32 @_setjmp 
@@ -23,7 +23,7 @@ jmp_buf* resolve_get_recover_longjmp_buf() {
     return &recover_longjmp_buf;
 }
 
-void resolve_report_sanitizer_triggered() { printf("Calling sanitizer!\n"); }
+void __resolve_report_violation() { printf("Calling sanitizer!\n"); }
 
 int div_zero_main(int argc, const char* argv[]) {        
     int math = (int) (42.0 / (float)argc);

@@ -294,9 +294,9 @@ pub extern "C" fn resolve_obj_type(base_ptr: *mut c_void) -> AllocType {
  * @return
  */
 #[unsafe(no_mangle)]
-pub extern "C" fn resolve_report_sanitize_mem_inst_triggered(ptr: *mut c_void) {
+pub extern "C" fn __resolve_report_invalid_access(ptr: *mut c_void) {
     info!(
-        "[SANITIZE] Applying sanitizer to address 0x{:x}",
+        "[RESOLVE] Invalid memory access at address 0x{:x}",
         ptr as Vaddr
     );
 }
@@ -305,8 +305,8 @@ pub extern "C" fn resolve_report_sanitize_mem_inst_triggered(ptr: *mut c_void) {
  * @brief - Logs when program enters sanitization basic block for arithmetic operations
  */
 #[unsafe(no_mangle)]
-pub extern "C" fn resolve_report_sanitizer_triggered() -> () {
-    info!("[SANITIZE] Applying arithmetic sanitization in basic block");
+pub extern "C" fn __resolve_report_violation() -> () {
+    info!("[RESOLVE] Vulnerability triggered");
 }
 
 #[cfg(test)]
