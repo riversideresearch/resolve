@@ -105,7 +105,7 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
 
   Function *getOrCreateFreeOfNonHeapSanitizer(
       Function *F, Vulnerability::RemediationStrategies strategy) {
-    std::string handlerName = "resolve_sanitize_non_heap_free";
+    std::string handlerName = "__cve_san_nonheap_free";
     Module *M = F->getParent();
     LLVMContext &Ctx = M->getContext();
     GlobalVariable *map = SanitizerMaps[F];
@@ -115,6 +115,7 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
     // TODO: handle address spaces other than 0
     auto ptr_ty = PointerType::get(Ctx, 0);
     auto usize_ty = Type::getInt64Ty(Ctx);
+    auto i1_ty = Type::getInt1Ty(Ctx);
 
     // TODO: write this in asm as some kind of sanitzer_rt?
     FunctionType *resolveFreeNonHeapFnTy =
@@ -140,7 +141,7 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
       { builder.getInt64(0), builder.getInt64(0) }
     );
     Value *mapEntry = builder.CreateCall(getOrCreateSanitizerMapEntry(M), { mapPtr, ConstantInt::get(usize_ty, 2)});
-    Value *isZero = builder.CreateICmpEQ(mapEntry, ConstantInt::get(usize_ty, 0));
+    Value *isZero = builder.CreateICmpEQ(mapEntry, ConstantInt::get(i1_ty, 0));
     builder.CreateCondBr(isZero, FreeHeapBB, CheckOnHeapBB);
 
     // Call Is Heap Func
