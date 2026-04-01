@@ -10,12 +10,14 @@ dependencies = [
     "google-genai>=1.69.0",
     "ollama>=0.6.1",
     "pydantic>=2.12.5",
+    "pyelftools>=0.32",
     "univers>=31.1.0",
 ]
 
 [project.scripts]
 resolve = "resolve.cli:main"
 resolve-reach = "resolve.reach:main"
+resolve-remediate = "resolve.remediate:main"
 resolve-input-synthesis = "resolve.cli:main"
 resolve-input-synthesis-setup = "resolve.input_synthesis.setup:main"
 resolve-input-synthesis-run-all = "resolve.input_synthesis.run_all:main"
