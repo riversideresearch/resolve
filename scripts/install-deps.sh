@@ -26,6 +26,8 @@ PKGS="build-essential \
     curl \
     zip \
     unzip \
+    php-cli \
+    php-xml \
     pkg-config \
     python3-pip \
     python3-venv \
