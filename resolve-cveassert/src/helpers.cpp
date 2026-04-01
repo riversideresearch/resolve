@@ -41,7 +41,7 @@ Function *getOrCreateSanitizerMapEntry(Module *M) {
   FunctionType *sanitizerMapIdxFnTy = 
     FunctionType::get(i1_ty, { ptr_ty, usize_ty }, false);
 
-  Function *sanitizerMapIdxFn = getOrCreateResolveHelper(M, "resolve_get_sanitizer_flag", sanitizerMapIdxFnTy);
+  Function *sanitizerMapIdxFn = getOrCreateResolveHelper(M, "__cve_get_flag", sanitizerMapIdxFnTy);
   if (!sanitizerMapIdxFn->empty()) { return sanitizerMapIdxFn; }
 
   IRBuilder<> builder(Ctx);
@@ -125,7 +125,7 @@ Function *getOrCreateIsHeap(Module *M, LLVMContext &Ctx) {
       FunctionType::get(i1_ty, {ptr_ty}, false);
 
   Function *resolveIsHeapFn =
-      getOrCreateResolveHelper(M, "resolve_is_heap", resolveIsHeapFnTy);
+      getOrCreateResolveHelper(M, "__cve_is_heap", resolveIsHeapFnTy);
   
   if (!resolveIsHeapFn->empty()) { return resolveIsHeapFn; }
 
@@ -213,9 +213,19 @@ Function *getOrCreateRemediationBehavior(Module *M,
 
   FunctionType *resolveRemedBehaviorFnTy =
       FunctionType::get(void_ty, {}, false);
+  
+  std::string fnName;
+  switch(strategy) {
+      case Vulnerability::RemediationStrategies::EXIT:
+        fnName = "__cve_exit";
+        break;
+      case Vulnerability::RemediationStrategies::RECOVER:
+        fnName = "__cve_recover";
+        break;
+  }
 
   Function *resolveRemedBehaviorFn = getOrCreateResolveHelper(
-      M, "resolve_remediation_behavior", resolveRemedBehaviorFnTy);
+      M, fnName, resolveRemedBehaviorFnTy);
   if (!resolveRemedBehaviorFn->empty()) { return resolveRemedBehaviorFn; }
 
   BasicBlock *BB = BasicBlock::Create(Ctx, "entry", resolveRemedBehaviorFn);
