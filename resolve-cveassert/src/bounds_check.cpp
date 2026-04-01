@@ -101,10 +101,12 @@ static Function *getOrCreateResolveAccessOk(Module *M) {
 }
 
 static Function *getOrCreateBoundsCheckLoadSanitizer(
-    Function *F, LLVMContext &Ctx, Type *ty,
+    Function *F, Type *ty, 
     Vulnerability::RemediationStrategies strategy) {
   std::string handlerName = "resolve_bounds_check_ld_" + getLLVMType(ty);
   Module *M = F->getParent();
+  LLVMContext &Ctx = M->getContext();
+  GlobalVariable *map = SanitizerMaps[F];
 
   IRBuilder<> builder(Ctx);
 
@@ -113,7 +115,6 @@ static Function *getOrCreateBoundsCheckLoadSanitizer(
   auto usize_ty = Type::getInt64Ty(Ctx);
 
   FunctionType *resolveLoadFnTy = FunctionType::get(ty, {ptr_ty}, false);
-
   Function *resolveLoadFn = getOrCreateResolveHelper(M, handlerName, resolveLoadFnTy);
 
   if (!resolveLoadFn->empty()) { return resolveLoadFn; }
@@ -123,10 +124,15 @@ static Function *getOrCreateBoundsCheckLoadSanitizer(
   BasicBlock *NormalLoadBB = BasicBlock::Create(Ctx, "normal_load", resolveLoadFn);
   BasicBlock *SanitizeLoadBB = BasicBlock::Create(Ctx, "sanitize_load", resolveLoadFn);
 
-  Value *basePtr = resolveLoadFn->getArg(0);
-
   builder.SetInsertPoint(EntryBB);
-  Value* mapEntry = builder.CreateCall(getOrCreateSanitizerMapEntry(F), { ConstantInt::get(usize_ty, 0)});
+  Value *basePtr = resolveLoadFn->getArg(0);
+  Value *mapPtr = builder.CreateGEP(
+    map->getValueType(),
+    map,
+    { builder.getInt64(0), builder.getInt64(0) }
+  );
+
+  Value* mapEntry = builder.CreateCall(getOrCreateSanitizerMapEntry(M), { mapPtr, ConstantInt::get(usize_ty, 0)});
   Value *isZero = builder.CreateICmpEQ(mapEntry, ConstantInt::get(i1_ty, 0));
   builder.CreateCondBr(isZero, NormalLoadBB, CheckAccessBB);
 
@@ -153,10 +159,12 @@ static Function *getOrCreateBoundsCheckLoadSanitizer(
 }
 
 static Function *getOrCreateBoundsCheckStoreSanitizer(
-    Function *F, LLVMContext &Ctx, Type *ty,
+    Function *F, Type *ty,
     Vulnerability::RemediationStrategies strategy) {
   std::string handlerName = "resolve_bounds_check_st_" + getLLVMType(ty);
   Module *M = F->getParent();
+  LLVMContext &Ctx = M->getContext();
+  GlobalVariable *map = SanitizerMaps[F];
 
   IRBuilder<> builder(Ctx);
 
@@ -177,11 +185,17 @@ static Function *getOrCreateBoundsCheckStoreSanitizer(
   BasicBlock *NormalStoreBB = BasicBlock::Create(Ctx, "normal_store", resolveStoreFn);
   BasicBlock *SanitizeStoreBB = BasicBlock::Create(Ctx, "sanitize_store", resolveStoreFn);
 
+  builder.SetInsertPoint(EntryBB);
   Value *basePtr = resolveStoreFn->getArg(0);
   Value *storedVal = resolveStoreFn->getArg(1);
-  builder.SetInsertPoint(EntryBB);
+  
+  Value *mapPtr = builder.CreateGEP(
+    map->getValueType(),
+    map,
+    { builder.getInt64(0), builder.getInt64(0) }
+  );
 
-  Value* mapEntry = builder.CreateCall(getOrCreateSanitizerMapEntry(F), { ConstantInt::get(usize_ty, 0)});
+  Value* mapEntry = builder.CreateCall(getOrCreateSanitizerMapEntry(M), { mapPtr, ConstantInt::get(usize_ty, 0)});
   Value *isZero = builder.CreateICmpEQ(mapEntry, ConstantInt::get(i1_ty, 0));
   builder.CreateCondBr(isZero, NormalStoreBB, CheckAccessBB);
 
@@ -210,6 +224,7 @@ static Function *getOrCreateBoundsCheckMemcpySanitizer(
   std::string handlerName = "resolve_bounds_check_memcpy";
   Module *M = F->getParent();
   LLVMContext &Ctx = M->getContext();
+  GlobalVariable *map = SanitizerMaps[F];
 
   IRBuilder<> builder(Ctx);
 
@@ -234,7 +249,12 @@ static Function *getOrCreateBoundsCheckMemcpySanitizer(
   Value *src_ptr = resolveMemcpyFn->getArg(1);
   Value *size_arg = resolveMemcpyFn->getArg(2);
 
-  Value* mapEntry = builder.CreateCall(getOrCreateSanitizerMapEntry(F), { ConstantInt::get(size_ty, 0)});
+  Value *mapPtr = builder.CreateGEP(
+    map->getValueType(),
+    map,
+    { builder.getInt64(0), builder.getInt64(0) }
+  );
+  Value* mapEntry = builder.CreateCall(getOrCreateSanitizerMapEntry(M), { mapPtr, ConstantInt::get(size_ty, 0)});
   Value *isZero = builder.CreateICmpEQ(mapEntry, ConstantInt::get(i1_ty, 0));
   builder.CreateCondBr(isZero, NormalBB, CheckAccessBB);
 
@@ -269,6 +289,7 @@ static Function *getOrCreateBoundsCheckMemsetSanitizer(
   std::string handlerName = "resolve_bounds_check_memset";
   Module *M = F->getParent();
   LLVMContext &Ctx = M->getContext();
+  GlobalVariable *map = SanitizerMaps[F];
 
   IRBuilder<> builder(Ctx);
 
@@ -294,7 +315,12 @@ static Function *getOrCreateBoundsCheckMemsetSanitizer(
   Value *valueArg = resolveMemsetFn->getArg(1);
   Value *accessSize = resolveMemsetFn->getArg(2);
 
-  Value* mapEntry = builder.CreateCall(getOrCreateSanitizerMapEntry(F), { ConstantInt::get(size_ty, 0)});
+  Value *mapPtr = builder.CreateGEP(
+    map->getValueType(),
+    map,
+    { builder.getInt64(0), builder.getInt64(0) }
+  );
+  Value* mapEntry = builder.CreateCall(getOrCreateSanitizerMapEntry(M), { mapPtr, ConstantInt::get(size_ty, 0)});
   Value *isZero = builder.CreateICmpEQ(mapEntry, ConstantInt::get(i1_ty, 0));
   builder.CreateCondBr(isZero, NormalBB, CheckAccessBB);
   
@@ -326,6 +352,7 @@ static Function *getOrCreateResolveGep(Function *F) {
   std::string handlerName = "resolve_gep";
   Module *M = F->getParent();
   LLVMContext &Ctx = M->getContext();
+  GlobalVariable *map = SanitizerMaps[F];
 
   IRBuilder<> builder(Ctx);
 
@@ -352,8 +379,13 @@ static Function *getOrCreateResolveGep(Function *F) {
   // Extract the base and derived pointer
   Value *basePtr = resolveGepFn->getArg(0);
   Value *derivedPtr = resolveGepFn->getArg(1);
+  Value *mapPtr = builder.CreateGEP(
+    map->getValueType(),
+    map,
+    { builder.getInt64(0), builder.getInt64(0) }
+  );
 
-  Value* mapEntry = builder.CreateCall(getOrCreateSanitizerMapEntry(F), { ConstantInt::get(size_ty, 0)});
+  Value* mapEntry = builder.CreateCall(getOrCreateSanitizerMapEntry(M), { mapPtr, ConstantInt::get(size_ty, 0)});
   Value *isZero = builder.CreateICmpEQ(mapEntry, ConstantInt::get(i1_ty, 0));
   builder.CreateCondBr(isZero, NormalBB, GetBaseAndLimitBB);
 
@@ -578,6 +610,7 @@ void sanitizeMemset(Function *F,
 
 void sanitizeLoadStore(Function *F,
                        Vulnerability::RemediationStrategies strategy) {
+  Module *M = F->getParent();
   LLVMContext &Ctx = F->getContext();
   IRBuilder<> builder(Ctx);
 
@@ -621,7 +654,7 @@ void sanitizeLoadStore(Function *F,
     }
 
     auto loadFn = getOrCreateBoundsCheckLoadSanitizer(
-        F, F->getContext(), valueTy, strategy);
+        F, valueTy, strategy);
 
     auto sanitizedLoad = builder.CreateCall(loadFn, {ptr});
     Inst->replaceAllUsesWith(sanitizedLoad);
@@ -642,7 +675,7 @@ void sanitizeLoadStore(Function *F,
     }
 
     auto storeFn = getOrCreateBoundsCheckStoreSanitizer(
-        F, F->getContext(), valueTy, strategy);
+        F, valueTy, strategy);
 
     auto sanitizedStore =
         builder.CreateCall(storeFn, {ptr, Inst->getValueOperand()});
