@@ -4,6 +4,9 @@ __pycache__
 CMakeFiles
 CMakeCache.txt
 
+# local install folder
+install/
+
 # ignore repos/outputs from tests
 llvm-plugin/tests/**/*.ll
 llvm-plugin/tests/**/*.ll.mem
