@@ -13,7 +13,7 @@
 
 using namespace llvm;
 
-/// Replaces all calls to `name` in `F` with calls to `resolve_name`
+/// Replaces all calls to `name` in `F` with calls to `__resolve_name`
 static void wrapLibraryFunction(Function *F, StringRef name, FunctionType *ty) {
   Module *M = F->getParent();
   LLVMContext &Ctx = M->getContext();
