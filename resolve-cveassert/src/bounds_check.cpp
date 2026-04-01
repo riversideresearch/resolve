@@ -436,7 +436,7 @@ void instrumentGEP(Function *F) {
       return;
     }
 
-    if (gep->getMetadata("resolve.noinstrument")) { return; }
+    if (gep->getMetadata("cve.noinstrument")) { return; }
 
     Value *basePtr = gep->getPointerOperand();
     GetElementPtrInst *derivedPtr = gep;

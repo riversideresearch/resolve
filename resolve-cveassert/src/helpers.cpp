@@ -198,7 +198,7 @@ Function *getOrCreateRecoverBufferFunction(Module *M) {
   builder.SetInsertPoint(EntryBB);
   builder.CreateRet(Constant::getNullValue(ptr_ty));
 
-  resolveRecoverFn->setMetadata("resolve.noinstrument", MDNode::get(Ctx, {}));
+  resolveRecoverFn->setMetadata("cve.noinstrument", MDNode::get(Ctx, {}));
   validateIR(resolveRecoverFn);
 
   return resolveRecoverFn;

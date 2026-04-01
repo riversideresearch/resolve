@@ -108,7 +108,7 @@ void instrumentAlloca(Function *F) {
     // NOTE: attaching metadata to gep instruction to prevent instrumentation of
     // gep
     if (auto *inst = dyn_cast<Instruction>(typedPtr)) {
-      inst->setMetadata("resolve.noinstrument", MDNode::get(Ctx, {}));
+      inst->setMetadata("cve.noinstrument", MDNode::get(Ctx, {}));
     }
 
     // Collect lifetime calls
