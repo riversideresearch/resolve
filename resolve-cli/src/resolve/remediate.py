@@ -1,4 +1,5 @@
 import argparse
+import mmap
 from pathlib import Path
 
 from elftools.elf.elffile import ELFFile
@@ -39,12 +40,11 @@ def patch_symbol(
 
     Raises ValueError if the symbol is not found
     """
-    with elf_path.open("rb") as f:
-        elf = ELFFile(f)
+    with elf_path.open("r+b") as f, mmap.mmap(f.fileno(), 0) as mm:
+        elf = ELFFile(mm)
         symbol_addr = find_symbol_offset(elf, symbol_name)
-
         if symbol_addr is None:
-            raise ValueError(f"Symbol '{symbol_name}' not found in ELF")
+            raise ValueError(f"Symbol '{symbol_name}' not found")
 
         file_offset = find_file_offset(elf, symbol_addr)
         if file_offset is None:
@@ -52,17 +52,12 @@ def patch_symbol(
                 f"Symbol '{symbol_name}' not located in any PT_LOAD segment"
             )
 
-    # Read and patch the binary
-    data = bytearray(elf_path.read_bytes())
-    print(f"{len(new_bytes)}")
+        end = file_offset + len(new_bytes)
+        if end > mm.size():
+            raise ValueError("Patch exceeds file size")
 
-    print(f"patching {data[file_offset:file_offset + len(new_bytes)]} with {new_bytes}")
-    data[file_offset:file_offset + len(new_bytes)] = new_bytes
-
-    data[file_offset:file_offset + len(new_bytes)] = new_bytes
-
-    # Write patched output
-    elf_path.write_bytes(data)
+        mm[file_offset:end] = new_bytes
+        mm.flush()
 
 def main():
     parser = argparse.ArgumentParser()
