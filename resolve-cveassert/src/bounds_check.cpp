@@ -44,8 +44,8 @@ static FunctionCallee getResolveBaseAndLimit(Module *M) {
                                 attrs);
 }
 
-static Function *getOrCreateResolveAccessOk(Module *M) {
-  std::string handlerName = "resolve_access_ok";
+static Function *getOrCreateAccessOk(Module *M) {
+  std::string handlerName = "__cve_access_ok";
   LLVMContext &Ctx = M->getContext();
 
   IRBuilder<> builder(Ctx);
@@ -138,7 +138,7 @@ static Function *getOrCreateBoundsCheckLoadSanitizer(
 
   builder.SetInsertPoint(CheckAccessBB);
   Value *withinBounds = builder.CreateCall(
-    getOrCreateResolveAccessOk(M), { basePtr, ConstantExpr::getSizeOf(ty)}
+    getOrCreateAccessOk(M), { basePtr, ConstantExpr::getSizeOf(ty)}
   );
  
   builder.CreateCondBr(withinBounds, NormalLoadBB, SanitizeLoadBB);
@@ -201,7 +201,7 @@ static Function *getOrCreateBoundsCheckStoreSanitizer(
 
   builder.SetInsertPoint(CheckAccessBB);
   Value *withinBounds = builder.CreateCall(
-      getOrCreateResolveAccessOk(M), {basePtr, ConstantExpr::getSizeOf(ty)});
+      getOrCreateAccessOk(M), {basePtr, ConstantExpr::getSizeOf(ty)});
 
   builder.CreateCondBr(withinBounds, NormalStoreBB, SanitizeStoreBB);
 
@@ -260,9 +260,9 @@ static Function *getOrCreateBoundsCheckMemcpySanitizer(
 
   builder.SetInsertPoint(CheckAccessBB);
   Value *check_src_bd =
-      builder.CreateCall(getOrCreateResolveAccessOk(M), {src_ptr, size_arg});
+      builder.CreateCall(getOrCreateAccessOk(M), {src_ptr, size_arg});
   Value *check_dst_bd =
-      builder.CreateCall(getOrCreateResolveAccessOk(M), {dst_ptr, size_arg});
+      builder.CreateCall(getOrCreateAccessOk(M), {dst_ptr, size_arg});
 
   Value *withinBounds = builder.CreateAnd(check_src_bd, check_dst_bd);
   builder.CreateCondBr(withinBounds, NormalBB, SanitizeMemcpyBB);
@@ -326,7 +326,7 @@ static Function *getOrCreateBoundsCheckMemsetSanitizer(
   
   builder.SetInsertPoint(CheckAccessBB);
   Value *check_dst_bd =
-      builder.CreateCall(getOrCreateResolveAccessOk(M), {basePtr, accessSize});
+      builder.CreateCall(getOrCreateAccessOk(M), {basePtr, accessSize});
   builder.CreateCondBr(check_dst_bd, NormalBB, SanitizeMemsetBB);
 
   // NormalBB: call memset and return the pointer
