@@ -7,7 +7,7 @@
 // RUN: RESOLVE_LABEL_CVE=vulnerabilities/buffer_overflow.json %clang -S -emit-llvm \
 // RUN: -fpass-plugin=%plugin \
 // RUN: %s -o - | %FileCheck %s 
-// CHECK: call ptr @resolve_bounds_check_memcpy 
+// CHECK: call ptr @__cve_san_memcpy
 // RUN: RESOLVE_LABEL_CVE=vulnerabilities/buffer_overflow.json %clang -O0 -g -fpass-plugin=%plugin \ 
 // RUN: -L%rlib -lresolve -Wl,-rpath=%rlib %s -o %t.exe
 // RUN: %t.exe input.bin; test $? -eq 3

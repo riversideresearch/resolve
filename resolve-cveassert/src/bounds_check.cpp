@@ -221,7 +221,7 @@ static Function *getOrCreateBoundsCheckStoreSanitizer(
 
 static Function *getOrCreateBoundsCheckMemcpySanitizer(
     Function *F, Vulnerability::RemediationStrategies strategy) {
-  std::string handlerName = "__cve_san_bd_memcpy";
+  std::string handlerName = "__cve_san_memcpy";
   Module *M = F->getParent();
   LLVMContext &Ctx = M->getContext();
   GlobalVariable *map = SanitizerMaps[F];
@@ -286,7 +286,7 @@ static Function *getOrCreateBoundsCheckMemcpySanitizer(
 
 static Function *getOrCreateBoundsCheckMemsetSanitizer(
     Function *F, Vulnerability::RemediationStrategies strategy) {
-  std::string handlerName = "__cve_san_bd_memset";
+  std::string handlerName = "__cve_san_memset";
   Module *M = F->getParent();
   LLVMContext &Ctx = M->getContext();
   GlobalVariable *map = SanitizerMaps[F];
