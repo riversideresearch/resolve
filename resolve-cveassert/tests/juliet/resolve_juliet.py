@@ -359,6 +359,17 @@ def test_cwe(
     return pass_count, total_tests
 
 
+def assert_coverage(coverage: float, target: int | None):
+    if target is None:
+        return
+
+    if coverage > target:
+        print(f"OK: Coverage {coverage:.2f}% greater than target {target}%")
+    else:
+        print(f"FAIL: Coverage {coverage:.2f}% not greater than target {target}%")
+        return 1
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -375,6 +386,11 @@ def main():
         type=int,
         default=200,
         help="Limit the number of tests processed per CWE",
+    )
+    parser.add_argument(
+        "--assert_coverage_greater",
+        type=int,
+        help="Exit with a non-zero code if final coverage percentage is not greater than this value",
     )
     parser.add_argument(
         "--out_dir",
@@ -445,5 +461,8 @@ def main():
     print(f"Total testcases: {total_tests}")
     print(f"Percentage covered: {success_percent:.2f}%")
 
+    return assert_coverage(success_percent, args.assert_coverage_greater)
+
+
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
