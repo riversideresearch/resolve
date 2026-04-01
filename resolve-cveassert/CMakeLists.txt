@@ -31,6 +31,10 @@ endif()
 
 # Test Targets
 add_custom_target(test-CVEAssert 
+    DEPENDS test-CVEAssert-lit test-CVEAssert-juliet
+)
+
+add_custom_target(test-CVEAssert-lit
     COMMAND
       ${CMAKE_COMMAND} -E env 
         RESOLVE_TEST_CVEASSERT_LIB=$<TARGET_FILE:CVEAssert>
@@ -38,7 +42,14 @@ add_custom_target(test-CVEAssert
         
     lit -v ${CMAKE_CURRENT_SOURCE_DIR}/tests/lit/
     DEPENDS CVEAssert
-    COMMENT "Running regression tests for CVEAssert"
+    COMMENT "Running lit regression tests for CVEAssert"
+)
+
+add_custom_target(test-CVEAssert-juliet
+    COMMAND python3 -B ${CMAKE_CURRENT_SOURCE_DIR}/tests/juliet/resolve_juliet.py -f 
+    SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/tests/juliet/resolve_juliet.py ${CMAKE_CURRENT_SOURCE_DIR}/tests/juliet/testcases.tar.xz
+    DEPENDS CVEAssert
+    COMMENT "Running juilet coverage tests for CVEAssert"
 )
 
 #Install 
