@@ -1,0 +1,14 @@
+8.700132e-02 div_zero.c
+7.614398e-02 div_zero_no_remed.c
+8.664036e-02 div_zero_rec.c
+1.521311e-01 heap_oob.c
+2.877545e-02 oob_no_remed.c
+3.239942e-02 overflow_add.c
+2.981210e-02 overflow_add_no_remed.c
+3.532441e-01 stack_oob.c
+1.625340e-01 overflow_widen.c
+1.735229e-01 memcpy_oob.c
+1.748312e-01 buffer_overflow.c
+1.736648e-01 memset_oob.c
+1.609166e-01 safe_memset.c
+1.468878e-01 stack_loop_oob.c
