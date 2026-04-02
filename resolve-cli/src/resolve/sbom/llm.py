@@ -43,7 +43,6 @@ class Ollama(LLM):
         
     def _query(self, payload: str) -> str:
         resp = self.api(self.model, payload)
-        print("response: ",resp)
         return resp.response        
         
 class Gemini(LLM):
