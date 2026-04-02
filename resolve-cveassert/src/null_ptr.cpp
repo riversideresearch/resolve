@@ -65,11 +65,6 @@ getOrCreateNullPtrLoadSanitizer(Function *F, Type *ty,
   builder.CreateCondBr(IsNull, SanitizeNullPtrBB, NormalLoadBB);
 
   builder.SetInsertPoint(SanitizeNullPtrBB);
-  FunctionType *logMemInstFuncTy = FunctionType::get(void_ty, {ptr_ty}, false);
-  FunctionCallee logMemInstFunc = M->getOrInsertFunction(
-      "__resolve_report_invalid_access", logMemInstFuncTy);
-  builder.CreateCall(logMemInstFunc, { inputPtr });
-
   switch (strategy) {
   case Vulnerability::RemediationStrategies::CONTINUE: {
     builder.CreateRet(Constant::getNullValue(ty));
@@ -142,11 +137,6 @@ static Function *getOrCreateNullPtrStoreSanitizer(
   builder.CreateCondBr(IsNull, SanitizeNullPtrBB, NormalStoreBB);
 
   builder.SetInsertPoint(SanitizeNullPtrBB);
-  FunctionType *logMemInstFuncTy = FunctionType::get(void_ty, {ptr_ty}, false);
-  FunctionCallee logMemInstFunc = M->getOrInsertFunction(
-      "__resolve_report_invalid_access", logMemInstFuncTy);
-  builder.CreateCall(logMemInstFunc, {inputPtr});
-
   switch (strategy) {
   case Vulnerability::RemediationStrategies::CONTINUE: {
     builder.CreateRetVoid();

@@ -288,20 +288,6 @@ pub extern "C" fn resolve_obj_type(base_ptr: *mut c_void) -> AllocType {
 }
 
 /**
- * @brief - Logs when program enters a sanitization basic block
- * @input
- *  - ptr: Pointer that is being sanitized
- * @return
- */
-#[unsafe(no_mangle)]
-pub extern "C" fn __resolve_report_invalid_access(ptr: *mut c_void) {
-    info!(
-        "[RESOLVE] Invalid memory access at address 0x{:x}",
-        ptr as Vaddr
-    );
-}
-
-/**
  * @brief - Logs when program enters sanitization basic block for arithmetic operations
  */
 #[unsafe(no_mangle)]
