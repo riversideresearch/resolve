@@ -7,7 +7,6 @@ from resolve.sbom.dependancies import SoftwareDependancy, read_spdx_deps, Malfor
 from resolve.sbom.schema.nist_api import CWE
 from resolve.sbom.schema.vuln_spec import Vulnerability, VulnerabilityDocument
 import resolve.sbom.llm as llm
-import pdb
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -48,16 +47,20 @@ def output_json(vulns: list[Vulnerability], output_path: Path):
         f.write(doc.model_dump_json())
     
     
-def dep2vulns(dep: SoftwareDependancy, ai: llm.LLM) -> list[Vulnerability]:
+def dep2vulns(dep: SoftwareDependancy, ai: llm.LLM | None) -> list[Vulnerability]:
     vulns = []
     if not dep.cves:
         return []
     for cve in dep.cves:
-        try:
-            affected_file, affected_function = ai.get_affected(cve.get_description())
-        except llm.LLMError as e:
-            print(f"Failed to identify affected file, func for {cve.id} due to {e}. Skipping.")
-            continue
+        if ai:
+            try:
+                affected_file, affected_function = ai.get_affected(cve.get_description())
+            except llm.LLMError as e:
+                print(f"Failed to identify affected file, func for {cve.id} due to {e.__cause__}. Skipping.")
+                continue
+        else:
+            affected_file = "UNKNOWN"
+            affected_function = "UNKNOWN"
         if not cve.weaknesses:
             print(f"CVE {cve.id} does not have a known CWE associated. Skipping.")
             continue
@@ -88,14 +91,18 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     asyncio.run(dep_lookup(deps, min_base_score_v3=args.min_score, allow_no_v3_score=args.allow_empty_score, allow_disputed=args.allow_disputed, allow_deferred=args.allow_deferred, allow_rejected=args.allow_rejected))
-    match args.llm_provider:
-        case 'gemini':
-            ai = llm.Gemini()
-        case 'ollama':
-            ai = llm.Ollama()
-        case _:
-            print("Err: Unsupported provider",args.llm_provider)
-            return 1
+    ai = None
+    try:
+        match args.llm_provider:
+            case 'gemini':
+                ai = llm.Gemini()
+            case 'ollama':
+                ai = llm.Ollama()
+            case _:
+                print("Err: Unsupported provider",args.llm_provider)
+                return 1
+    except (llm.APIKeyError, llm.APIConnectionError) as e:
+        print(f"Cannot connect to AI Backend {args.llm_provider} due to {e.__cause__}")
     vulnerabilities = []
     for d in deps:
         vulnerabilities.extend(dep2vulns(d, ai))
