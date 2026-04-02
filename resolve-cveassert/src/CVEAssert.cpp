@@ -227,7 +227,7 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
   /// Return true if `F` meets instrumentation critera for vuln
   bool shouldInstrument(Function &F, Vulnerability &vuln) {
     // Skip noinstrument functions
-    if (F.getMetadata("resolve.noinstrument")) {
+    if (F.getMetadata("cve.noinstrument")) {
       return false;
     }
 

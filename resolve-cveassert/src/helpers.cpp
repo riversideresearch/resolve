@@ -111,7 +111,7 @@ Function *getOrCreateResolveHelper(Module *M, std::string fn_name,
     return handler;
 
   Function *resolveHelperFn = Function::Create(fn_type, link_type, fn_name, M);
-  resolveHelperFn->setMetadata("resolve.noinstrument", MDNode::get(Ctx, {}));
+  resolveHelperFn->setMetadata("cve.noinstrument", MDNode::get(Ctx, {}));
   return resolveHelperFn;
 }
 
