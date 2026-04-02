@@ -306,7 +306,7 @@ pub extern "C" fn __resolve_report_invalid_access(ptr: *mut c_void) {
  */
 #[unsafe(no_mangle)]
 pub extern "C" fn __resolve_report_violation() -> () {
-    info!("[RESOLVE] Vulnerability triggered");
+    info!("[RESOLVE] sanitizer triggered");
 }
 
 #[cfg(test)]
