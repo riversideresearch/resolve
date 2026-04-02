@@ -234,7 +234,7 @@ static Function *getOrCreateBoundsCheckStoreSanitizer(
   return resolveStoreFn;
 }
 
-static Function *getOrCreateBoundsCheckMemcpySanitizer(
+static Function *getOrCreateBoundsCheckMemmoveSanitizer(
     Function *F, Vulnerability::RemediationStrategies strategy) {
   std::string handlerName = "__cve_san_memcpy";
   Module *M = F->getParent();
