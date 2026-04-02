@@ -213,7 +213,7 @@ Function *getOrCreateRemediationBehavior(Module *M,
 
   FunctionType *fnTy = FunctionType::get(void_ty, {}, false);
 
-  if (strategy != Vulnerability::RemediationStrategies::EXIT ||
+  if (strategy != Vulnerability::RemediationStrategies::EXIT &&
       strategy != Vulnerability::RemediationStrategies::RECOVER) {
       return nullptr;
   }
