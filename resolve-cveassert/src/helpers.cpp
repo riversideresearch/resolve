@@ -232,13 +232,15 @@ Function *getOrCreateRemediationBehavior(Module *M,
   IRBuilder<> builder(BB);
 
   switch(strategy) {
-    case Vulnerability::RemediationStrategies::EXIT: 
+    case Vulnerability::RemediationStrategies::EXIT: {
       FunctionType *exitTy = FunctionType::get(void_ty, {i32_ty}, false);
-      FunctionCallee exitFn = M->getOrInsertFunction("exit", exitTy, false);
+      FunctionCallee exitFn = M->getOrInsertFunction("exit", exitTy);
       builder.CreateCall(exitFn, { builder.getInt32(3) });
+      builder.CreateUnreachable();
       break;
+    }
 
-    case Vulnerability::RemediationStrategies::RECOVER:
+    case Vulnerability::RemediationStrategies::RECOVER: {
       FunctionCallee longjmpFn = M->getOrInsertFunction(
         "longjmp", FunctionType::get(void_ty, { ptr_ty, i32_ty },
         false
@@ -247,7 +249,9 @@ Function *getOrCreateRemediationBehavior(Module *M,
       Function *resolveRecoverFn = getOrCreateRecoverBufferFunction(M);
       Value *buf = builder.CreateCall(resolveRecoverFn);
       builder.CreateCall(longjmpFn, { buf, builder.getInt32(42) });
+      builder.CreateUnreachable();
       break;
+    }
 
     default:
       llvm_unreachable("Unsupported remediation strategy");
