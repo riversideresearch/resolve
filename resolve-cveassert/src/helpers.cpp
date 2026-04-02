@@ -211,8 +211,7 @@ Function *getOrCreateRemediationBehavior(Module *M,
   auto void_ty = Type::getVoidTy(Ctx);
   auto i32_ty = Type::getInt32Ty(Ctx);
 
-  FunctionType *resolveRemedBehaviorFnTy =
-      FunctionType::get(void_ty, {}, false);
+  FunctionType *fnTy = FunctionType::get(void_ty, {}, false);
   
   std::string fnName;
   switch(strategy) {
@@ -222,38 +221,39 @@ Function *getOrCreateRemediationBehavior(Module *M,
       case Vulnerability::RemediationStrategies::RECOVER:
         fnName = "__cve_recover";
         break;
+      default:
+        llvm_unreachable("Unsupported remediation strategy");
   }
 
-  Function *resolveRemedBehaviorFn = getOrCreateResolveHelper(
-      M, fnName, resolveRemedBehaviorFnTy);
-  if (!resolveRemedBehaviorFn->empty()) { return resolveRemedBehaviorFn; }
+  Function *fn = getOrCreateResolveHelper(M, fnName, fnTy);
+  if (!fn->empty()) { return fn; }
 
-  BasicBlock *BB = BasicBlock::Create(Ctx, "entry", resolveRemedBehaviorFn);
-  IRBuilder<> Builder(BB);
+  BasicBlock *BB = BasicBlock::Create(Ctx, "entry", fn);
+  IRBuilder<> builder(BB);
 
-  if (strategy == Vulnerability::RemediationStrategies::EXIT) {
-    // void exit(i32)
-    FunctionType *exitTy =
-        FunctionType::get(void_ty, {Type::getInt32Ty(Ctx)}, false);
+  switch(strategy) {
+    case Vulnerability::RemediationStrategies::EXIT: 
+      FunctionType *exitTy = FunctionType::get(void_ty, {i32_ty}, false);
+      FunctionCallee exitFn = M->getOrInsertFunction("exit", exitTy, false);
+      builder.CreateCall(exitFn, { builder.getInt32(3) });
+      break;
 
-    FunctionCallee exitFn = M->getOrInsertFunction("exit", exitTy);
-    Value *exitCode = Builder.getInt32(3);
-    Builder.CreateCall(exitFn, {exitCode});
+    case Vulnerability::RemediationStrategies::RECOVER:
+      FunctionCallee longjmpFn = M->getOrInsertFunction(
+        "longjmp", FunctionType::get(void_ty, { ptr_ty, i32_ty },
+        false
+      ));
 
-  } else if (strategy == Vulnerability::RemediationStrategies::RECOVER) {
-    // void longjmp(void buf[], int val)
-    FunctionCallee longjmpFn = M->getOrInsertFunction(
-        "longjmp", FunctionType::get(void_ty, {ptr_ty, i32_ty}, false));
+      Function *resolveRecoverFn = getOrCreateRecoverBufferFunction(M);
+      Value *buf = builder.CreateCall(resolveRecoverFn);
+      builder.CreateCall(longjmpFn, { buf, builder.getInt32(42) });
 
-    // NOTE: resolve_get_recover_longjmp_buf must exist in C source code
-    Function *resolveRecoverFn = getOrCreateRecoverBufferFunction(M);
+    default:
+      llvm_unreachable("Unsupported remediation strategy");
+    
+    }
 
-    Value *resolve_longjmp_ptr = Builder.CreateCall(resolveRecoverFn);
-    Value *longjmpVal = ConstantInt::get(i32_ty, 42);
-    Builder.CreateCall(longjmpFn, {resolve_longjmp_ptr, longjmpVal});
+    builder.CreateRetVoid();
+    validateIR(fn);
+    return fn;
   }
-  Builder.CreateRetVoid();
-
-  validateIR(resolveRemedBehaviorFn);
-  return resolveRemedBehaviorFn;
-}
