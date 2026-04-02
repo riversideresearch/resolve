@@ -71,7 +71,8 @@ getOrCreateNullPtrLoadSanitizer(Function *F, Type *ty,
     break;
   }
 
-  default:
+  case Vulnerability::RemediationStrategies::EXIT:
+  case Vulnerability::RemediationStrategies::RECOVER:
     builder.CreateCall(getOrCreateRemediationBehavior(M, strategy));
     builder.CreateUnreachable();
     break;
@@ -143,7 +144,8 @@ static Function *getOrCreateNullPtrStoreSanitizer(
     break;
   }
 
-  default:
+  case Vulnerability::RemediationStrategies::EXIT:
+  case Vulnerability::RemediationStrategies::RECOVER:
     builder.CreateCall(getOrCreateRemediationBehavior(M, strategy));
     builder.CreateUnreachable();
     break;

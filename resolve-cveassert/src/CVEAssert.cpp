@@ -149,9 +149,10 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
     Value *IsHeap = builder.CreateCall(getOrCreateIsHeap(M, Ctx), {inputPtr});
     builder.CreateCondBr(IsHeap, FreeHeapBB, SanitizeNonHeapBB);
 
-    // Sanitize Block: Call getOrCreateRemediationBehavior
     builder.SetInsertPoint(SanitizeNonHeapBB);
-    builder.CreateCall(getOrCreateRemediationBehavior(M, strategy), {});
+    if (Function *fn = getOrCreateRemediationBehavior(M, strategy)) {
+      builder.CreateCall(fn);
+    }
     builder.CreateRetVoid();
 
     // Free Block: call Free

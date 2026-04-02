@@ -150,8 +150,9 @@ static Function *getOrCreateBoundsCheckLoadSanitizer(
 
   // SanitizeLoadBB: Apply remediation strategy
   builder.SetInsertPoint(SanitizeLoadBB);
-  builder.CreateCall(getOrCreateResolveReportSanitizerTriggered(M));
-  builder.CreateCall(getOrCreateRemediationBehavior(M, strategy));
+  if (Function *fn = getOrCreateRemediationBehavior(M, strategy)) {
+    builder.CreateCall(fn);
+  }
   builder.CreateRet(Constant::getNullValue(ty));
 
   validateIR(resolveLoadFn);
@@ -211,8 +212,9 @@ static Function *getOrCreateBoundsCheckStoreSanitizer(
 
   // SanitizeStoreBB: Apply remediation strategy
   builder.SetInsertPoint(SanitizeStoreBB);
-  builder.CreateCall(getOrCreateResolveReportSanitizerTriggered(M));
-  builder.CreateCall(getOrCreateRemediationBehavior(M, strategy));
+  if (Function *fn = getOrCreateRemediationBehavior(M, strategy)) {
+    builder.CreateCall(fn);
+  }
   builder.CreateRetVoid();
 
   validateIR(resolveStoreFn);
@@ -276,8 +278,9 @@ static Function *getOrCreateBoundsCheckMemcpySanitizer(
 
   // SanitizeMemcpyBB: Remediate memcpy returns null pointer.
   builder.SetInsertPoint(SanitizeMemcpyBB);
-  builder.CreateCall(getOrCreateResolveReportSanitizerTriggered(M));
-  builder.CreateCall(getOrCreateRemediationBehavior(M, strategy));
+  if (Function *fn = getOrCreateRemediationBehavior(M, strategy)) {
+    builder.CreateCall(fn);
+  }
   builder.CreateRet(dst_ptr);
 
   validateIR(resolveMemcpyFn);
@@ -339,9 +342,10 @@ static Function *getOrCreateBoundsCheckMemsetSanitizer(
       builder.CreateCall(memsetFn, {basePtr, valueArg, accessSize});
   builder.CreateRet(memsetPtr);
 
-  // SanitizeMemsetBB: Jump to remediation
   builder.SetInsertPoint(SanitizeMemsetBB);
-  builder.CreateCall(getOrCreateRemediationBehavior(M, strategy));
+  if (Function *fn = getOrCreateRemediationBehavior(M, strategy)) {
+    builder.CreateCall(fn);
+  }
   builder.CreateRet(basePtr);
 
   validateIR(resolveMemsetFn);

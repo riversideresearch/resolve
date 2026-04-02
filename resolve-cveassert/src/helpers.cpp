@@ -212,6 +212,11 @@ Function *getOrCreateRemediationBehavior(Module *M,
   auto i32_ty = Type::getInt32Ty(Ctx);
 
   FunctionType *fnTy = FunctionType::get(void_ty, {}, false);
+
+  if (strategy != Vulnerability::RemediationStrategies::EXIT ||
+      strategy != Vulnerability::RemediationStrategies::RECOVER) {
+        return nullptr;
+  }
   
   std::string fnName;
   switch(strategy) {
@@ -221,8 +226,6 @@ Function *getOrCreateRemediationBehavior(Module *M,
       case Vulnerability::RemediationStrategies::RECOVER:
         fnName = "__cve_recover";
         break;
-      default:
-        llvm_unreachable("Unsupported remediation strategy");
   }
 
   Function *fn = getOrCreateResolveHelper(M, fnName, fnTy);
@@ -255,10 +258,8 @@ Function *getOrCreateRemediationBehavior(Module *M,
 
     default:
       llvm_unreachable("Unsupported remediation strategy");
-    
     }
-
-    builder.CreateRetVoid();
+    
     validateIR(fn);
     return fn;
   }

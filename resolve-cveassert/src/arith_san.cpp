@@ -102,8 +102,9 @@ void sanitizeBitShift(Function *F,
     builder.CreateCondBr(checkBitPos, remedShiftBB, preserveShiftBB);
 
     builder.SetInsertPoint(remedShiftBB);
-    builder.CreateCall(getOrCreateResolveReportSanitizerTriggered(M));
-    builder.CreateCall(getOrCreateRemediationBehavior(M, strategy));
+    if (Function *fn = getOrCreateRemediationBehavior(M, strategy)) {
+      builder.CreateCall(fn);
+    }
     Value *safeShift = nullptr;
     Value *safeBitPos;
 
@@ -241,8 +242,9 @@ void sanitizeDivideByZero(Function *F,
     builder.CreateCondBr(isZero, remedDivBB, preserveDivBB);
 
     builder.SetInsertPoint(remedDivBB);
-    builder.CreateCall(getOrCreateResolveReportSanitizerTriggered(M));
-    builder.CreateCall(getOrCreateRemediationBehavior(M, strategy));
+    if (Function *fn = getOrCreateRemediationBehavior(M, strategy)) {
+      builder.CreateCall(fn);
+    }
     Value *safeDiv = nullptr;
     Value *safeIntDivisor;
     Value *safeFpDivisor;
@@ -552,8 +554,9 @@ void sanitizeIntOverflow(Function *F,
     builder.CreateCondBr(isOverflow, remedOverflowBB, joinResultBB);
 
     builder.SetInsertPoint(remedOverflowBB);
-    builder.CreateCall(getOrCreateResolveReportSanitizerTriggered(M));
-    builder.CreateCall(getOrCreateRemediationBehavior(M, strategy));
+    if (Function *fn = getOrCreateRemediationBehavior(M, strategy)) {
+      builder.CreateCall(fn);
+    }
     builder.CreateBr(joinResultBB);
 
     
