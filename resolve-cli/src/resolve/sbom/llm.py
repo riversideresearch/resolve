@@ -7,8 +7,14 @@ class LLMError(BaseException):
 class AffectedNotFoundError(LLMError):
     pass
 
+class APIConnectionError(LLMError):
+    pass
+
+class APIKeyError(LLMError):
+    pass
+
 class LLM:
-    prompt = "The following text describes a CVE. If it specifies which file and function are vulnerable, reply in the format file:function. Othewise, if this is not readily apparent, reply 'N/A'. "
+    prompt: str = "The following text describes a CVE. If it specifies which file and function is vulnerable, reply in the exact format `{file name}:{function name}` Othewise, if this is not readily apparent, reply `N/A`. "
     
     def _query(self, payload : str) -> str:
         raise NotImplementedError
@@ -30,23 +36,23 @@ class LLM:
         
         
 class Ollama(LLM):
-    def __init__(self, model = 'gemma3', server = 'http://localhost:11434'):
-        import requests
-        self.requests = requests
-        self.model = model
-        self.api_base = server + "/api/generate"
+    def __init__(self, model: str = 'gemma3', server: str = 'http://localhost:11434'):
+        import ollama
+        self.api = ollama.generate
+        self.model = model            
         
     def _query(self, payload: str) -> str:
-        params = {"model": self.model, "prompt": payload}
-        resp = self.requests.get(self.api_base, params=params)
-        resp.raise_for_status()
-        return resp.json()['message']['content']
-        
+        resp = self.api(self.model, payload)
+        print("response: ",resp)
+        return resp.response        
         
 class Gemini(LLM):
-    def __init__(self, model = 'gemini-2.5-flash', **kwargs) -> None:
+    def __init__(self, model: str = 'gemini-2.5-flash', **kwargs) -> None:
         from google import genai
-        self.client = genai.Client(**kwargs)
+        try:
+            self.client = genai.Client(**kwargs)
+        except ValueError as e:
+            raise APIKeyError() from e
         self.model = model
         
     def _query(self, payload: str) -> str:

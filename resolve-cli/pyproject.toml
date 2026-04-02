@@ -8,6 +8,7 @@ dependencies = [
     "aiohttp>=3.13.3",
     "asyncio>=4.0.0",
     "google-genai>=1.69.0",
+    "ollama>=0.6.1",
     "pydantic>=2.12.5",
     "univers>=31.1.0",
 ]
