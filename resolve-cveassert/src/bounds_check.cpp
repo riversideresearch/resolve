@@ -483,7 +483,7 @@ void instrumentGEP(Function *F) {
   }
 }
 
-void sanitizeMemcpy(Function *F,
+void instrumentMemcpy(Function *F,
                     Vulnerability::RemediationStrategies strategy) {
   LLVMContext &Ctx = F->getContext();
   IRBuilder<> builder(Ctx);
@@ -539,7 +539,7 @@ void sanitizeMemcpy(Function *F,
   }
 }
 
-void sanitizeMemset(Function *F,
+void instrumentMemset(Function *F,
                     Vulnerability::RemediationStrategies strategy) {
   LLVMContext &Ctx = F->getContext();
   IRBuilder<> builder(Ctx);
@@ -608,7 +608,7 @@ void sanitizeMemset(Function *F,
   }
 }
 
-void sanitizeLoadStore(Function *F,
+void instrumentLoadStore(Function *F,
                        Vulnerability::RemediationStrategies strategy) {
   Module *M = F->getParent();
   LLVMContext &Ctx = F->getContext();
@@ -624,7 +624,7 @@ void sanitizeLoadStore(Function *F,
     break;
 
   default:
-    llvm::errs() << "[CVEAssert] Error: sanitizeLoadStore does not support "
+    llvm::errs() << "[CVEAssert] Error: instrumentLoadStore does not support "
                     "remediation strategy "
                  << "defaulting to continue strategy!\n";
     strategy = Vulnerability::RemediationStrategies::CONTINUE;
@@ -688,7 +688,7 @@ void sanitizeLoadStore(Function *F,
 void sanitizeMemInstBounds(Function *F,
                            Vulnerability::RemediationStrategies strategy) {
   instrumentGEP(F);
-  sanitizeMemcpy(F, strategy);
-  sanitizeMemset(F, strategy);
-  sanitizeLoadStore(F, strategy);
+  instrumentMemcpy(F, strategy);
+  instrumentMemset(F, strategy);
+  instrumentLoadStore(F, strategy);
 }

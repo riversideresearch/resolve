@@ -7,11 +7,11 @@
 
 #include "Vulnerability.hpp"
 #include "llvm/IR/Function.h"
-void sanitizeLoadStore(llvm::Function *F,
+void instrumentLoadStore(llvm::Function *F,
                        Vulnerability::RemediationStrategies strategy);
-void sanitizeMemcpy(llvm::Function *F,
+void instrumentMemcpy(llvm::Function *F,
                     Vulnerability::RemediationStrategies strategy);
-void sanitizeMemset(llvm::Function *F,
+void instrumentMemset(llvm::Function *F,
                     Vulnerability::RemediationStrategies strategy);
 void sanitizeMemInstBounds(llvm::Function *F,
                            Vulnerability::RemediationStrategies strategy);
