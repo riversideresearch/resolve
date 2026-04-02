@@ -215,7 +215,7 @@ Function *getOrCreateRemediationBehavior(Module *M,
 
   if (strategy != Vulnerability::RemediationStrategies::EXIT ||
       strategy != Vulnerability::RemediationStrategies::RECOVER) {
-        return nullptr;
+      return nullptr;
   }
   
   std::string fnName;
@@ -259,7 +259,7 @@ Function *getOrCreateRemediationBehavior(Module *M,
     default:
       llvm_unreachable("Unsupported remediation strategy");
     }
-    
+
     validateIR(fn);
     return fn;
   }

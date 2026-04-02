@@ -150,6 +150,7 @@ static Function *getOrCreateBoundsCheckLoadSanitizer(
 
   // SanitizeLoadBB: Apply remediation strategy
   builder.SetInsertPoint(SanitizeLoadBB);
+  builder.CreateCall(getOrCreateResolveReportSanitizerTriggered(M));
   if (Function *fn = getOrCreateRemediationBehavior(M, strategy)) {
     builder.CreateCall(fn);
   }
@@ -212,6 +213,7 @@ static Function *getOrCreateBoundsCheckStoreSanitizer(
 
   // SanitizeStoreBB: Apply remediation strategy
   builder.SetInsertPoint(SanitizeStoreBB);
+  builder.CreateCall(getOrCreateResolveReportSanitizerTriggered(M));
   if (Function *fn = getOrCreateRemediationBehavior(M, strategy)) {
     builder.CreateCall(fn);
   }
@@ -278,6 +280,7 @@ static Function *getOrCreateBoundsCheckMemcpySanitizer(
 
   // SanitizeMemcpyBB: Remediate memcpy returns null pointer.
   builder.SetInsertPoint(SanitizeMemcpyBB);
+  builder.CreateCall(getOrCreateResolveReportSanitizerTriggered(M));
   if (Function *fn = getOrCreateRemediationBehavior(M, strategy)) {
     builder.CreateCall(fn);
   }
@@ -343,6 +346,7 @@ static Function *getOrCreateBoundsCheckMemsetSanitizer(
   builder.CreateRet(memsetPtr);
 
   builder.SetInsertPoint(SanitizeMemsetBB);
+  builder.CreateCall(getOrCreateResolveReportSanitizerTriggered(M));
   if (Function *fn = getOrCreateRemediationBehavior(M, strategy)) {
     builder.CreateCall(fn);
   }
