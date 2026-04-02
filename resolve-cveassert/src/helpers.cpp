@@ -247,6 +247,7 @@ Function *getOrCreateRemediationBehavior(Module *M,
       Function *resolveRecoverFn = getOrCreateRecoverBufferFunction(M);
       Value *buf = builder.CreateCall(resolveRecoverFn);
       builder.CreateCall(longjmpFn, { buf, builder.getInt32(42) });
+      break;
 
     default:
       llvm_unreachable("Unsupported remediation strategy");
