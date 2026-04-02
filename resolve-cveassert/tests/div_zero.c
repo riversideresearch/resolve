@@ -16,7 +16,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-void __resolve_report_violation() { printf("Applying sanitizer!"); }
+void __resolve_report_violation() { printf("Applying sanitizer!\n"); }
 
 int div_zero_main(int argc, const char* argv[]) {        
     int math = (int) (42.0 / (float)argc);
