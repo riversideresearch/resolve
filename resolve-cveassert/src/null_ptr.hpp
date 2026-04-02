@@ -7,5 +7,5 @@
 
 #include "Vulnerability.hpp"
 #include "llvm/IR/Function.h"
-void sanitizeNullPointers(llvm::Function *f,
+void sanitizeNullPointers(llvm::Function *F,
                           Vulnerability::RemediationStrategies strategy);

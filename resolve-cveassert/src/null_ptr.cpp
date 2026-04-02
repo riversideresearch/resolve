@@ -11,15 +11,19 @@
 #include "llvm/IR/Verifier.h"
 #include "llvm/Support/raw_ostream.h"
 
+#include "CVEAssert.hpp"
 #include "Vulnerability.hpp"
 #include "helpers.hpp"
 
 using namespace llvm;
 
 static Function *
-getOrCreateNullPtrLoadSanitizer(Module *M, LLVMContext &Ctx, Type *ty,
+getOrCreateNullPtrLoadSanitizer(Function *F, Type *ty,
                                 Vulnerability::RemediationStrategies strategy) {
-  std::string handlerName = "resolve_sanitize_null_ptr_ld_" + getLLVMType(ty);
+  std::string handlerName = "__cve_san_null_ptr_ld_" + getLLVMType(ty);
+  Module *M = F->getParent();
+  LLVMContext &Ctx = M->getContext();
+  GlobalVariable *map = SanitizerMaps[F];
 
   IRBuilder<> builder(Ctx);
   // TODO: handle address spaces other than 0
@@ -38,9 +42,16 @@ getOrCreateNullPtrLoadSanitizer(Module *M, LLVMContext &Ctx, Type *ty,
   BasicBlock *SanitizeNullPtrBB = BasicBlock::Create(Ctx,"sanitize_null_ptr", resolveNullPtrLdFn);
   BasicBlock *NormalLoadBB = BasicBlock::Create(Ctx, "safe_load", resolveNullPtrLdFn);
 
-  Argument *inputPtr = resolveNullPtrLdFn->getArg(0);
   builder.SetInsertPoint(EntryBB);
-  Value *mapEntry = builder.CreateCall(getOrCreateSanitizerMapEntry(M), { ConstantInt::get(usize_ty, 1)});
+  Argument *inputPtr = resolveNullPtrLdFn->getArg(0);
+  Value *zero = builder.getInt64(0);
+  Value *mapPtr = builder.CreateGEP(
+    map->getValueType(),
+    map,
+    { zero, zero }
+  );
+
+  Value *mapEntry = builder.CreateCall(getOrCreateSanitizerMapEntry(M), { mapPtr, ConstantInt::get(usize_ty, 1)});
   Value *isZero = builder.CreateICmpEQ(mapEntry, ConstantInt::get(i1_ty, 0));
   builder.CreateCondBr(isZero, NormalLoadBB, CheckIfNullBB);
 
@@ -54,18 +65,15 @@ getOrCreateNullPtrLoadSanitizer(Module *M, LLVMContext &Ctx, Type *ty,
   builder.CreateCondBr(IsNull, SanitizeNullPtrBB, NormalLoadBB);
 
   builder.SetInsertPoint(SanitizeNullPtrBB);
-  FunctionType *logMemInstFuncTy = FunctionType::get(void_ty, {ptr_ty}, false);
-  FunctionCallee logMemInstFunc = M->getOrInsertFunction(
-      "resolve_report_sanitize_mem_inst_triggered", logMemInstFuncTy);
-  builder.CreateCall(logMemInstFunc, { inputPtr });
-
   switch (strategy) {
   case Vulnerability::RemediationStrategies::CONTINUE: {
     builder.CreateRet(Constant::getNullValue(ty));
     break;
   }
 
-  default:
+  case Vulnerability::RemediationStrategies::EXIT:
+  case Vulnerability::RemediationStrategies::RECOVER:
+    builder.CreateCall(getOrCreateResolveReportSanitizerTriggered(M));
     builder.CreateCall(getOrCreateRemediationBehavior(M, strategy));
     builder.CreateUnreachable();
     break;
@@ -80,9 +88,12 @@ getOrCreateNullPtrLoadSanitizer(Module *M, LLVMContext &Ctx, Type *ty,
 }
 
 static Function *getOrCreateNullPtrStoreSanitizer(
-    Module *M, LLVMContext &Ctx, Type *ty,
+    Function *F, Type *ty,
     Vulnerability::RemediationStrategies strategy) {
-  std::string handlerName = "resolve_sanitize_null_ptr_st_" + getLLVMType(ty);
+  std::string handlerName = "__cve_san_null_ptr_st_" + getLLVMType(ty);
+  Module *M = F->getParent();
+  LLVMContext &Ctx = M->getContext();
+  GlobalVariable *map = SanitizerMaps[F];
 
   IRBuilder<> builder(Ctx);
   // TODO: handle address spaces other than 0
@@ -102,11 +113,17 @@ static Function *getOrCreateNullPtrStoreSanitizer(
   BasicBlock *SanitizeNullPtrBB = BasicBlock::Create(Ctx, "sanitize_null_ptr", resolveNullPtrStFn);
   BasicBlock *NormalStoreBB = BasicBlock::Create(Ctx, "safe_store", resolveNullPtrStFn);
 
-  Argument *inputPtr = resolveNullPtrStFn->getArg(0);
-  Argument *inputValue = resolveNullPtrStFn->getArg(1);
   // Set insertion point to entry block
   builder.SetInsertPoint(EntryBB);
-  Value *mapEntry = builder.CreateCall(getOrCreateSanitizerMapEntry(M), { ConstantInt::get(usize_ty, 1)});
+  Argument *inputPtr = resolveNullPtrStFn->getArg(0);
+  Argument *inputValue = resolveNullPtrStFn->getArg(1);
+  Value *mapPtr = builder.CreateGEP(
+    map->getValueType(),
+    map,
+    { builder.getInt64(0), builder.getInt64(0) }
+  );
+
+  Value *mapEntry = builder.CreateCall(getOrCreateSanitizerMapEntry(M), { mapPtr, ConstantInt::get(usize_ty, 1)});
   Value *isZero = builder.CreateICmpEQ(mapEntry, ConstantInt::get(i1_ty, 0));
   builder.CreateCondBr(isZero, NormalStoreBB, CheckIfNullBB);
 
@@ -122,18 +139,15 @@ static Function *getOrCreateNullPtrStoreSanitizer(
   builder.CreateCondBr(IsNull, SanitizeNullPtrBB, NormalStoreBB);
 
   builder.SetInsertPoint(SanitizeNullPtrBB);
-  FunctionType *logMemInstFuncTy = FunctionType::get(void_ty, {ptr_ty}, false);
-  FunctionCallee logMemInstFunc = M->getOrInsertFunction(
-      "resolve_report_sanitize_mem_inst_triggered", logMemInstFuncTy);
-  builder.CreateCall(logMemInstFunc, {inputPtr});
-
   switch (strategy) {
   case Vulnerability::RemediationStrategies::CONTINUE: {
     builder.CreateRetVoid();
     break;
   }
 
-  default:
+  case Vulnerability::RemediationStrategies::EXIT:
+  case Vulnerability::RemediationStrategies::RECOVER:
+    builder.CreateCall(getOrCreateResolveReportSanitizerTriggered(M));
     builder.CreateCall(getOrCreateRemediationBehavior(M, strategy));
     builder.CreateUnreachable();
     break;
@@ -148,9 +162,11 @@ static Function *getOrCreateNullPtrStoreSanitizer(
   return resolveNullPtrStFn;
 }
 
-void sanitizeNullPointers(Function *f,
+void sanitizeNullPointers(Function *F,
                           Vulnerability::RemediationStrategies strategy) {
-  IRBuilder<> builder(f->getContext());
+  Module *M = F->getParent();
+  LLVMContext &Ctx = F->getContext();
+  IRBuilder<> builder(Ctx);
 
   std::vector<LoadInst *> loadList;
   std::vector<StoreInst *> storeList;
@@ -169,7 +185,7 @@ void sanitizeNullPointers(Function *f,
     break;
   }
 
-  for (auto &BB : *f) {
+  for (auto &BB : *F) {
     for (auto &I : BB) {
       if (auto Inst = dyn_cast<LoadInst>(&I)) {
         loadList.push_back(Inst);
@@ -184,7 +200,7 @@ void sanitizeNullPointers(Function *f,
     auto valueTy = Inst->getType();
 
     auto loadFn = getOrCreateNullPtrLoadSanitizer(
-        f->getParent(), f->getContext(), valueTy, strategy);
+        F, valueTy, strategy);
 
     auto sanitizedLoad =
         builder.CreateCall(loadFn, {Inst->getPointerOperand()});
@@ -197,7 +213,7 @@ void sanitizeNullPointers(Function *f,
     builder.SetInsertPoint(Inst);
     auto valueTy = Inst->getValueOperand()->getType();
     auto storeFn = getOrCreateNullPtrStoreSanitizer(
-        f->getParent(), f->getContext(), valueTy, strategy);
+        F, valueTy, strategy);
 
     auto sanitizedStore = builder.CreateCall(
         storeFn, {Inst->getPointerOperand(), Inst->getValueOperand()});

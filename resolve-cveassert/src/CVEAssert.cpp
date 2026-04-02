@@ -4,6 +4,7 @@
  */
 
 #include "llvm/Analysis/MemorySSA.h"
+#include "llvm/ADT/DenseMap.h"
 #include "llvm/Demangle/Demangle.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/GlobalAlias.h"
@@ -38,24 +39,30 @@ using namespace llvm;
 
 // Global env var
 bool CVE_ASSERT_DEBUG; 
+DenseMap<Function *, GlobalVariable *> SanitizerMaps;
 
 
-GlobalVariable* initSanitizerMap(Module *M) {
-    LLVMContext &Ctx = M->getContext();
-    ArrayType *arrty = ArrayType::get(Type::getInt1Ty(Ctx), 7);
-    
-    M->getOrInsertGlobal("sanitizer_map", arrty);
-    GlobalVariable *gSanitizerMap = M->getNamedGlobal("sanitizer_map");
-    
-    gSanitizerMap->setLinkage(GlobalValue::ExternalLinkage);
-    gSanitizerMap->setConstant(false);
+GlobalVariable* initSanitizerMap(Function &F) {
+  Module *M = F.getParent();
+  LLVMContext &Ctx = M->getContext();
+  Type *i1_ty = Type::getInt1Ty(Ctx);
+  ArrayType *arr_ty = ArrayType::get(i1_ty, 7);
 
-    if (!gSanitizerMap->hasInitializer()) {
-      std::vector<Constant *> elems(7, ConstantInt::get(Type::getInt1Ty(Ctx), 1));
-      gSanitizerMap->setInitializer(ConstantArray::get(arrty, elems));
-    }
+  std::string globalName = F.getName().str() + ".sanmap"; 
 
-    return gSanitizerMap;
+  Constant *gv = M->getOrInsertGlobal(globalName, arr_ty);
+  // cast<> performs an implicit assertion for Constant -> GlobalVariable
+  auto *gSanitizerMap = cast<GlobalVariable>(gv);
+
+  gSanitizerMap->setLinkage(GlobalValue::ExternalLinkage);
+  gSanitizerMap->setConstant(false);
+
+  if (!gSanitizerMap->hasInitializer()) {
+    std::vector<Constant *> elems(7, ConstantInt::get(i1_ty, 1));
+    gSanitizerMap->setInitializer(ConstantArray::get(arr_ty, elems));
+  }
+
+  return gSanitizerMap;
 }
 
 namespace {
@@ -96,14 +103,18 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
   }
 
   Function *getOrCreateFreeOfNonHeapSanitizer(
-      Module *M, Vulnerability::RemediationStrategies strategy) {
-    std::string handlerName = "resolve_sanitize_non_heap_free";
+      Function *F, Vulnerability::RemediationStrategies strategy) {
+    std::string handlerName = "__cve_san_nonheap_free";
+    Module *M = F->getParent();
     LLVMContext &Ctx = M->getContext();
+    GlobalVariable *map = SanitizerMaps[F];
+
 
     IRBuilder<> builder(Ctx);
     // TODO: handle address spaces other than 0
     auto ptr_ty = PointerType::get(Ctx, 0);
     auto usize_ty = Type::getInt64Ty(Ctx);
+    auto i1_ty = Type::getInt1Ty(Ctx);
 
     // TODO: write this in asm as some kind of sanitzer_rt?
     FunctionType *resolveFreeNonHeapFnTy =
@@ -123,8 +134,13 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
     builder.SetInsertPoint(EntryBB);
     Argument *inputPtr = resolveFreeNonHeapFn->getArg(0);
 
-    Value *mapEntry = builder.CreateCall(getOrCreateSanitizerMapEntry(M), { ConstantInt::get(usize_ty, 2)});
-    Value *isZero = builder.CreateICmpEQ(mapEntry, ConstantInt::get(usize_ty, 0));
+    Value *mapPtr = builder.CreateGEP(
+      map->getValueType(),
+      map,
+      { builder.getInt64(0), builder.getInt64(0) }
+    );
+    Value *mapEntry = builder.CreateCall(getOrCreateSanitizerMapEntry(M), { mapPtr, ConstantInt::get(usize_ty, 2)});
+    Value *isZero = builder.CreateICmpEQ(mapEntry, ConstantInt::get(i1_ty, 0));
     builder.CreateCondBr(isZero, FreeHeapBB, CheckOnHeapBB);
 
     // Call Is Heap Func
@@ -133,9 +149,10 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
     Value *IsHeap = builder.CreateCall(getOrCreateIsHeap(M, Ctx), {inputPtr});
     builder.CreateCondBr(IsHeap, FreeHeapBB, SanitizeNonHeapBB);
 
-    // Sanitize Block: Call getOrCreateRemediationBehavior
     builder.SetInsertPoint(SanitizeNonHeapBB);
-    builder.CreateCall(getOrCreateRemediationBehavior(M, strategy), {});
+    if (Function *fn = getOrCreateRemediationBehavior(M, strategy)) {
+      builder.CreateCall(fn);
+    }
     builder.CreateRetVoid();
 
     // Free Block: call Free
@@ -167,7 +184,7 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
     for (auto call : workList) {
       builder.SetInsertPoint(call);
       auto sanitizerFn =
-          getOrCreateFreeOfNonHeapSanitizer(F->getParent(), strategy);
+          getOrCreateFreeOfNonHeapSanitizer(F, strategy);
 
       builder.CreateCall(sanitizerFn, {call->getArgOperand(0)});
       call->removeFromParent();
@@ -210,7 +227,7 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
   /// Return true if `F` meets instrumentation critera for vuln
   bool shouldInstrument(Function &F, Vulnerability &vuln) {
     // Skip noinstrument functions
-    if (F.getMetadata("resolve.noinstrument")) {
+    if (F.getMetadata("cve.noinstrument")) {
       return false;
     }
 
@@ -231,7 +248,7 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
   PreservedAnalyses runOnFunction(Function &F, ModuleAnalysisManager &MAM,
                                   Vulnerability &vuln) {
     auto result = PreservedAnalyses::all();
-
+  
     if (!shouldInstrument(F, vuln)) {
       return result;
     }
@@ -320,8 +337,18 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
   PreservedAnalyses run(Module &M, ModuleAnalysisManager &MAM) {
     auto result = PreservedAnalyses::all();
     InstrumentMemInst instrument_mem_inst;
+  
+    /// Precompute globals before instrumentation
+    for (auto &F : M) {
+      for (auto &vuln : vulnerabilities) {
+        if (F.isDeclaration()) continue;
 
-    initSanitizerMap(&M);
+        if (shouldInstrument(F, vuln)) {
+          SanitizerMaps[&F] = initSanitizerMap(F);
+        }
+      }
+    }
+
 
     for (auto &vuln : vulnerabilities) {
       // Also skip instrumentation for skipped vulnerabilities

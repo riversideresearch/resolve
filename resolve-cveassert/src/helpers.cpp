@@ -34,30 +34,34 @@ void validateIR(Function *F) {
 Function *getOrCreateSanitizerMapEntry(Module *M) {
   LLVMContext &Ctx = M->getContext();
   auto i1_ty = Type::getInt1Ty(Ctx);
+  auto ptr_ty = PointerType::get(Ctx, 0);
   auto usize_ty = Type::getInt64Ty(Ctx);
-  GlobalVariable *gSanitizerMap = M->getNamedGlobal("sanitizer_map");
+  auto arr_ty = ArrayType::get(i1_ty, 7);
 
   FunctionType *sanitizerMapIdxFnTy = 
-    FunctionType::get(i1_ty, { usize_ty }, false);
+    FunctionType::get(i1_ty, { ptr_ty, usize_ty }, false);
 
-  Function *sanitizerMapIdxFn = getOrCreateResolveHelper(M, "resolve_get_sanitizer_flag", sanitizerMapIdxFnTy);
+  Function *sanitizerMapIdxFn = getOrCreateResolveHelper(M, "__cve_get_flag", sanitizerMapIdxFnTy);
   if (!sanitizerMapIdxFn->empty()) { return sanitizerMapIdxFn; }
 
   IRBuilder<> builder(Ctx);
 
-  // When indexing an array use two indices
-  // 1. First index step from the global ptr
-  // 2. Second index: the actual element index 
-  Value *zero = builder.getInt64(0);
-  Value *idx = sanitizerMapIdxFn->getArg(0);
   BasicBlock *EntryBB = BasicBlock::Create(Ctx, "entry", sanitizerMapIdxFn);
   builder.SetInsertPoint(EntryBB);
 
-  Value* sanitizerMapPtr = builder.CreateGEP(ArrayType::get((i1_ty), 7),
-   gSanitizerMap, { zero, idx }
+  // When indexing an array use two indices
+  // 1. First index step from the global ptr
+  // 2. Second index: the actual element index 
+  Argument *mapPtr = sanitizerMapIdxFn->getArg(0);
+  Argument *idx = sanitizerMapIdxFn->getArg(1);
+
+  Value *zero = builder.getInt64(0);
+
+  Value* sanitizerMapPtr = builder.CreateGEP(arr_ty,
+   mapPtr, { zero, idx }
   );
-  Value* mapValue = builder.CreateLoad(i1_ty, sanitizerMapPtr);
-  builder.CreateRet(mapValue);
+  Value* flag = builder.CreateLoad(i1_ty, sanitizerMapPtr);
+  builder.CreateRet(flag);
 
   validateIR(sanitizerMapIdxFn);
   return sanitizerMapIdxFn;
@@ -107,7 +111,7 @@ Function *getOrCreateResolveHelper(Module *M, std::string fn_name,
     return handler;
 
   Function *resolveHelperFn = Function::Create(fn_type, link_type, fn_name, M);
-  resolveHelperFn->setMetadata("resolve.noinstrument", MDNode::get(Ctx, {}));
+  resolveHelperFn->setMetadata("cve.noinstrument", MDNode::get(Ctx, {}));
   return resolveHelperFn;
 }
 
@@ -121,7 +125,7 @@ Function *getOrCreateIsHeap(Module *M, LLVMContext &Ctx) {
       FunctionType::get(i1_ty, {ptr_ty}, false);
 
   Function *resolveIsHeapFn =
-      getOrCreateResolveHelper(M, "resolve_is_heap", resolveIsHeapFnTy);
+      getOrCreateResolveHelper(M, "__cve_is_heap", resolveIsHeapFnTy);
   
   if (!resolveIsHeapFn->empty()) { return resolveIsHeapFn; }
 
@@ -163,7 +167,7 @@ Function *getOrCreateResolveReportSanitizerTriggered(Module *M) {
   FunctionType *resolveReportFnTy = FunctionType::get(void_ty, {}, false);
 
   Function *resolveReportFn =
-      getOrCreateResolveHelper(M, "resolve_report_sanitizer_triggered",
+      getOrCreateResolveHelper(M, "__resolve_report_violation",
                                resolveReportFnTy, GlobalValue::WeakAnyLinkage);
   if (!resolveReportFn->empty()) { return resolveReportFn; }
 
@@ -194,53 +198,68 @@ Function *getOrCreateRecoverBufferFunction(Module *M) {
   builder.SetInsertPoint(EntryBB);
   builder.CreateRet(Constant::getNullValue(ptr_ty));
 
-  resolveRecoverFn->setMetadata("resolve.noinstrument", MDNode::get(Ctx, {}));
+  resolveRecoverFn->setMetadata("cve.noinstrument", MDNode::get(Ctx, {}));
   validateIR(resolveRecoverFn);
 
   return resolveRecoverFn;
 }
 
-Function *
-getOrCreateRemediationBehavior(Module *M,
+Function *getOrCreateRemediationBehavior(Module *M,
                                Vulnerability::RemediationStrategies strategy) {
   auto &Ctx = M->getContext();
   auto ptr_ty = PointerType::get(Ctx, 0);
   auto void_ty = Type::getVoidTy(Ctx);
   auto i32_ty = Type::getInt32Ty(Ctx);
 
-  FunctionType *resolveRemedBehaviorFnTy =
-      FunctionType::get(void_ty, {}, false);
+  FunctionType *fnTy = FunctionType::get(void_ty, {}, false);
 
-  Function *resolveRemedBehaviorFn = getOrCreateResolveHelper(
-      M, "resolve_remediation_behavior", resolveRemedBehaviorFnTy);
-  if (!resolveRemedBehaviorFn->empty()) { return resolveRemedBehaviorFn; }
-
-  BasicBlock *BB = BasicBlock::Create(Ctx, "entry", resolveRemedBehaviorFn);
-  IRBuilder<> Builder(BB);
-
-  if (strategy == Vulnerability::RemediationStrategies::EXIT) {
-    // void exit(i32)
-    FunctionType *exitTy =
-        FunctionType::get(void_ty, {Type::getInt32Ty(Ctx)}, false);
-
-    FunctionCallee exitFn = M->getOrInsertFunction("exit", exitTy);
-    Value *exitCode = Builder.getInt32(3);
-    Builder.CreateCall(exitFn, {exitCode});
-
-  } else if (strategy == Vulnerability::RemediationStrategies::RECOVER) {
-    // void longjmp(void buf[], int val)
-    FunctionCallee longjmpFn = M->getOrInsertFunction(
-        "longjmp", FunctionType::get(void_ty, {ptr_ty, i32_ty}, false));
-
-    // NOTE: resolve_get_recover_longjmp_buf must exist in C source code
-    Function *resolveRecoverFn = getOrCreateRecoverBufferFunction(M);
-
-    Value *resolve_longjmp_ptr = Builder.CreateCall(resolveRecoverFn);
-    Value *longjmpVal = ConstantInt::get(i32_ty, 42);
-    Builder.CreateCall(longjmpFn, {resolve_longjmp_ptr, longjmpVal});
+  if (strategy != Vulnerability::RemediationStrategies::EXIT &&
+      strategy != Vulnerability::RemediationStrategies::RECOVER) {
+      return nullptr;
   }
-  Builder.CreateRetVoid();
+  
+  std::string fnName;
+  switch(strategy) {
+      case Vulnerability::RemediationStrategies::EXIT:
+        fnName = "__cve_exit";
+        break;
+      case Vulnerability::RemediationStrategies::RECOVER:
+        fnName = "__cve_recover";
+        break;
+  }
 
-  validateIR(resolveRemedBehaviorFn);
-  return resolveRemedBehaviorFn;
-}
+  Function *fn = getOrCreateResolveHelper(M, fnName, fnTy);
+  if (!fn->empty()) { return fn; }
+
+  BasicBlock *BB = BasicBlock::Create(Ctx, "entry", fn);
+  IRBuilder<> builder(BB);
+
+  switch(strategy) {
+    case Vulnerability::RemediationStrategies::EXIT: {
+      FunctionType *exitTy = FunctionType::get(void_ty, {i32_ty}, false);
+      FunctionCallee exitFn = M->getOrInsertFunction("exit", exitTy);
+      builder.CreateCall(exitFn, { builder.getInt32(3) });
+      builder.CreateUnreachable();
+      break;
+    }
+
+    case Vulnerability::RemediationStrategies::RECOVER: {
+      FunctionCallee longjmpFn = M->getOrInsertFunction(
+        "longjmp", FunctionType::get(void_ty, { ptr_ty, i32_ty },
+        false
+      ));
+
+      Function *resolveRecoverFn = getOrCreateRecoverBufferFunction(M);
+      Value *buf = builder.CreateCall(resolveRecoverFn);
+      builder.CreateCall(longjmpFn, { buf, builder.getInt32(42) });
+      builder.CreateUnreachable();
+      break;
+    }
+
+    default:
+      llvm_unreachable("Unsupported remediation strategy");
+    }
+
+    validateIR(fn);
+    return fn;
+  }

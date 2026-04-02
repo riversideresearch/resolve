@@ -13,7 +13,7 @@
 
 using namespace llvm;
 
-/// Replaces all calls to `name` in `F` with calls to `resolve_name`
+/// Replaces all calls to `name` in `F` with calls to `__resolve_name`
 static void wrapLibraryFunction(Function *F, StringRef name, FunctionType *ty) {
   Module *M = F->getParent();
   LLVMContext &Ctx = M->getContext();
@@ -21,7 +21,7 @@ static void wrapLibraryFunction(Function *F, StringRef name, FunctionType *ty) {
 
   SmallVector<CallInst *, 8> callList;
 
-  SmallString<16> resolveCalleeName = {"resolve_", name};
+  SmallString<16> resolveCalleeName = {"__resolve_", name};
   FunctionCallee resolveCallee = M->getOrInsertFunction(resolveCalleeName, ty);
 
   auto swap_call = [&](CallInst *callInst) {
@@ -83,10 +83,10 @@ void instrumentAlloca(Function *F) {
   std::vector<AllocaInst *> toFreeList;
 
   auto allocateFn = M->getOrInsertFunction(
-      "resolve_stack_obj",
+      "__resolve_alloca",
       FunctionType::get(void_ty, {ptr_ty, size_ty}, false));
   auto invalidateFn = M->getOrInsertFunction(
-      "resolve_invalidate_stack", FunctionType::get(void_ty, {ptr_ty}, false));
+      "__resolve_invalidate_stack", FunctionType::get(void_ty, {ptr_ty}, false));
 
   auto handle_alloca = [&](auto *allocaInst) {
     bool hasStart = false;
@@ -108,7 +108,7 @@ void instrumentAlloca(Function *F) {
     // NOTE: attaching metadata to gep instruction to prevent instrumentation of
     // gep
     if (auto *inst = dyn_cast<Instruction>(typedPtr)) {
-      inst->setMetadata("resolve.noinstrument", MDNode::get(Ctx, {}));
+      inst->setMetadata("cve.noinstrument", MDNode::get(Ctx, {}));
     }
 
     // Collect lifetime calls

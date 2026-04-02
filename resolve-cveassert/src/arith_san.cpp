@@ -32,6 +32,7 @@ void sanitizeBitShift(Function *F,
   auto &Ctx = M->getContext();
   auto usize_ty = Type::getInt64Ty(Ctx);
   auto i1_ty = Type::getInt1Ty(Ctx);
+  GlobalVariable *map = SanitizerMaps[F];
   IRBuilder<> builder(Ctx);
   std::vector<Instruction *> worklist;
 
@@ -77,7 +78,13 @@ void sanitizeBitShift(Function *F,
 
     checkMapEntryBB->getTerminator()->eraseFromParent();
     builder.SetInsertPoint(checkMapEntryBB);
-    Value *mapEntry = builder.CreateCall(getOrCreateSanitizerMapEntry(M), { ConstantInt::get(usize_ty, 5)});
+    Value *zero = builder.getInt64(0);
+    Value *mapPtr = builder.CreateGEP(
+        map->getValueType(),
+        map,
+        { zero, zero }
+    ); 
+    Value *mapEntry = builder.CreateCall(getOrCreateSanitizerMapEntry(M), { mapPtr, ConstantInt::get(usize_ty, 5)});
     Value *isMapEntryZero = builder.CreateICmpEQ(mapEntry, ConstantInt::get(i1_ty, 0));
     builder.CreateCondBr(isMapEntryZero, preserveShiftBB, remedShiftBB);
     
@@ -95,8 +102,9 @@ void sanitizeBitShift(Function *F,
     builder.CreateCondBr(checkBitPos, remedShiftBB, preserveShiftBB);
 
     builder.SetInsertPoint(remedShiftBB);
-    builder.CreateCall(getOrCreateResolveReportSanitizerTriggered(M));
-    builder.CreateCall(getOrCreateRemediationBehavior(M, strategy));
+    if (Function *fn = getOrCreateRemediationBehavior(M, strategy)) {
+      builder.CreateCall(fn);
+    }
     Value *safeShift = nullptr;
     Value *safeBitPos;
 
@@ -154,6 +162,7 @@ void sanitizeDivideByZero(Function *F,
   auto &Ctx = M->getContext();
   auto usize_ty = Type::getInt64Ty(Ctx);
   auto i1_ty = Type::getInt1Ty(Ctx);
+  GlobalVariable *map = SanitizerMaps[F];
   IRBuilder<> builder(Ctx);
   std::vector<Instruction *> worklist;
 
@@ -199,7 +208,13 @@ void sanitizeDivideByZero(Function *F,
 
     checkMapEntryBB->getTerminator()->eraseFromParent();
     builder.SetInsertPoint(checkMapEntryBB);
-    Value *mapEntry = builder.CreateCall(getOrCreateSanitizerMapEntry(M), { ConstantInt::get(usize_ty, 3)});
+    Value *zero = builder.getInt64(0);
+    Value *mapPtr = builder.CreateGEP(
+        map->getValueType(),
+        map,
+        { zero, zero }
+    );
+    Value *mapEntry = builder.CreateCall(getOrCreateSanitizerMapEntry(M), { mapPtr, ConstantInt::get(usize_ty, 3)});
     Value *isMapEntryZero = builder.CreateICmpEQ(mapEntry, ConstantInt::get(i1_ty, 0));
     builder.CreateCondBr(isMapEntryZero, preserveDivBB, checkZeroBB);
 
@@ -228,7 +243,9 @@ void sanitizeDivideByZero(Function *F,
 
     builder.SetInsertPoint(remedDivBB);
     builder.CreateCall(getOrCreateResolveReportSanitizerTriggered(M));
-    builder.CreateCall(getOrCreateRemediationBehavior(M, strategy));
+    if (Function *fn = getOrCreateRemediationBehavior(M, strategy)) {
+      builder.CreateCall(fn);
+    }
     Value *safeDiv = nullptr;
     Value *safeIntDivisor;
     Value *safeFpDivisor;
@@ -381,11 +398,11 @@ void sanitizeIntOverflow(Function *F,
                          Vulnerability::RemediationStrategies strategy) {
   std::vector<Instruction *> worklist;
   Module *M = F->getParent();
-  auto &Ctx = M->getContext();
-  IRBuilder<> builder(Ctx);
-
+  auto &Ctx = M->getContext();   
   auto usize_ty = Type::getInt64Ty(Ctx);
   auto i1_ty = Type::getInt1Ty(Ctx);
+  GlobalVariable *map = SanitizerMaps[F];
+  IRBuilder<> builder(Ctx);
 
   switch (strategy) {
   case Vulnerability::RemediationStrategies::WIDEN:
@@ -524,6 +541,12 @@ void sanitizeIntOverflow(Function *F,
 
     checkMapEntryBB->getTerminator()->eraseFromParent();
     builder.SetInsertPoint(checkMapEntryBB);
+    Value *zero = builder.getInt64(0);
+    Value *mapPtr = builder.CreateGEP(
+        map->getValueType(),
+        map,
+        { zero, zero }
+    ); 
     Value *mapEntry = builder.CreateCall(getOrCreateSanitizerMapEntry(M), { ConstantInt::get(usize_ty, 3)});
     Value *isMapEntryZero = builder.CreateICmpEQ(mapEntry, ConstantInt::get(i1_ty, 0));
     builder.CreateCondBr(isMapEntryZero, joinResultBB, checkOverflowBB);
@@ -533,7 +556,9 @@ void sanitizeIntOverflow(Function *F,
 
     builder.SetInsertPoint(remedOverflowBB);
     builder.CreateCall(getOrCreateResolveReportSanitizerTriggered(M));
-    builder.CreateCall(getOrCreateRemediationBehavior(M, strategy));
+    if (Function *fn = getOrCreateRemediationBehavior(M, strategy)) {
+      builder.CreateCall(fn);
+    }
     builder.CreateBr(joinResultBB);
 
     
