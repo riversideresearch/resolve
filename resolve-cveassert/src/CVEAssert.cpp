@@ -45,22 +45,20 @@ DenseMap<Function *, GlobalVariable *> SanitizerMaps;
 GlobalVariable* initSanitizerMap(Function &F) {
   Module *M = F.getParent();
   LLVMContext &Ctx = M->getContext();
-  ArrayType *arrty = ArrayType::get(Type::getInt1Ty(Ctx), 7);
+  ArrayType *arr_ty = ArrayType::get(Type::getInt1Ty(Ctx), 7);
 
   std::string globalName = F.getName().str() + ".sanmap"; 
 
-  // DEBUGGING
-  auto *gSanitizerMap = dyn_cast<GlobalVariable>(
-    M->getOrInsertGlobal(globalName, arrty)
-  );
-  assert(gSanitizerMap && "[ERROR] Expected a GlobalVariable");
+  Constant *gv = M->getOrInsertGlobal(globalName, arr_ty);
+  // cast<> performs an implicit assertion for Constant -> GlobalVariable
+  auto *gSanitizerMap = cast<GlobalVariable>(gv);
 
   gSanitizerMap->setLinkage(GlobalValue::ExternalLinkage);
   gSanitizerMap->setConstant(false);
 
   if (!gSanitizerMap->hasInitializer()) {
     std::vector<Constant *> elems(7, ConstantInt::get(Type::getInt1Ty(Ctx), 1));
-    gSanitizerMap->setInitializer(ConstantArray::get(arrty, elems));
+    gSanitizerMap->setInitializer(ConstantArray::get(arr_ty, elems));
   }
 
   return gSanitizerMap;
