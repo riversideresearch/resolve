@@ -46,7 +46,10 @@ add_custom_target(test-CVEAssert-lit
 )
 
 add_custom_target(test-CVEAssert-juliet
-    COMMAND python3 -B ${CMAKE_CURRENT_SOURCE_DIR}/tests/juliet/resolve_juliet.py -f --assert_coverage_greater 30
+    COMMAND ${CMAKE_COMMAND} -E env
+      # Ensure resolvecc is in path
+      "PATH=${CMAKE_SOURCE_DIR}/resolve-cc/bin:$ENV{PATH}"
+      python3 -B ${CMAKE_CURRENT_SOURCE_DIR}/tests/juliet/resolve_juliet.py -f --assert_coverage_greater 30
     SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/tests/juliet/resolve_juliet.py ${CMAKE_CURRENT_SOURCE_DIR}/tests/juliet/testcases.tar.xz
     DEPENDS CVEAssert
     COMMENT "Running juilet coverage tests for CVEAssert"
