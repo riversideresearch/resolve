@@ -263,7 +263,7 @@ pub struct ShadowObjBounds {
  *         shadow object as pointers 
  */
 #[unsafe(no_mangle)]
-pub extern "C" fn __resolve_get_base_and_limit(ptr: *mut c_void) -> ShadowObjBounds {
+pub extern "C" fn __resolve_get_bounds(ptr: *mut c_void) -> ShadowObjBounds {
     let sobj_table = ALIVE_OBJ_LIST.lock();
     let Some(sobj) = sobj_table.search_intersection(ptr as Vaddr) else {
         return ShadowObjBounds { base: std::ptr::null_mut(), limit: std::ptr::null_mut() }

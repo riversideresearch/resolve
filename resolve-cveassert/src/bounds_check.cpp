@@ -24,7 +24,7 @@
 
 using namespace llvm;
 
-static FunctionCallee getResolveBaseAndLimit(Module *M) {
+static FunctionCallee getOrCreateResolveGetBounds(Module *M) {
   auto &Ctx = M->getContext();
   auto ptr_ty = PointerType::get(Ctx, 0);
   auto struct_ty = StructType::get(Ctx, {ptr_ty, ptr_ty}, false);
@@ -39,7 +39,7 @@ static FunctionCallee getResolveBaseAndLimit(Module *M) {
   AttributeList attrs =
       AttributeList::get(Ctx, AttributeList::FunctionIndex, FnAttrs);
 
-  return M->getOrInsertFunction("__resolve_get_base_and_limit",
+  return M->getOrInsertFunction("__resolve_get_bounds",
                                 FunctionType::get(struct_ty, {ptr_ty}, false),
                                 attrs);
 }
@@ -75,7 +75,7 @@ static Function *getOrCreateAccessOk(Module *M) {
   Value *accessSize = resolveAccessOkFn->getArg(1);
 
   Value *baseAndLimit =
-      builder.CreateCall(getResolveBaseAndLimit(M), {basePtr});
+      builder.CreateCall(getOrCreateResolveGetBounds(M), {basePtr});
   Value *limitValue = builder.CreateExtractValue(baseAndLimit, 1);
   Value *limitInt = builder.CreatePtrToInt(limitValue, size_ty);
   Value *baseInt = builder.CreatePtrToInt(basePtr, size_ty);
@@ -399,7 +399,7 @@ static Function *getOrCreateResolveGep(Function *F) {
 
   builder.SetInsertPoint(GetBaseAndLimitBB);
   Value *baseAndLimit =
-      builder.CreateCall(getResolveBaseAndLimit(M), {basePtr});
+      builder.CreateCall(getOrCreateResolveGetBounds(M), {basePtr});
   Value *baseValue = builder.CreateExtractValue(baseAndLimit, 0);
   Value *limitValue = builder.CreateExtractValue(baseAndLimit, 1);
 
