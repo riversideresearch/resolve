@@ -57,17 +57,23 @@ static Function *getOrCreateAccessOk(Module *M) {
   FunctionType *resolveAccessOkFnTy =
       FunctionType::get(bool_ty, {ptr_ty, size_ty}, false);
 
-  Function *resolveAccessOkFn = getOrCreateResolveHelper(M, handlerName, resolveAccessOkFnTy);
+  Function *resolveAccessOkFn =
+      getOrCreateResolveHelper(M, handlerName, resolveAccessOkFnTy);
 
-  if (!resolveAccessOkFn->empty()) { return resolveAccessOkFn; }
+  if (!resolveAccessOkFn->empty()) {
+    return resolveAccessOkFn;
+  }
 
   // Adding an attribute to always inline this function
   resolveAccessOkFn->addFnAttr(Attribute::AlwaysInline);
 
   BasicBlock *EntryBB = BasicBlock::Create(Ctx, "entry", resolveAccessOkFn);
-  BasicBlock *CheckAccessBB = BasicBlock::Create(Ctx, "check_access", resolveAccessOkFn);
-  BasicBlock *TrueBB = BasicBlock::Create(Ctx, "return_true", resolveAccessOkFn);
-  BasicBlock *FalseBB = BasicBlock::Create(Ctx, "return_false", resolveAccessOkFn);
+  BasicBlock *CheckAccessBB =
+      BasicBlock::Create(Ctx, "check_access", resolveAccessOkFn);
+  BasicBlock *TrueBB =
+      BasicBlock::Create(Ctx, "return_true", resolveAccessOkFn);
+  BasicBlock *FalseBB =
+      BasicBlock::Create(Ctx, "return_false", resolveAccessOkFn);
 
   builder.SetInsertPoint(EntryBB);
 
@@ -101,8 +107,7 @@ static Function *getOrCreateAccessOk(Module *M) {
 }
 
 static Function *getOrCreateBoundsCheckLoadSanitizer(
-    Function *F, Type *ty, 
-    Vulnerability::RemediationStrategies strategy) {
+    Function *F, Type *ty, Vulnerability::RemediationStrategies strategy) {
   std::string handlerName = "__cve_san_bd_ld_" + getLLVMType(ty);
   Module *M = F->getParent();
   LLVMContext &Ctx = M->getContext();
@@ -115,32 +120,35 @@ static Function *getOrCreateBoundsCheckLoadSanitizer(
   auto usize_ty = Type::getInt64Ty(Ctx);
 
   FunctionType *resolveLoadFnTy = FunctionType::get(ty, {ptr_ty}, false);
-  Function *resolveLoadFn = getOrCreateResolveHelper(M, handlerName, resolveLoadFnTy);
+  Function *resolveLoadFn =
+      getOrCreateResolveHelper(M, handlerName, resolveLoadFnTy);
 
-  if (!resolveLoadFn->empty()) { return resolveLoadFn; }
+  if (!resolveLoadFn->empty()) {
+    return resolveLoadFn;
+  }
 
   BasicBlock *EntryBB = BasicBlock::Create(Ctx, "entry", resolveLoadFn);
-  BasicBlock *CheckAccessBB = BasicBlock::Create(Ctx, "check_access", resolveLoadFn);
-  BasicBlock *NormalLoadBB = BasicBlock::Create(Ctx, "normal_load", resolveLoadFn);
-  BasicBlock *SanitizeLoadBB = BasicBlock::Create(Ctx, "sanitize_load", resolveLoadFn);
+  BasicBlock *CheckAccessBB =
+      BasicBlock::Create(Ctx, "check_access", resolveLoadFn);
+  BasicBlock *NormalLoadBB =
+      BasicBlock::Create(Ctx, "normal_load", resolveLoadFn);
+  BasicBlock *SanitizeLoadBB =
+      BasicBlock::Create(Ctx, "sanitize_load", resolveLoadFn);
 
   builder.SetInsertPoint(EntryBB);
   Value *basePtr = resolveLoadFn->getArg(0);
-  Value *mapPtr = builder.CreateGEP(
-    map->getValueType(),
-    map,
-    { builder.getInt64(0), builder.getInt64(0) }
-  );
+  Value *mapPtr = builder.CreateGEP(map->getValueType(), map,
+                                    {builder.getInt64(0), builder.getInt64(0)});
 
-  Value* mapEntry = builder.CreateCall(getOrCreateSanitizerMapEntry(M), { mapPtr, ConstantInt::get(usize_ty, 0)});
+  Value *mapEntry = builder.CreateCall(getOrCreateSanitizerMapEntry(M),
+                                       {mapPtr, ConstantInt::get(usize_ty, 0)});
   Value *isZero = builder.CreateICmpEQ(mapEntry, ConstantInt::get(i1_ty, 0));
   builder.CreateCondBr(isZero, NormalLoadBB, CheckAccessBB);
 
   builder.SetInsertPoint(CheckAccessBB);
   Value *withinBounds = builder.CreateCall(
-    getOrCreateAccessOk(M), { basePtr, ConstantExpr::getSizeOf(ty)}
-  );
- 
+      getOrCreateAccessOk(M), {basePtr, ConstantExpr::getSizeOf(ty)});
+
   builder.CreateCondBr(withinBounds, NormalLoadBB, SanitizeLoadBB);
 
   // NormalLoadBB: Return the loaded value.
@@ -161,8 +169,7 @@ static Function *getOrCreateBoundsCheckLoadSanitizer(
 }
 
 static Function *getOrCreateBoundsCheckStoreSanitizer(
-    Function *F, Type *ty,
-    Vulnerability::RemediationStrategies strategy) {
+    Function *F, Type *ty, Vulnerability::RemediationStrategies strategy) {
   std::string handlerName = "__cve_san_bd_st_" + getLLVMType(ty);
   Module *M = F->getParent();
   LLVMContext &Ctx = M->getContext();
@@ -179,25 +186,29 @@ static Function *getOrCreateBoundsCheckStoreSanitizer(
   FunctionType *resolveStoreFnTy =
       FunctionType::get(void_ty, {ptr_ty, ty}, false);
 
-  Function *resolveStoreFn = getOrCreateResolveHelper(M, handlerName, resolveStoreFnTy);
-  if (!resolveStoreFn->empty()) { return resolveStoreFn; }
+  Function *resolveStoreFn =
+      getOrCreateResolveHelper(M, handlerName, resolveStoreFnTy);
+  if (!resolveStoreFn->empty()) {
+    return resolveStoreFn;
+  }
 
   BasicBlock *EntryBB = BasicBlock::Create(Ctx, "entry", resolveStoreFn);
-  BasicBlock *CheckAccessBB = BasicBlock::Create(Ctx, "check_access", resolveStoreFn);
-  BasicBlock *NormalStoreBB = BasicBlock::Create(Ctx, "normal_store", resolveStoreFn);
-  BasicBlock *SanitizeStoreBB = BasicBlock::Create(Ctx, "sanitize_store", resolveStoreFn);
+  BasicBlock *CheckAccessBB =
+      BasicBlock::Create(Ctx, "check_access", resolveStoreFn);
+  BasicBlock *NormalStoreBB =
+      BasicBlock::Create(Ctx, "normal_store", resolveStoreFn);
+  BasicBlock *SanitizeStoreBB =
+      BasicBlock::Create(Ctx, "sanitize_store", resolveStoreFn);
 
   builder.SetInsertPoint(EntryBB);
   Value *basePtr = resolveStoreFn->getArg(0);
   Value *storedVal = resolveStoreFn->getArg(1);
-  
-  Value *mapPtr = builder.CreateGEP(
-    map->getValueType(),
-    map,
-    { builder.getInt64(0), builder.getInt64(0) }
-  );
 
-  Value* mapEntry = builder.CreateCall(getOrCreateSanitizerMapEntry(M), { mapPtr, ConstantInt::get(usize_ty, 0)});
+  Value *mapPtr = builder.CreateGEP(map->getValueType(), map,
+                                    {builder.getInt64(0), builder.getInt64(0)});
+
+  Value *mapEntry = builder.CreateCall(getOrCreateSanitizerMapEntry(M),
+                                       {mapPtr, ConstantInt::get(usize_ty, 0)});
   Value *isZero = builder.CreateICmpEQ(mapEntry, ConstantInt::get(i1_ty, 0));
   builder.CreateCondBr(isZero, NormalStoreBB, CheckAccessBB);
 
@@ -239,13 +250,19 @@ static Function *getOrCreateBoundsCheckMemcpySanitizer(
   FunctionType *resolveMemcpyFnTy =
       FunctionType::get(ptr_ty, {ptr_ty, ptr_ty, size_ty}, false);
 
-  Function *resolveMemcpyFn = getOrCreateResolveHelper(M, handlerName, resolveMemcpyFnTy);
-  if (!resolveMemcpyFn->empty()) { return resolveMemcpyFn; }
+  Function *resolveMemcpyFn =
+      getOrCreateResolveHelper(M, handlerName, resolveMemcpyFnTy);
+  if (!resolveMemcpyFn->empty()) {
+    return resolveMemcpyFn;
+  }
 
   BasicBlock *EntryBB = BasicBlock::Create(Ctx, "entry", resolveMemcpyFn);
-  BasicBlock *CheckAccessBB = BasicBlock::Create(Ctx, "check_access", resolveMemcpyFn);
-  BasicBlock *NormalBB = BasicBlock::Create(Ctx, "safe_memcpy", resolveMemcpyFn);
-  BasicBlock *SanitizeMemcpyBB = BasicBlock::Create(Ctx, "sanitize_memcpy", resolveMemcpyFn);
+  BasicBlock *CheckAccessBB =
+      BasicBlock::Create(Ctx, "check_access", resolveMemcpyFn);
+  BasicBlock *NormalBB =
+      BasicBlock::Create(Ctx, "safe_memcpy", resolveMemcpyFn);
+  BasicBlock *SanitizeMemcpyBB =
+      BasicBlock::Create(Ctx, "sanitize_memcpy", resolveMemcpyFn);
 
   builder.SetInsertPoint(EntryBB);
   // Extract dst, src, size arguments from function
@@ -253,12 +270,10 @@ static Function *getOrCreateBoundsCheckMemcpySanitizer(
   Value *src_ptr = resolveMemcpyFn->getArg(1);
   Value *size_arg = resolveMemcpyFn->getArg(2);
 
-  Value *mapPtr = builder.CreateGEP(
-    map->getValueType(),
-    map,
-    { builder.getInt64(0), builder.getInt64(0) }
-  );
-  Value* mapEntry = builder.CreateCall(getOrCreateSanitizerMapEntry(M), { mapPtr, ConstantInt::get(size_ty, 0)});
+  Value *mapPtr = builder.CreateGEP(map->getValueType(), map,
+                                    {builder.getInt64(0), builder.getInt64(0)});
+  Value *mapEntry = builder.CreateCall(getOrCreateSanitizerMapEntry(M),
+                                       {mapPtr, ConstantInt::get(size_ty, 0)});
   Value *isZero = builder.CreateICmpEQ(mapEntry, ConstantInt::get(i1_ty, 0));
   builder.CreateCondBr(isZero, NormalBB, CheckAccessBB);
 
@@ -307,13 +322,19 @@ static Function *getOrCreateBoundsCheckMemsetSanitizer(
   FunctionType *resolveMemsetFnTy =
       FunctionType::get(ptr_ty, {ptr_ty, i32_ty, size_ty}, false);
 
-  Function *resolveMemsetFn = getOrCreateResolveHelper(M, handlerName, resolveMemsetFnTy);
-  if (!resolveMemsetFn->empty()) { return resolveMemsetFn; } 
+  Function *resolveMemsetFn =
+      getOrCreateResolveHelper(M, handlerName, resolveMemsetFnTy);
+  if (!resolveMemsetFn->empty()) {
+    return resolveMemsetFn;
+  }
 
   BasicBlock *EntryBB = BasicBlock::Create(Ctx, "entry", resolveMemsetFn);
-  BasicBlock *CheckAccessBB = BasicBlock::Create(Ctx, "check_access", resolveMemsetFn);
-  BasicBlock *NormalBB = BasicBlock::Create(Ctx, "safe_memset", resolveMemsetFn);
-  BasicBlock *SanitizeMemsetBB = BasicBlock::Create(Ctx, "sanitize_memset", resolveMemsetFn);
+  BasicBlock *CheckAccessBB =
+      BasicBlock::Create(Ctx, "check_access", resolveMemsetFn);
+  BasicBlock *NormalBB =
+      BasicBlock::Create(Ctx, "safe_memset", resolveMemsetFn);
+  BasicBlock *SanitizeMemsetBB =
+      BasicBlock::Create(Ctx, "sanitize_memset", resolveMemsetFn);
 
   builder.SetInsertPoint(EntryBB);
   // Extract arguments for memset
@@ -321,15 +342,13 @@ static Function *getOrCreateBoundsCheckMemsetSanitizer(
   Value *valueArg = resolveMemsetFn->getArg(1);
   Value *accessSize = resolveMemsetFn->getArg(2);
 
-  Value *mapPtr = builder.CreateGEP(
-    map->getValueType(),
-    map,
-    { builder.getInt64(0), builder.getInt64(0) }
-  );
-  Value* mapEntry = builder.CreateCall(getOrCreateSanitizerMapEntry(M), { mapPtr, ConstantInt::get(size_ty, 0)});
+  Value *mapPtr = builder.CreateGEP(map->getValueType(), map,
+                                    {builder.getInt64(0), builder.getInt64(0)});
+  Value *mapEntry = builder.CreateCall(getOrCreateSanitizerMapEntry(M),
+                                       {mapPtr, ConstantInt::get(size_ty, 0)});
   Value *isZero = builder.CreateICmpEQ(mapEntry, ConstantInt::get(i1_ty, 0));
   builder.CreateCondBr(isZero, NormalBB, CheckAccessBB);
-  
+
   builder.SetInsertPoint(CheckAccessBB);
   Value *check_dst_bd =
       builder.CreateCall(getOrCreateAccessOk(M), {basePtr, accessSize});
@@ -371,29 +390,34 @@ static Function *getOrCreateResolveGep(Function *F) {
   FunctionType *resolveGepFnTy =
       FunctionType::get(ptr_ty, {ptr_ty, ptr_ty}, false);
 
-  Function *resolveGepFn = getOrCreateResolveHelper(M, handlerName, resolveGepFnTy);
-  if (!resolveGepFn->empty()) { return resolveGepFn; }
+  Function *resolveGepFn =
+      getOrCreateResolveHelper(M, handlerName, resolveGepFnTy);
+  if (!resolveGepFn->empty()) {
+    return resolveGepFn;
+  }
 
   // Adding attribute to always inline
   resolveGepFn->addFnAttr(Attribute::AlwaysInline);
 
   BasicBlock *EntryBB = BasicBlock::Create(Ctx, "entry", resolveGepFn);
-  BasicBlock *GetBaseAndLimitBB = BasicBlock::Create(Ctx, "get_base_and_limit", resolveGepFn);
-  BasicBlock *CheckComputedPtrBB = BasicBlock::Create(Ctx, "check_access", resolveGepFn);
-  BasicBlock *NormalBB = BasicBlock::Create(Ctx, "return_normal_ptr", resolveGepFn);
-  BasicBlock *OnePastBB = BasicBlock::Create(Ctx, "return_tainted_ptr", resolveGepFn);
+  BasicBlock *GetBaseAndLimitBB =
+      BasicBlock::Create(Ctx, "get_base_and_limit", resolveGepFn);
+  BasicBlock *CheckComputedPtrBB =
+      BasicBlock::Create(Ctx, "check_access", resolveGepFn);
+  BasicBlock *NormalBB =
+      BasicBlock::Create(Ctx, "return_normal_ptr", resolveGepFn);
+  BasicBlock *OnePastBB =
+      BasicBlock::Create(Ctx, "return_tainted_ptr", resolveGepFn);
 
   builder.SetInsertPoint(EntryBB);
   // Extract the base and derived pointer
   Value *basePtr = resolveGepFn->getArg(0);
   Value *derivedPtr = resolveGepFn->getArg(1);
-  Value *mapPtr = builder.CreateGEP(
-    map->getValueType(),
-    map,
-    { builder.getInt64(0), builder.getInt64(0) }
-  );
+  Value *mapPtr = builder.CreateGEP(map->getValueType(), map,
+                                    {builder.getInt64(0), builder.getInt64(0)});
 
-  Value* mapEntry = builder.CreateCall(getOrCreateSanitizerMapEntry(M), { mapPtr, ConstantInt::get(size_ty, 0)});
+  Value *mapEntry = builder.CreateCall(getOrCreateSanitizerMapEntry(M),
+                                       {mapPtr, ConstantInt::get(size_ty, 0)});
   Value *isZero = builder.CreateICmpEQ(mapEntry, ConstantInt::get(i1_ty, 0));
   builder.CreateCondBr(isZero, NormalBB, GetBaseAndLimitBB);
 
@@ -444,7 +468,9 @@ void instrumentGEP(Function *F) {
       return;
     }
 
-    if (gep->getMetadata("cve.noinstrument")) { return; }
+    if (gep->getMetadata("cve.noinstrument")) {
+      return;
+    }
 
     Value *basePtr = gep->getPointerOperand();
     GetElementPtrInst *derivedPtr = gep;
@@ -492,7 +518,7 @@ void instrumentGEP(Function *F) {
 }
 
 void instrumentMemcpy(Function *F,
-                    Vulnerability::RemediationStrategies strategy) {
+                      Vulnerability::RemediationStrategies strategy) {
   LLVMContext &Ctx = F->getContext();
   IRBuilder<> builder(Ctx);
   std::vector<Instruction *> memcpyList;
@@ -539,8 +565,7 @@ void instrumentMemcpy(Function *F,
       sizeArg = MC->getArgOperand(2);
     }
 
-    auto memcpyFn =
-        getOrCreateBoundsCheckMemcpySanitizer(F, strategy);
+    auto memcpyFn = getOrCreateBoundsCheckMemcpySanitizer(F, strategy);
     auto memcpyCall = builder.CreateCall(memcpyFn, {dstPtr, srcPtr, sizeArg});
     Inst->replaceAllUsesWith(memcpyCall);
     Inst->eraseFromParent();
@@ -548,7 +573,7 @@ void instrumentMemcpy(Function *F,
 }
 
 void instrumentMemset(Function *F,
-                    Vulnerability::RemediationStrategies strategy) {
+                      Vulnerability::RemediationStrategies strategy) {
   LLVMContext &Ctx = F->getContext();
   IRBuilder<> builder(Ctx);
   std::vector<Instruction *> memsetList;
@@ -607,8 +632,7 @@ void instrumentMemset(Function *F,
       sizeArg = builder.CreateIntCast(sizeArg, ExpectedLengthTy, false);
     }
 
-    auto memsetFn =
-        getOrCreateBoundsCheckMemsetSanitizer(F, strategy);
+    auto memsetFn = getOrCreateBoundsCheckMemsetSanitizer(F, strategy);
     auto memsetCall =
         builder.CreateCall(memsetFn, {basePtr, valueArg, sizeArg});
     Inst->replaceAllUsesWith(memsetCall);
@@ -617,7 +641,7 @@ void instrumentMemset(Function *F,
 }
 
 void instrumentLoadStore(Function *F,
-                       Vulnerability::RemediationStrategies strategy) {
+                         Vulnerability::RemediationStrategies strategy) {
   Module *M = F->getParent();
   LLVMContext &Ctx = F->getContext();
   IRBuilder<> builder(Ctx);
@@ -661,8 +685,7 @@ void instrumentLoadStore(Function *F,
         continue;
     }
 
-    auto loadFn = getOrCreateBoundsCheckLoadSanitizer(
-        F, valueTy, strategy);
+    auto loadFn = getOrCreateBoundsCheckLoadSanitizer(F, valueTy, strategy);
 
     auto sanitizedLoad = builder.CreateCall(loadFn, {ptr});
     Inst->replaceAllUsesWith(sanitizedLoad);
@@ -682,8 +705,7 @@ void instrumentLoadStore(Function *F,
         continue;
     }
 
-    auto storeFn = getOrCreateBoundsCheckStoreSanitizer(
-        F, valueTy, strategy);
+    auto storeFn = getOrCreateBoundsCheckStoreSanitizer(F, valueTy, strategy);
 
     auto sanitizedStore =
         builder.CreateCall(storeFn, {ptr, Inst->getValueOperand()});

@@ -83,10 +83,10 @@ void instrumentAlloca(Function *F) {
   std::vector<AllocaInst *> toFreeList;
 
   auto allocateFn = M->getOrInsertFunction(
-      "__resolve_alloca",
-      FunctionType::get(void_ty, {ptr_ty, size_ty}, false));
-  auto invalidateFn = M->getOrInsertFunction(
-      "__resolve_invalidate_stack", FunctionType::get(void_ty, {ptr_ty}, false));
+      "__resolve_alloca", FunctionType::get(void_ty, {ptr_ty, size_ty}, false));
+  auto invalidateFn =
+      M->getOrInsertFunction("__resolve_invalidate_stack",
+                             FunctionType::get(void_ty, {ptr_ty}, false));
 
   auto handle_alloca = [&](auto *allocaInst) {
     bool hasStart = false;
