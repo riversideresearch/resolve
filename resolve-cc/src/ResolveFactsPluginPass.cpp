@@ -19,8 +19,8 @@ struct ResolveFactsPluginPass : public PassInfoMixin<ResolveFactsPluginPass> {
 };
 
 extern "C" LLVM_ATTRIBUTE_WEAK PassPluginLibraryInfo llvmGetPassPluginInfo() {
-  return {LLVM_PLUGIN_API_VERSION, "ResolveFactsPluginPass", LLVM_VERSION_STRING,
-          [](PassBuilder &PB) {
+  return {LLVM_PLUGIN_API_VERSION, "ResolveFactsPluginPass",
+          LLVM_VERSION_STRING, [](PassBuilder &PB) {
             PB.registerPipelineStartEPCallback(
                 [&](ModulePassManager &MPM, OptimizationLevel) {
                   MPM.addPass(ResolveFactsPluginPass());
