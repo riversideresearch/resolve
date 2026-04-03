@@ -5,6 +5,11 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "aiohttp>=3.13.3",
+    "asyncio>=4.0.0",
+    "google-genai>=1.69.0",
+    "ollama>=0.6.1",
+    "pydantic>=2.12.5",
     "univers>=31.1.0",
 ]
 
@@ -16,6 +21,7 @@ resolve-input-synthesis-setup = "resolve.input_synthesis.setup:main"
 resolve-input-synthesis-run-all = "resolve.input_synthesis.run_all:main"
 resolve-input-synthesis-improve-cve = "resolve.input_synthesis.improve_CVE:main"
 resolve-input-synthesis-reachability = "resolve.input_synthesis.reachability:main"
+resolve-sbom = "resolve.sbom.main:main"
 
 [build-system]
 requires = ["uv_build>=0.10.9,<0.11.0"]

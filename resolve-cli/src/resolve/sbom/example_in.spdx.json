@@ -1,0 +1,99 @@
+{
+  "@context" : "https://spdx.org/rdf/3.0.1/spdx-context.jsonld",
+  "@graph" : 
+  [
+    {
+      "@id" : "_:Build#CreationInfo",
+      "comment" : "This SBOM was generated from the CMakeLists.txt File",
+      "created" : "2026-03-26T15:11:30Z",
+      "createdBy" : 
+      [
+        "https://gitlab.kitware.com/cmake/cmake"
+      ],
+      "specVersion" : "3.0.1",
+      "type" : "CreationInfo"
+    },
+    {
+      "creationInfo" : "_:Build#CreationInfo",
+      "element" : 
+      [
+        {
+          "builtTime" : "2026-03-26T15:11:30Z",
+          "creationInfo" : "_:Build#CreationInfo",
+          "name" : "fontconfig:fontconfig_project::fontconfig",
+          "originatedBy" : 
+          [
+            {
+              "creationInfo" : "_:Build#CreationInfo",
+              "name" : "Qt6Widgets",
+              "spdxId" : "urn:Qt6Widgets#Organization",
+              "type" : "Organization"
+            }
+          ],
+          "software_packageVersion" : "2.2.1",
+          "spdxId" : "urn:Qt6Widgets:Qt6::Widgets#Package",
+          "type" : "software_Package"
+        },
+        {
+          "builtTime" : "2026-03-26T15:11:30Z",
+          "creationInfo" : "_:Build#CreationInfo",
+          "name" : "Qt6Widgets:Qt6::Widgets",
+          "originatedBy" : 
+          [
+            {
+              "creationInfo" : "_:Build#CreationInfo",
+              "name" : "Qt6Widgets",
+              "spdxId" : "urn:Qt6Widgets#Organization",
+              "type" : "Organization"
+            }
+          ],
+          "software_packageVersion" : "6.10.2",
+          "spdxId" : "urn:Qt6Widgets:Qt6::Widgets#Package",
+          "type" : "software_Package"
+        }
+      ],
+      "name" : "DolphinVcsTargets",
+      "profileConformance" : 
+      [
+        "core",
+        "software"
+      ],
+      "rootElement" : 
+      [
+        {
+          "creationInfo" : "_:Build#CreationInfo",
+          "name" : "dolphinvcs",
+          "software_primaryPurpose" : "library",
+          "spdxId" : "urn:dolphinvcs#Package",
+          "type" : "software_Package"
+        }
+      ],
+      "spdxId" : "urn:DolphinVcsTargets#SPDXDocument",
+      "type" : "SpdxDocument"
+    },
+    {
+      "creationInfo" : "_:Build#CreationInfo",
+      "description" : "Linked Libraries",
+      "from" : "urn:dolphinvcs#Package",
+      "relationshipType" : "dependsOn",
+      "spdxId" : "urn:Static#Relationship",
+      "to" : 
+      [
+        "urn:Qt6Widgets:Qt6::Widgets#Package"
+      ],
+      "type" : "Relationship"
+    },
+    {
+      "creationInfo" : "_:Build#CreationInfo",
+      "description" : "Linked Libraries",
+      "from" : "urn:dolphinvcs#Package",
+      "relationshipType" : "dependsOn",
+      "spdxId" : "urn:Static#Relationship",
+      "to" : 
+      [
+        "urn:Qt6Widgets:Qt6::Widgets#Package"
+      ],
+      "type" : "Relationship"
+    }
+  ]
+}
