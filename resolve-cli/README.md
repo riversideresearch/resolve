@@ -68,3 +68,20 @@ Current subcommands are...
     - `reachability.md` -- revised reachability analysis
     - `conclusion.md` -- one-paragraph summary
     - `input-synthesis/` -- synthesized inputs and supporting scripts (if applicable)
+
+- [`sbom`](resolve-cli/src/resolve/sbom/README.md)
+
+  Searches NVD for known vulnerabilities in an SBOM and generates vulnerabilities.json with the results.
+
+  Inputs:
+  - '<project name>.spdx.json' -- CMAKE-generated software bill of materials (SBOM) in spdx format
+
+  Outputs:
+  - `vulnerabilities.json` -- File listing found vulnerabilities for use by `reach` subcommand.
+
+  Options (required):
+  - `-i`, `--sbom`: path to SBOM file
+  - `-o`, `--out`: path for output file
+  
+  Options (optional):
+    - See subcommand's README
