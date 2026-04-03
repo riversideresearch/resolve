@@ -4,7 +4,7 @@ This tool cross-references a CMAKE-generated SBOM with NIST's NVD to identify kn
 
 ## Principle of Operation
 
-This tool parses the CMAKE-generated `spdx` SBOM file to identify the name and version number of each dependancy.
+This tool parses the CMAKE-generated `spdx` SBOM file to identify the name and version number of each dependency.
 These are then looked up in NIST's NVD to find any known CVEs.
 For each identified CVE, its corresponding CWE(s) is looked up in MITRE's CWE database.
 Finally, an LLM is used to extract the vulnerable file and function from the natural language CVE description.
@@ -50,10 +50,10 @@ This method uses `gemma3` as the model.
 
 ## Design Considerations
 
-This codebase is designed to use async networking for its API requests. Real-world projects are expected to have many dependancies,
+This codebase is designed to use async networking for its API requests. Real-world projects are expected to have many dependencies,
 and the NIST and MITRE APIs are not fast. The async model allows us to dispatch requests in parallelinmprove execution speed. 
 
 Unfortunately, for now, the LLM interactions are synchronous and execute one-at-a-time.
 
 This project uses `pydantic` models to represent the [schemas](schema/README.md) for the [APIs](schema_defs/README.md) it interacts with.
-See the relavant documentation for details.
+See the relevant documentation for details.

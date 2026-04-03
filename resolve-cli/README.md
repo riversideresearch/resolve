@@ -54,7 +54,7 @@ Current subcommands are...
 
 - [`input-synthesis`](resolve-cli/src/resolve/input_synthesis/README.md)
 
-  Runs the input synthesis workflow to perform CVE analysis and improvement, (AI enchanced) reachability analysis, and finally input synthesis. 
+  Runs the input synthesis workflow to perform CVE analysis and improvement, (AI enhanced) reachability analysis, and finally input synthesis. 
 
   Inputs: 
     - CVE description (consumed by LLM, so any human readable file is appropriate)
@@ -69,12 +69,12 @@ Current subcommands are...
     - `conclusion.md` -- one-paragraph summary
     - `input-synthesis/` -- synthesized inputs and supporting scripts (if applicable)
 
-- [`sbom`](resolve-cli/src/resolve/sbom/README.md)
+- [`sbom`](-src/resolve/sbom/README.md)
 
   Searches NVD for known vulnerabilities in an SBOM and generates vulnerabilities.json with the results.
 
   Inputs:
-  - '<project name>.spdx.json' -- CMAKE-generated software bill of materials (SBOM) in spdx format
+  - `<project name>.spdx.json` -- CMAKE-generated software bill of materials (SBOM) in spdx format
 
   Outputs:
   - `vulnerabilities.json` -- File listing found vulnerabilities for use by `reach` subcommand.

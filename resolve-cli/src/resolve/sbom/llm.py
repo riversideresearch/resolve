@@ -14,7 +14,7 @@ class APIKeyError(LLMError):
     pass
 
 class LLM:
-    prompt: str = "The following text describes a CVE. If it specifies which file and function is vulnerable, reply in the exact format `{file name}:{function name}` Othewise, if this is not readily apparent, reply `N/A`. "
+    prompt: str = "The following text describes a CVE. If it specifies which file and function is vulnerable, reply in the exact format `{file name}:{function name}` Otherwise, if this is not readily apparent, reply `N/A`. "
     
     def _query(self, payload : str) -> str:
         raise NotImplementedError
