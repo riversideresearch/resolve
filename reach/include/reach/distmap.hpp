@@ -18,13 +18,11 @@ struct distmap_blacklist {
   std::unordered_set<NNodeId, resolve_facts::pair_hash> blacklist;
 };
 
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_ONLY_SERIALIZE
-(distmap_blacklist, distmap, blacklist);
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_ONLY_SERIALIZE(distmap_blacklist, distmap,
+                                                  blacklist);
 
 namespace distmap {
-  distmap_blacklist
-  gen(const reach_facts::database& db,
-      const NNodeId& dst,
-      bool dynlink = false,
-      const std::optional<std::vector<dlsym::loaded_symbol>>& loaded_syms = {});
+distmap_blacklist
+gen(const reach_facts::database &db, const NNodeId &dst, bool dynlink = false,
+    const std::optional<std::vector<dlsym::loaded_symbol>> &loaded_syms = {});
 }

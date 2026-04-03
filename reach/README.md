@@ -77,9 +77,6 @@ stdout if no path was given.
 ## Code
 
 Under `lib/`:
-- cache.hpp
-  + templated helper functions for reading/writing data structures
-    (vector, unordered_set, unordered_map) to/from disk
 - facts.hpp, facts.cpp
   + in-memory representation of fact databases, and loading from .facts files
   + defns related to dlsym loaded symbol logs from dynamic analysis

@@ -10,8 +10,8 @@
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/raw_ostream.h"
 
-#include "undesirableop.hpp"
 #include "helpers.hpp"
+#include "undesirableop.hpp"
 
 #include <optional>
 #include <string>
@@ -45,10 +45,12 @@ static Function *replaceUndesirableFunction(Module *M, CallInst *call,
   FunctionType *resolveSanitizedFnTy =
       call->getCalledFunction()->getFunctionType();
 
-  Function *resolveSanitizedFn = getOrCreateResolveHelper(M, handlerName,
-    resolveSanitizedFnTy);
+  Function *resolveSanitizedFn =
+      getOrCreateResolveHelper(M, handlerName, resolveSanitizedFnTy);
 
-  if (!resolveSanitizedFn->empty()) { return resolveSanitizedFn; }
+  if (!resolveSanitizedFn->empty()) {
+    return resolveSanitizedFn;
+  }
 
   BasicBlock *EntryBB = BasicBlock::Create(Ctx, "", resolveSanitizedFn);
   // Insert a return instruction here.

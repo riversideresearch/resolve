@@ -8,6 +8,11 @@
 // Use this instead of std::priority_queue for fast 'contains' and
 // 'decrease_key' operations.
 
+// 0-indexed heap:
+//        0
+//    1       2
+//  3   4   5   6
+
 #pragma once
 
 #include <stdexcept>
@@ -15,15 +20,14 @@
 #include <utility>
 #include <vector>
 
-template <typename K, std::totally_ordered V>
-class binary_heap {
- public:
+template <typename K, std::totally_ordered V> class binary_heap {
+public:
   // Insert a key/value pair into the heap.
-  void insert(const K& k, const V& v) {
+  void insert(const K &k, const V &v) {
     if (!this->contains(k)) {
       this->_ixs[k] = this->_heap.size();
       this->_heap.push_back({k, v});
-      this->_heapify_up(this->_heap.size()-1);
+      this->_heapify_up(this->_heap.size() - 1);
     } else {
       throw std::invalid_argument("key already exists");
     }
@@ -31,32 +35,35 @@ class binary_heap {
 
   // Extract the minimum element from the heap.
   std::pair<K, V> extract() {
+    if (_heap.empty()) {
+      throw std::out_of_range("extract on empty heap");
+    }
     const auto root = this->_heap.front();
-    this->_heap[0] = this->_heap.back();
-    this->_heap.pop_back();
     this->_ixs.erase(root.first);
+    if (this->_heap.size() == 1) {
+      this->_heap.pop_back();
+      return root;
+    }
+    this->_heap[0] = this->_heap.back();
     this->_ixs[this->_heap[0].first] = 0;
+    this->_heap.pop_back();
     this->_heapify_down(0);
     return root;
   }
 
   // Associate to key [k] a new value [v] (must be less than or equal
   // to the previous value associated with [k]).
-  void decrease_key(const K& k, const V& v) {
+  void decrease_key(const K &k, const V &v) {
     size_t i = this->_ixs[k];
     this->_heap[i].second = v;
     this->_heapify_up(i);
   }
 
-  constexpr size_t size() const {
-    return this->_heap.size();
-  }
+  constexpr size_t size() const { return this->_heap.size(); }
 
-  constexpr bool contains(const K& k) {
-    return this->_ixs.contains(k);
-  }
+  constexpr bool contains(const K &k) { return this->_ixs.contains(k); }
 
- private:
+private:
   std::vector<std::pair<K, V>> _heap;
   std::unordered_map<K, size_t> _ixs;
 
@@ -69,7 +76,7 @@ class binary_heap {
   // Heapify up at index [i].
   void _heapify_up(size_t i) {
     if (i > 0) {
-      size_t parent_i = i / 2;
+      size_t parent_i = (i - 1) / 2;
       if (this->_heap[i].second < this->_heap[parent_i].second) {
         this->_swap(i, parent_i);
         this->_heapify_up(parent_i);
@@ -79,8 +86,8 @@ class binary_heap {
 
   // Heapify down at index [i].
   void _heapify_down(size_t i) {
-    size_t left_i = 2 * i;
-    size_t right_i = 2 * i + 1;
+    size_t left_i = 2 * i + 1;
+    size_t right_i = 2 * i + 2;
 
     size_t smallest = i;
     if (left_i < this->_heap.size() &&

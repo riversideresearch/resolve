@@ -6,6 +6,7 @@
 // reach
 
 #include <chrono>
+#include <cxxabi.h>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -13,7 +14,6 @@
 #include <unordered_map>
 #include <utility>
 #include <vector>
-#include <cxxabi.h>
 
 #include "argparse/argparse.hpp"
 
@@ -30,7 +30,7 @@ using json = nlohmann::json;
 
 // Load config from input file if it was given, then allow any
 // explicitly given command line arguments to override the input file.
-conf::config load_config(const argparse::ArgumentParser& program) {
+conf::config load_config(const argparse::ArgumentParser &program) {
   try {
     const optional<string> in_path = program.present<string>("input");
     conf::config conf;
@@ -49,11 +49,9 @@ conf::config load_config(const argparse::ArgumentParser& program) {
       auto dst_str = program.get<string>("dst");
       auto srcs = util::split(src_str, ',');
       auto dsts = util::split(dst_str, ',');
-      
-      conf.queries.push_back({
-          { std::stoi(srcs[0]), std::stoi(srcs[1]) },
-          { std::stoi(dsts[0]), std::stoi(dsts[1]) }
-        });
+
+      conf.queries.push_back({{std::stoi(srcs[0]), std::stoi(srcs[1])},
+                              {std::stoi(dsts[0]), std::stoi(dsts[1])}});
     }
     conf.dynlink = program.get<bool>("dynlink") || conf.dynlink;
     if (program.present<string>("output")) {
@@ -73,13 +71,13 @@ conf::config load_config(const argparse::ArgumentParser& program) {
       conf.num_paths = 1;
     }
     conf.validate_facts =
-      program.get<bool>("validate-facts") || conf.validate_facts;
+        program.get<bool>("validate-facts") || conf.validate_facts;
 
     if (program.present<string>("path")) {
       auto path = program.get<string>("path");
       auto path_split = util::split(path, ',');
 
-      for (const auto& p: path_split) {
+      for (const auto &p : path_split) {
         // split on first ';' only to allow c++ namespaced names
         // e.g. graph.cpp;graph::build_from_program_facts
         auto idx = p.find(';');
@@ -88,7 +86,7 @@ conf::config load_config(const argparse::ArgumentParser& program) {
           conf.candidate_path.emplace_back(std::nullopt, p);
         } else {
           auto path = p.substr(0, idx);
-          auto node = p.substr(idx+1);
+          auto node = p.substr(idx + 1);
           conf.candidate_path.emplace_back(path, node);
         }
       }
@@ -96,14 +94,13 @@ conf::config load_config(const argparse::ArgumentParser& program) {
 
     conf.verbose = program.get<bool>("verbose") || conf.verbose;
     return conf;
-  }
-  catch (exception &e) {
+  } catch (exception &e) {
     throw runtime_error("argparse error: " + string(e.what()));
   }
 }
 
 optional<vector<dlsym::loaded_symbol>>
-build_loaded_syms(const optional<fs::path>& path) {
+build_loaded_syms(const optional<fs::path> &path) {
   if (path.has_value()) {
     const auto log_opt = dlsym::load_log_from_file(path.value());
     if (!log_opt.has_value()) {
@@ -112,21 +109,21 @@ build_loaded_syms(const optional<fs::path>& path) {
     const auto log = log_opt.value();
     vector<dlsym::loaded_symbol> syms;
     // Ensure no duplicate entries
-    for (const auto& sym : log.loaded_symbols) {
+    for (const auto &sym : log.loaded_symbols) {
       if (find(syms.begin(), syms.end(), sym) == syms.end()) {
         syms.push_back(sym);
       }
     }
-    return { syms };
+    return {syms};
   } else {
     return {};
   }
 }
 
-void validate_config(const conf::config& conf) {
+void validate_config(const conf::config &conf) {
   if (!fs::exists(conf.facts_dir)) {
-    cerr << "CONFIG ERROR: facts_dir "
-         << conf.facts_dir << " doesn't exist." << endl;
+    cerr << "CONFIG ERROR: facts_dir " << conf.facts_dir << " doesn't exist."
+         << endl;
     exit(1);
   }
 }
@@ -136,44 +133,39 @@ void print_config(const conf::config &conf) {
   cout << setw(4) << j << endl;
 }
 
-int main(int argc, char* argv[]) {
+int main(int argc, char *argv[]) {
   argparse::ArgumentParser program("reach");
 
   program.add_argument("-f", "--facts_dir")
-    .help("directory containing facts files");
-  program.add_argument("-s", "--src")
-    .help("source node in graph");
-  program.add_argument("-d", "--dst")
-    .help("destination node in graph");
-  program.add_argument("-i", "--input")
-    .help("JSON input path");
-  program.add_argument("-o", "--output")
-    .help("JSON output path");
+      .help("directory containing facts files");
+  program.add_argument("-s", "--src").help("source node in graph");
+  program.add_argument("-d", "--dst").help("destination node in graph");
+  program.add_argument("-i", "--input").help("JSON input path");
+  program.add_argument("-o", "--output").help("JSON output path");
   program.add_argument("-dl", "--dynlink")
-    .help("treat functions with external linkage as having their address taken")
-    .flag();
+      .help(
+          "treat functions with external linkage as having their address taken")
+      .flag();
   program.add_argument("-ds", "--dlsym-log")
-    .help("path to file containing dlsym log of loaded symbols");
-  program.add_argument("-o", "--output")
-    .help("JSON output path");
+      .help("path to file containing dlsym log of loaded symbols");
   program.add_argument("-g", "--graph")
-    .help("graph type (\"simple\", \"cfg\", or \"call\"). Default \"cfg\"");
+      .help("graph type (\"simple\", \"cfg\", or \"call\"). Default \"cfg\"");
   program.add_argument("-p", "--path")
-    .help("candidate path of comma-separated function_name or file;function_name");
+      .help("candidate path of comma-separated function_name or "
+            "file;function_name");
   program.add_argument("-n", "--num-paths")
-    .help("number of paths to generate (n shortest)")
-    .scan<'i', size_t>();
+      .help("number of paths to generate (n shortest)")
+      .scan<'i', size_t>();
   program.add_argument("--validate-facts")
-    .help("validate facts database after loading")
-    .flag();
+      .help("validate facts database after loading")
+      .flag();
   program.add_argument("--verbose")
-    .help("print misc information to stdout")
-    .flag();
+      .help("print misc information to stdout")
+      .flag();
 
   try {
     program.parse_args(argc, argv);
-  }
-  catch (const std::exception& err) {
+  } catch (const std::exception &err) {
     cerr << err.what() << endl;
     cerr << program;
     exit(1);
@@ -190,12 +182,12 @@ int main(int argc, char* argv[]) {
   // Execute reachability queries.
   // First, build graph.
 
-  typedef graph::T
-    (*graph_builder)(const resolve_facts::ProgramFacts&, bool,
-                     const optional<vector<dlsym::loaded_symbol>>&);
+  typedef graph::T (*graph_builder)(
+      const resolve_facts::ProgramFacts &, bool,
+      const optional<vector<dlsym::loaded_symbol>> &);
 
   const unordered_map<string, graph_builder> graph_builders = {
-    { "cfg", graph::build_from_program_facts },
+      {"cfg", graph::build_from_program_facts},
   };
 
   if (!graph_builders.contains(conf.graph_type)) {
@@ -210,29 +202,26 @@ int main(int argc, char* argv[]) {
 
   duration<double> facts_load_time = system_clock::now() - t0;
 
-
   if (conf.verbose) {
 
     auto nodes = 0;
     auto edges = 0;
-    for (const auto& [_, m]: pf.modules) {
+    for (const auto &[_, m] : pf.modules) {
       nodes += m.nodes.size();
       edges += m.edges.size();
     }
     cout << "Loaded facts in " << facts_load_time.count()
-         << " seconds. # nodes = " << nodes
-         << " # edges = " << edges << endl;
+         << " seconds. # nodes = " << nodes << " # edges = " << edges << endl;
   }
 
-
-
   t0 = system_clock::now();
-  const auto g = graph_builders.at(conf.graph_type)(pf, conf.dynlink, loaded_syms);
+  const auto g =
+      graph_builders.at(conf.graph_type)(pf, conf.dynlink, loaded_syms);
   duration<double> graph_build_time = system_clock::now() - t0;
 
   if (conf.verbose) {
     auto edges = 0;
-    for (const auto& [_, e]: g.edges) {
+    for (const auto &[_, e] : g.edges) {
       edges += e.size();
     }
 
@@ -251,14 +240,14 @@ int main(int argc, char* argv[]) {
 
   std::vector<NNodeId> candidate_ids;
 
-  auto find_node = [&](const auto& node) -> std::optional<NNodeId> {
-
-    for (const auto& [mid, m]: pf.modules) {
-      if (node.file && !m.nodes.at(mid).source_file.value_or("").contains(*node.file)) { 
+  auto find_node = [&](const auto &node) -> std::optional<NNodeId> {
+    for (const auto &[mid, m] : pf.modules) {
+      if (node.file &&
+          !m.nodes.at(mid).source_file.value_or("").contains(*node.file)) {
         continue;
       }
 
-      for (const auto& [nid, n]: m.nodes) {
+      for (const auto &[nid, n] : m.nodes) {
         if (n.type == NodeType::Function && n.name.has_value()) {
           auto name = n.name.value();
           // Try an exact match on the function name
@@ -267,14 +256,15 @@ int main(int argc, char* argv[]) {
           }
 
           // If that doesn't work attempt to demangle the name
-          // Sadly __cxa_demangle either requires a malloced pointer as input, 
+          // Sadly __cxa_demangle either requires a malloced pointer as input,
           // or returns a (fresh) malloced pointer as a result.
-          // Calling free() in 2025 is sad. I tried to be fancy with a shared_ptr with a custom deallocator
-          // but was getting malloc corruption errors.
+          // Calling free() in 2025 is sad. I tried to be fancy with a
+          // shared_ptr with a custom deallocator but was getting malloc
+          // corruption errors.
           auto ret = abi::__cxa_demangle(name.c_str(), NULL, NULL, NULL);
 
           if (ret) {
-            std::string demangled { ret };
+            std::string demangled{ret};
             free(ret);
 
             if (demangled.contains(node.function_name)) {
@@ -287,24 +277,26 @@ int main(int argc, char* argv[]) {
     return std::nullopt;
   };
 
-  for (const auto& p: conf.candidate_path) {
+  for (const auto &p : conf.candidate_path) {
     auto id = find_node(p);
     if (!id.has_value()) {
-      cerr << "No matching node found for candidate path node (file: " << p.file.value_or("<none>") << ", function: " << p.function_name << ")\n";
+      cerr << "No matching node found for candidate path node (file: "
+           << p.file.value_or("<none>") << ", function: " << p.function_name
+           << ")\n";
     } else {
       candidate_ids.push_back(id.value());
     }
-
   }
 
   if (conf.candidate_path.size() > 1 && candidate_ids.size() < 2) {
     cerr << "Candidate path specified but not enough nodes found; path: \n";
-    for (const auto& p: conf.candidate_path) {
-      cerr << "\t file:" << p.file.value_or("<none>") << ", name: " << p.function_name << "\n";
+    for (const auto &p : conf.candidate_path) {
+      cerr << "\t file:" << p.file.value_or("<none>")
+           << ", name: " << p.function_name << "\n";
     }
   } else if (candidate_ids.size() >= 2) {
-    for (auto i = 0; i < candidate_ids.size() -1; i += 1) {
-      conf.queries.emplace_back(candidate_ids[i], candidate_ids[i+1]);
+    for (auto i = 0; i < candidate_ids.size() - 1; i += 1) {
+      conf.queries.emplace_back(candidate_ids[i], candidate_ids[i + 1]);
     }
   }
 
@@ -315,11 +307,13 @@ int main(int argc, char* argv[]) {
     qres.dst = q.dst;
 
     auto print_missing = [&](auto node, auto type) {
-      cerr << "node " << type << " " << resolve_facts::to_string(node) << " not found" << endl;
+      cerr << "node " << type << " " << resolve_facts::to_string(node)
+           << " not found" << endl;
     };
 
-    // The graph may not have any edges from the src as all may be of the form (dst -> src)
-    // If the explicit edge does not exist at least check that the id is found in the total list of nodes
+    // The graph may not have any edges from the src as all may be of the form
+    // (dst -> src) If the explicit edge does not exist at least check that the
+    // id is found in the total list of nodes
     auto has_src = g.edges.contains(q.src) || pf.containsNode(q.src);
     auto has_dst = g.edges.contains(q.dst) || pf.containsNode(q.dst);
 
@@ -333,24 +327,24 @@ int main(int argc, char* argv[]) {
     // If both src and dst exist, try to find path.
     if (has_src && has_dst) {
 
-      const auto paths = search::k_paths_yen(g.edges, q.dst,
-                                             q.src, conf.num_paths.value());
+      const auto paths =
+          search::k_paths_yen(g.edges, q.dst, q.src, conf.num_paths.value());
 
       duration<double> query_time = system_clock::now() - t0;
       qres.query_time = query_time.count();
 
       vector<double> weights;
-      for (const auto& p : paths) {
+      for (const auto &p : paths) {
         weights.push_back(graph::path_weight(p));
       }
       if (!is_sorted(weights.begin(), weights.end())) {
         cerr << "WARNING: paths not sorted by weight" << endl;
       }
 
-      for (const auto& path : paths) {
+      for (const auto &path : paths) {
         vector<NNodeId> p_ids;
         vector<string> edges;
-        for (const auto& e : path) {
+        for (const auto &e : path) {
           const auto id = e.node;
           p_ids.push_back(id);
           edges.push_back(EdgeType_to_string(e.type));
@@ -360,7 +354,7 @@ int main(int argc, char* argv[]) {
         reverse(edges.begin(), edges.end());
         edges.pop_back();
 
-        qres.paths.push_back({ p_ids, edges });
+        qres.paths.push_back({p_ids, edges});
       }
     } else {
       exit(-1);

@@ -18,7 +18,10 @@ llvm::Function *getOrCreateResolveReportSanitizerTriggered(llvm::Module *M);
 llvm::Function *
 getOrCreateRemediationBehavior(llvm::Module *M,
                                Vulnerability::RemediationStrategies strategy);
-llvm::Function *getOrCreateResolveHelper(llvm::Module *M, std::string fn_name, llvm::FunctionType* fn_type,
-    llvm::GlobalValue::LinkageTypes link_type = llvm::Function::InternalLinkage);
+llvm::Function *
+getOrCreateResolveHelper(llvm::Module *M, std::string fn_name,
+                         llvm::FunctionType *fn_type,
+                         llvm::GlobalValue::LinkageTypes link_type =
+                             llvm::Function::InternalLinkage);
 void validateIR(llvm::Function *F);
 llvm::Function *getOrCreateSanitizerMapEntry(llvm::Module *M);

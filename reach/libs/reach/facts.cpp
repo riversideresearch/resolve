@@ -16,29 +16,27 @@ using namespace resolve_facts;
 using namespace reach_facts;
 using namespace std;
 
-
-#define DB_ERR(id, m1, m2) \
-  std::cerr << "id " << resolve_facts::to_string(id) << " in " << #m1 << " not found in " << #m2 << std::endl
+#define DB_ERR(id, m1, m2)                                                     \
+  std::cerr << "id " << resolve_facts::to_string(id) << " in " << #m1          \
+            << " not found in " << #m2 << std::endl
 
 namespace fs = filesystem;
 
-database reach_facts::load(istream& facts,
-                     LoadOptions options) {
+database reach_facts::load(istream &facts, LoadOptions options) {
   database db;
   auto pf = ProgramFacts::deserialize(facts);
 
-
   auto num_nodes = 0;
-  for (const auto& [k,v]: pf.modules) {
-      num_nodes += v.nodes.size();
+  for (const auto &[k, v] : pf.modules) {
+    num_nodes += v.nodes.size();
   }
 
   db.node_type.reserve(num_nodes);
   db.name.reserve(num_nodes);
 
-  for (const auto& [mid, m]: pf.modules) {
+  for (const auto &[mid, m] : pf.modules) {
 
-    for (const auto& [nid, n]: m.nodes) {
+    for (const auto &[nid, n] : m.nodes) {
       auto id = std::make_pair(mid, nid);
       if (is_set(options, LoadOptions::NodeType)) {
         db.node_type.emplace(id, n.type);
@@ -54,25 +52,29 @@ database reach_facts::load(istream& facts,
         if (is_set(options, LoadOptions::CallType) && n.call_type.has_value()) {
           db.call_type.emplace(id, *n.call_type);
         }
-        if (is_set(options, LoadOptions::AddressTaken) && n.address_taken == true) {
-           db.address_taken.push_back(id);
-        } 
-        if (is_set(options, LoadOptions::FunctionType) && n.function_type.has_value()) {
+        if (is_set(options, LoadOptions::AddressTaken) &&
+            n.address_taken == true) {
+          db.address_taken.push_back(id);
+        }
+        if (is_set(options, LoadOptions::FunctionType) &&
+            n.function_type.has_value()) {
           auto ft = *n.function_type;
-          db.fun_sig.emplace(id, ft.substr(1, ft.length()-2));
+          db.fun_sig.emplace(id, ft.substr(1, ft.length() - 2));
         }
       }
     }
 
     if (is_set(options, LoadOptions::Edges)) {
-      for (const auto& [eid, e]: m.edges) {
-        const auto& [s, d] = eid;
+      for (const auto &[eid, e] : m.edges) {
+        const auto &[s, d] = eid;
         auto sid = std::make_pair(mid, s);
         auto did = std::make_pair(mid, d);
-        for (const auto k: e.kinds) {
-          if (is_set(options, LoadOptions::Contains) && k == EdgeKind::Contains) {
+        for (const auto k : e.kinds) {
+          if (is_set(options, LoadOptions::Contains) &&
+              k == EdgeKind::Contains) {
             db.contains[sid].push_back(did);
-          } else if (is_set(options, LoadOptions::Calls) && k == EdgeKind::Calls) {
+          } else if (is_set(options, LoadOptions::Calls) &&
+                     k == EdgeKind::Calls) {
             db.calls.emplace(sid, did);
           } else if (is_set(options, LoadOptions::ControlFlow) &&
                      k == EdgeKind::ControlFlowTo) {
@@ -88,7 +90,7 @@ database reach_facts::load(istream& facts,
   return db;
 }
 
-database reach_facts::load(const fs::path& facts_dir, LoadOptions options) {
+database reach_facts::load(const fs::path &facts_dir, LoadOptions options) {
   const string facts_path = facts_dir / "facts.facts";
   ifstream facts(facts_path);
 
@@ -101,7 +103,7 @@ database reach_facts::load(const fs::path& facts_dir, LoadOptions options) {
 
 // These checks ensure that the hashmap lookups in
 // graph::build_call_graph and graph::build_cfg will succeed.
-bool reach_facts::validate(const database& db) {
+bool reach_facts::validate(const database &db) {
   // All nodes are assigned a type.
   if (!(KEYS_SUBSET(db.contains, db.node_type) &&
         KEYS_SUBSET(db.calls, db.node_type) &&
@@ -114,7 +116,7 @@ bool reach_facts::validate(const database& db) {
   }
 
   // Nodes with Direct call type are in [calls] and [fun_sig].
-  for (const auto& [id, call_type] : db.call_type) {
+  for (const auto &[id, call_type] : db.call_type) {
     if (call_type == CallType::Direct) {
       if (!db.calls.contains(id)) {
         DB_ERR(id, db.call_type, db.calls);
@@ -136,7 +138,7 @@ bool reach_facts::validate(const database& db) {
   }
 
   // Functions with external linkage appear in [fun_sig] and [name].
-  for (const auto& [id, linkage] : db.linkage) {
+  for (const auto &[id, linkage] : db.linkage) {
     if (linkage == Linkage::ExternalLinkage &&
         db.node_type.at(id) == NodeType::Function) {
       if (!db.fun_sig.contains(id)) {
@@ -151,7 +153,7 @@ bool reach_facts::validate(const database& db) {
   }
 
   // Basic blocks are in [contains].
-  for (const auto& [id, node_type] : db.node_type) {
+  for (const auto &[id, node_type] : db.node_type) {
     if (node_type == NodeType::BasicBlock) {
       if (!db.contains.contains(id)) {
         std::cerr << "Basic block with id " << resolve_facts::to_string(id)

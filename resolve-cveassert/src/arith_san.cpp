@@ -52,10 +52,10 @@ void sanitizeBitShift(Function *F,
     for (auto &instr : BB) {
       if (auto *BinOp = dyn_cast<BinaryOperator>(&instr)) {
         switch (BinOp->getOpcode()) {
-          case Instruction::Shl:
-          case Instruction::AShr:
-          case Instruction::LShr: {
-            worklist.push_back(BinOp);
+        case Instruction::Shl:
+        case Instruction::AShr:
+        case Instruction::LShr: {
+          worklist.push_back(BinOp);
         }
 
         default:
@@ -73,29 +73,29 @@ void sanitizeBitShift(Function *F,
     BasicBlock *checkMapEntryBB = binary_inst->getParent();
     BasicBlock *joinResultBB = checkMapEntryBB->splitBasicBlock(binary_inst);
     BasicBlock *checkShiftBB = BasicBlock::Create(Ctx, "check_zero", F);
-    BasicBlock *preserveShiftBB = BasicBlock::Create(Ctx, "preserve_shift", F, joinResultBB);
-    BasicBlock *remedShiftBB = BasicBlock::Create(Ctx, "remediate_shift", F, joinResultBB);
+    BasicBlock *preserveShiftBB =
+        BasicBlock::Create(Ctx, "preserve_shift", F, joinResultBB);
+    BasicBlock *remedShiftBB =
+        BasicBlock::Create(Ctx, "remediate_shift", F, joinResultBB);
 
     checkMapEntryBB->getTerminator()->eraseFromParent();
     builder.SetInsertPoint(checkMapEntryBB);
     Value *zero = builder.getInt64(0);
-    Value *mapPtr = builder.CreateGEP(
-        map->getValueType(),
-        map,
-        { zero, zero }
-    ); 
-    Value *mapEntry = builder.CreateCall(getOrCreateSanitizerMapEntry(M), { mapPtr, ConstantInt::get(usize_ty, 5)});
-    Value *isMapEntryZero = builder.CreateICmpEQ(mapEntry, ConstantInt::get(i1_ty, 0));
+    Value *mapPtr = builder.CreateGEP(map->getValueType(), map, {zero, zero});
+    Value *mapEntry =
+        builder.CreateCall(getOrCreateSanitizerMapEntry(M),
+                           {mapPtr, ConstantInt::get(usize_ty, 5)});
+    Value *isMapEntryZero =
+        builder.CreateICmpEQ(mapEntry, ConstantInt::get(i1_ty, 0));
     builder.CreateCondBr(isMapEntryZero, preserveShiftBB, remedShiftBB);
-    
-    
+
     builder.SetInsertPoint(checkShiftBB);
     Value *shifted_value = binary_inst->getOperand(0);
     Value *bit_pos = binary_inst->getOperand(1);
     unsigned BitWidth = shifted_value->getType()->getIntegerBitWidth();
 
-    isNegative = builder.CreateICmpULT(
-        bit_pos, ConstantInt::get(bit_pos->getType(), 0));
+    isNegative =
+        builder.CreateICmpULT(bit_pos, ConstantInt::get(bit_pos->getType(), 0));
     isGreaterThanBitwidth = builder.CreateICmpUGE(
         bit_pos, ConstantInt::get(bit_pos->getType(), BitWidth));
     Value *checkBitPos = builder.CreateOr(isNegative, isGreaterThanBitwidth);
@@ -188,7 +188,7 @@ void sanitizeDivideByZero(Function *F,
             BinOp->getOpcode() == Instruction::SRem ||
             BinOp->getOpcode() == Instruction::URem ||
             BinOp->getOpcode() == Instruction::FRem) {
-            worklist.push_back(BinOp);
+          worklist.push_back(BinOp);
         }
       }
     }
@@ -203,19 +203,20 @@ void sanitizeDivideByZero(Function *F,
     BasicBlock *checkMapEntryBB = binary_inst->getParent();
     BasicBlock *joinResultBB = checkMapEntryBB->splitBasicBlock(binary_inst);
     BasicBlock *checkZeroBB = BasicBlock::Create(Ctx, "check_zero", F);
-    BasicBlock *preserveDivBB = BasicBlock::Create(Ctx, "preserve_division", F, joinResultBB);
-    BasicBlock *remedDivBB = BasicBlock::Create(Ctx, "remediate_division", F, joinResultBB);
+    BasicBlock *preserveDivBB =
+        BasicBlock::Create(Ctx, "preserve_division", F, joinResultBB);
+    BasicBlock *remedDivBB =
+        BasicBlock::Create(Ctx, "remediate_division", F, joinResultBB);
 
     checkMapEntryBB->getTerminator()->eraseFromParent();
     builder.SetInsertPoint(checkMapEntryBB);
     Value *zero = builder.getInt64(0);
-    Value *mapPtr = builder.CreateGEP(
-        map->getValueType(),
-        map,
-        { zero, zero }
-    );
-    Value *mapEntry = builder.CreateCall(getOrCreateSanitizerMapEntry(M), { mapPtr, ConstantInt::get(usize_ty, 3)});
-    Value *isMapEntryZero = builder.CreateICmpEQ(mapEntry, ConstantInt::get(i1_ty, 0));
+    Value *mapPtr = builder.CreateGEP(map->getValueType(), map, {zero, zero});
+    Value *mapEntry =
+        builder.CreateCall(getOrCreateSanitizerMapEntry(M),
+                           {mapPtr, ConstantInt::get(usize_ty, 3)});
+    Value *isMapEntryZero =
+        builder.CreateICmpEQ(mapEntry, ConstantInt::get(i1_ty, 0));
     builder.CreateCondBr(isMapEntryZero, preserveDivBB, checkZeroBB);
 
     builder.SetInsertPoint(checkZeroBB);
@@ -282,7 +283,6 @@ void sanitizeDivideByZero(Function *F,
       break;
     }
     builder.CreateBr(joinResultBB);
-
 
     builder.SetInsertPoint(preserveDivBB);
     Value *normalResult = nullptr;
@@ -398,7 +398,7 @@ void sanitizeIntOverflow(Function *F,
                          Vulnerability::RemediationStrategies strategy) {
   std::vector<Instruction *> worklist;
   Module *M = F->getParent();
-  auto &Ctx = M->getContext();   
+  auto &Ctx = M->getContext();
   auto usize_ty = Type::getInt64Ty(Ctx);
   auto i1_ty = Type::getInt1Ty(Ctx);
   GlobalVariable *map = SanitizerMaps[F];
@@ -537,18 +537,18 @@ void sanitizeIntOverflow(Function *F,
     BasicBlock *checkMapEntryBB = binary_inst->getParent();
     BasicBlock *joinResultBB = checkMapEntryBB->splitBasicBlock(binary_inst);
     BasicBlock *checkOverflowBB = BasicBlock::Create(Ctx, "check_overflow", F);
-    BasicBlock *remedOverflowBB = BasicBlock::Create(Ctx, "remediate_overflow", F, joinResultBB);
+    BasicBlock *remedOverflowBB =
+        BasicBlock::Create(Ctx, "remediate_overflow", F, joinResultBB);
 
     checkMapEntryBB->getTerminator()->eraseFromParent();
     builder.SetInsertPoint(checkMapEntryBB);
     Value *zero = builder.getInt64(0);
-    Value *mapPtr = builder.CreateGEP(
-        map->getValueType(),
-        map,
-        { zero, zero }
-    ); 
-    Value *mapEntry = builder.CreateCall(getOrCreateSanitizerMapEntry(M), { ConstantInt::get(usize_ty, 3)});
-    Value *isMapEntryZero = builder.CreateICmpEQ(mapEntry, ConstantInt::get(i1_ty, 0));
+    Value *mapPtr = builder.CreateGEP(map->getValueType(), map, {zero, zero});
+    Value *mapEntry =
+        builder.CreateCall(getOrCreateSanitizerMapEntry(M),
+                           {mapPtr, ConstantInt::get(usize_ty, 3)});
+    Value *isMapEntryZero =
+        builder.CreateICmpEQ(mapEntry, ConstantInt::get(i1_ty, 0));
     builder.CreateCondBr(isMapEntryZero, joinResultBB, checkOverflowBB);
 
     builder.SetInsertPoint(checkOverflowBB);
@@ -561,7 +561,6 @@ void sanitizeIntOverflow(Function *F,
     }
     builder.CreateBr(joinResultBB);
 
-    
     builder.SetInsertPoint(&*joinResultBB->begin());
     if (strategy == Vulnerability::RemediationStrategies::SAT) {
       binary_inst->replaceAllUsesWith(satResult);

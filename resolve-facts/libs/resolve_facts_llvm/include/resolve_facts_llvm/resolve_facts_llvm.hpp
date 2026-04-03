@@ -30,19 +30,19 @@
 using namespace llvm;
 
 namespace resolve {
-  static ProgramFacts all_facts;
-  static LLVMFacts facts(all_facts);
+static ProgramFacts all_facts;
+static LLVMFacts facts(all_facts);
 
-  std::string debugLocToString(DebugLoc dbgLoc);
+std::string debugLocToString(DebugLoc dbgLoc);
 
-  std::string typeToString(const Type &type);
+std::string typeToString(const Type &type);
 
-  void getGlobalFacts(GlobalVariable &G);
+void getGlobalFacts(GlobalVariable &G);
 
-  void getFunctionFacts(Function &F);
+void getFunctionFacts(Function &F);
 
-  void getModuleFacts(Module &M);
+void getModuleFacts(Module &M);
 
-  // Embed the accumulated facts into custom ELF sections.
-  void embedFacts(Module &M);
-}
+// Embed the accumulated facts into custom ELF sections.
+void embedFacts(Module &M);
+} // namespace resolve
