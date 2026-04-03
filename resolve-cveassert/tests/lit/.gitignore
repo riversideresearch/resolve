@@ -1,5 +1,6 @@
 # ignore repos/outputs from tests
-tests/**/*.ll
+**/*.ll
 **/*.ll.mem
-tests/Output
-tests/.lit_test_times.txt
+Output/
+.lit_test_times.txt
+resolve_log.out*
