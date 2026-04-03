@@ -757,7 +757,7 @@ void instrumentMemmove(Function *F,
   }
 }
 
-void sanitizeLoadStore(Function *F,
+void instrumentLoadStore(Function *F,
                        Vulnerability::RemediationStrategies strategy) {
   Module *M = F->getParent();
   LLVMContext &Ctx = F->getContext();
