@@ -127,7 +127,9 @@ configure_flags() {
 
     if $LINK_LIBRESOLVE; then 
         RUNTIME_FLAGS+=(-L"$RESOLVE_LIB_DIR")
+        RUNTIME_FLAGS+=("-Wl,--no-as-needed")
         RUNTIME_FLAGS+=("-lresolve")
+        RUNTIME_FLAGS+=("-Wl,--as-needed")
         RUNTIME_FLAGS+=(-Wl,-rpath="$RESOLVE_LIB_DIR")
 
     else

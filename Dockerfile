@@ -8,9 +8,20 @@ ARG RESOLVE_PREFIX=/opt/resolve
 
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    curl \
     git \
     sudo \
+    tar \
+    unzip \
+    zip \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# Install vcpkg
+ENV VCPKG_ROOT=/opt/vcpkg
+ENV PATH="${VCPKG_ROOT}:${PATH}"
+RUN git clone --depth 1 --branch 2026.03.18 https://github.com/microsoft/vcpkg.git ${VCPKG_ROOT} && \
+    ${VCPKG_ROOT}/bootstrap-vcpkg.sh -disableMetrics
 
 # Install deps
 COPY scripts /opt/resolve/scripts
@@ -58,6 +69,11 @@ COPY CMakeLists.txt /resolve/CMakeLists.txt
 WORKDIR /resolve/
 RUN PATH=$PATH:~/.cargo/bin make build install
 
+ENV CMAKE_EXPERIMENTAL_FIND_CPS_PACKAGES="e82e467b-f997-4464-8ace-b00808fff261"
+ENV CMAKE_EXPERIMENTAL_EXPORT_PACKAGE_INFO="b80be207-778e-46ba-8080-b23bba22639e" 
+ENV CMAKE_EXPERIMENTAL_GENERATE_SBOM="ca494ed3-b261-4205-a01f-603c95e4cae0"
+ENV CMAKE_INSTALL_SBOM_FORMATS="SPDX"
+
 FROM base AS git-version
 COPY .git/ /resolve-git/
 
@@ -69,3 +85,8 @@ FROM base AS resolve
 RUN --mount=from=cmake-builder,source=/build-cmake,target=/build-cmake,rw make -C /build-cmake install 
 COPY --from=builder /opt/resolve /opt/resolve
 COPY --from=git-version /RESOLVE_VERSION /RESOLVE_VERSION
+
+ENV CMAKE_EXPERIMENTAL_FIND_CPS_PACKAGES="e82e467b-f997-4464-8ace-b00808fff261"
+ENV CMAKE_EXPERIMENTAL_EXPORT_PACKAGE_INFO="b80be207-778e-46ba-8080-b23bba22639e" 
+ENV CMAKE_EXPERIMENTAL_GENERATE_SBOM="ca494ed3-b261-4205-a01f-603c95e4cae0"
+ENV CMAKE_INSTALL_SBOM_FORMATS="SPDX"
