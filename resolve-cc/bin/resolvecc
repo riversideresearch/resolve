@@ -7,9 +7,14 @@
 set -e
 #set -x # for debugging
 
-# Path for clang
 SCRIPT_DIR="${0%/*}"
-REAL_CLANG=$(which clang)
+
+# Path for clang
+case "$0" in
+    *"cxx") REAL_CLANG=$(which clang++) ;;
+    *)      REAL_CLANG=$(which clang) ;;
+esac
+
 RESOLVE_LIB_DIR=${RESOLVE_LIB_DIR:-"$SCRIPT_DIR"/../lib}
 
 # Path to fact-gen plugin
