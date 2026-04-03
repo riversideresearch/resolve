@@ -9,20 +9,20 @@ set -e
 
 # Path for clang
 SCRIPT_DIR="${0%/*}"
-REAL_CLANG="/usr/bin/clang"
-LIB_DIR="$SCRIPT_DIR"/../lib
+REAL_CLANG=$(which clang)
+RESOLVE_LIB_DIR=${RESOLVE_LIB_DIR:-"$SCRIPT_DIR"/../lib}
 
 # Path to fact-gen plugin
-RESOLVE_PLUGIN="$LIB_DIR"/libResolveFactsPlugin.so
+RESOLVE_FACT_PLUGIN=${RESOLVE_FACT_PLUGIN:-"$RESOLVE_LIB_DIR"/libResolveFactsPlugin.so}
 
 # Path to cve-assert plugin
-CVEASSERT_PLUGIN="$LIB_DIR"/libCVEAssert.so
+RESOLVE_CVEASSERT_PLUGIN=${RESOLVE_CVEASSERT_PLUGIN:-"$RESOLVE_LIB_DIR"/libCVEAssert.so}
 
 # Variable tells resolvecc whether to link libresolve or not
 LINK_LIBRESOLVE=true
 
 # Variable tells resolvecc to include ResolveFacts plugin
-USE_RESOLVE=true
+USE_RESOLVE_FACTS=true
 
 # Variable stores path of CVE description
 RESOLVE_LABEL_CVE=${RESOLVE_LABEL_CVE:-}
@@ -52,7 +52,7 @@ NEW_ARGS=()
 
 
 # This function parses the -fcve-assert and path to CVE description
-handle_cve_assert() {
+handle_cve_assert_arg() {
     local idx=$1
     local file="${args[$((idx + 1))]}"
 
@@ -76,12 +76,12 @@ parse_args() {
         # check each case for flag presence
         case "$arg" in
             -fno-resolve)
-            # set USE_RESOLVE to false if -fno-resolve is found
-                USE_RESOLVE=false
+            # set USE_RESOLVE_FACTS to false if -fno-resolve is found
+                USE_RESOLVE_FACTS=false
                 ;;
             -fcve-assert)
                 # handle the -fcve-assert flag and the file following it
-                handle_cve_assert "$i"
+                handle_cve_assert_arg "$i"
                 USE_CVEASSERT=true
                 i=$((i + 1))
                 continue # continue to next argument in loop
@@ -111,19 +111,19 @@ configure_flags() {
         COMPTIME_FLAGS+=("-fno-builtin-memcpy")
         COMPTIME_FLAGS+=("-fno-builtin-memmove")
         COMPTIME_FLAGS+=("-fno-builtin-memset")
-        COMPTIME_FLAGS+=("-fpass-plugin=$CVEASSERT_PLUGIN")
+        COMPTIME_FLAGS+=("-fpass-plugin=$RESOLVE_CVEASSERT_PLUGIN")
     fi
 
 
-    # Check if USE_RESOLVE flag is set to true
-    if $USE_RESOLVE; then 
-        COMPTIME_FLAGS+=("-fpass-plugin=$RESOLVE_PLUGIN")
+    # Check if USE_RESOLVE_FACTS flag is set to true
+    if $USE_RESOLVE_FACTS; then 
+        COMPTIME_FLAGS+=("-fpass-plugin=$RESOLVE_FACTS_PLUGIN")
     fi
 
     if $LINK_LIBRESOLVE; then 
-        RUNTIME_FLAGS+=(-L"$LIB_DIR")
+        RUNTIME_FLAGS+=(-L"$RESOLVE_LIB_DIR")
         RUNTIME_FLAGS+=("-lresolve")
-        RUNTIME_FLAGS+=(-Wl,-rpath="$LIB_DIR")
+        RUNTIME_FLAGS+=(-Wl,-rpath="$RESOLVE_LIB_DIR")
 
     else
         RUNTIME_FLAGS=()
