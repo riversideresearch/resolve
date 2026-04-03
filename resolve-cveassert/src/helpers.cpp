@@ -219,11 +219,6 @@ getOrCreateRemediationBehavior(Module *M,
 
   FunctionType *fnTy = FunctionType::get(void_ty, {}, false);
 
-  if (strategy != Vulnerability::RemediationStrategies::EXIT &&
-      strategy != Vulnerability::RemediationStrategies::RECOVER) {
-    return nullptr;
-  }
-
   std::string fnName;
   switch (strategy) {
   case Vulnerability::RemediationStrategies::EXIT:
@@ -232,6 +227,8 @@ getOrCreateRemediationBehavior(Module *M,
   case Vulnerability::RemediationStrategies::RECOVER:
     fnName = "__cve_recover";
     break;
+  default:
+    return nullptr;
   }
 
   Function *fn = getOrCreateResolveHelper(M, fnName, fnTy);

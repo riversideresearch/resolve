@@ -69,10 +69,9 @@ getOrCreateNullPtrLoadSanitizer(Function *F, Type *ty,
 
   builder.SetInsertPoint(SanitizeNullPtrBB);
   switch (strategy) {
-  case Vulnerability::RemediationStrategies::CONTINUE: {
+  case Vulnerability::RemediationStrategies::CONTINUE:
     builder.CreateRet(Constant::getNullValue(ty));
     break;
-  }
 
   case Vulnerability::RemediationStrategies::EXIT:
   case Vulnerability::RemediationStrategies::RECOVER:
@@ -80,6 +79,9 @@ getOrCreateNullPtrLoadSanitizer(Function *F, Type *ty,
     builder.CreateCall(getOrCreateRemediationBehavior(M, strategy));
     builder.CreateUnreachable();
     break;
+
+  default:
+    llvm_unreachable("Not a supported strategy");
   }
 
   builder.SetInsertPoint(NormalLoadBB);
@@ -146,10 +148,9 @@ static Function *getOrCreateNullPtrStoreSanitizer(
 
   builder.SetInsertPoint(SanitizeNullPtrBB);
   switch (strategy) {
-  case Vulnerability::RemediationStrategies::CONTINUE: {
+  case Vulnerability::RemediationStrategies::CONTINUE:
     builder.CreateRetVoid();
     break;
-  }
 
   case Vulnerability::RemediationStrategies::EXIT:
   case Vulnerability::RemediationStrategies::RECOVER:
@@ -157,6 +158,9 @@ static Function *getOrCreateNullPtrStoreSanitizer(
     builder.CreateCall(getOrCreateRemediationBehavior(M, strategy));
     builder.CreateUnreachable();
     break;
+
+  default:
+    llvm_unreachable("Not a supported strategy");
   }
 
   // Return Block: returns pointer if non-null
