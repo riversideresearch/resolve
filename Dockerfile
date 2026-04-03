@@ -1,4 +1,8 @@
 # syntax=docker/dockerfile:1
+#
+# Copyright (c) 2025 Riverside Research.
+# LGPL-3; See LICENSE.txt in the repo root for details.
+
 FROM ubuntu:24.04 AS base
 ARG RESOLVE_PREFIX=/opt/resolve
 
