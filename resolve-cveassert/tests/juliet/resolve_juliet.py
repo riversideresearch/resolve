@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+#
+# Copyright (c) 2025 Riverside Research.
+# LGPL-3; See LICENSE.txt in the repo root for details.
+
 from abc import ABC
 from concurrent.futures import ThreadPoolExecutor
 from itertools import groupby
