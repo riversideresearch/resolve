@@ -642,7 +642,6 @@ void instrumentMemset(Function *F,
 
 void instrumentLoadStore(Function *F,
                          Vulnerability::RemediationStrategies strategy) {
-  Module *M = F->getParent();
   LLVMContext &Ctx = F->getContext();
   IRBuilder<> builder(Ctx);
 

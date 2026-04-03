@@ -29,7 +29,6 @@ getOrCreateNullPtrLoadSanitizer(Function *F, Type *ty,
   // TODO: handle address spaces other than 0
   auto ptr_ty = PointerType::get(Ctx, 0);
   auto usize_ty = Type::getInt64Ty(Ctx);
-  auto void_ty = Type::getVoidTy(Ctx);
   auto i1_ty = Type::getInt1Ty(Ctx);
 
   // TODO: write this in asm as some kind of sanitzer_rt?
@@ -103,7 +102,6 @@ static Function *getOrCreateNullPtrStoreSanitizer(
   // TODO: handle address spaces other than 0
   auto ptr_ty = PointerType::get(Ctx, 0);
   auto usize_ty = Type::getInt64Ty(Ctx);
-  auto void_ty = Type::getVoidTy(Ctx);
   auto i1_ty = Type::getInt1Ty(Ctx);
 
   // TODO: write this in asm as some kind of sanitzer_rt?
@@ -174,7 +172,6 @@ static Function *getOrCreateNullPtrStoreSanitizer(
 
 void sanitizeNullPointers(Function *F,
                           Vulnerability::RemediationStrategies strategy) {
-  Module *M = F->getParent();
   LLVMContext &Ctx = F->getContext();
   IRBuilder<> builder(Ctx);
 
