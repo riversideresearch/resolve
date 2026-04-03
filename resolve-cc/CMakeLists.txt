@@ -3,8 +3,8 @@
 
 # Collect source files for checks
 file(GLOB_RECURSE SRC
-    "${CMAKE_CURRENT_SOURCE_DIR}/hooks/*.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/hooks/*.hpp"
+    # "${CMAKE_CURRENT_SOURCE_DIR}/hooks/*.cpp"
+    # "${CMAKE_CURRENT_SOURCE_DIR}/hooks/*.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/*.hpp"
 )
