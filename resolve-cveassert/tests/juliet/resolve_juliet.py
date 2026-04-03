@@ -23,6 +23,7 @@ juliet_testcases_dir = juliet_testsuite_root / "testcases"
 juliet_testcase_support_headers = juliet_testsuite_root / "testcasesupport"
 
 resolve_cc = "resolvecc"
+resolve_cxx = "resolvecxx"
 
 
 def compile_io_c(out_dir: Path):
@@ -133,6 +134,9 @@ class CWETest:
 
     def __str__(self):
         return self.name
+
+    def is_cpp(self):
+        return any(".cpp" == s.suffix for s in self.source_paths)
 
     @staticmethod
     def match_function_name_in_file(path: Path, name_pattern: str) -> str | None:
@@ -245,6 +249,11 @@ class ResultCompilationFailure(Result):
     def __str__(self) -> str:
         return "failed_to_compile" + (" (cpp)" if self.cpp else "")
 
+def compiler_for_test(test: CWETest) -> str:
+    if test.is_cpp():
+        return resolve_cxx
+    else:
+        return resolve_cc
 
 def do_test(test: CWETest, io_obj: Path, out_dir: Path) -> Result:
     # Binary path to compiled testcase executable
@@ -255,8 +264,10 @@ def do_test(test: CWETest, io_obj: Path, out_dir: Path) -> Result:
     with cve_description_path.open("w") as f:
         json.dump(test.get_cve_description(), f, indent=4)
 
+    compiler = compiler_for_test(test)
+
     compile_cmd = [
-        resolve_cc,
+        compiler,
         "-fcve-assert",
         str(cve_description_path),
         "-DOMITGOOD",
@@ -271,9 +282,7 @@ def do_test(test: CWETest, io_obj: Path, out_dir: Path) -> Result:
 
     compile_process = subprocess.run(compile_cmd, capture_output=True, text=True)
     if compile_process.returncode != 0:
-        return ResultCompilationFailure(
-            compile_process, cpp=any(".cpp" == s.suffix for s in test.source_paths)
-        )
+        return ResultCompilationFailure(compile_process, cpp=test.is_cpp())
 
     try:
         executed_binary = subprocess.run(
