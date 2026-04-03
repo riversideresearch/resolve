@@ -19,12 +19,16 @@ set(RUST_LIB ${RUST_OUT_DIR}/${CARGO_PROFILE}/libresolve.so)
 
 set(LIBRESOLVE_LIBRARY_PATH ${RUST_OUT_DIR}/${CARGO_PROFILE} PARENT_SCOPE)
 
+file(GLOB_RECURSE RUST_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/*")
+
 add_custom_command(
     OUTPUT ${RUST_LIB}
     COMMAND 
         ${CMAKE_COMMAND} -E env CARGO_TARGET_DIR=${RUST_OUT_DIR} cargo build ${CARGO_FLAGS} 
     WORKING_DIRECTORY ${RUST_CRATE_DIR}
-    COMMENT "Building libresolve.so" VERBATIM)
+    COMMENT "Building libresolve.so" VERBATIM
+    DEPENDS ${RUST_SOURCES} ${CMAKE_CURRENT_SOURCE_DIR}/Cargo.lock ${CMAKE_CURRENT_SOURCE_DIR}/Cargo.toml ${CMAKE_CURRENT_SOURCE_DIR}/rust-toolchain.toml
+)
 
 add_custom_target(test-libresolve
     COMMAND cargo test
