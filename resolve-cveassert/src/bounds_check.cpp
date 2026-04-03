@@ -108,7 +108,7 @@ static Function *getOrCreateAccessOk(Module *M) {
 
 static Function *getOrCreateBoundsCheckLoadSanitizer(
     Function *F, Type *ty, Vulnerability::RemediationStrategies strategy) {
-  std::string handlerName = "__cve_san_bd_ld_" + getLLVMType(ty);
+  std::string handlerName = "__cve_san_bound_ld_" + getLLVMType(ty);
   Module *M = F->getParent();
   LLVMContext &Ctx = M->getContext();
   GlobalVariable *map = SanitizerMaps[F];
@@ -170,7 +170,7 @@ static Function *getOrCreateBoundsCheckLoadSanitizer(
 
 static Function *getOrCreateBoundsCheckStoreSanitizer(
     Function *F, Type *ty, Vulnerability::RemediationStrategies strategy) {
-  std::string handlerName = "__cve_san_bd_st_" + getLLVMType(ty);
+  std::string handlerName = "__cve_san_bound_st_" + getLLVMType(ty);
   Module *M = F->getParent();
   LLVMContext &Ctx = M->getContext();
   GlobalVariable *map = SanitizerMaps[F];
