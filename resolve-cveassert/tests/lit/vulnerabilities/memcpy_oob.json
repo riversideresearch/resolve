@@ -1,0 +1,15 @@
+{
+    "vulnerabilities": [
+        {
+            "cve-id": "CVE-resolve-oob-3",
+            "cve-description": "",
+            "package-name": "resolve-test",
+            "package-version": "1.4.5",
+            "cwe-id": "787",
+            "cwe-name": "Heap OOB write",
+            "affected-function": "main",
+            "affected-file": "memcpy_oob.c",
+            "remediation-strategy": "exit" 
+        }
+    ]
+}

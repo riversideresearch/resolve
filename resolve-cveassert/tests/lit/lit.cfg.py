@@ -1,0 +1,45 @@
+# Copyright (c) 2025 Riverside Research.
+# LGPL-3; See LICENSE.txt in the repo root for details.
+
+import os
+import lit.formats
+import lit.util
+
+# Name of test suite
+config.name = "RESOLVE_SANITIZER_TEST"
+
+# Source and execution root
+config.test_source_root = os.path.dirname(__file__)
+config.test_exec_root = config.test_source_root
+
+# Treat files with RUN lines as shell-style tests
+config.test_format = lit.formats.ShTest(True)
+
+# Look up clang and FileCheck
+clang = lit.util.which("clang-18")
+filecheck = lit.util.which("FileCheck-18")
+
+if not clang:
+    lit.fatal("Could not find clang in PATH")
+
+if not filecheck:
+    lit.fatal("Could not find FileCheck-18 in PATH")
+
+# Make substitutions in RUN lines of tests
+config.substitutions.append(("%clang", clang))
+config.substitutions.append(("%FileCheck", filecheck))
+
+# Add path to pass plugin
+plugin = os.environ.get("RESOLVE_TEST_CVEASSERT_LIB",
+    default=os.path.dirname(__file__) + "/../../build/resolve-cveassert/libCVEAssert.so"
+)
+config.substitutions.append(("%plugin", plugin))
+
+# Add path to libresolve rlib
+rlib = os.environ.get("RESOLVE_TEST_LIBRESOLVE_LIBRARY_PATH",
+    default=os.path.dirname(__file__) + "/../../build/resolve-cveassert/libresolve/libresolve-build/debug/"
+)
+config.substitutions.append(("%rlib", rlib))
+
+# Add suffixes to test
+config.suffixes = ['.c']
