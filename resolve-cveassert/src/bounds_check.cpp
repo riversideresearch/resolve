@@ -362,8 +362,8 @@ static Function *getOrCreateBoundsCheckMemmoveSanitizer(
   }
   builder.CreateRet(dst_ptr);
 
-  validateIR(resolveMemcpyFn);
-  return resolveMemcpyFn;
+  validateIR(resolveMemmoveFn);
+  return resolveMemmoveFn;
 }
 
 static Function *getOrCreateBoundsCheckMemsetSanitizer(
