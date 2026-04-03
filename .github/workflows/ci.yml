@@ -20,6 +20,8 @@ jobs:
         run: make install
       - name: Test
         run: make test
+      - name: Check
+        run: make check
       - name: Build Examples
         run: ./examples/openssl.sh
 
