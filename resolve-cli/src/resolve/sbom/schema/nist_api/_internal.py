@@ -417,7 +417,6 @@ class Weakness(BaseModel):
     def set_cwe(self, cwe: CWE):
         self.cwe = cwe
 
-
 class Operator(Enum):
     AND = 'AND'
     OR = 'OR'

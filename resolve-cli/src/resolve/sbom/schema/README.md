@@ -16,7 +16,7 @@ curl -O https://csrc.nist.gov/schema/nvd/api/2.0/cve_api_json_2.0.schema
 datamodel-codegen --input cve_api_json_2.0.schema --input-file-type jsonschema --output cve_api
 ```
 
-The scema definitions used to generate files in this directory are available in `../schema_defs/`. 
+The schema definitions used to generate files in this directory are available in `../schema_defs/`. 
 
 ### By hand
 

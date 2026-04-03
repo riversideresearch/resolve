@@ -5,7 +5,7 @@ from resolve.sbom.schema.nist_api import CveItem, CWE
 from resolve.sbom.schema import nist_api
 import asyncio
 from aiohttp import ClientSession
-from resolve.sbom.dependancies import SoftwareDependancy
+from resolve.sbom.dependencies import SoftwareDependancy
 
 CVE_API_BASE_PATH = "https://services.nvd.nist.gov/rest/json/cves/2.0"
 
@@ -20,10 +20,12 @@ async def get_cwe(session: aiohttp.ClientSession, id: str):
         return None
     async with session.get(f"https://cwe-api.mitre.org/api/v1/cwe/weakness/{id_num}") as resp:
         if not resp.ok: 
+            print("warning: CWE lookup failed: ",resp)
             return None
         body = await resp.json()
         entry = body.get("Weaknesses")
         if not entry or not len(entry):
+            print(f"CWE Responded empty: {resp}")
             return None
         entry = entry[0]
         try:
@@ -44,11 +46,9 @@ async def get_cves(session: aiohttp.ClientSession, params: dict[str, Any]) -> li
             if cve.weaknesses:
                 for weakness in cve.weaknesses:
                     cwe = None
-                    if weakness.type == 'Primary':
-                        # description should be of format description=[LangString(lang='en', value='CWE-79')]
-                        for desc in weakness.description:
-                            if desc.lang == 'en' and 'CWE' in desc.value:
-                                cwe = await get_cwe(session, desc.value)
+                    for desc in weakness.description:
+                        if desc.lang == 'en' and 'CWE' in desc.value:
+                            cwe = await get_cwe(session, desc.value)
                     if isinstance(cwe, CWE):
                         weakness.set_cwe(cwe)
             CVEs.append(cve)

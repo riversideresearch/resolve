@@ -3,7 +3,7 @@ import asyncio
 import sys
 from pathlib import Path
 from resolve.sbom.lookup import dep_lookup
-from resolve.sbom.dependancies import SoftwareDependancy, read_spdx_deps, MalformedSPDXError
+from resolve.sbom.dependencies import SoftwareDependancy, read_spdx_deps, MalformedSPDXError
 from resolve.sbom.schema.nist_api import CWE
 from resolve.sbom.schema.vuln_spec import Vulnerability, VulnerabilityDocument
 import resolve.sbom.llm as llm
@@ -67,7 +67,7 @@ def dep2vulns(dep: SoftwareDependancy, ai: llm.LLM | None) -> list[Vulnerability
         for weakness in cve.weaknesses:
             cwe = weakness.cwe
             if not isinstance(cwe, CWE):
-                print(f"Error: CWE entry is of wrong type! ({type(cwe)}")
+                print(f"Error: CWE entry is of wrong type! ({type(cwe)}) [{weakness}]")
                 continue
             vuln = Vulnerability(
                 cve_id = cve.id,
