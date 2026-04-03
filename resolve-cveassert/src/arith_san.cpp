@@ -544,8 +544,9 @@ void sanitizeIntOverflow(Function *F,
     builder.SetInsertPoint(checkMapEntryBB);
     Value *zero = builder.getInt64(0);
     Value *mapPtr = builder.CreateGEP(map->getValueType(), map, {zero, zero});
-    Value *mapEntry = builder.CreateCall(getOrCreateSanitizerMapEntry(M),
-                                         {ConstantInt::get(usize_ty, 3)});
+    Value *mapEntry =
+        builder.CreateCall(getOrCreateSanitizerMapEntry(M),
+                           {mapPtr, ConstantInt::get(usize_ty, 3)});
     Value *isMapEntryZero =
         builder.CreateICmpEQ(mapEntry, ConstantInt::get(i1_ty, 0));
     builder.CreateCondBr(isMapEntryZero, joinResultBB, checkOverflowBB);
