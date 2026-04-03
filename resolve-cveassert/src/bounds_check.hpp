@@ -12,7 +12,7 @@ void instrumentLoadStore(llvm::Function *F,
 void instrumentMemcpy(llvm::Function *F,
                       Vulnerability::RemediationStrategies strategy);
 void instrumentMemmove(llvm::Function *F,
-                    Vulnerability::RemediationStrategies strategy);
+                       Vulnerability::RemediationStrategies strategy);
 void instrumentMemset(llvm::Function *F,
                       Vulnerability::RemediationStrategies strategy);
 void sanitizeMemInstBounds(llvm::Function *F,

@@ -250,13 +250,19 @@ static Function *getOrCreateBoundsCheckMemcpySanitizer(
   FunctionType *resolveMemmoveFnTy =
       FunctionType::get(ptr_ty, {ptr_ty, ptr_ty, size_ty}, false);
 
-  Function *resolveMemmoveFn = getOrCreateResolveHelper(M, handlerName, resolveMemmoveFnTy);
-  if (!resolveMemmoveFn->empty()) { return resolveMemmoveFn; }
+  Function *resolveMemmoveFn =
+      getOrCreateResolveHelper(M, handlerName, resolveMemmoveFnTy);
+  if (!resolveMemmoveFn->empty()) {
+    return resolveMemmoveFn;
+  }
 
   BasicBlock *EntryBB = BasicBlock::Create(Ctx, "entry", resolveMemmoveFn);
-  BasicBlock *CheckAccessBB = BasicBlock::Create(Ctx, "check_access", resolveMemmoveFn);
-  BasicBlock *NormalBB = BasicBlock::Create(Ctx, "safe_memcpy", resolveMemmoveFn);
-  BasicBlock *SanitizeMemcpyBB = BasicBlock::Create(Ctx, "sanitize_memcpy", resolveMemmoveFn);
+  BasicBlock *CheckAccessBB =
+      BasicBlock::Create(Ctx, "check_access", resolveMemmoveFn);
+  BasicBlock *NormalBB =
+      BasicBlock::Create(Ctx, "safe_memcpy", resolveMemmoveFn);
+  BasicBlock *SanitizeMemcpyBB =
+      BasicBlock::Create(Ctx, "sanitize_memcpy", resolveMemmoveFn);
 
   builder.SetInsertPoint(EntryBB);
   // Extract dst, src, size arguments from function
@@ -315,13 +321,19 @@ static Function *getOrCreateBoundsCheckMemmoveSanitizer(
   FunctionType *resolveMemmoveFnTy =
       FunctionType::get(ptr_ty, {ptr_ty, ptr_ty, size_ty}, false);
 
-  Function *resolveMemmoveFn = getOrCreateResolveHelper(M, handlerName, resolveMemmoveFnTy);
-  if (!resolveMemmoveFn->empty()) { return resolveMemmoveFn; }
+  Function *resolveMemmoveFn =
+      getOrCreateResolveHelper(M, handlerName, resolveMemmoveFnTy);
+  if (!resolveMemmoveFn->empty()) {
+    return resolveMemmoveFn;
+  }
 
   BasicBlock *EntryBB = BasicBlock::Create(Ctx, "entry", resolveMemmoveFn);
-  BasicBlock *CheckAccessBB = BasicBlock::Create(Ctx, "check_access", resolveMemmoveFn);
-  BasicBlock *NormalBB = BasicBlock::Create(Ctx, "safe_memmove", resolveMemmoveFn);
-  BasicBlock *SanitizeMemmoveBB = BasicBlock::Create(Ctx, "sanitize_memmove", resolveMemmoveFn);
+  BasicBlock *CheckAccessBB =
+      BasicBlock::Create(Ctx, "check_access", resolveMemmoveFn);
+  BasicBlock *NormalBB =
+      BasicBlock::Create(Ctx, "safe_memmove", resolveMemmoveFn);
+  BasicBlock *SanitizeMemmoveBB =
+      BasicBlock::Create(Ctx, "sanitize_memmove", resolveMemmoveFn);
 
   builder.SetInsertPoint(EntryBB);
   // Extract dst, src, size arguments from function
@@ -329,12 +341,10 @@ static Function *getOrCreateBoundsCheckMemmoveSanitizer(
   Value *src_ptr = resolveMemmoveFn->getArg(1);
   Value *size_arg = resolveMemmoveFn->getArg(2);
 
-  Value *mapPtr = builder.CreateGEP(
-    map->getValueType(),
-    map,
-    { builder.getInt64(0), builder.getInt64(0) }
-  );
-  Value* mapEntry = builder.CreateCall(getOrCreateSanitizerMapEntry(M), { mapPtr, ConstantInt::get(size_ty, 0)});
+  Value *mapPtr = builder.CreateGEP(map->getValueType(), map,
+                                    {builder.getInt64(0), builder.getInt64(0)});
+  Value *mapEntry = builder.CreateCall(getOrCreateSanitizerMapEntry(M),
+                                       {mapPtr, ConstantInt::get(size_ty, 0)});
   Value *isZero = builder.CreateICmpEQ(mapEntry, ConstantInt::get(i1_ty, 0));
   builder.CreateCondBr(isZero, NormalBB, CheckAccessBB);
 
@@ -351,7 +361,8 @@ static Function *getOrCreateBoundsCheckMemmoveSanitizer(
   builder.SetInsertPoint(NormalBB);
   FunctionCallee memmoveFn = M->getOrInsertFunction(
       "memmove", FunctionType::get(ptr_ty, {ptr_ty, ptr_ty, size_ty}, false));
-  Value *memmovePtr = builder.CreateCall(memmoveFn, {dst_ptr, src_ptr, size_arg});
+  Value *memmovePtr =
+      builder.CreateCall(memmoveFn, {dst_ptr, src_ptr, size_arg});
   builder.CreateRet(memmovePtr);
 
   // SanitizeMemcpyBB: Remediate memcpy returns null pointer.
@@ -702,7 +713,7 @@ void instrumentMemset(Function *F,
 }
 
 void instrumentMemmove(Function *F,
-                    Vulnerability::RemediationStrategies strategy) {
+                       Vulnerability::RemediationStrategies strategy) {
   LLVMContext &Ctx = F->getContext();
   IRBuilder<> builder(Ctx);
   std::vector<Instruction *> memmoveList;
@@ -749,8 +760,7 @@ void instrumentMemmove(Function *F,
       sizeArg = MC->getArgOperand(2);
     }
 
-    auto memmoveFn =
-        getOrCreateBoundsCheckMemmoveSanitizer(F, strategy);
+    auto memmoveFn = getOrCreateBoundsCheckMemmoveSanitizer(F, strategy);
     auto memmoveCall = builder.CreateCall(memmoveFn, {dstPtr, srcPtr, sizeArg});
     Inst->replaceAllUsesWith(memmoveCall);
     Inst->eraseFromParent();
@@ -758,7 +768,7 @@ void instrumentMemmove(Function *F,
 }
 
 void instrumentLoadStore(Function *F,
-                       Vulnerability::RemediationStrategies strategy) {
+                         Vulnerability::RemediationStrategies strategy) {
   Module *M = F->getParent();
   LLVMContext &Ctx = F->getContext();
   IRBuilder<> builder(Ctx);
