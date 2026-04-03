@@ -13,7 +13,7 @@ REAL_CLANG=$(which clang)
 RESOLVE_LIB_DIR=${RESOLVE_LIB_DIR:-"$SCRIPT_DIR"/../lib}
 
 # Path to fact-gen plugin
-RESOLVE_FACT_PLUGIN=${RESOLVE_FACT_PLUGIN:-"$RESOLVE_LIB_DIR"/libResolveFactsPlugin.so}
+RESOLVE_FACTS_PLUGIN=${RESOLVE_FACTS_PLUGIN:-"$RESOLVE_LIB_DIR"/libResolveFactsPlugin.so}
 
 # Path to cve-assert plugin
 RESOLVE_CVEASSERT_PLUGIN=${RESOLVE_CVEASSERT_PLUGIN:-"$RESOLVE_LIB_DIR"/libCVEAssert.so}
