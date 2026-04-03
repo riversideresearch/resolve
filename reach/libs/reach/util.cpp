@@ -11,15 +11,15 @@
 using namespace std;
 
 namespace util {
-  // Split string by single character delimiter.
-  // https://stackoverflow.com/a/46931770
-  vector<string> split(const string& s, char delim) {
-    vector<string> result;
-    stringstream ss(s);
-    string item;
-    while (getline(ss, item, delim)) {
-      result.push_back(item);
-    }
-    return result;
+// Split string by single character delimiter.
+// https://stackoverflow.com/a/46931770
+vector<string> split(const string &s, char delim) {
+  vector<string> result;
+  stringstream ss(s);
+  string item;
+  while (getline(ss, item, delim)) {
+    result.push_back(item);
   }
-}  // namespace util
+  return result;
+}
+} // namespace util

@@ -20,15 +20,14 @@
 #include <utility>
 #include <vector>
 
-template <typename K, std::totally_ordered V>
-class binary_heap {
- public:
+template <typename K, std::totally_ordered V> class binary_heap {
+public:
   // Insert a key/value pair into the heap.
-  void insert(const K& k, const V& v) {
+  void insert(const K &k, const V &v) {
     if (!this->contains(k)) {
       this->_ixs[k] = this->_heap.size();
       this->_heap.push_back({k, v});
-      this->_heapify_up(this->_heap.size()-1);
+      this->_heapify_up(this->_heap.size() - 1);
     } else {
       throw std::invalid_argument("key already exists");
     }
@@ -54,21 +53,17 @@ class binary_heap {
 
   // Associate to key [k] a new value [v] (must be less than or equal
   // to the previous value associated with [k]).
-  void decrease_key(const K& k, const V& v) {
+  void decrease_key(const K &k, const V &v) {
     size_t i = this->_ixs[k];
     this->_heap[i].second = v;
     this->_heapify_up(i);
   }
 
-  constexpr size_t size() const {
-    return this->_heap.size();
-  }
+  constexpr size_t size() const { return this->_heap.size(); }
 
-  constexpr bool contains(const K& k) {
-    return this->_ixs.contains(k);
-  }
+  constexpr bool contains(const K &k) { return this->_ixs.contains(k); }
 
- private:
+private:
   std::vector<std::pair<K, V>> _heap;
   std::unordered_map<K, size_t> _ixs;
 
