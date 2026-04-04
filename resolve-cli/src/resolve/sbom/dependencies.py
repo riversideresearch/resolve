@@ -25,6 +25,23 @@ class SoftwareDependancy(BaseModel):
 class MalformedSPDXError(Exception):
     pass
 
+def read_spdx2_deps(filepath: pathlib.Path) -> list[SoftwareDependancy]:
+    with open(filepath) as f:
+        data = json.loads(f.read())
+        ret: set[SoftwareDependancy] = set()
+    try:
+        pkgs = data["packages"]
+        assert isinstance(pkgs, list)
+    except (KeyError, AssertionError) as e:
+        raise MalformedSPDXError from e
+    for p in pkgs:
+        name = p.get("name")
+        ver = p.get("versionInfo")
+        if name and ver:
+            ret.add(SoftwareDependancy(name=name, version=ver))
+    return list(ret)
+
+
 def read_spdx_deps(filepath: pathlib.Path) -> list[SoftwareDependancy]:
     with open(filepath) as f:
         data = json.loads(f.read())

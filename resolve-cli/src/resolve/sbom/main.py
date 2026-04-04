@@ -3,7 +3,12 @@ import asyncio
 import sys
 from pathlib import Path
 from resolve.sbom.lookup import dep_lookup
-from resolve.sbom.dependencies import SoftwareDependancy, read_spdx_deps, MalformedSPDXError
+from resolve.sbom.dependencies import (
+    SoftwareDependancy,
+    read_spdx2_deps,
+    read_spdx_deps,
+    MalformedSPDXError,
+)
 from resolve.sbom.schema.nist_api import CWE
 from resolve.sbom.schema.vuln_spec import Vulnerability, VulnerabilityDocument
 import resolve.sbom.llm as llm
@@ -86,9 +91,12 @@ def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv if argv else sys.argv[1:])
     try:
         deps = read_spdx_deps(args.sbom)
-    except (FileNotFoundError, MalformedSPDXError) as e:
-        print(f"Error: Could not ingest file: {e}")
-        return 1
+    except (FileNotFoundError, MalformedSPDXError) as e1:
+        try:
+            deps = read_spdx2_deps(args.sbom)
+        except (FileNotFoundError, MalformedSPDXError) as e2:
+            print(f"Error: Could not ingest file: {e1!r}; {e2!r}")
+            return 1
 
     asyncio.run(dep_lookup(deps, min_base_score_v3=args.min_score, allow_no_v3_score=args.allow_empty_score, allow_disputed=args.allow_disputed, allow_deferred=args.allow_deferred, allow_rejected=args.allow_rejected))
     ai = None
