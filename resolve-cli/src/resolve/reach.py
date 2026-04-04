@@ -319,15 +319,14 @@ class ReachabilityResult:
         and updates it with its func_id
         """
         func_id = fact_parser.get_func_id(self.sink.affected_function)
-        assert func_id is not None, f"Could not find affected function '{self.sink.affected_function}'"
+        if func_id is None:
+            self.reachability = Reachability.UNREACHABLE_NOT_FOUND
+            return
 
         module_name = fact_parser.get_module_name_for_node(func_id) 
         print(f"Found function '{self.sink.affected_function}' in module '{module_name}'")
 
-        if func_id:
-            self.func_id = func_id
-        else:
-            self.reachability = Reachability.UNREACHABLE_NOT_FOUND
+        self.func_id = func_id
 
     def update_from_tool_results(self, tool_results: ReachToolResults):
         assert self.func_id is not None
