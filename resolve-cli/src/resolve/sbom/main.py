@@ -18,10 +18,12 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Identify known CVEs / CWEs for a given SBOM")
     parser.add_argument("-o", "--out", type=Path, help="Path of output file")
     parser.add_argument(
-        "-i", "--sbom",
+        "-i",
+        "--sbom",
         type=Path,
+        nargs="+",
         help="Path to the input SBOM file.",
-        required=True
+        required=True,
     )
     parser.add_argument('-E', '--allow-empty-score', action='store_true')
     parser.add_argument('-s', '--min-score', type=float, default=0.0)
@@ -94,14 +96,24 @@ def dep2vulns(dep: SoftwareDependancy, ai: llm.LLM | None) -> list[Vulnerability
 
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv if argv else sys.argv[1:])
-    try:
-        deps = read_spdx_deps(args.sbom)
-    except (FileNotFoundError, MalformedSPDXError) as e1:
+    deps: list[SoftwareDependancy] = []
+
+    def read_input_sbom(sbom: Path):
         try:
-            deps = read_spdx2_deps(args.sbom)
-        except (FileNotFoundError, MalformedSPDXError) as e2:
-            print(f"Error: Could not ingest file: {e1!r}; {e2!r}")
-            return 1
+            return read_spdx_deps(sbom)
+        except (FileNotFoundError, MalformedSPDXError) as e1:
+            try:
+                return read_spdx2_deps(sbom)
+            except (FileNotFoundError, MalformedSPDXError) as e2:
+                print(f"Error: Could not ingest file: {e1!r}; {e2!r}")
+        return None
+
+    for sbom in args.sbom:
+        if found_deps := read_input_sbom(sbom):
+            deps += found_deps
+
+    if len(deps) == 0:
+        return 1
 
     asyncio.run(dep_lookup(deps, min_base_score_v3=args.min_score, allow_no_v3_score=args.allow_empty_score, allow_disputed=args.allow_disputed, allow_deferred=args.allow_deferred, allow_rejected=args.allow_rejected))
     ai = None
