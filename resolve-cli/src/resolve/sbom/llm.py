@@ -57,6 +57,7 @@ class Opencode(LLM):
         env = os.environ.copy()
         env["OPENCODE_PERMISSION"] = json.dumps(
             {
+                "*": "deny",
                 "webfetch": "allow",
                 "websearch": "allow",
                 "codesearch": "allow",
