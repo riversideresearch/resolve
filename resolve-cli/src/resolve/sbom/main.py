@@ -54,7 +54,7 @@ def output_stdout(deps: list[SoftwareDependancy]):
 def output_json(vulns: list[Vulnerability], output_path: Path):
     doc = VulnerabilityDocument(vulnerabilities=vulns)
     with open(output_path, 'w') as f:
-        f.write(doc.model_dump_json())
+        f.write(doc.model_dump_json(indent=2))
     
     
 def dep2vulns(dep: SoftwareDependancy, ai: llm.LLM | None) -> list[Vulnerability]:
