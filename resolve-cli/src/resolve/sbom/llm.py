@@ -44,7 +44,38 @@ class Ollama(LLM):
     def _query(self, payload: str) -> str:
         resp = self.api(self.model, payload)
         return resp.response        
-        
+
+class Opencode(LLM):
+    def __init__(self, model: str = "openai/gpt-5.4-mini"):
+        self.model = model
+
+    def _query(self, payload: str) -> str:
+        import subprocess
+        import json
+        import os
+
+        env = os.environ.copy()
+        env["OPENCODE_PERMISSION"] = json.dumps(
+            {
+                "webfetch": "allow",
+                "websearch": "allow",
+                "codesearch": "allow",
+            }
+        )
+        agent_command = ["opencode", "run", "--agent", "build"]
+        agent_command += ["--model", self.model]
+
+        process = subprocess.run(
+            agent_command + [payload],
+            env=env,
+            text=True,
+            stdout=subprocess.PIPE,
+            check=True,
+        )
+
+        return process.stdout.splitlines()[-1]
+
+
 class Gemini(LLM):
     def __init__(self, model: str = 'gemini-2.5-flash', **kwargs) -> None:
         from google import genai

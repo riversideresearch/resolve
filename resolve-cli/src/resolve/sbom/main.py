@@ -28,7 +28,12 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument('-D', '--allow-disputed', action='store_true')
     parser.add_argument('-d', '--allow-deferred', action='store_true')
     parser.add_argument('-R', '--allow-rejected', action='store_true')
-    parser.add_argument('-L', '--llm-provider', choices=['gemini', 'ollama'], default='gemini')
+    parser.add_argument(
+        "-L",
+        "--llm-provider",
+        choices=["gemini", "ollama", "opencode"],
+        default="gemini",
+    )
     return parser.parse_args(argv)
 
 def output_stdout(deps: list[SoftwareDependancy]):
@@ -106,6 +111,8 @@ def main(argv: list[str] | None = None) -> int:
                 ai = llm.Gemini()
             case 'ollama':
                 ai = llm.Ollama()
+            case "opencode":
+                ai = llm.Opencode()
             case _:
                 print("Err: Unsupported provider",args.llm_provider)
                 return 1
