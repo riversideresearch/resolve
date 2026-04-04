@@ -54,19 +54,22 @@ class Sink:
         """
         Load metadata from TA2 supplied vulnerabilities.json
         """
+
+        def get(key: str):
+            return vuln.get(key, None) or vuln[key.replace("-", "_")]
+
         return cls(
             # The only required fields for our analysis
-            cve_id=vuln["cve-id"],
-            affected_function=vuln["affected-function"],
-
+            cve_id=get("cve-id"),
+            affected_function=get("affected-function"),
             # Misc
-            cve_description=vuln["cve-description"],
-            package_name=vuln["package-name"],
-            vulnerable_package_version=vuln["package-version"],
-            package_version=None, # populate later if we get the src dir
-            cwe_id=vuln["cwe-id"],
-            cwe_name=vuln["cwe-name"],
-            affected_file=vuln["affected-file"],
+            cve_description=get("cve-description"),
+            package_name=get("package-name"),
+            vulnerable_package_version=get("package-version"),
+            package_version=None,  # populate later if we get the src dir
+            cwe_id=get("cwe-id"),
+            cwe_name=get("cwe-name"),
+            affected_file=get("affected-file"),
         )
 
 T = TypeVar("T")
