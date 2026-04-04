@@ -1,6 +1,7 @@
 from __future__ import annotations
 import json
 import pathlib
+import re
 from pydantic import BaseModel
 from resolve.sbom.schema.nist_api import CveItem
 
@@ -37,6 +38,8 @@ def read_spdx2_deps(filepath: pathlib.Path) -> list[SoftwareDependancy]:
     for p in pkgs:
         name = p.get("name")
         ver = p.get("versionInfo")
+        ver = re.search("\d+\.\d+(?:\.\d+)*", ver) if ver else ver
+        ver = ver[0] if ver else ver
         if name and ver:
             ret.add(SoftwareDependancy(name=name, version=ver))
     return list(ret)
