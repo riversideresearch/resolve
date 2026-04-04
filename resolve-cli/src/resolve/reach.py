@@ -347,13 +347,13 @@ class ReachabilityResult:
                 classification = "unreachable"
                 justification = {
                     "conclusion": "Not Found",
-                    "reason": "The affected function was not found in compiled program metadata."
+                    "reason": f"The affected function {self.sink.affected_file}:{self.sink.affected_function} was not found in compiled program metadata.",
                 }
             case Reachability.UNREACHABLE_NO_PATH:
                 classification = "unreachable"
                 justification = {
                     "conclusion": "Not Reachable",
-                    "reason": "Control Flow Graph analysis found no paths to target function."
+                    "reason": f"Control Flow Graph analysis found no paths to target function {self.sink.affected_file}:{self.sink.affected_function}.",
                 }
             case Reachability.REACHABLE:
                 assert self.paths
