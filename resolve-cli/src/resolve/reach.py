@@ -442,13 +442,13 @@ class ReachToolManager:
 
 class Orchestrator:
     def __init__(self, facts_dir: str, vuln_json_path: str, final_out_path: str, reach_bin_path: str|None, reach_args: list[str], cp_src_dir: str|None, graph_dir: str|None, entrypoint: str):
-        default_reach_path = Path(__file__).absolute().parents[1] / "reach/build/reach"
+        DEFAULT_REACH_PATH = "reach"
         
         self.reach_args = reach_args
         self.facts_dir = Path(facts_dir)
         self.vuln_json_path = Path(vuln_json_path)
         self.final_out_path = Path(final_out_path)
-        self.reach_bin_path = Path(reach_bin_path) if reach_bin_path else default_reach_path
+        self.reach_bin_path = Path(reach_bin_path) if reach_bin_path else DEFAULT_REACH_PATH
         self.cp_src_dir = Path(cp_src_dir) if cp_src_dir else None
 
         self.fact_parser = FactParser(self.facts_dir)
