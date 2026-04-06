@@ -133,7 +133,8 @@ def main(argv: list[str] | None = None) -> int:
     vulnerabilities = []
     for d in deps:
         vulnerabilities.extend(dep2vulns(d, ai))
-    out = args.out if args.out else args.sbom.with_suffix(".vuln.json")
+
+    out = args.out if args.out else args.sbom[0].with_suffix(".vuln.json")
+    output_stdout(deps)
     output_json(vulnerabilities, out)
-    output_stdout(deps) # TODO convert to vulns
     return 0
