@@ -66,10 +66,11 @@ async def get_cve_by_dep(session: ClientSession, dep: SoftwareDependancy, **kwar
     return dep
 
 def filter_cves(cves: list[CveItem], min_base_score_v3: float = 0.0, allow_no_v3_score: bool = False, allow_disputed: bool = True, allow_deferred: bool = True, allow_rejected: bool = False):
-    out = []
+    out: list[CveItem] = []
     for cve in cves:
         v3_score = cve.metrics.get_v3_base_score() if cve.metrics else None
         if (not allow_no_v3_score and not v3_score) or (v3_score and v3_score < min_base_score_v3):
+            print(f"Filtering {cve.id} because is CVSS score is too low")
             continue
         def check_disputed():
             """Return true if a 'disputed' tag is applied to the CVE"""
@@ -82,12 +83,15 @@ def filter_cves(cves: list[CveItem], min_base_score_v3: float = 0.0, allow_no_v3
             return False
             
         if not allow_disputed and check_disputed():
+            print(f"Filtering {cve.id} because it has the disputed tag")
             continue
             
         if isinstance(cve.vulnStatus, str):
             if not allow_deferred and cve.vulnStatus.lower() == 'deferred':
+                print(f"Filtering {cve.id} because it has the deferred status")
                 continue
             if not allow_rejected and cve.vulnStatus.lower() == 'rejected':
+                print(f"Filtering {cve.id} because it has the rejected status")
                 continue
         out.append(cve)
     return out
