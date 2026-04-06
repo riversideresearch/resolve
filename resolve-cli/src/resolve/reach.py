@@ -56,7 +56,10 @@ class Sink:
         """
 
         def get(key: str):
-            return vuln.get(key, None) or vuln[key.replace("-", "_")]
+            val = vuln.get(key, None)
+            if val is not None:
+                return val
+            vuln[key.replace("-", "_")]
 
         return cls(
             # The only required fields for our analysis
