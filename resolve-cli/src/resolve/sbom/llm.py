@@ -71,8 +71,9 @@ class Opencode(LLM):
             env=env,
             text=True,
             capture_output=True,
-            check=True,
         )
+        if process.returncode != 0:
+            raise LLMError(process.stderr)
 
         return process.stdout.splitlines()[-1]
 
