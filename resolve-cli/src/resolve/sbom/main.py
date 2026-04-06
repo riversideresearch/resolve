@@ -34,7 +34,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "-L",
         "--llm-provider",
         choices=["gemini", "ollama", "opencode"],
-        default="gemini",
+        default=None,
     )
     return parser.parse_args(argv)
 
@@ -125,6 +125,8 @@ def main(argv: list[str] | None = None) -> int:
                 ai = llm.Ollama()
             case "opencode":
                 ai = llm.Opencode()
+            case None:
+                ai = None
             case _:
                 print("Err: Unsupported provider",args.llm_provider)
                 return 1
