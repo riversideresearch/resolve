@@ -18,7 +18,7 @@ class Vulnerability(BaseModel):
     cve_description: str
     package_name: str
     package_version: str
-    cwe_id: Annotated[str, Field(pattern=r"^\d+$")]
+    cwe_id: Annotated[str, Field(pattern=r"^(?:\d+)|UNKNOWN$")]
     cwe_name: str
     affected_file: str
     affected_function: str

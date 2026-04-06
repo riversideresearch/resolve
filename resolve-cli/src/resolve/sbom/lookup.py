@@ -60,6 +60,13 @@ async def get_cves(session: aiohttp.ClientSession, params: dict[str, Any]) -> li
         print(f"Multi-part query: requestind index {params['startIndex']}")
     return CVEs
 
+async def get_cve_by_id(session: ClientSession, id: str, **kwargs):
+    cves = await get_cves(session, params=dict(cveId=id))
+    cves = filter_cves(cves, **kwargs)
+    print(len(cves))
+    return id, cves
+
+
 async def get_cve_by_dep(session: ClientSession, dep: SoftwareDependancy, **kwargs):
     cves = await get_cves(session, dep.as_query())
     dep.set_cves(filter_cves(cves, **kwargs))
@@ -109,3 +116,19 @@ async def dep_lookup(deps: list[SoftwareDependancy], **kwargs) -> list[SoftwareD
             print(f"Lookup failure: {r}")
 
     return deps
+
+async def cve_lookup(cve_ids: list[str], **kwargs) -> list[tuple[str, list[CveItem]]]:
+    requests = []
+    async with ClientSession() as session:
+        for id in cve_ids:
+            rqst = get_cve_by_id(session, id, **kwargs)
+            requests.append(rqst)
+        results: list[BaseException | tuple[str, list[CveItem]]] = await asyncio.gather(
+            *requests, return_exceptions=True
+        )
+
+    for r in results:
+        if isinstance(r, Exception):
+            print(f"Lookup failure: {r}")
+
+    return [r for r in results if not isinstance(r, BaseException)]
