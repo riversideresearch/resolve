@@ -54,19 +54,25 @@ class Sink:
         """
         Load metadata from TA2 supplied vulnerabilities.json
         """
+
+        def get(key: str):
+            val = vuln.get(key, None)
+            if val is not None:
+                return val
+            vuln[key.replace("-", "_")]
+
         return cls(
             # The only required fields for our analysis
-            cve_id=vuln["cve-id"],
-            affected_function=vuln["affected-function"],
-
+            cve_id=get("cve-id"),
+            affected_function=get("affected-function"),
             # Misc
-            cve_description=vuln["cve-description"],
-            package_name=vuln["package-name"],
-            vulnerable_package_version=vuln["package-version"],
-            package_version=None, # populate later if we get the src dir
-            cwe_id=vuln["cwe-id"],
-            cwe_name=vuln["cwe-name"],
-            affected_file=vuln["affected-file"],
+            cve_description=get("cve-description"),
+            package_name=get("package-name"),
+            vulnerable_package_version=get("package-version"),
+            package_version=None,  # populate later if we get the src dir
+            cwe_id=get("cwe-id"),
+            cwe_name=get("cwe-name"),
+            affected_file=get("affected-file"),
         )
 
 T = TypeVar("T")
@@ -316,15 +322,14 @@ class ReachabilityResult:
         and updates it with its func_id
         """
         func_id = fact_parser.get_func_id(self.sink.affected_function)
-        assert func_id is not None, f"Could not find affected function '{self.sink.affected_function}'"
+        if func_id is None:
+            self.reachability = Reachability.UNREACHABLE_NOT_FOUND
+            return
 
         module_name = fact_parser.get_module_name_for_node(func_id) 
         print(f"Found function '{self.sink.affected_function}' in module '{module_name}'")
 
-        if func_id:
-            self.func_id = func_id
-        else:
-            self.reachability = Reachability.UNREACHABLE_NOT_FOUND
+        self.func_id = func_id
 
     def update_from_tool_results(self, tool_results: ReachToolResults):
         assert self.func_id is not None
@@ -345,13 +350,13 @@ class ReachabilityResult:
                 classification = "unreachable"
                 justification = {
                     "conclusion": "Not Found",
-                    "reason": "The affected function was not found in compiled program metadata."
+                    "reason": f"The affected function {self.sink.affected_file}:{self.sink.affected_function} was not found in compiled program metadata.",
                 }
             case Reachability.UNREACHABLE_NO_PATH:
                 classification = "unreachable"
                 justification = {
                     "conclusion": "Not Reachable",
-                    "reason": "Control Flow Graph analysis found no paths to target function."
+                    "reason": f"Control Flow Graph analysis found no paths to target function {self.sink.affected_file}:{self.sink.affected_function}.",
                 }
             case Reachability.REACHABLE:
                 assert self.paths
@@ -440,13 +445,13 @@ class ReachToolManager:
 
 class Orchestrator:
     def __init__(self, facts_dir: str, vuln_json_path: str, final_out_path: str, reach_bin_path: str|None, reach_args: list[str], cp_src_dir: str|None, graph_dir: str|None, entrypoint: str):
-        default_reach_path = Path(__file__).absolute().parents[1] / "reach/build/reach"
+        DEFAULT_REACH_PATH = "reach"
         
         self.reach_args = reach_args
         self.facts_dir = Path(facts_dir)
         self.vuln_json_path = Path(vuln_json_path)
         self.final_out_path = Path(final_out_path)
-        self.reach_bin_path = Path(reach_bin_path) if reach_bin_path else default_reach_path
+        self.reach_bin_path = Path(reach_bin_path) if reach_bin_path else DEFAULT_REACH_PATH
         self.cp_src_dir = Path(cp_src_dir) if cp_src_dir else None
 
         self.fact_parser = FactParser(self.facts_dir)
