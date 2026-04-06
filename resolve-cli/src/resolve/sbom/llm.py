@@ -46,7 +46,7 @@ class Ollama(LLM):
         return resp.response        
 
 class Opencode(LLM):
-    def __init__(self, model: str = "openai/gpt-5.4-mini"):
+    def __init__(self, model: str = "openai/gpt-5.3-codex-spark"):
         self.model = model
 
     def _query(self, payload: str) -> str:
@@ -58,9 +58,9 @@ class Opencode(LLM):
         env["OPENCODE_PERMISSION"] = json.dumps(
             {
                 "*": "deny",
-                "webfetch": "allow",
-                "websearch": "allow",
-                "codesearch": "allow",
+                # "webfetch": "allow",
+                # "websearch": "allow",
+                # "codesearch": "allow",
             }
         )
         agent_command = ["opencode", "run", "--agent", "build"]
