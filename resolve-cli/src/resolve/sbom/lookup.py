@@ -63,7 +63,6 @@ async def get_cves(session: aiohttp.ClientSession, params: dict[str, Any]) -> li
 async def get_cve_by_id(session: ClientSession, id: str, **kwargs):
     cves = await get_cves(session, params=dict(cveId=id))
     cves = filter_cves(cves, **kwargs)
-    print(len(cves))
     return id, cves
 
 
