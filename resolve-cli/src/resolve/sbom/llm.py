@@ -70,7 +70,7 @@ class Opencode(LLM):
             agent_command + [payload],
             env=env,
             text=True,
-            stdout=subprocess.PIPE,
+            capture_output=True,
             check=True,
         )
 
