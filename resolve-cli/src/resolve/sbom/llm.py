@@ -14,8 +14,8 @@ class APIKeyError(LLMError):
     pass
 
 class LLM:
-    prompt: str = "The following text describes a CVE. If it specifies which file and function is vulnerable, reply in the exact format `{file name}:{function name}` Otherwise, if this is not readily apparent, reply `N/A`. "
-    
+    prompt: str = "The following text describes a CVE. If it specifies which file and function is vulnerable, end your reply with the exact format `{file name}:{function name}`. Otherwise, if this is not apparent, end your reply with `N/A`. Use thinking and tools if needed, but ensure the final line of your response is exactly the expected format."
+
     def _query(self, payload : str) -> str:
         raise NotImplementedError
         
@@ -46,7 +46,7 @@ class Ollama(LLM):
         return resp.response        
 
 class Opencode(LLM):
-    def __init__(self, model: str = "openai/gpt-5.4-mini"):
+    def __init__(self, model: str = "openai/gpt-5.3-codex-spark"):
         self.model = model
 
     def _query(self, payload: str) -> str:
@@ -66,11 +66,7 @@ class Opencode(LLM):
         agent_command += ["--model", self.model]
 
         process = subprocess.run(
-            agent_command
-            + [
-                payload,
-                "\nUse internet metadata if necessary to support the cve description",
-            ],
+            agent_command + [payload],
             env=env,
             text=True,
             stderr=subprocess.PIPE,
@@ -78,7 +74,6 @@ class Opencode(LLM):
         )
         if process.returncode != 0:
             print(process.stderr)
-            print(process.stdout)
             raise LLMError(process.stderr)
 
         return process.stdout.splitlines()[-1]
