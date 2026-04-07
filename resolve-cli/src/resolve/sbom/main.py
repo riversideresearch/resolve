@@ -37,7 +37,9 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "-L",
         "--llm-provider",
+        nargs="?",
         choices=["gemini", "ollama", "opencode"],
+        const="opencode",
         default=None,
     )
     return parser.parse_args(argv)
