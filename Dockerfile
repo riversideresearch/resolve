@@ -58,7 +58,6 @@ COPY klee /resolve/klee
 COPY klee-uclibc-160 /resolve/klee-uclibc-160
 COPY resolve-cc /resolve/resolve-cc
 COPY resolve-cveassert /resolve/resolve-cveassert
-COPY reach /resolve/reach
 COPY resolve-facts /resolve/resolve-facts
 COPY mcp /resolve/mcp
 COPY resolve-cli /resolve/resolve-cli
