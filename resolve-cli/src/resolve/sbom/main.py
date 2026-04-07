@@ -92,7 +92,7 @@ def cve2vuln(
     if ai:
         try:
             affected_file, affected_function = ai.get_affected(cve.get_description())
-        except llm.AffectedNotFoundError as e:
+        except llm.AffectedNotFoundError:
             print(f"No affected file, func identifed in {cve.id}.")
         except llm.LLMError as e:
             print(f"Failed to identify affected file, func for {cve.id} due to {e!r}.")
@@ -190,7 +190,7 @@ def main(argv: list[str] | None = None) -> int:
             return args.out
         try:
             return args.sbom[0].with_suffix(".vuln.json")
-        except IndexError:
+        except (IndexError, TypeError):
             return Path.cwd() / "vuln.json"
 
     out = get_out()
