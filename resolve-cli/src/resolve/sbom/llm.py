@@ -46,7 +46,7 @@ class Ollama(LLM):
         return resp.response        
 
 class Opencode(LLM):
-    def __init__(self, model: str = "openai/gpt-5.3-codex-spark"):
+    def __init__(self, model: str = "openai/gpt-5.4-mini"):
         self.model = model
 
     def _query(self, payload: str) -> str:
@@ -57,20 +57,24 @@ class Opencode(LLM):
         env = os.environ.copy()
         env["OPENCODE_PERMISSION"] = json.dumps(
             {
-                "*": "deny",
-                # "webfetch": "allow",
-                # "websearch": "allow",
-                # "codesearch": "allow",
+                "webfetch": "allow",
+                "websearch": "allow",
+                "codesearch": "allow",
             }
         )
         agent_command = ["opencode", "run", "--agent", "build"]
         agent_command += ["--model", self.model]
 
         process = subprocess.run(
-            agent_command + [payload],
+            agent_command
+            + [
+                payload,
+                "\nUse internet metadata if necessary to support the cve description",
+            ],
             env=env,
             text=True,
-            capture_output=True,
+            capture_output=False,
+            stdout=subprocess.PIPE,
         )
         if process.returncode != 0:
             raise LLMError(process.stderr)
