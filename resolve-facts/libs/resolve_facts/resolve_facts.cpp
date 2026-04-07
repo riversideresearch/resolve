@@ -207,3 +207,65 @@ const Node& ProgramFacts::getNode(const NamespacedNodeId& nodeId) const {
 std::string resolve_facts::to_string(const NamespacedNodeId& id) {
   return "(" + std::to_string(id.first) + "," + std::to_string(id.second) + ")";
 }
+
+NamespacedNodeId resolve_facts::from_string(const std::string& s) {
+    auto it = s.begin();
+    auto end = s.end();
+
+    auto skip_ws = [&it, end]() {
+      while (it != end && std::isspace(static_cast<unsigned char>(*it))) {
+        ++it;
+      }
+    };
+
+    skip_ws();
+
+    bool has_paren = false;
+    if (it != end && *it == '(') {
+        has_paren = true;
+        ++it;
+    }
+
+    skip_ws();
+    NamespacedNodeId id;
+    {
+      // Parse first integer
+      auto result = std::from_chars(it.base(), end.base(), id.first);
+      if (result.ec != std::errc()) {
+        throw std::invalid_argument("Invalid first integer in: " + s);
+      }
+      it = s.begin() + (result.ptr - s.data());
+    }
+
+    skip_ws();
+    if (it == end || *it != ',') {
+      throw std::invalid_argument("Missing comma in: " + s);
+    }
+    ++it;
+
+    skip_ws();
+    {
+      auto result = std::from_chars(it.base(), end.base(), id.second);
+      if (result.ec != std::errc()) {
+        throw std::invalid_argument("Invalid second integer in: " + s);
+      }
+      it = s.begin() + (result.ptr - s.data());
+    }
+
+    skip_ws();
+
+    // If parentheses were present, enforce closing ')'
+    if (has_paren) {
+      if (it == end || *it != ')') {
+        throw std::invalid_argument("Missing closing parenthesis in: " + s);
+      }
+      ++it;
+      skip_ws();
+    }
+
+    if (it != end) {
+      throw std::invalid_argument("Extra characters after parsing: " + s);
+    }
+
+    return id;
+}
