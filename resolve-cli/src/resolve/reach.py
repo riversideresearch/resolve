@@ -59,7 +59,7 @@ class Sink:
             val = vuln.get(key, None)
             if val is not None:
                 return val
-            vuln[key.replace("-", "_")]
+            return vuln[key.replace("-", "_")]
 
         return cls(
             # The only required fields for our analysis
@@ -450,7 +450,11 @@ class Orchestrator:
         self.reach_args = reach_args
         self.facts_dir = Path(facts_dir)
         self.vuln_json_path = Path(vuln_json_path)
-        self.final_out_path = Path(final_out_path)
+        self.final_out_path = (
+            Path(final_out_path)
+            if final_out_path
+            else Path(vuln_json_path).with_suffix(".reach.json")
+        )
         self.reach_bin_path = Path(reach_bin_path) if reach_bin_path else DEFAULT_REACH_PATH
         self.cp_src_dir = Path(cp_src_dir) if cp_src_dir else None
 
@@ -635,11 +639,7 @@ def main():
     )
 
     parser.add_argument(
-        "-o",
-        "--output",
-        type=str,
-        help="the path to write the output file to",
-        required=True
+        "-o", "--output", type=str, help="the path to write the output file to"
     )
 
     parser.add_argument(
