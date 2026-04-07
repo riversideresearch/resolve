@@ -18,11 +18,10 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Identify known CVEs / CWEs for a given SBOM")
     parser.add_argument("-o", "--out", type=Path, help="Path of output file")
     parser.add_argument(
-        "-i",
-        "--sbom",
+        "sbom",
         type=Path,
         nargs="*",
-        help="Path to the input SBOM file.",
+        help="Path to the input SBOM file(s).",
     )
     parser.add_argument(
         "--id",
