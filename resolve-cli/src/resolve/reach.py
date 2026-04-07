@@ -236,18 +236,33 @@ class FactParser:
         name = self.nodes[module_id].props["source_file"]
         return name
 
-    def get_func_id(self, func_name: str):
+    def get_func_id(self, func_name: str, file_name: str = ""):
+        matches: list[NodeID] = []
         # First try true symbol names
         for f in self.nodes.kinds["Function"]:
             # try to get the function that we are precisely looking for
-            if func_name == f.get("name", ""):
+            if func_name == f.get("name", "") and file_name in f.get("source_file", ""):
                 return f.id
 
         # Next try demangled C++ symbol names
         for f in self.nodes.kinds["Function"]:
             # If we fail to get an exact match, try a substring match on demangled names
-            if func_name in f.props.get("demangled_name", ""):
-                return f.id
+            if func_name in f.props.get("demangled_name", "") and file_name in f.get(
+                "source_file", ""
+            ):
+                matches.append(f.id)
+
+        match len(matches):
+            case 0:
+                return None
+            case 1:
+                pass
+            case _:
+                print(
+                    f"[RW]: WARNING: multiple metadata matches for {file_name}:{func_name}"
+                )
+
+        return matches[0]
 
 @dataclass
 class ReachToolResult:
@@ -321,13 +336,15 @@ class ReachabilityResult:
         Looks for the function signature of a sink in nodeprops.facts
         and updates it with its func_id
         """
-        func_id = fact_parser.get_func_id(self.sink.affected_function)
+        func_id = fact_parser.get_func_id(
+            self.sink.affected_function, self.sink.affected_file
+        )
         if func_id is None:
             self.reachability = Reachability.UNREACHABLE_NOT_FOUND
             return
 
-        module_name = fact_parser.get_module_name_for_node(func_id) 
-        print(f"Found function '{self.sink.affected_function}' in module '{module_name}'")
+        file_name = fact_parser.get_module_name_for_node(func_id)
+        print(f"Found function '{self.sink.affected_function}' in module '{file_name}'")
 
         self.func_id = func_id
 
@@ -534,9 +551,9 @@ class Orchestrator:
         src = self.fact_parser.get_func_id(self.entrypoint)
         assert src is not None, f"Could not find source function '{self.entrypoint}'"
 
-        module_name = self.fact_parser.get_module_name_for_node(src)
+        file_name = self.fact_parser.get_module_name_for_node(src)
 
-        print(f"Found function '{self.entrypoint}' in module '{module_name}'")
+        print(f"Found function '{self.entrypoint}' in module '{file_name}'")
         self.src = src
         for result in self.results:
             result.update_from_fact_parser(self.fact_parser)
