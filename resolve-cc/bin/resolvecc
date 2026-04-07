@@ -32,6 +32,10 @@ USE_RESOLVE_FACTS=true
 # Variable stores path of CVE description
 RESOLVE_LABEL_CVE=${RESOLVE_LABEL_CVE:-}
 
+# Variables stores the compilers name
+CLANG_COMPILER_NAME=${CLANG_COMPILER_NAME:-"$(basename "$REAL_CLANG")"}
+RESOLVE_COMPILER_NAME=${RESOLVE_COMPILER_NAME:-"$(basename "$0")"}
+
 # Variable tells resolvecc to load CVEAssert plugin
 if [ "${RESOLVE_LABEL_CVE}" ]; then
     USE_CVEASSERT=true
@@ -140,13 +144,13 @@ configure_flags() {
 resolvecc_help() {
     # Usage message
     cat <<EOF
-resolvecc — Clang wrapper with RESOLVE plugins 
+$RESOLVE_COMPILER_NAME — $CLANG_COMPILER_NAME wrapper with RESOLVE plugins 
 
 USAGE:
-    resolvecc [options] file...
+    $RESOLVE_COMPILER_NAME [options] file...
 
 DESCRIPTION:
-    resolvecc wraps /usr/bin/clang and automatically:
+    $RESOLVE_COMPILER_NAME wraps $CLANG_COMPILER_NAME and automatically:
 
       • Loads the CVEAssert LLVM pass plugin
       • Loads the ResolveFactsPlugin LLVM pass plugin
@@ -168,16 +172,16 @@ WRAPPER OPTIONS:
 All other options are forwarded directly to clang.
 
 EXAMPLES:
-    resolvecc -fcve-assert vuln.json test.c
-    resolvecc -fcve-assert vuln.json -lresolve -O2 -g test.c
-    resolvecc -fno-resolve test.c 
-    resolvecc -c test.c
+    $RESOLVE_COMPILER_NAME -fcve-assert vuln.json test.c
+    $RESOLVE_COMPILER_NAME -fcve-assert vuln.json -lresolve -O2 -g test.c
+    $RESOLVE_COMPILER_NAME -fno-resolve test.c 
+    $RESOLVE_COMPILER_NAME -c test.c
 EOF
 }
 
 invoke_clang() {
     #DEBUGGING writing compiler invocation to stderr
-    echo "[resolvecc] invoking:" >&2
+    echo "[$RESOLVE_COMPILER_NAME] invoking:" >&2
     echo "$REAL_CLANG ${COMPTIME_FLAGS[*]} ${NEW_ARGS[*]} ${RUNTIME_FLAGS[*]}" >&2
     RESOLVE_LABEL_CVE="$RESOLVE_LABEL_CVE" \
     exec "$REAL_CLANG" \
