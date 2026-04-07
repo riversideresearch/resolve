@@ -66,7 +66,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if not args.out_dir and not args.out_bin:
-        parser.error("You must provide either a directory or binary out output facts to.")
+        args.out_dir = Path.cwd()
 
     def ingest_facts(out_dir: Path):
         print(f"Using input bin at {args.in_bin}")
