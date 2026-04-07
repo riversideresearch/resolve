@@ -78,12 +78,6 @@ def report_by_id(vulns_by_id: list[tuple[str, list[CveItem]]]):
 
 def output_json(vulns: list[Vulnerability], output_path: Path):
     doc = VulnerabilityDocument(vulnerabilities=vulns)
-    try:
-        with open(output_path, "r") as f:
-            old_doc = VulnerabilityDocument.model_validate_json(f.read())
-            doc = doc.merge(old_doc)
-    except IOError:
-        pass
 
     with open(output_path, 'w') as f:
         f.write(doc.model_dump_json(indent=2))
