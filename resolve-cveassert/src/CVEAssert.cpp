@@ -53,7 +53,7 @@ GlobalVariable *initSanitizerMap(Function &F) {
   // cast<> performs an implicit assertion for Constant -> GlobalVariable
   auto *gSanitizerMap = cast<GlobalVariable>(gv);
 
-  gSanitizerMap->setLinkage(GlobalValue::ExternalLinkage);
+  gSanitizerMap->setLinkage(GlobalValue::LinkOnceAnyLinkage);
   gSanitizerMap->setConstant(false);
 
   if (!gSanitizerMap->hasInitializer()) {
