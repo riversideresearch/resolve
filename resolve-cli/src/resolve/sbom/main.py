@@ -148,22 +148,16 @@ def main(argv: list[str] | None = None) -> int:
     asyncio.run(dep_lookup(deps, **kwargs))
     vulns_by_id = asyncio.run(cve_lookup(args.id or [], **kwargs))
 
-    ai = None
+    provider = {
+        "gemini": llm.Gemini,
+        "ollama": llm.Ollama,
+        "opencode": llm.Opencode,
+    }.get(args.llm_provider, lambda: None)
     try:
-        match args.llm_provider:
-            case 'gemini':
-                ai = llm.Gemini()
-            case 'ollama':
-                ai = llm.Ollama()
-            case "opencode":
-                ai = llm.Opencode()
-            case None:
-                ai = None
-            case _:
-                print("Err: Unsupported provider",args.llm_provider)
-                return 1
+        ai: None | llm.LLM = provider()
     except (llm.APIKeyError, llm.APIConnectionError) as e:
         print(f"Cannot connect to AI Backend {args.llm_provider} due to {e.__cause__}")
+        ai = None
 
     vulnerabilities: list[Vulnerability] = []
     for dep in deps:
