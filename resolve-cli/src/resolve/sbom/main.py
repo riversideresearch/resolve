@@ -146,7 +146,6 @@ def main(argv: list[str] | None = None) -> int:
     )
 
     asyncio.run(dep_lookup(deps, **kwargs))
-    vulns_by_id = asyncio.run(cve_lookup(args.id or [], **kwargs))
 
     provider = {
         "gemini": llm.Gemini,
@@ -160,13 +159,17 @@ def main(argv: list[str] | None = None) -> int:
         ai = None
 
     vulnerabilities: list[Vulnerability] = []
+    seen_ids = set(args.id)
     for dep in deps:
         assert dep.cves is not None
         for cve in dep.cves:
+            if args.id and cve.id.root not in args.id:
+                continue
+            seen_ids.discard(cve.id.root)
             vulnerabilities.extend(cve2vuln(cve, dep, ai=ai))
-    for _, cves in vulns_by_id:
-        for v in cves:
-            vulnerabilities.extend(cve2vuln(v, None, ai=ai))
+
+    for not_seen in seen_ids:
+        print(f"No match found for {not_seen}")
 
     def get_out():
         if args.out:
@@ -178,6 +181,5 @@ def main(argv: list[str] | None = None) -> int:
 
     out = get_out()
     report_deps(deps)
-    report_by_id(vulns_by_id)
     output_json(vulnerabilities, out)
     return 0
