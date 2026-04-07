@@ -16,7 +16,7 @@ else:
     COMPRESSION_SUFFIX = ""
 
 FACT_SECTION_MAP = [
-    (".facts", "facts.facts"),
+    (".facts", ".facts"),
 ]
 
 # ------------------------------------------------------------------------------
@@ -36,26 +36,47 @@ def append_to_section(section: str, input_file: Path, target_bin: Path):
     subprocess.run(["llvm-objcopy", "--add-section", f"{section}=/dev/stdin", f"{target_bin}"], input=facts, check=True)
 
 def embed_facts(out_dir: Path, target_bin: Path):
+    def out_file(suffix: str):
+        return out_dir / target_bin.with_suffix(suffix).name
+
     # compress if needed
     if USE_COMPRESSION:
-        subprocess.run([f"zstd", "-f", *(str(out_dir/file) for _, file in FACT_SECTION_MAP)], check=True)
+        subprocess.run(
+            [
+                "zstd",
+                "-f",
+                *(str(out_file(suffix)) for _, suffix in FACT_SECTION_MAP),
+            ],
+            check=True,
+        )
 
-    for section, file in FACT_SECTION_MAP:
-        append_to_section(section, out_dir/(file+COMPRESSION_SUFFIX), target_bin)
+    for section, suffix in FACT_SECTION_MAP:
+        append_to_section(section, out_file(suffix), target_bin)
 
 def extract_facts(out_dir: Path, target_bin: Path):
-    for section, file in FACT_SECTION_MAP:
+    def out_file(suffix: str):
+        return out_dir / target_bin.with_suffix(suffix + COMPRESSION_SUFFIX).name
+
+    for section, suffix in FACT_SECTION_MAP:
         if subprocess.run([f"objdump -h \"{target_bin}\" | grep \"{section}\""], shell=True).returncode:
             # No section
             contents = b""
         else:
             contents = subprocess.run(["llvm-objcopy", "--dump-section", f"{section}=/dev/stdout", f"{target_bin}"], capture_output=True, check=True).stdout
-        with open(out_dir/(file+COMPRESSION_SUFFIX), "ba+") as f:
+        with out_file(suffix).open("ba+") as f:
             f.write(contents)
 
     # decompress if needed
     if USE_COMPRESSION:
-        subprocess.run([f"zstd", "-f", "-d", *(str(out_dir/file)+COMPRESSION_SUFFIX for _, file in FACT_SECTION_MAP)], check=True)
+        subprocess.run(
+            [
+                "zstd",
+                "-f",
+                "-d",
+                *(out_file(suffix) for _, suffix in FACT_SECTION_MAP),
+            ],
+            check=True,
+        )
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Fact Extraction Helper.")
