@@ -28,11 +28,10 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         nargs="*",
         help="Vulnerability id of interest",
     )
-    parser.add_argument('-E', '--allow-empty-score', action='store_true')
-    parser.add_argument('-s', '--min-score', type=float, default=0.0)
-    parser.add_argument('-D', '--allow-disputed', action='store_true')
-    parser.add_argument('-d', '--allow-deferred', action='store_true')
-    parser.add_argument('-R', '--allow-rejected', action='store_true')
+    parser.add_argument("--min-score", type=float, default=None)
+    parser.add_argument("--filter-deferred", action="store_true")
+    parser.add_argument("--filter-disputed", action="store_true")
+    parser.add_argument("--filter-rejected", action="store_true")
     parser.add_argument(
         "-L",
         "--llm-provider",
@@ -138,26 +137,16 @@ def main(argv: list[str] | None = None) -> int:
         if found_deps := read_input_sbom(sbom):
             deps += found_deps
 
-    asyncio.run(
-        dep_lookup(
-            deps,
-            min_base_score_v3=args.min_score,
-            allow_no_v3_score=args.allow_empty_score,
-            allow_disputed=args.allow_disputed,
-            allow_deferred=args.allow_deferred,
-            allow_rejected=args.allow_rejected,
-        )
+    kwargs = dict(
+        min_base_score_v3=args.min_score or 0.0,
+        allow_no_v3_score=args.min_score is None,
+        allow_disputed=not args.filter_disputed,
+        allow_deferred=not args.filter_deferred,
+        allow_rejected=not args.filter_rejected,
     )
-    vulns_by_id = asyncio.run(
-        cve_lookup(
-            args.id or [],
-            min_base_score_v3=args.min_score,
-            allow_no_v3_score=args.allow_empty_score,
-            allow_disputed=args.allow_disputed,
-            allow_deferred=args.allow_deferred,
-            allow_rejected=args.allow_rejected,
-        )
-    )
+
+    asyncio.run(dep_lookup(deps, **kwargs))
+    vulns_by_id = asyncio.run(cve_lookup(args.id or [], **kwargs))
 
     ai = None
     try:
