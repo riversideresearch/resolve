@@ -448,7 +448,7 @@ static Function *getOrCreateBoundsCheckMemsetSanitizer(
 }
 
 static Function *getOrCreateResolveGep(Function *F) {
-  std::string handlerName = "__cve_san_gep";
+  std::string handlerName = "__cve_gep";
   Module *M = F->getParent();
   LLVMContext &Ctx = M->getContext();
   GlobalVariable *map = SanitizerMaps[F];
