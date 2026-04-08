@@ -59,7 +59,6 @@ pub extern "C" fn __resolve_malloc(size: usize) -> *mut c_void {
         ptr as Vaddr
     );
 
-    // Return the pointer
     ptr
 }
 
@@ -80,7 +79,6 @@ pub extern "C" fn __resolve_free(ptr: *mut c_void) -> () {
 
     let ptr_size = {
         let mut obj_list = ALIVE_OBJ_LIST.lock();
-        // Lookup shadow object
         let sobj_opt = obj_list.search_intersection(ptr as Vaddr);
         let size = sobj_opt.map(|o| o.size());
         // remove shadow obj from live list
