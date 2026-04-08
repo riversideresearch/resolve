@@ -53,7 +53,7 @@ echo "[+] Running reachability analysis."
 "$REACH_WRAPPER" \
     -i openssl_vulnerabilities.json \
     -o openssl_reach_out.json \
-    -f openssl_facts \
+    -f openssl_facts/libcrypto.facts \
     -e "CMS_RecipientInfo_decrypt" \
     -r /opt/resolve/bin/reach
 

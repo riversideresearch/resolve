@@ -1,8 +1,0 @@
-main.c:main-*->main.c:process_command = 1
-main.c:main-*->main.c:cJSON_Version = 1
-main.c:main-*->cJSON.c:cJSON_Version = 1
-main.c:main-*->cJSON.c:print = 1
-main.c:main-*->main.c:strncmp = 1
-main.c:cJSON_Version-*->main.c:main = 0
-main.c:main-*->cJSON.c:print = 1
-main.c:main-*->cJSON.c:replace_item_in_object = 1

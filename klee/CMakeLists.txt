@@ -646,7 +646,6 @@ message(STATUS "KLEE_SOLVER_LIBRARIES: '${KLEE_SOLVER_LIBRARIES}'")
 ################################################################################
 # RESOLVE components
 ################################################################################
-add_subdirectory(../reach ${CMAKE_CURRENT_BINARY_DIR}/reach)
 add_subdirectory(../resolve-facts  ${CMAKE_CURRENT_BINARY_DIR}/resolve-facts)
 
 # find_package(Reach REQUIRED)

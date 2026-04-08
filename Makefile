@@ -5,11 +5,20 @@ SHELL := /bin/bash
 all: build
 
 .PHONY: build check test install clean
-build: configure
-	cmake --build build
-
 configure: 
 	cmake -Bbuild -GNinja
+
+build: configure-default
+	cmake --build build
+
+configure-default: 
+	cmake -Bbuild -GNinja -DCMAKE_BUILD_TYPE=
+
+build-release: configure-release
+	cmake --build build
+
+configure-release: 
+	cmake -Bbuild -GNinja -DCMAKE_BUILD_TYPE=Release
 
 check: configure
 	cmake --build build --target check
@@ -17,10 +26,10 @@ check: configure
 test: configure
 	cmake --build build --target test-CVEAssert test-libresolve
 
-install: build
+install: configure
 	cmake --install build
 
-install-local: build
+install-local: configure
 	cmake --install build --prefix install
 
 clean:

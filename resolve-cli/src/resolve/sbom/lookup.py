@@ -60,16 +60,31 @@ async def get_cves(session: aiohttp.ClientSession, params: dict[str, Any]) -> li
         print(f"Multi-part query: requestind index {params['startIndex']}")
     return CVEs
 
+async def get_cve_by_id(session: ClientSession, id: str, **kwargs):
+    cves = await get_cves(session, params=dict(cveId=id))
+    cves = filter_cves(cves, **kwargs)
+    return id, cves
+
+
 async def get_cve_by_dep(session: ClientSession, dep: SoftwareDependancy, **kwargs):
     cves = await get_cves(session, dep.as_query())
     dep.set_cves(filter_cves(cves, **kwargs))
     return dep
 
-def filter_cves(cves: list[CveItem], min_base_score_v3: float = 0.0, allow_no_v3_score: bool = False, allow_disputed: bool = True, allow_deferred: bool = True, allow_rejected: bool = False):
-    out = []
+def filter_cves(
+    cves: list[CveItem],
+    min_base_score_v3: float = 0.0,
+    allow_no_v3_score: bool = False,
+    allow_disputed: bool = True,
+    allow_deferred: bool = True,
+    allow_rejected: bool = False,
+    allow_ids: list[str] | None = None,
+):
+    out: list[CveItem] = []
     for cve in cves:
         v3_score = cve.metrics.get_v3_base_score() if cve.metrics else None
         if (not allow_no_v3_score and not v3_score) or (v3_score and v3_score < min_base_score_v3):
+            print(f"Filtering {cve.id} because is CVSS score is too low")
             continue
         def check_disputed():
             """Return true if a 'disputed' tag is applied to the CVE"""
@@ -80,14 +95,20 @@ def filter_cves(cves: list[CveItem], min_base_score_v3: float = 0.0, allow_no_v3
                                 if t.value == 'disputed':
                                     return True
             return False
-            
+
         if not allow_disputed and check_disputed():
+            print(f"Filtering {cve.id} because it has the disputed tag")
             continue
-            
+
+        if allow_ids and cve.id.root not in allow_ids:
+            continue
+
         if isinstance(cve.vulnStatus, str):
             if not allow_deferred and cve.vulnStatus.lower() == 'deferred':
+                print(f"Filtering {cve.id} because it has the deferred status")
                 continue
             if not allow_rejected and cve.vulnStatus.lower() == 'rejected':
+                print(f"Filtering {cve.id} because it has the rejected status")
                 continue
         out.append(cve)
     return out
@@ -105,3 +126,19 @@ async def dep_lookup(deps: list[SoftwareDependancy], **kwargs) -> list[SoftwareD
             print(f"Lookup failure: {r}")
 
     return deps
+
+async def cve_lookup(cve_ids: list[str], **kwargs) -> list[tuple[str, list[CveItem]]]:
+    requests = []
+    async with ClientSession() as session:
+        for id in cve_ids:
+            rqst = get_cve_by_id(session, id, **kwargs)
+            requests.append(rqst)
+        results: list[BaseException | tuple[str, list[CveItem]]] = await asyncio.gather(
+            *requests, return_exceptions=True
+        )
+
+    for r in results:
+        if isinstance(r, Exception):
+            print(f"Lookup failure: {r}")
+
+    return [r for r in results if not isinstance(r, BaseException)]

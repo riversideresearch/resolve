@@ -5,7 +5,8 @@
 #
 
 set -e
-#set -x # for debugging
+# set -x # for debugging
+# RESOLVECC_DEBUG=true
 
 SCRIPT_DIR="${0%/*}"
 
@@ -180,9 +181,12 @@ EOF
 }
 
 invoke_clang() {
-    #DEBUGGING writing compiler invocation to stderr
-    echo "[$RESOLVE_COMPILER_NAME] invoking:" >&2
-    echo "$REAL_CLANG ${COMPTIME_FLAGS[*]} ${NEW_ARGS[*]} ${RUNTIME_FLAGS[*]}" >&2
+    # DEBUGGING writing compiler invocation to stderr
+    if [ -n "$RESOLVECC_DEBUG" ]; then
+        echo "[$RESOLVE_COMPILER_NAME] invoking:" >&2
+        echo "$REAL_CLANG ${COMPTIME_FLAGS[*]} ${NEW_ARGS[*]} ${RUNTIME_FLAGS[*]}" >&2
+    fi
+
     RESOLVE_LABEL_CVE="$RESOLVE_LABEL_CVE" \
     exec "$REAL_CLANG" \
         "${COMPTIME_FLAGS[@]}" \

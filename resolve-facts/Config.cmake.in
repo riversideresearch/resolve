@@ -6,3 +6,4 @@ include(CMakeFindDependencyMacro)
 find_dependency(glaze)
 
 check_required_components(ResolveFacts)
+check_required_components(Reach)

@@ -3,18 +3,22 @@
   LGPL-3; See LICENSE.txt in the repo root for details.
 -->
 
-# reach
+# Resolve facts
+
+Tools for creating and querying RESOLVE binary metadata
+
+## reach
 
 Fast graph reachability for E-BOSS RESOLVE.
 
-## Run
+### Run
 
 ```
 cmake -B build && cmake --build build/
 ./build/reach --help
 ```
 
-## Description
+### Description
 
 This development is factored into a library part (under `lib/`) and an
 executable tool (under `src/`) that uses the library.
@@ -49,7 +53,7 @@ auto-generated from this definition).
 The input file format supports multiple queries (see struct `query`
 and the `queries` field of struct `config` in `src/config.hpp`).
 
-## Architecture
+### Architecture
 
 The implementation is organized roughly as follows:
 
@@ -74,7 +78,7 @@ used by `lib/graph.hpp` to build a graph, which is passed to
 into a JSON object and written to the provided output path or to
 stdout if no path was given.
 
-## Code
+### Code
 
 Under `lib/`:
 - facts.hpp, facts.cpp

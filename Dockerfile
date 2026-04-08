@@ -58,7 +58,6 @@ COPY klee /resolve/klee
 COPY klee-uclibc-160 /resolve/klee-uclibc-160
 COPY resolve-cc /resolve/resolve-cc
 COPY resolve-cveassert /resolve/resolve-cveassert
-COPY reach /resolve/reach
 COPY resolve-facts /resolve/resolve-facts
 COPY mcp /resolve/mcp
 COPY resolve-cli /resolve/resolve-cli
@@ -67,7 +66,7 @@ COPY CMakeLists.txt /resolve/CMakeLists.txt
 
 # Build
 WORKDIR /resolve/
-RUN PATH=$PATH:~/.cargo/bin make build install
+RUN PATH=$PATH:~/.cargo/bin make build-release install
 
 ENV CMAKE_EXPERIMENTAL_FIND_CPS_PACKAGES="e82e467b-f997-4464-8ace-b00808fff261"
 ENV CMAKE_EXPERIMENTAL_EXPORT_PACKAGE_INFO="b80be207-778e-46ba-8080-b23bba22639e" 

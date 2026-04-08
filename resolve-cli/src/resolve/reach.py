@@ -59,7 +59,7 @@ class Sink:
             val = vuln.get(key, None)
             if val is not None:
                 return val
-            vuln[key.replace("-", "_")]
+            return vuln[key.replace("-", "_")]
 
         return cls(
             # The only required fields for our analysis
@@ -189,10 +189,10 @@ def demangle(names: Iterable[str]):
     return res.stdout.split("\n")
 
 class FactParser:
-    def __init__(self, facts_folder: Path):
-        self.facts_folder = facts_folder
+    def __init__(self, facts_file: Path):
+        self.facts_file = facts_file
         # Load Nodes
-        with (facts_folder / "facts.facts").open() as f:
+        with (facts_file).open() as f:
 
             all_nodes = []
             #all_edges = []
@@ -236,18 +236,33 @@ class FactParser:
         name = self.nodes[module_id].props["source_file"]
         return name
 
-    def get_func_id(self, func_name: str):
+    def get_func_id(self, func_name: str, file_name: str = ""):
+        matches: list[NodeID] = []
         # First try true symbol names
         for f in self.nodes.kinds["Function"]:
             # try to get the function that we are precisely looking for
-            if func_name == f.get("name", ""):
+            if func_name == f.get("name", "") and file_name in f.get("source_file", ""):
                 return f.id
 
         # Next try demangled C++ symbol names
         for f in self.nodes.kinds["Function"]:
             # If we fail to get an exact match, try a substring match on demangled names
-            if func_name in f.props.get("demangled_name", ""):
-                return f.id
+            if func_name in f.props.get("demangled_name", "") and file_name in f.get(
+                "source_file", ""
+            ):
+                matches.append(f.id)
+
+        match len(matches):
+            case 0:
+                return None
+            case 1:
+                pass
+            case _:
+                print(
+                    f"[RW]: WARNING: multiple metadata matches for {file_name}:{func_name}"
+                )
+
+        return matches[0]
 
 @dataclass
 class ReachToolResult:
@@ -321,13 +336,15 @@ class ReachabilityResult:
         Looks for the function signature of a sink in nodeprops.facts
         and updates it with its func_id
         """
-        func_id = fact_parser.get_func_id(self.sink.affected_function)
+        func_id = fact_parser.get_func_id(
+            self.sink.affected_function, self.sink.affected_file
+        )
         if func_id is None:
             self.reachability = Reachability.UNREACHABLE_NOT_FOUND
             return
 
-        module_name = fact_parser.get_module_name_for_node(func_id) 
-        print(f"Found function '{self.sink.affected_function}' in module '{module_name}'")
+        file_name = fact_parser.get_module_name_for_node(func_id)
+        print(f"Found function '{self.sink.affected_function}' in module '{file_name}'")
 
         self.func_id = func_id
 
@@ -387,8 +404,8 @@ class ReachabilityResult:
         }
 
 class ReachToolManager:
-    def __init__(self, facts_dir: Path, src_id: str, tmp_reach_input_path: Path, reach_output_path: Path, reach_path: Path, reach_args: list[str]):
-        self.facts_dir = facts_dir
+    def __init__(self, facts_file: Path, src_id: str, tmp_reach_input_path: Path, reach_output_path: Path, reach_path: Path, reach_args: list[str]):
+        self.facts_file = facts_file
         self.src_id = src_id
         self.reach_output_path = reach_output_path
         self.reach_path = reach_path
@@ -415,7 +432,7 @@ class ReachToolManager:
     def invoke_reach(self) -> None:
         cmd = [
             str(self.reach_path),
-            "-f", str(self.facts_dir),
+            "-f", str(self.facts_file),
             "-i", str(self.tmp_reach_input_path),
             "-o", str(self.reach_output_path)
         ]
@@ -444,17 +461,21 @@ class ReachToolManager:
         }
 
 class Orchestrator:
-    def __init__(self, facts_dir: str, vuln_json_path: str, final_out_path: str, reach_bin_path: str|None, reach_args: list[str], cp_src_dir: str|None, graph_dir: str|None, entrypoint: str):
+    def __init__(self, facts_file: str, vuln_json_path: str, final_out_path: str, reach_bin_path: str|None, reach_args: list[str], cp_src_dir: str|None, graph_dir: str|None, entrypoint: str):
         DEFAULT_REACH_PATH = "reach"
         
         self.reach_args = reach_args
-        self.facts_dir = Path(facts_dir)
+        self.facts_file = Path(facts_file)
         self.vuln_json_path = Path(vuln_json_path)
-        self.final_out_path = Path(final_out_path)
+        self.final_out_path = (
+            Path(final_out_path)
+            if final_out_path
+            else Path(vuln_json_path).with_suffix(".reach.json")
+        )
         self.reach_bin_path = Path(reach_bin_path) if reach_bin_path else DEFAULT_REACH_PATH
         self.cp_src_dir = Path(cp_src_dir) if cp_src_dir else None
 
-        self.fact_parser = FactParser(self.facts_dir)
+        self.fact_parser = FactParser(self.facts_file)
         self.fact_parser.demangle_names()
 
         self.output_graph_path = graph_dir
@@ -530,9 +551,9 @@ class Orchestrator:
         src = self.fact_parser.get_func_id(self.entrypoint)
         assert src is not None, f"Could not find source function '{self.entrypoint}'"
 
-        module_name = self.fact_parser.get_module_name_for_node(src)
+        file_name = self.fact_parser.get_module_name_for_node(src)
 
-        print(f"Found function '{self.entrypoint}' in module '{module_name}'")
+        print(f"Found function '{self.entrypoint}' in module '{file_name}'")
         self.src = src
         for result in self.results:
             result.update_from_fact_parser(self.fact_parser)
@@ -562,7 +583,7 @@ class Orchestrator:
             tmp_in = Path("reach_wrap_input.json")
             tmp_out = Path("reach_wrap_output.json")
 
-        self.input_manager = ReachToolManager(self.facts_dir, src, tmp_in, tmp_out, self.reach_bin_path, self.reach_args)
+        self.input_manager = ReachToolManager(self.facts_file, src, tmp_in, tmp_out, self.reach_bin_path, self.reach_args)
         
         unsolved_results = self.get_unsolved_results()
         self.input_manager.serialize_tool_input(unsolved_results)
@@ -635,18 +656,14 @@ def main():
     )
 
     parser.add_argument(
-        "-o",
-        "--output",
-        type=str,
-        help="the path to write the output file to",
-        required=True
+        "-o", "--output", type=str, help="the path to write the output file to"
     )
 
     parser.add_argument(
         "-f",
         "--facts",
         type=str,
-        help="the folder containing the facts files",
+        help="the file containing the facts",
         required=True
     )
 

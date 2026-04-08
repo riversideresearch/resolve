@@ -39,13 +39,23 @@ function(resolve_add_check_targets target_name)
     )
 
     # Target: run clang-tidy
-    add_custom_target(lint-${target_name}
-        COMMAND clang-tidy
-                -p $<TARGET_FILE_DIR:${target_name}>
-                ${sources}
-        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-        COMMENT "Running clang-tidy checks on ${target_name}"
-    )
+    # Skip this for c++ 23 target because glaze uses some features that llvm-18 doesn't supply
+    get_target_property(target_std ${target_name} CXX_STANDARD)
+    message("${target_name} @ ${target_std}")
+    if (target_std AND target_std GREATER_EQUAL 23)
+        add_custom_target(lint-${target_name}
+            COMMAND true
+            COMMENT "Skipping clang-tidy checks for cxx_23+ ${target_name}"
+        )
+    else()
+        add_custom_target(lint-${target_name}
+            COMMAND clang-tidy
+                    -p ${CMAKE_BINARY_DIR}
+                    ${sources}
+            WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+            COMMENT "Running clang-tidy checks on ${target_name}"
+        )
+    endif()
 
     # Needed by clang tidy
     set_target_properties(${target_name} PROPERTIES EXPORT_COMPILE_COMMANDS ON)
