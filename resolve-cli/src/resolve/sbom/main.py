@@ -143,6 +143,7 @@ def main(argv: list[str] | None = None) -> int:
         allow_disputed=not args.filter_disputed,
         allow_deferred=not args.filter_deferred,
         allow_rejected=not args.filter_rejected,
+        allow_ids=args.id,
     )
 
     asyncio.run(dep_lookup(deps, **kwargs))
@@ -160,11 +161,8 @@ def main(argv: list[str] | None = None) -> int:
 
     vulnerabilities: list[Vulnerability] = []
     seen_ids = set(args.id)
-    for dep in deps:
-        assert dep.cves is not None
-        for cve in dep.cves:
-            if args.id and cve.id.root not in args.id:
-                continue
+    for dep in deps or []:
+        for cve in dep.cves or []:
             seen_ids.discard(cve.id.root)
             vulnerabilities.extend(cve2vuln(cve, dep, ai=ai))
 
