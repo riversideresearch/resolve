@@ -116,7 +116,7 @@ struct ModuleFacts {
 using NamespacedNodeId = std::pair<NodeId, NodeId>;
 
 std::string to_string(const NamespacedNodeId &id);
-NamespacedNodeId from_string(const std::string& s);
+NamespacedNodeId from_string(const std::string &s);
 
 struct ProgramFacts {
   std::unordered_map<NodeId, ModuleFacts> modules;
