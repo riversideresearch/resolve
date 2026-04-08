@@ -192,7 +192,7 @@ class FactParser:
     def __init__(self, facts_folder: Path):
         self.facts_folder = facts_folder
         # Load Nodes
-        with (facts_folder / "facts.facts").open() as f:
+        with (facts_folder / "facts").open() as f:
 
             all_nodes = []
             #all_edges = []
