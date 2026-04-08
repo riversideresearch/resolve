@@ -4,7 +4,9 @@ use libc::{
     c_char, c_void, calloc, free, malloc, realloc, strdup, strlen, strndup, strnlen,
 };
 
-use crate::shadowobjs::{ALIVE_OBJ_LIST, AllocType, FREED_OBJ_LIST, Vaddr};
+use crate::shadowobjs::{
+    ALIVE_OBJ_LIST, AllocType, FREED_OBJ_LIST, STACK_OBJ_LIST, Vaddr,
+};
 
 use log::{info, warn};
 
@@ -16,25 +18,54 @@ use log::{info, warn};
 #[unsafe(no_mangle)]
 pub extern "C" fn __resolve_alloca(ptr: *mut c_void, size: usize) -> () {
     let base = ptr as Vaddr;
-    {
-        let mut obj_list = ALIVE_OBJ_LIST.lock();
-        obj_list.add_shadow_object(AllocType::Stack, base, size);
-    }
+
+    STACK_OBJ_LIST.with_borrow_mut(|l| {
+        l.add_shadow_object(AllocType::Stack, base, size);
+    });
 
     info!("[STACK] Object allocated with size: {size}, address: 0x{base:x}");
 }
 
+/*
 #[unsafe(no_mangle)]
+pub extern "C" fn resolve_invalidate_stack(base: *mut c_void) {
 pub extern "C" fn __resolve_invalidate_stack(base: *mut c_void) {
     let base = base as Vaddr;
 
-    {
-        let mut obj_list = ALIVE_OBJ_LIST.lock();
-        obj_list.invalidate_at(base);
-    }
+    STACK_OBJ_LIST.with_borrow_mut(|l| {
+        l.invalidate_at(base);
+    });
 
-    info!("[STACK] Free addr 0x{base:x}");
+    info!("[STACK] Free range 0x{base:x}");
 }
+*/
+
+macro_rules! invalidate_stacks {
+    ($name:ident; $($ns:literal),+) => {
+
+#[unsafe(no_mangle)]
+pub extern "C" fn $name($(${concat(base_, $ns)}: *mut c_void, )+) {
+
+    STACK_OBJ_LIST.with_borrow_mut(|l| {
+        $(
+        l.invalidate_at(${concat(base_, $ns)} as Vaddr);
+        info!("[STACK] Free address 0x{:x}", ${concat(base_, $ns)} as Vaddr);
+        )+
+    });
+
+}
+
+    }
+}
+
+// the x64 ABI allows up to 6 arguments to be passed via register,
+// so provide that many functions as we cannot define a variadic
+invalidate_stacks!(resolve_invalidate_stack; 1);
+invalidate_stacks!(resolve_invalidate_stack_2; 1, 2);
+invalidate_stacks!(resolve_invalidate_stack_3; 1, 2, 3);
+invalidate_stacks!(resolve_invalidate_stack_4; 1, 2, 3, 4);
+invalidate_stacks!(resolve_invalidate_stack_5; 1, 2, 3, 4, 5);
+invalidate_stacks!(resolve_invalidate_stack_6; 1, 2, 3, 4, 5, 6);
 
 /**
  * @brief - Allocator logging interface for malloc
@@ -62,6 +93,67 @@ pub extern "C" fn __resolve_malloc(size: usize) -> *mut c_void {
     // Return the pointer
     ptr
 }
+
+/**
+ * @brief - Function call to replace llvm 'gep' instruction
+ * @input
+ *  - ptr: unique pointer root
+ *  - derived: pointer derived from unique root ptr
+ * @return valid pointer within bounds of allocation or
+ * pointer 1-past limit of allocation
+ */
+
+#[unsafe(no_mangle)]
+pub extern "C" fn resolve_gep(ptr: *mut c_void, derived: *mut c_void, max_access: usize) -> *mut c_void {
+    let base = ptr as Vaddr;
+    let derived = derived as Vaddr;
+
+    
+    let contains_or_err = |obj: &ShadowObject| {
+        // If shadow object exists then check if the access is within bounds
+        if obj.contains(ShadowObject::limit(derived, max_access)) {
+            trace!(
+                "[GEP] ptr {max_access}x{derived:x} valid for base 0x{base:x}, obj: {}@0x{:x}",
+                obj.size(),
+                obj.base
+            );
+            return derived as *mut c_void;
+        }
+
+        error!(
+            "[GEP] ptr {max_access}x{derived:x} not valid for base 0x{base:x}, obj: {}@0x{:x}",
+            obj.size(),
+            obj.base
+        );
+
+        // Pointer known-invalid, return sentinel to indicate failure
+        0 as *mut c_void
+    };
+
+    // Check the local stack list first since it is cheaper.
+    if let Some(sobj) = STACK_OBJ_LIST.with_borrow(|l| l.search_intersection(base).cloned()) {
+        return contains_or_err(&sobj);
+    };
+
+    let sobj_table = ALIVE_OBJ_LIST.lock();
+
+    // Look up the shadow object corresponding to this access.
+    let Some(sobj) = sobj_table.search_intersection(base) else {
+        warn!("[GEP] Cannot find ptr 0x{base:x} in shadow table");
+
+        // NOTE: Not doing this right now
+        // In theory it could catch bugs where integers are forced to pointers...
+        // But there are too many allocation we don't know about, like those in libc
+        // or the argv pointer.
+        // return 0 as *mut c_void;
+
+        // Assume unknown pointers are safe
+        return derived as *mut c_void;
+    };
+
+    contains_or_err(sobj)
+}
+
 
 /**
  * @brief - Allocator logging interface for free
@@ -263,6 +355,59 @@ pub struct ShadowObjBounds {
  *         shadow object as pointers 
  */
 #[unsafe(no_mangle)]
+pub extern "C" fn resolve_check_bounds(base_ptr: *mut c_void, size: usize) -> bool {
+    let base = base_ptr as Vaddr;
+
+    // Nullptr clearly are not valid, and may be returned by resolve_gep if it is an invalid call.
+    if base == 0 {
+        return false;
+    }
+
+    let contains_or_err = |obj: &ShadowObject| {
+        // If shadow object exists then check if the access is within bounds
+        if obj.contains(ShadowObject::limit(base, size)) {
+            // Access in Bounds
+            trace!(
+                "[BOUNDS] Access allowed {size}@0x{base:x} for allocation {}@0x{:x}",
+                obj.size(),
+                obj.base
+            );
+            return true;
+        } else {
+            error!(
+                "[BOUNDS] OOB access at {size}@0x{base:x} too big for allocation {}@0x{:x}",
+                obj.size(),
+                obj.base
+            );
+            return false;
+        }
+    };
+
+    if let Some(sobj) = STACK_OBJ_LIST.with_borrow(|l| l.search_intersection(base).cloned()) {
+        return contains_or_err(&sobj);
+    }
+
+    // Look up the shadow object corresponding to this access
+    let sobj_table = ALIVE_OBJ_LIST.lock();
+    if let Some(sobj) = sobj_table.search_intersection(base) {
+        return contains_or_err(sobj);
+    }
+
+    // Check if this is an invalid pointer for one of the known shadow objects
+    if let Some(sobj) = sobj_table.search_invalid(base) {
+        error!(
+            "[BOUNDS] OOB access for {}@0x{:x}, invalid address computation",
+            sobj.size(),
+            sobj.base
+        );
+        return false;
+    }
+
+    warn!("[BOUNDS] unknown pointer 0x:{base:x}");
+
+    // Not a tracked pointer, assume good to avoid trapping on otherwise valid pointers
+    // TODO: add a strict mode to reject here / add extra tracking.
+    true
 pub extern "C" fn __resolve_get_bounds(ptr: *mut c_void) -> ShadowObjBounds {
     let sobj_table = ALIVE_OBJ_LIST.lock();
     let Some(sobj) = sobj_table.search_intersection(ptr as Vaddr) else {
@@ -276,13 +421,21 @@ pub extern "C" fn __resolve_get_bounds(ptr: *mut c_void) -> ShadowObjBounds {
 pub extern "C" fn resolve_obj_type(base_ptr: *mut c_void) -> AllocType {
     let base = base_ptr as Vaddr;
 
-    let find_in = |table: &crate::MutexWrap<crate::shadowobjs::ShadowObjectTable>| {
-        let t = table.lock();
-        t.search_intersection(base).map(|o| o.alloc_type)
+    let find_in = |table: &crate::shadowobjs::ShadowObjectTable| {
+        table.search_intersection(base).map(|o| o.alloc_type)
     };
 
     // Why does this search freed before alive?
-    let alloc_type = find_in(&FREED_OBJ_LIST).or_else(|| find_in(&ALIVE_OBJ_LIST));
+    let alloc_type = STACK_OBJ_LIST
+        .with_borrow(|l| find_in(l))
+        .or_else(|| {
+            let l = FREED_OBJ_LIST.lock();
+            find_in(&l)
+        })
+        .or_else(|| {
+            let l = ALIVE_OBJ_LIST.lock();
+            find_in(&l)
+        });
 
     alloc_type.unwrap_or(AllocType::Unknown)
 }
@@ -292,13 +445,14 @@ pub extern "C" fn resolve_obj_type(base_ptr: *mut c_void) -> AllocType {
  */
 #[unsafe(no_mangle)]
 pub extern "C" fn __resolve_report_violation() -> () {
-    info!("[RESOLVE] sanitizer triggered");
+    error!("[RESOLVE] sanitizer triggered");
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::{resolve_init, shadowobjs::AllocType};
+    use test::Bencher;
 
     #[test]
     fn test_malloc_free() {
@@ -336,5 +490,25 @@ mod tests {
 
             assert!(obj.is_none());
         }
+    }
+
+    
+    #[bench]
+    fn bench_resolve_stack(b: &mut Bencher) {
+        resolve_init();
+
+        let addrs: Vec<_> = (0x7FFF_0000_0000_0000..0x7FFF_0000_0001_0000)
+            .map(|a: usize| a as *mut c_void)
+            .collect();
+
+        b.iter(|| {
+            addrs.iter().for_each(|a| resolve_stack_obj(*a, 1));
+
+            addrs.iter().for_each(|&a| {
+                let _ = resolve_gep(a, a, 1);
+            });
+
+            addrs.iter().for_each(|a| resolve_invalidate_stack(*a));
+        });
     }
 }
