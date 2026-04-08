@@ -142,7 +142,7 @@ target_link_libraries(resolve_read_props PRIVATE resolve_facts glaze::glaze argp
 target_compile_features(resolve_read_props PUBLIC cxx_std_23)
 
 if(COMMAND resolve_add_check_targets)
-    resolve_add_check_targets(resolve_read_props src/read_props/main.cpp)
+    resolve_add_check_targets(resolve_read_props "${CMAKE_CURRENT_SOURCE_DIR}/src/read_props/main.cpp")
 endif()
 
 install(TARGETS resolve_read_props EXPORT resolve_facts_targets)
