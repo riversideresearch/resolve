@@ -8,7 +8,7 @@ use crate::shadowobjs::{
     ALIVE_OBJ_LIST, AllocType, FREED_OBJ_LIST, STACK_OBJ_LIST, Vaddr
 };
 
-use log::{info, warn};
+use log::{error, info, warn};
 
 /**
  * @brief - Allocator interface for stack objects
@@ -366,13 +366,13 @@ mod tests {
             .collect();
 
         b.iter(|| {
-            addrs.iter().for_each(|a| resolve_stack_obj(*a, 1));
+            addrs.iter().for_each(|&a| __resolve_alloca(a, 1));
 
             addrs.iter().for_each(|&a| {
-                let _ = resolve_gep(a, a, 1);
+                let _ = __resolve_get_bounds(a);
             });
 
-            addrs.iter().for_each(|a| resolve_invalidate_stack(*a));
+            addrs.iter().for_each(|&a| __resolve_invalidate_stack(a));
         });
     }
 }
