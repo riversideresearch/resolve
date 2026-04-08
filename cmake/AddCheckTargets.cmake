@@ -41,7 +41,7 @@ function(resolve_add_check_targets target_name)
     # Target: run clang-tidy
     add_custom_target(lint-${target_name}
         COMMAND clang-tidy
-                -p $<TARGET_FILE_DIR:${target_name}>
+                -p ${CMAKE_BINARY_DIR}
                 ${sources}
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
         COMMENT "Running clang-tidy checks on ${target_name}"
