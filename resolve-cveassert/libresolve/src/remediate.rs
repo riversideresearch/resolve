@@ -26,9 +26,8 @@ pub extern "C" fn __resolve_alloca(ptr: *mut c_void, size: usize) -> () {
     info!("[STACK] Object allocated with size: {size}, address: 0x{base:x}");
 }
 
-/*
 #[unsafe(no_mangle)]
-pub extern "C" fn resolve_invalidate_stack(base: *mut c_void) {
+// TODO: the x64 ABI allows up to 6 arguments to be passed via register...
 pub extern "C" fn __resolve_invalidate_stack(base: *mut c_void) {
     let base = base as Vaddr;
 
@@ -36,36 +35,8 @@ pub extern "C" fn __resolve_invalidate_stack(base: *mut c_void) {
         l.invalidate_at(base);
     });
 
-    info!("[STACK] Free range 0x{base:x}");
+    info!("[STACK] Free addr 0x{base:x}");
 }
-*/
-
-macro_rules! invalidate_stacks {
-    ($name:ident; $($ns:literal),+) => {
-
-#[unsafe(no_mangle)]
-pub extern "C" fn $name($(${concat(base_, $ns)}: *mut c_void, )+) {
-
-    STACK_OBJ_LIST.with_borrow_mut(|l| {
-        $(
-        l.invalidate_at(${concat(base_, $ns)} as Vaddr);
-        info!("[STACK] Free address 0x{:x}", ${concat(base_, $ns)} as Vaddr);
-        )+
-    });
-
-}
-
-    }
-}
-
-// the x64 ABI allows up to 6 arguments to be passed via register,
-// so provide that many functions as we cannot define a variadic
-invalidate_stacks!(resolve_invalidate_stack; 1);
-invalidate_stacks!(resolve_invalidate_stack_2; 1, 2);
-invalidate_stacks!(resolve_invalidate_stack_3; 1, 2, 3);
-invalidate_stacks!(resolve_invalidate_stack_4; 1, 2, 3, 4);
-invalidate_stacks!(resolve_invalidate_stack_5; 1, 2, 3, 4, 5);
-invalidate_stacks!(resolve_invalidate_stack_6; 1, 2, 3, 4, 5, 6);
 
 /**
  * @brief - Allocator logging interface for malloc

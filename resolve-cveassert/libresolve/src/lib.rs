@@ -2,7 +2,6 @@
 // LGPL-3; See LICENSE.txt in the repo root for details.
 
 #![feature(btree_cursors)]
-#![feature(macro_metavar_expr_concat)]
 #![feature(test)]
 extern crate test;
 
