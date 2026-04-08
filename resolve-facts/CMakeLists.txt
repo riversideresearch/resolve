@@ -96,10 +96,13 @@ install(DIRECTORY include/resolve_facts_llvm DESTINATION ${CMAKE_INSTALL_INCLUDE
 
 # Collect source files for checks
 file(GLOB_RECURSE SRC
-    "${CMAKE_CURRENT_SOURCE_DIR}/include/reach/*.hpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/libs/reach/*.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/reach/*.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/reach/*.hpp"
+)
+
+file(GLOB_RECURSE LIB
+    "${CMAKE_CURRENT_SOURCE_DIR}/include/reach/*.hpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/libs/reach/*.cpp"
 )
 
 # reach lib
@@ -127,6 +130,7 @@ add_executable(reach src/reach/main.cpp)
 target_link_libraries(reach PRIVATE libreach json argparse)
 
 if(COMMAND resolve_add_check_targets)
+    resolve_add_check_targets(libreach ${LIB})
     resolve_add_check_targets(reach ${SRC})
 endif()
 
