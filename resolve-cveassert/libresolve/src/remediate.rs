@@ -5,7 +5,7 @@ use libc::{
 };
 
 use crate::shadowobjs::{
-    ALIVE_OBJ_LIST, AllocType, FREED_OBJ_LIST, STACK_OBJ_LIST, Vaddr,
+    ALIVE_OBJ_LIST, AllocType, FREED_OBJ_LIST, STACK_OBJ_LIST, Vaddr
 };
 
 use log::{info, warn};
@@ -64,67 +64,6 @@ pub extern "C" fn __resolve_malloc(size: usize) -> *mut c_void {
     // Return the pointer
     ptr
 }
-
-/**
- * @brief - Function call to replace llvm 'gep' instruction
- * @input
- *  - ptr: unique pointer root
- *  - derived: pointer derived from unique root ptr
- * @return valid pointer within bounds of allocation or
- * pointer 1-past limit of allocation
- */
-
-#[unsafe(no_mangle)]
-pub extern "C" fn resolve_gep(ptr: *mut c_void, derived: *mut c_void, max_access: usize) -> *mut c_void {
-    let base = ptr as Vaddr;
-    let derived = derived as Vaddr;
-
-    
-    let contains_or_err = |obj: &ShadowObject| {
-        // If shadow object exists then check if the access is within bounds
-        if obj.contains(ShadowObject::limit(derived, max_access)) {
-            trace!(
-                "[GEP] ptr {max_access}x{derived:x} valid for base 0x{base:x}, obj: {}@0x{:x}",
-                obj.size(),
-                obj.base
-            );
-            return derived as *mut c_void;
-        }
-
-        error!(
-            "[GEP] ptr {max_access}x{derived:x} not valid for base 0x{base:x}, obj: {}@0x{:x}",
-            obj.size(),
-            obj.base
-        );
-
-        // Pointer known-invalid, return sentinel to indicate failure
-        0 as *mut c_void
-    };
-
-    // Check the local stack list first since it is cheaper.
-    if let Some(sobj) = STACK_OBJ_LIST.with_borrow(|l| l.search_intersection(base).cloned()) {
-        return contains_or_err(&sobj);
-    };
-
-    let sobj_table = ALIVE_OBJ_LIST.lock();
-
-    // Look up the shadow object corresponding to this access.
-    let Some(sobj) = sobj_table.search_intersection(base) else {
-        warn!("[GEP] Cannot find ptr 0x{base:x} in shadow table");
-
-        // NOTE: Not doing this right now
-        // In theory it could catch bugs where integers are forced to pointers...
-        // But there are too many allocation we don't know about, like those in libc
-        // or the argv pointer.
-        // return 0 as *mut c_void;
-
-        // Assume unknown pointers are safe
-        return derived as *mut c_void;
-    };
-
-    contains_or_err(sobj)
-}
-
 
 /**
  * @brief - Allocator logging interface for free
@@ -326,66 +265,20 @@ pub struct ShadowObjBounds {
  *         shadow object as pointers 
  */
 #[unsafe(no_mangle)]
-pub extern "C" fn resolve_check_bounds(base_ptr: *mut c_void, size: usize) -> bool {
-    let base = base_ptr as Vaddr;
-
-    // Nullptr clearly are not valid, and may be returned by resolve_gep if it is an invalid call.
-    if base == 0 {
-        return false;
-    }
-
-    let contains_or_err = |obj: &ShadowObject| {
-        // If shadow object exists then check if the access is within bounds
-        if obj.contains(ShadowObject::limit(base, size)) {
-            // Access in Bounds
-            trace!(
-                "[BOUNDS] Access allowed {size}@0x{base:x} for allocation {}@0x{:x}",
-                obj.size(),
-                obj.base
-            );
-            return true;
-        } else {
-            error!(
-                "[BOUNDS] OOB access at {size}@0x{base:x} too big for allocation {}@0x{:x}",
-                obj.size(),
-                obj.base
-            );
-            return false;
-        }
-    };
-
-    if let Some(sobj) = STACK_OBJ_LIST.with_borrow(|l| l.search_intersection(base).cloned()) {
-        return contains_or_err(&sobj);
-    }
-
-    // Look up the shadow object corresponding to this access
-    let sobj_table = ALIVE_OBJ_LIST.lock();
-    if let Some(sobj) = sobj_table.search_intersection(base) {
-        return contains_or_err(sobj);
-    }
-
-    // Check if this is an invalid pointer for one of the known shadow objects
-    if let Some(sobj) = sobj_table.search_invalid(base) {
-        error!(
-            "[BOUNDS] OOB access for {}@0x{:x}, invalid address computation",
-            sobj.size(),
-            sobj.base
-        );
-        return false;
-    }
-
-    warn!("[BOUNDS] unknown pointer 0x:{base:x}");
-
-    // Not a tracked pointer, assume good to avoid trapping on otherwise valid pointers
-    // TODO: add a strict mode to reject here / add extra tracking.
-    true
 pub extern "C" fn __resolve_get_bounds(ptr: *mut c_void) -> ShadowObjBounds {
-    let sobj_table = ALIVE_OBJ_LIST.lock();
-    let Some(sobj) = sobj_table.search_intersection(ptr as Vaddr) else {
-        return ShadowObjBounds { base: std::ptr::null_mut(), limit: std::ptr::null_mut() }
+    let base = ptr as Vaddr;
+
+    let get_bounds = |table: &crate::shadowobjs::ShadowObjectTable| {
+        table.search_intersection(base).map(|sobj| {
+            ShadowObjBounds { base: sobj.base as *mut c_void, limit: sobj.limit as *mut c_void }
+        })
     };
 
-    return ShadowObjBounds { base: sobj.base as *mut c_void, limit: sobj.limit as *mut c_void }
+    let default = ShadowObjBounds { base: std::ptr::null_mut(), limit: std::ptr::null_mut() };
+
+    return STACK_OBJ_LIST.with_borrow(get_bounds)
+            .or_else(|| { let l = ALIVE_OBJ_LIST.lock(); get_bounds(&l) })
+            .unwrap_or(default);
 }
 
 #[unsafe(no_mangle)]
