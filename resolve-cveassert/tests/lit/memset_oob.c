@@ -7,7 +7,7 @@
 // RUN: RESOLVE_LABEL_CVE=vulnerabilities/memset_oob.json %clang -S -emit-llvm \
 // RUN: -fpass-plugin=%plugin \
 // RUN: %s -o - | %FileCheck %s 
-// CHECK: call ptr @__cve_san_memset 
+// CHECK: call ptr @__cve_memset 
 // RUN: RESOLVE_LABEL_CVE=vulnerabilities/memset_oob.json %clang -O0 -g -fpass-plugin=%plugin \ 
 // RUN: -L%rlib -lresolve -Wl,-rpath=%rlib %s -o %t.exe
 // RUN: %t.exe; test $? -eq 3
