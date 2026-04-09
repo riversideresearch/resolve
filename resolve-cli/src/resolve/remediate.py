@@ -1,9 +1,16 @@
 import argparse
 import mmap
 from pathlib import Path
-
+import json
+from dataclasses import dataclass
 from elftools.elf.elffile import ELFFile
 from elftools.elf.sections import SymbolTableSection
+
+@dataclass
+class CweTarget:
+    cwe: int
+    fnName: str
+
 
 CWE_PATCHES = {
     0: [0, 1, 2, 3, 4, 5, 6],
@@ -26,7 +33,6 @@ def find_symbol_offset(elf: ELFFile, symbol_name: str):
                     return symbol
     return None
 
-
 def find_file_offset(elf: ELFFile, vaddr: int) -> int | None:
     """
     Convert a virtual address to a file offset by scanning PT_LOAD segments.
@@ -39,12 +45,10 @@ def find_file_offset(elf: ELFFile, vaddr: int) -> int | None:
                 return int(segment["p_offset"] + (vaddr - start))
     return None
 
-
 def set_byte(mm: mmap.mmap, offset: int, bit: int):
     """
     Set byte @ offset
     """
-    # Get the original bit at the byte offset
     original = mm[offset]
     print(f"[DEBUGGING] Original bit: {original}")
 
@@ -52,10 +56,31 @@ def set_byte(mm: mmap.mmap, offset: int, bit: int):
         print(f"[INFO] set_bit and original bit match: {bit} no changes made to binary")
         return original, bit
 
-    modified = bit
-    mm[offset] = modified
+    mm[offset] = bit
+    return original, bit
 
-    return original, modified
+def parse_cve_description(json_path: Path) -> CweTarget:
+    with json_path.open("r") as f:
+        json_obj = json.load(f)
+
+        if not json_obj["vulnerabilities"]:
+            raise ValueError("[ERROR] No vulnerabilities found.")
+        
+        vuln = json_obj["vulnerabilities"][0] 
+
+        if not vuln["cwe-id"]:
+            raise ValueError("[ERROR] 'cwe-id' field not present.")
+        
+        cwe_id = vuln["cwe-id"]
+        if not cwe_id:
+            raise ValueError("[ERROR] 'cwe-id' field not present.")
+
+        if not vuln["affected-function"]:
+            raise ValueError("[ERROR] 'affected-function' field not present.")
+        
+        bitmap = vuln["affected-function"] + ".sanmap"
+        return CweTarget(int(cwe_id), name)
+
 
 def patch_symbol(elf_path: Path, symbol_name: str, cwe: int, bit: int):
     """
@@ -111,13 +136,8 @@ def main():
     )
 
     parser.add_argument(
-        "symbol",
-        type=str,
-    )
-
-    parser.add_argument(
-        "cwe",
-        type=int,
+        "cve",
+        type=Path,
     )
 
     parser.add_argument(
@@ -126,7 +146,8 @@ def main():
     )
 
     args = parser.parse_args()
-    patch_symbol(args.target_bin, args.symbol, args.cwe, args.bit)
+    cve = parse_cve_description(args.cve)
+    patch_symbol(args.target_bin, cve.fnName, cve.cwe, args.bit)
 
 if __name__ == "__main__":
     main()
