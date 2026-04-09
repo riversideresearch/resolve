@@ -6,7 +6,7 @@
 // RUN: %clang -S -emit-llvm \
 // RUN: %s -o - | %FileCheck %s 
 // CHECK-LABEL: dso_local i32 @main
-// CHECK-NOT: call ptr @__cve_san_memcpy
+// CHECK-NOT: call ptr @__cve_memcpy
 
 #include <stdlib.h>
 int loop(int *array) {
