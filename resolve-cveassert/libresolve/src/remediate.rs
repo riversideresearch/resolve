@@ -4,9 +4,11 @@ use libc::{
     c_char, c_void, calloc, free, malloc, realloc, strdup, strlen, strndup, strnlen,
 };
 
-use crate::shadowobjs::{ALIVE_OBJ_LIST, AllocType, FREED_OBJ_LIST, Vaddr};
+use crate::shadowobjs::{
+    ALIVE_OBJ_LIST, AllocType, FREED_OBJ_LIST, STACK_OBJ_LIST, Vaddr
+};
 
-use log::{info, warn};
+use log::{error, info, warn};
 
 /**
  * @brief - Allocator interface for stack objects
@@ -16,22 +18,22 @@ use log::{info, warn};
 #[unsafe(no_mangle)]
 pub extern "C" fn __resolve_alloca(ptr: *mut c_void, size: usize) -> () {
     let base = ptr as Vaddr;
-    {
-        let mut obj_list = ALIVE_OBJ_LIST.lock();
-        obj_list.add_shadow_object(AllocType::Stack, base, size);
-    }
+
+    STACK_OBJ_LIST.with_borrow_mut(|l| {
+        l.add_shadow_object(AllocType::Stack, base, size);
+    });
 
     info!("[STACK] Object allocated with size: {size}, address: 0x{base:x}");
 }
 
 #[unsafe(no_mangle)]
+// TODO: the x64 ABI allows up to 6 arguments to be passed via register...
 pub extern "C" fn __resolve_invalidate_stack(base: *mut c_void) {
     let base = base as Vaddr;
 
-    {
-        let mut obj_list = ALIVE_OBJ_LIST.lock();
-        obj_list.invalidate_at(base);
-    }
+    STACK_OBJ_LIST.with_borrow_mut(|l| {
+        l.invalidate_at(base);
+    });
 
     info!("[STACK] Free addr 0x{base:x}");
 }
@@ -262,25 +264,40 @@ pub struct ShadowObjBounds {
  */
 #[unsafe(no_mangle)]
 pub extern "C" fn __resolve_get_bounds(ptr: *mut c_void) -> ShadowObjBounds {
-    let sobj_table = ALIVE_OBJ_LIST.lock();
-    let Some(sobj) = sobj_table.search_intersection(ptr as Vaddr) else {
-        return ShadowObjBounds { base: std::ptr::null_mut(), limit: std::ptr::null_mut() }
+    let base = ptr as Vaddr;
+
+    let get_bounds = |table: &crate::shadowobjs::ShadowObjectTable| {
+        table.search_intersection(base).map(|sobj| {
+            ShadowObjBounds { base: sobj.base as *mut c_void, limit: sobj.limit as *mut c_void }
+        })
     };
 
-    return ShadowObjBounds { base: sobj.base as *mut c_void, limit: sobj.limit as *mut c_void }
+    let default = ShadowObjBounds { base: std::ptr::null_mut(), limit: std::ptr::null_mut() };
+
+    return STACK_OBJ_LIST.with_borrow(get_bounds)
+            .or_else(|| { let l = ALIVE_OBJ_LIST.lock(); get_bounds(&l) })
+            .unwrap_or(default);
 }
 
 #[unsafe(no_mangle)]
 pub extern "C" fn resolve_obj_type(base_ptr: *mut c_void) -> AllocType {
     let base = base_ptr as Vaddr;
 
-    let find_in = |table: &crate::MutexWrap<crate::shadowobjs::ShadowObjectTable>| {
-        let t = table.lock();
-        t.search_intersection(base).map(|o| o.alloc_type)
+    let find_in = |table: &crate::shadowobjs::ShadowObjectTable| {
+        table.search_intersection(base).map(|o| o.alloc_type)
     };
 
     // Why does this search freed before alive?
-    let alloc_type = find_in(&FREED_OBJ_LIST).or_else(|| find_in(&ALIVE_OBJ_LIST));
+    let alloc_type = STACK_OBJ_LIST
+        .with_borrow(|l| find_in(l))
+        .or_else(|| {
+            let l = FREED_OBJ_LIST.lock();
+            find_in(&l)
+        })
+        .or_else(|| {
+            let l = ALIVE_OBJ_LIST.lock();
+            find_in(&l)
+        });
 
     alloc_type.unwrap_or(AllocType::Unknown)
 }
@@ -290,13 +307,14 @@ pub extern "C" fn resolve_obj_type(base_ptr: *mut c_void) -> AllocType {
  */
 #[unsafe(no_mangle)]
 pub extern "C" fn __resolve_report_violation() -> () {
-    info!("[RESOLVE] sanitizer triggered");
+    error!("[RESOLVE] sanitizer triggered");
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::{resolve_init, shadowobjs::AllocType};
+    use test::Bencher;
 
     #[test]
     fn test_malloc_free() {
@@ -334,5 +352,25 @@ mod tests {
 
             assert!(obj.is_none());
         }
+    }
+
+    
+    #[bench]
+    fn bench_resolve_stack(b: &mut Bencher) {
+        resolve_init();
+
+        let addrs: Vec<_> = (0x7FFF_0000_0000_0000..0x7FFF_0000_0001_0000)
+            .map(|a: usize| a as *mut c_void)
+            .collect();
+
+        b.iter(|| {
+            addrs.iter().for_each(|&a| __resolve_alloca(a, 1));
+
+            addrs.iter().for_each(|&a| {
+                let _ = __resolve_get_bounds(a);
+            });
+
+            addrs.iter().for_each(|&a| __resolve_invalidate_stack(a));
+        });
     }
 }
