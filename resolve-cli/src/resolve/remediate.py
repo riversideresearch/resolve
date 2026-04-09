@@ -5,6 +5,16 @@ from pathlib import Path
 from elftools.elf.elffile import ELFFile
 from elftools.elf.sections import SymbolTableSection
 
+CWE_PATCHES = {
+    0: [0, 1, 2, 3, 4, 5, 6],
+    121: [0],
+    122: [0],
+    123: [0],
+    125: [0],
+    131: [0],
+    369: [3]
+}
+
 def find_symbol_offset(elf: ELFFile, symbol_name: str):
     """
     Locate the symbol inside an ELF file via symbol table lookup.
@@ -29,7 +39,21 @@ def find_file_offset(elf: ELFFile, vaddr: int) -> int | None:
                 return int(segment["p_offset"] + (vaddr - start))
     return None
 
-def patch_symbol(elf_path: Path, symbol_name: str, index: int):
+
+def flip_byte(mm: mmap.mmap, offset: int):
+    """
+    Toggles the bit from 0 --> 1 or 1 --> 0
+    """
+    # Get the original bit at the byte offset
+    original = mm[offset]
+    # Create another value that toggles
+    modified = 0 if original != 0 else 1
+    # write the value to the byte offset 
+    mm[offset] = modified
+
+    return original, modified
+
+def patch_symbol(elf_path: Path, symbol_name: str, cwe: int):
     """
     Patch the value of a symbol inside the ELF binary
     """
@@ -43,29 +67,36 @@ def patch_symbol(elf_path: Path, symbol_name: str, index: int):
         symbol_addr = int(symbol["st_value"])
         symbol_size = int(symbol["st_size"])
 
-        if index < 0 or index >= symbol_size:
-            raise ValueError(
-                f"[ERROR] Index '{index}' out of bounds (size={symbol_size})"
-            )
-
         base_offset = find_file_offset(elf, symbol_addr)
         if base_offset is None:
             raise ValueError(
                 f"Symbol '{symbol_name}' not located in any PT_LOAD segment"
             )
-        
-        target_offset = base_offset + index
-        if target_offset >= mm.size():
-            raise ValueError("[ERROR] Target offset exceeds file size")
 
-        mm[target_offset] = 0 if mm[target_offset] != 0 else 1
-        mm.flush()
+        if cwe not in CWE_PATCHES:
+            raise ValueError(f"[ERROR] Unsupported CWE {cwe}")
 
-        print(
-            f"[INFO] Patched {symbol_name}[{index}] "
-            f"@ file offset {target_offset:#x}"
+        offsets = CWE_PATCHES[cwe]
+
+        for rel_offset in offsets:
+            if rel_offset < 0 or rel_offset >= symbol_size:
+                raise ValueError(
+                    f"[ERROR] Offset {rel_offset} out of bounds "
+                    f"(symbol size = {symbol_size})"
+                )
+
+            target_offset = base_offset + rel_offset
+
+            if target_offset >= mm.size():
+                raise ValueError(f"[ERROR] Target offset {target_offset:#x} out of range")
+            
+            original, modified = flip_byte(mm, target_offset)
+            print(
+                f"[INFO] Patched {symbol_name}[{rel_offset}] "
+                f"@ file offset {target_offset:#x}: {original:#x} -> {modified:#x}"
         )
 
+        mm.flush()
 
 
 def main():
@@ -81,12 +112,12 @@ def main():
     )
 
     parser.add_argument(
-        "index",
+        "cwe",
         type=int,
     )
 
     args = parser.parse_args()
-    patch_symbol(args.target_bin, args.symbol, args.index)
+    patch_symbol(args.target_bin, args.symbol, args.cwe)
 
 if __name__ == "__main__":
     main()
