@@ -50,7 +50,6 @@ def set_byte(mm: mmap.mmap, offset: int, bit: int):
     Set byte @ offset
     """
     original = mm[offset]
-    print(f"[DEBUGGING] Original bit: {original}")
 
     if original == bit:
         print(f"[INFO] set_bit and original bit match: {bit} no changes made to binary")
