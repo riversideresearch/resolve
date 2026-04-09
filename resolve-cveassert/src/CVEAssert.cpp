@@ -55,12 +55,12 @@ GlobalVariable *initSanitizerMap(Function &F) {
 
   gSanitizerMap->setLinkage(GlobalValue::LinkOnceAnyLinkage);
   gSanitizerMap->setConstant(false);
+  gSanitizerMap->setMetadata("cve.noinstrument", MDNode::get(Ctx, {}));
 
   if (!gSanitizerMap->hasInitializer()) {
     std::vector<Constant *> elems(7, ConstantInt::get(i1_ty, 1));
     gSanitizerMap->setInitializer(ConstantArray::get(arr_ty, elems));
   }
-
   return gSanitizerMap;
 }
 
