@@ -9,7 +9,7 @@ from elftools.elf.sections import SymbolTableSection
 @dataclass
 class CweTarget:
     cwe: int
-    fnName: str
+    function_name: str
 
 
 CWE_PATCHES = {
@@ -146,7 +146,7 @@ def main():
 
     args = parser.parse_args()
     cve = parse_cve_description(args.cve)
-    patch_symbol(args.target_bin, cve.fnName, cve.cwe, args.bit)
+    patch_symbol(args.target_bin, cve.function_name, cve.cwe, args.bit)
 
 if __name__ == "__main__":
     main()
