@@ -2,8 +2,6 @@
 // LGPL-3; See LICENSE.txt in the repo root for details.
 
 #![feature(btree_cursors)]
-#![feature(test)]
-extern crate test;
 
 mod remediate;
 mod shadowobjs;
