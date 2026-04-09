@@ -40,20 +40,24 @@ def find_file_offset(elf: ELFFile, vaddr: int) -> int | None:
     return None
 
 
-def flip_byte(mm: mmap.mmap, offset: int):
+def set_byte(mm: mmap.mmap, offset: int, bit: int):
     """
-    Toggles byte @ offset from 0 --> 1 or 1 --> 0
+    Set byte @ offset
     """
     # Get the original bit at the byte offset
     original = mm[offset]
-    # Create another value that toggles
-    modified = 0 if original != 0 else 1
-    # write the value to the byte offset 
+    print(f"[DEBUGGING] Original bit: {original}")
+
+    if original == bit:
+        print(f"[INFO] set_bit and original bit match: {bit} no changes made to binary")
+        return original, bit
+
+    modified = bit
     mm[offset] = modified
 
     return original, modified
 
-def patch_symbol(elf_path: Path, symbol_name: str, cwe: int):
+def patch_symbol(elf_path: Path, symbol_name: str, cwe: int, bit: int):
     """
     Patch the value of a symbol inside the ELF binary
     """
@@ -90,7 +94,7 @@ def patch_symbol(elf_path: Path, symbol_name: str, cwe: int):
             if target_offset >= mm.size():
                 raise ValueError(f"[ERROR] Target offset {target_offset:#x} out of range")
             
-            original, modified = flip_byte(mm, target_offset)
+            original, modified = set_byte(mm, target_offset, bit)
             print(
                 f"[INFO] Patched {symbol_name}[{rel_offset}] "
                 f"@ file offset {target_offset:#x}: {original:#x} -> {modified:#x}"
@@ -116,8 +120,13 @@ def main():
         type=int,
     )
 
+    parser.add_argument(
+        "bit",
+        type=int,
+    )
+
     args = parser.parse_args()
-    patch_symbol(args.target_bin, args.symbol, args.cwe)
+    patch_symbol(args.target_bin, args.symbol, args.cwe, args.bit)
 
 if __name__ == "__main__":
     main()
