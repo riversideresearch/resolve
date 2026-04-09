@@ -61,7 +61,6 @@ GlobalVariable *initSanitizerMap(Function &F) {
     std::vector<Constant *> elems(7, ConstantInt::get(i1_ty, 1));
     gSanitizerMap->setInitializer(ConstantArray::get(arr_ty, elems));
   }
-
   return gSanitizerMap;
 }
 
