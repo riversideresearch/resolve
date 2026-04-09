@@ -42,7 +42,7 @@ def find_file_offset(elf: ELFFile, vaddr: int) -> int | None:
 
 def flip_byte(mm: mmap.mmap, offset: int):
     """
-    Toggles the bit from 0 --> 1 or 1 --> 0
+    Toggles byte @ offset from 0 --> 1 or 1 --> 0
     """
     # Get the original bit at the byte offset
     original = mm[offset]
