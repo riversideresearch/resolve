@@ -58,27 +58,32 @@ def set_byte(mm: mmap.mmap, offset: int, bit: int):
     mm[offset] = bit
     return original, bit
 
-def parse_cve_description(json_path: Path) -> CweTarget:
+def parse_cve_description(json_path: Path) -> list[CweTarget]:
+    """
+    Parses CVE descriptions and stores them in list
+    If 'cwe-id' or 'affected-function' fields cannot 
+    be found then raise ValueError
+    """
+    cwe_targets = []
+    
     with json_path.open("r") as f:
         json_obj = json.load(f)
 
         if not json_obj["vulnerabilities"]:
             raise ValueError("[ERROR] No vulnerabilities found.")
         
-        vuln = json_obj["vulnerabilities"][0] 
+        for vuln in json_obj["vulnerabilities"]:
+            cwe_id = vuln["cwe-id"]
+            function_name = vuln["affected-function"]
+            if not cwe_id:
+                raise ValueError("[ERROR] 'cwe-id' field not present.")
 
-        if not vuln["cwe-id"]:
-            raise ValueError("[ERROR] 'cwe-id' field not present.")
+            if not vuln["affected-function"]:
+                raise ValueError("[ERROR] 'affected-function' field not present.")
+            
+            cwe_targets.append(CweTarget(int(cwe_id), function_name + ".sanmap"))
         
-        cwe_id = vuln["cwe-id"]
-        if not cwe_id:
-            raise ValueError("[ERROR] 'cwe-id' field not present.")
-
-        if not vuln["affected-function"]:
-            raise ValueError("[ERROR] 'affected-function' field not present.")
-        
-        bitmap = vuln["affected-function"] + ".sanmap"
-        return CweTarget(int(cwe_id), bitmap)
+        return cwe_targets
 
 
 def patch_symbol(elf_path: Path, symbol_name: str, cwe: int, bit: int):
@@ -145,8 +150,10 @@ def main():
     )
 
     args = parser.parse_args()
-    cve = parse_cve_description(args.cve)
-    patch_symbol(args.target_bin, cve.function_name, cve.cwe, args.bit)
+    cve_list = parse_cve_description(args.cve)
+
+    for cve in cve_list:
+        patch_symbol(args.target_bin, cve.function_name, cve.cwe, args.bit)
 
 if __name__ == "__main__":
     main()
