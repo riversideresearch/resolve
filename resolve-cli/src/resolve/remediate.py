@@ -78,7 +78,7 @@ def parse_cve_description(json_path: Path) -> CweTarget:
             raise ValueError("[ERROR] 'affected-function' field not present.")
         
         bitmap = vuln["affected-function"] + ".sanmap"
-        return CweTarget(int(cwe_id), name)
+        return CweTarget(int(cwe_id), bitmap)
 
 
 def patch_symbol(elf_path: Path, symbol_name: str, cwe: int, bit: int):
