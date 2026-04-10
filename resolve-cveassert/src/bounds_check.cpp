@@ -161,8 +161,10 @@ static Function *getOrCreateBoundsCheckLoadSanitizer(
   builder.CreateCall(getOrCreateResolveReportSanitizerTriggered(M));
   if (Function *fn = getOrCreateRemediationBehavior(M, strategy)) {
     builder.CreateCall(fn);
+    builder.CreateUnreachable();
+  } else {
+    builder.CreateRet(Constant::getNullValue(ty));
   }
-  builder.CreateRet(Constant::getNullValue(ty));
 
   validateIR(resolveLoadFn);
   return resolveLoadFn;
@@ -227,9 +229,11 @@ static Function *getOrCreateBoundsCheckStoreSanitizer(
   builder.CreateCall(getOrCreateResolveReportSanitizerTriggered(M));
   if (Function *fn = getOrCreateRemediationBehavior(M, strategy)) {
     builder.CreateCall(fn);
+    builder.CreateUnreachable();
+  } else {
+    builder.CreateRetVoid();
   }
-  builder.CreateRetVoid();
-
+  
   validateIR(resolveStoreFn);
   return resolveStoreFn;
 }
@@ -266,9 +270,9 @@ static Function *getOrCreateBoundsCheckMemcpySanitizer(
 
   builder.SetInsertPoint(EntryBB);
   // Extract dst, src, size arguments from function
-  Value *dst_ptr = resolveMemmoveFn->getArg(0);
-  Value *src_ptr = resolveMemmoveFn->getArg(1);
-  Value *size_arg = resolveMemmoveFn->getArg(2);
+  Value *dstPtr = resolveMemmoveFn->getArg(0);
+  Value *srcPtr = resolveMemmoveFn->getArg(1);
+  Value *sizeArg = resolveMemmoveFn->getArg(2);
 
   Value *mapPtr = builder.CreateGEP(map->getValueType(), map,
                                     {builder.getInt64(0), builder.getInt64(0)});
@@ -278,19 +282,19 @@ static Function *getOrCreateBoundsCheckMemcpySanitizer(
   builder.CreateCondBr(isZero, NormalBB, CheckAccessBB);
 
   builder.SetInsertPoint(CheckAccessBB);
-  Value *check_src_bd =
-      builder.CreateCall(getOrCreateAccessOk(M), {src_ptr, size_arg});
-  Value *check_dst_bd =
-      builder.CreateCall(getOrCreateAccessOk(M), {dst_ptr, size_arg});
+  Value *check_src_access =
+      builder.CreateCall(getOrCreateAccessOk(M), {srcPtr, sizeArg});
+  Value *check_dst_access =
+      builder.CreateCall(getOrCreateAccessOk(M), {dstPtr, sizeArg});
 
-  Value *withinBounds = builder.CreateAnd(check_src_bd, check_dst_bd);
+  Value *withinBounds = builder.CreateAnd(check_src_access, check_dst_access);
   builder.CreateCondBr(withinBounds, NormalBB, SanitizeMemcpyBB);
 
   // NormalBB: Call memcpy and return the ptr
   builder.SetInsertPoint(NormalBB);
   FunctionCallee memcpyFn = M->getOrInsertFunction(
       "memcpy", FunctionType::get(ptr_ty, {ptr_ty, ptr_ty, size_ty}, false));
-  Value *memcpyPtr = builder.CreateCall(memcpyFn, {dst_ptr, src_ptr, size_arg});
+  Value *memcpyPtr = builder.CreateCall(memcpyFn, {dstPtr, srcPtr, sizeArg});
   builder.CreateRet(memcpyPtr);
 
   // SanitizeMemcpyBB: Remediate memcpy returns null pointer.
@@ -298,9 +302,10 @@ static Function *getOrCreateBoundsCheckMemcpySanitizer(
   builder.CreateCall(getOrCreateResolveReportSanitizerTriggered(M));
   if (Function *fn = getOrCreateRemediationBehavior(M, strategy)) {
     builder.CreateCall(fn);
+    builder.CreateUnreachable();
+  } else {
+    builder.CreateRet(dstPtr);
   }
-  builder.CreateRet(dst_ptr);
-
   validateIR(resolveMemmoveFn);
   return resolveMemmoveFn;
 }
@@ -337,9 +342,9 @@ static Function *getOrCreateBoundsCheckMemmoveSanitizer(
 
   builder.SetInsertPoint(EntryBB);
   // Extract dst, src, size arguments from function
-  Value *dst_ptr = resolveMemmoveFn->getArg(0);
-  Value *src_ptr = resolveMemmoveFn->getArg(1);
-  Value *size_arg = resolveMemmoveFn->getArg(2);
+  Value *dstPtr = resolveMemmoveFn->getArg(0);
+  Value *srcPtr = resolveMemmoveFn->getArg(1);
+  Value *sizeArg = resolveMemmoveFn->getArg(2);
 
   Value *mapPtr = builder.CreateGEP(map->getValueType(), map,
                                     {builder.getInt64(0), builder.getInt64(0)});
@@ -349,12 +354,12 @@ static Function *getOrCreateBoundsCheckMemmoveSanitizer(
   builder.CreateCondBr(isZero, NormalBB, CheckAccessBB);
 
   builder.SetInsertPoint(CheckAccessBB);
-  Value *check_src_bd =
-      builder.CreateCall(getOrCreateAccessOk(M), {src_ptr, size_arg});
-  Value *check_dst_bd =
-      builder.CreateCall(getOrCreateAccessOk(M), {dst_ptr, size_arg});
+  Value *check_src_access =
+      builder.CreateCall(getOrCreateAccessOk(M), {srcPtr, sizeArg});
+  Value *check_dst_access =
+      builder.CreateCall(getOrCreateAccessOk(M), {dstPtr, sizeArg});
 
-  Value *withinBounds = builder.CreateAnd(check_src_bd, check_dst_bd);
+  Value *withinBounds = builder.CreateAnd(check_src_access, check_dst_access);
   builder.CreateCondBr(withinBounds, NormalBB, SanitizeMemmoveBB);
 
   // NormalBB: Call memcpy and return the ptr
@@ -362,7 +367,7 @@ static Function *getOrCreateBoundsCheckMemmoveSanitizer(
   FunctionCallee memmoveFn = M->getOrInsertFunction(
       "memmove", FunctionType::get(ptr_ty, {ptr_ty, ptr_ty, size_ty}, false));
   Value *memmovePtr =
-      builder.CreateCall(memmoveFn, {dst_ptr, src_ptr, size_arg});
+      builder.CreateCall(memmoveFn, {dstPtr, srcPtr, sizeArg});
   builder.CreateRet(memmovePtr);
 
   // SanitizeMemcpyBB: Remediate memcpy returns null pointer.
@@ -370,8 +375,10 @@ static Function *getOrCreateBoundsCheckMemmoveSanitizer(
   builder.CreateCall(getOrCreateResolveReportSanitizerTriggered(M));
   if (Function *fn = getOrCreateRemediationBehavior(M, strategy)) {
     builder.CreateCall(fn);
-  }
-  builder.CreateRet(dst_ptr);
+    builder.CreateUnreachable();
+  } else {
+    builder.CreateRet(dstPtr);
+  } 
 
   validateIR(resolveMemmoveFn);
   return resolveMemmoveFn;
@@ -422,9 +429,9 @@ static Function *getOrCreateBoundsCheckMemsetSanitizer(
   builder.CreateCondBr(isZero, NormalBB, CheckAccessBB);
 
   builder.SetInsertPoint(CheckAccessBB);
-  Value *check_dst_bd =
+  Value *check_dst_access =
       builder.CreateCall(getOrCreateAccessOk(M), {basePtr, accessSize});
-  builder.CreateCondBr(check_dst_bd, NormalBB, SanitizeMemsetBB);
+  builder.CreateCondBr(check_dst_access, NormalBB, SanitizeMemsetBB);
 
   // NormalBB: call memset and return the pointer
   builder.SetInsertPoint(NormalBB);
@@ -440,8 +447,10 @@ static Function *getOrCreateBoundsCheckMemsetSanitizer(
   builder.CreateCall(getOrCreateResolveReportSanitizerTriggered(M));
   if (Function *fn = getOrCreateRemediationBehavior(M, strategy)) {
     builder.CreateCall(fn);
+    builder.CreateUnreachable();
+  } else {
+    builder.CreateRet(basePtr);
   }
-  builder.CreateRet(basePtr);
 
   validateIR(resolveMemsetFn);
   return resolveMemsetFn;
