@@ -26,6 +26,72 @@
 
 using namespace llvm;
 
+static void widenIntOverflow(Function *F) {
+  // Basic algorithm:
+  // Find the pattern of overflowing op -> sext
+  // Replace with sext -> overflowing op
+  // Repeat until fixpoint
+
+  std::deque<CastInst *> worklist;
+
+  // initialize worklist with all sext's
+  for (auto &BB : *F) {
+    for (auto &instr : BB) {
+      if (auto *CastOp = dyn_cast<CastInst>(&instr)) {
+        if (CastOp->getOpcode() == Instruction::SExt) {
+          worklist.push_back(CastOp);
+        }
+      }
+    }
+  }
+
+  // Cast to BinOp if this is an overflowing arith operation.
+  auto asArithOp = [](Value *val) -> BinaryOperator * {
+    if (auto *BinOp = dyn_cast<BinaryOperator>(val)) {
+      if (BinOp->getOpcode() == Instruction::Add ||
+          BinOp->getOpcode() == Instruction::Sub ||
+          BinOp->getOpcode() == Instruction::Mul) {
+        return BinOp;
+      }
+    }
+    return nullptr;
+  };
+
+  // for sext in worklist.pop:
+  //    // if not sext.arg(0).'could_overflow': continue
+  //    // make a new sext for op's args
+  //    // make a new op with the widen'd types
+  //    // replace all uses of sext with the new widened op
+  //    // add new sext to worklist
+  while (worklist.size()) {
+    auto *cast = worklist.front();
+    worklist.pop_front();
+    // Is this a sign extension of an overflowing op?
+    auto *arith = asArithOp(cast->getOperand(0));
+    if (arith == nullptr)
+      continue;
+
+    // Bubble up the sign extension and widen the operation...
+    auto widenTy = cast->getDestTy();
+    IRBuilder<> builder(arith->getNextNode());
+    CastInst *sextA = (CastInst *)builder.CreateCast(
+        cast->getOpcode(), arith->getOperand(0), widenTy);
+    CastInst *sextB = (CastInst *)builder.CreateCast(
+        cast->getOpcode(), arith->getOperand(1), widenTy);
+    auto widenedOp = builder.CreateBinOp(arith->getOpcode(), sextA, sextB);
+
+    // add new sext's to worklist
+    // FIXME: Why doesn't this work?
+    // worklist.push_back((CastInst*)sextA);
+    // worklist.push_back((CastInst*)sextB);
+
+    // replace this sext with the widened op
+    cast->replaceAllUsesWith(widenedOp);
+    cast->eraseFromParent();
+  }
+}
+
+
 void sanitizeDivideByZero(Function *F,
                           Vulnerability::RemediationStrategies strategy) {
   Module *M = F->getParent();
@@ -504,71 +570,5 @@ void sanitizeBitShift(Function *F,
 
     binary_inst->replaceAllUsesWith(phi);
     binary_inst->eraseFromParent();
-  }
-}
-
-
-static void widenIntOverflow(Function *F) {
-  // Basic algorithm:
-  // Find the pattern of overflowing op -> sext
-  // Replace with sext -> overflowing op
-  // Repeat until fixpoint
-
-  std::deque<CastInst *> worklist;
-
-  // initialize worklist with all sext's
-  for (auto &BB : *F) {
-    for (auto &instr : BB) {
-      if (auto *CastOp = dyn_cast<CastInst>(&instr)) {
-        if (CastOp->getOpcode() == Instruction::SExt) {
-          worklist.push_back(CastOp);
-        }
-      }
-    }
-  }
-
-  // Cast to BinOp if this is an overflowing arith operation.
-  auto asArithOp = [](Value *val) -> BinaryOperator * {
-    if (auto *BinOp = dyn_cast<BinaryOperator>(val)) {
-      if (BinOp->getOpcode() == Instruction::Add ||
-          BinOp->getOpcode() == Instruction::Sub ||
-          BinOp->getOpcode() == Instruction::Mul) {
-        return BinOp;
-      }
-    }
-    return nullptr;
-  };
-
-  // for sext in worklist.pop:
-  //    // if not sext.arg(0).'could_overflow': continue
-  //    // make a new sext for op's args
-  //    // make a new op with the widen'd types
-  //    // replace all uses of sext with the new widened op
-  //    // add new sext to worklist
-  while (worklist.size()) {
-    auto *cast = worklist.front();
-    worklist.pop_front();
-    // Is this a sign extension of an overflowing op?
-    auto *arith = asArithOp(cast->getOperand(0));
-    if (arith == nullptr)
-      continue;
-
-    // Bubble up the sign extension and widen the operation...
-    auto widenTy = cast->getDestTy();
-    IRBuilder<> builder(arith->getNextNode());
-    CastInst *sextA = (CastInst *)builder.CreateCast(
-        cast->getOpcode(), arith->getOperand(0), widenTy);
-    CastInst *sextB = (CastInst *)builder.CreateCast(
-        cast->getOpcode(), arith->getOperand(1), widenTy);
-    auto widenedOp = builder.CreateBinOp(arith->getOpcode(), sextA, sextB);
-
-    // add new sext's to worklist
-    // FIXME: Why doesn't this work?
-    // worklist.push_back((CastInst*)sextA);
-    // worklist.push_back((CastInst*)sextB);
-
-    // replace this sext with the widened op
-    cast->replaceAllUsesWith(widenedOp);
-    cast->eraseFromParent();
   }
 }
