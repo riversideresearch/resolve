@@ -9,7 +9,8 @@ from elftools.elf.sections import SymbolTableSection
 @dataclass
 class CweTarget:
     cwe: int
-    function_name: str
+    function_name: str,
+    cve_id: str
 
 
 CWE_PATCHES = {
@@ -79,13 +80,8 @@ def parse_cve_description(json_path: Path) -> list[CweTarget]:
         for vuln in json_obj["vulnerabilities"]:
             cwe_id = vuln["cwe-id"]
             function_name = vuln["affected-function"]
-            if not cwe_id:
-                raise ValueError("[ERROR] 'cwe-id' field not present.")
-
-            if not vuln["affected-function"]:
-                raise ValueError("[ERROR] 'affected-function' field not present.")
-            
-            cwe_targets.append(CweTarget(int(cwe_id), function_name + ".sanmap"))
+            cve_id = vuln["cve-id"]
+            cwe_targets.append(CweTarget(int(cwe_id), function_name + ".sanmap", cve_id))
         
         return cwe_targets
 
@@ -153,11 +149,18 @@ def main():
         type=int,
     )
 
+    parser.add_argument(
+        "--id",
+        nargs="*",
+        help="Vulnerability id of interest",
+    )
+
     args = parser.parse_args()
     cve_list = parse_cve_description(args.cve)
 
     for cve in cve_list:
-        patch_symbol(args.target_bin, cve.function_name, cve.cwe, args.bit)
+        if not args.id or cve.cve_id in args.id:
+            patch_symbol(args.target_bin, cve.function, cve.cwe, args.bit)
 
 if __name__ == "__main__":
     main()
