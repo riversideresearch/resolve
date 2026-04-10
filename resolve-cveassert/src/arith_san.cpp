@@ -91,7 +91,6 @@ static void widenIntOverflow(Function *F) {
   }
 }
 
-
 void sanitizeDivideByZero(Function *F,
                           Vulnerability::RemediationStrategies strategy) {
   Module *M = F->getParent();
