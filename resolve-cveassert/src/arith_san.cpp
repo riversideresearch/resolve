@@ -26,136 +26,6 @@
 
 using namespace llvm;
 
-void sanitizeBitShift(Function *F,
-                      Vulnerability::RemediationStrategies strategy) {
-  Module *M = F->getParent();
-  auto &Ctx = M->getContext();
-  auto usize_ty = Type::getInt64Ty(Ctx);
-  auto i1_ty = Type::getInt1Ty(Ctx);
-  GlobalVariable *map = SanitizerMaps[F];
-  IRBuilder<> builder(Ctx);
-  std::vector<Instruction *> worklist;
-
-  switch (strategy) {
-  case Vulnerability::RemediationStrategies::EXIT:
-  case Vulnerability::RemediationStrategies::RECOVER:
-    break;
-
-  default:
-    llvm::errs() << "[CVEAssert] Error: sanitizeBitShift does not support "
-                 << " remediation strategy defaulting to EXIT strategy!\n";
-    strategy = Vulnerability::RemediationStrategies::EXIT;
-    break;
-  }
-
-  for (auto &BB : *F) {
-    for (auto &instr : BB) {
-      if (auto *BinOp = dyn_cast<BinaryOperator>(&instr)) {
-        switch (BinOp->getOpcode()) {
-        case Instruction::Shl:
-        case Instruction::AShr:
-        case Instruction::LShr: {
-          worklist.push_back(BinOp);
-        }
-
-        default:
-          continue;
-        }
-      }
-    }
-  }
-
-  for (auto *binary_inst : worklist) {
-    Value *isNegative;
-    Value *isGreaterThanBitwidth;
-    Value *CheckShiftAmtCond;
-
-    BasicBlock *checkMapEntryBB = binary_inst->getParent();
-    BasicBlock *joinResultBB = checkMapEntryBB->splitBasicBlock(binary_inst);
-    BasicBlock *checkShiftBB = BasicBlock::Create(Ctx, "check_zero", F);
-    BasicBlock *preserveShiftBB =
-        BasicBlock::Create(Ctx, "preserve_shift", F, joinResultBB);
-    BasicBlock *remedShiftBB =
-        BasicBlock::Create(Ctx, "remediate_shift", F, joinResultBB);
-
-    checkMapEntryBB->getTerminator()->eraseFromParent();
-    builder.SetInsertPoint(checkMapEntryBB);
-    Value *zero = builder.getInt64(0);
-    Value *mapPtr = builder.CreateGEP(map->getValueType(), map, {zero, zero});
-    Value *mapEntry =
-        builder.CreateCall(getOrCreateSanitizerMapEntry(M),
-                           {mapPtr, ConstantInt::get(usize_ty, 5)});
-    Value *isMapEntryZero =
-        builder.CreateICmpEQ(mapEntry, ConstantInt::get(i1_ty, 0));
-    builder.CreateCondBr(isMapEntryZero, preserveShiftBB, remedShiftBB);
-
-    builder.SetInsertPoint(checkShiftBB);
-    Value *shifted_value = binary_inst->getOperand(0);
-    Value *bit_pos = binary_inst->getOperand(1);
-    unsigned BitWidth = shifted_value->getType()->getIntegerBitWidth();
-
-    isNegative =
-        builder.CreateICmpULT(bit_pos, ConstantInt::get(bit_pos->getType(), 0));
-    isGreaterThanBitwidth = builder.CreateICmpUGE(
-        bit_pos, ConstantInt::get(bit_pos->getType(), BitWidth));
-    Value *checkBitPos = builder.CreateOr(isNegative, isGreaterThanBitwidth);
-    builder.CreateCondBr(checkBitPos, remedShiftBB, preserveShiftBB);
-
-    builder.SetInsertPoint(remedShiftBB);
-    if (Function *fn = getOrCreateRemediationBehavior(M, strategy)) {
-      builder.CreateCall(fn);
-    }
-    Value *safeShift = nullptr;
-    Value *safeBitPos;
-
-    switch (binary_inst->getOpcode()) {
-    case Instruction::Shl:
-      safeBitPos = ConstantInt::get(bit_pos->getType(), 0);
-      safeShift = builder.CreateShl(shifted_value, safeBitPos);
-      break;
-
-    case Instruction::AShr:
-      safeBitPos = ConstantInt::get(bit_pos->getType(), 0);
-      safeShift = builder.CreateAShr(shifted_value, safeBitPos);
-      break;
-
-    case Instruction::LShr:
-      safeBitPos = ConstantInt::get(bit_pos->getType(), 0);
-      safeShift = builder.CreateLShr(shifted_value, safeBitPos);
-      break;
-    }
-    builder.CreateBr(joinResultBB);
-
-    builder.SetInsertPoint(preserveShiftBB);
-    Value *normalResult = nullptr;
-
-    switch (binary_inst->getOpcode()) {
-    case Instruction::Shl:
-      normalResult = builder.CreateShl(shifted_value, bit_pos);
-      builder.CreateBr(joinResultBB);
-      break;
-
-    case Instruction::AShr:
-      normalResult = builder.CreateAShr(shifted_value, bit_pos);
-      builder.CreateBr(joinResultBB);
-      break;
-
-    case Instruction::LShr:
-      normalResult = builder.CreateLShr(shifted_value, bit_pos);
-      builder.CreateBr(joinResultBB);
-      break;
-    }
-
-    builder.SetInsertPoint(&*joinResultBB->begin());
-    PHINode *phi = builder.CreatePHI(binary_inst->getType(), 2);
-    phi->addIncoming(safeShift, remedShiftBB);
-    phi->addIncoming(normalResult, preserveShiftBB);
-
-    binary_inst->replaceAllUsesWith(phi);
-    binary_inst->eraseFromParent();
-  }
-}
-
 void sanitizeDivideByZero(Function *F,
                           Vulnerability::RemediationStrategies strategy) {
   Module *M = F->getParent();
@@ -329,71 +199,6 @@ void sanitizeDivideByZero(Function *F,
   }
 }
 
-static void widenIntOverflow(Function *F) {
-  // Basic algorithm:
-  // Find the pattern of overflowing op -> sext
-  // Replace with sext -> overflowing op
-  // Repeat until fixpoint
-
-  std::deque<CastInst *> worklist;
-
-  // initialize worklist with all sext's
-  for (auto &BB : *F) {
-    for (auto &instr : BB) {
-      if (auto *CastOp = dyn_cast<CastInst>(&instr)) {
-        if (CastOp->getOpcode() == Instruction::SExt) {
-          worklist.push_back(CastOp);
-        }
-      }
-    }
-  }
-
-  // Cast to BinOp if this is an overflowing arith operation.
-  auto asArithOp = [](Value *val) -> BinaryOperator * {
-    if (auto *BinOp = dyn_cast<BinaryOperator>(val)) {
-      if (BinOp->getOpcode() == Instruction::Add ||
-          BinOp->getOpcode() == Instruction::Sub ||
-          BinOp->getOpcode() == Instruction::Mul) {
-        return BinOp;
-      }
-    }
-    return nullptr;
-  };
-
-  // for sext in worklist.pop:
-  //    // if not sext.arg(0).'could_overflow': continue
-  //    // make a new sext for op's args
-  //    // make a new op with the widen'd types
-  //    // replace all uses of sext with the new widened op
-  //    // add new sext to worklist
-  while (worklist.size()) {
-    auto *cast = worklist.front();
-    worklist.pop_front();
-    // Is this a sign extension of an overflowing op?
-    auto *arith = asArithOp(cast->getOperand(0));
-    if (arith == nullptr)
-      continue;
-
-    // Bubble up the sign extension and widen the operation...
-    auto widenTy = cast->getDestTy();
-    IRBuilder<> builder(arith->getNextNode());
-    CastInst *sextA = (CastInst *)builder.CreateCast(
-        cast->getOpcode(), arith->getOperand(0), widenTy);
-    CastInst *sextB = (CastInst *)builder.CreateCast(
-        cast->getOpcode(), arith->getOperand(1), widenTy);
-    auto widenedOp = builder.CreateBinOp(arith->getOpcode(), sextA, sextB);
-
-    // add new sext's to worklist
-    // FIXME: Why doesn't this work?
-    // worklist.push_back((CastInst*)sextA);
-    // worklist.push_back((CastInst*)sextB);
-
-    // replace this sext with the widened op
-    cast->replaceAllUsesWith(widenedOp);
-    cast->eraseFromParent();
-  }
-}
-
 void sanitizeIntOverflow(Function *F,
                          Vulnerability::RemediationStrategies strategy) {
   std::vector<Instruction *> worklist;
@@ -546,7 +351,7 @@ void sanitizeIntOverflow(Function *F,
     Value *mapPtr = builder.CreateGEP(map->getValueType(), map, {zero, zero});
     Value *mapEntry =
         builder.CreateCall(getOrCreateSanitizerMapEntry(M),
-                           {mapPtr, ConstantInt::get(usize_ty, 3)});
+                           {mapPtr, ConstantInt::get(usize_ty, 4)});
     Value *isMapEntryZero =
         builder.CreateICmpEQ(mapEntry, ConstantInt::get(i1_ty, 0));
     builder.CreateCondBr(isMapEntryZero, joinResultBB, checkOverflowBB);
@@ -569,5 +374,201 @@ void sanitizeIntOverflow(Function *F,
     }
 
     binary_inst->eraseFromParent();
+  }
+}
+
+void sanitizeBitShift(Function *F,
+                      Vulnerability::RemediationStrategies strategy) {
+  Module *M = F->getParent();
+  auto &Ctx = M->getContext();
+  auto usize_ty = Type::getInt64Ty(Ctx);
+  auto i1_ty = Type::getInt1Ty(Ctx);
+  GlobalVariable *map = SanitizerMaps[F];
+  IRBuilder<> builder(Ctx);
+  std::vector<Instruction *> worklist;
+
+  switch (strategy) {
+  case Vulnerability::RemediationStrategies::EXIT:
+  case Vulnerability::RemediationStrategies::RECOVER:
+    break;
+
+  default:
+    llvm::errs() << "[CVEAssert] Error: sanitizeBitShift does not support "
+                 << " remediation strategy defaulting to EXIT strategy!\n";
+    strategy = Vulnerability::RemediationStrategies::EXIT;
+    break;
+  }
+
+  for (auto &BB : *F) {
+    for (auto &instr : BB) {
+      if (auto *BinOp = dyn_cast<BinaryOperator>(&instr)) {
+        switch (BinOp->getOpcode()) {
+        case Instruction::Shl:
+        case Instruction::AShr:
+        case Instruction::LShr: {
+          worklist.push_back(BinOp);
+        }
+
+        default:
+          continue;
+        }
+      }
+    }
+  }
+
+  for (auto *binary_inst : worklist) {
+    Value *isNegative;
+    Value *isGreaterThanBitwidth;
+    Value *CheckShiftAmtCond;
+
+    BasicBlock *checkMapEntryBB = binary_inst->getParent();
+    BasicBlock *joinResultBB = checkMapEntryBB->splitBasicBlock(binary_inst);
+    BasicBlock *checkShiftBB = BasicBlock::Create(Ctx, "check_zero", F);
+    BasicBlock *preserveShiftBB =
+        BasicBlock::Create(Ctx, "preserve_shift", F, joinResultBB);
+    BasicBlock *remedShiftBB =
+        BasicBlock::Create(Ctx, "remediate_shift", F, joinResultBB);
+
+    checkMapEntryBB->getTerminator()->eraseFromParent();
+    builder.SetInsertPoint(checkMapEntryBB);
+    Value *zero = builder.getInt64(0);
+    Value *mapPtr = builder.CreateGEP(map->getValueType(), map, {zero, zero});
+    Value *mapEntry =
+        builder.CreateCall(getOrCreateSanitizerMapEntry(M),
+                           {mapPtr, ConstantInt::get(usize_ty, 5)});
+    Value *isMapEntryZero =
+        builder.CreateICmpEQ(mapEntry, ConstantInt::get(i1_ty, 0));
+    builder.CreateCondBr(isMapEntryZero, preserveShiftBB, remedShiftBB);
+
+    builder.SetInsertPoint(checkShiftBB);
+    Value *shifted_value = binary_inst->getOperand(0);
+    Value *bit_pos = binary_inst->getOperand(1);
+    unsigned BitWidth = shifted_value->getType()->getIntegerBitWidth();
+
+    isNegative =
+        builder.CreateICmpULT(bit_pos, ConstantInt::get(bit_pos->getType(), 0));
+    isGreaterThanBitwidth = builder.CreateICmpUGE(
+        bit_pos, ConstantInt::get(bit_pos->getType(), BitWidth));
+    Value *checkBitPos = builder.CreateOr(isNegative, isGreaterThanBitwidth);
+    builder.CreateCondBr(checkBitPos, remedShiftBB, preserveShiftBB);
+
+    builder.SetInsertPoint(remedShiftBB);
+    if (Function *fn = getOrCreateRemediationBehavior(M, strategy)) {
+      builder.CreateCall(fn);
+    }
+    Value *safeShift = nullptr;
+    Value *safeBitPos;
+
+    switch (binary_inst->getOpcode()) {
+    case Instruction::Shl:
+      safeBitPos = ConstantInt::get(bit_pos->getType(), 0);
+      safeShift = builder.CreateShl(shifted_value, safeBitPos);
+      break;
+
+    case Instruction::AShr:
+      safeBitPos = ConstantInt::get(bit_pos->getType(), 0);
+      safeShift = builder.CreateAShr(shifted_value, safeBitPos);
+      break;
+
+    case Instruction::LShr:
+      safeBitPos = ConstantInt::get(bit_pos->getType(), 0);
+      safeShift = builder.CreateLShr(shifted_value, safeBitPos);
+      break;
+    }
+    builder.CreateBr(joinResultBB);
+
+    builder.SetInsertPoint(preserveShiftBB);
+    Value *normalResult = nullptr;
+
+    switch (binary_inst->getOpcode()) {
+    case Instruction::Shl:
+      normalResult = builder.CreateShl(shifted_value, bit_pos);
+      builder.CreateBr(joinResultBB);
+      break;
+
+    case Instruction::AShr:
+      normalResult = builder.CreateAShr(shifted_value, bit_pos);
+      builder.CreateBr(joinResultBB);
+      break;
+
+    case Instruction::LShr:
+      normalResult = builder.CreateLShr(shifted_value, bit_pos);
+      builder.CreateBr(joinResultBB);
+      break;
+    }
+
+    builder.SetInsertPoint(&*joinResultBB->begin());
+    PHINode *phi = builder.CreatePHI(binary_inst->getType(), 2);
+    phi->addIncoming(safeShift, remedShiftBB);
+    phi->addIncoming(normalResult, preserveShiftBB);
+
+    binary_inst->replaceAllUsesWith(phi);
+    binary_inst->eraseFromParent();
+  }
+}
+
+
+static void widenIntOverflow(Function *F) {
+  // Basic algorithm:
+  // Find the pattern of overflowing op -> sext
+  // Replace with sext -> overflowing op
+  // Repeat until fixpoint
+
+  std::deque<CastInst *> worklist;
+
+  // initialize worklist with all sext's
+  for (auto &BB : *F) {
+    for (auto &instr : BB) {
+      if (auto *CastOp = dyn_cast<CastInst>(&instr)) {
+        if (CastOp->getOpcode() == Instruction::SExt) {
+          worklist.push_back(CastOp);
+        }
+      }
+    }
+  }
+
+  // Cast to BinOp if this is an overflowing arith operation.
+  auto asArithOp = [](Value *val) -> BinaryOperator * {
+    if (auto *BinOp = dyn_cast<BinaryOperator>(val)) {
+      if (BinOp->getOpcode() == Instruction::Add ||
+          BinOp->getOpcode() == Instruction::Sub ||
+          BinOp->getOpcode() == Instruction::Mul) {
+        return BinOp;
+      }
+    }
+    return nullptr;
+  };
+
+  // for sext in worklist.pop:
+  //    // if not sext.arg(0).'could_overflow': continue
+  //    // make a new sext for op's args
+  //    // make a new op with the widen'd types
+  //    // replace all uses of sext with the new widened op
+  //    // add new sext to worklist
+  while (worklist.size()) {
+    auto *cast = worklist.front();
+    worklist.pop_front();
+    // Is this a sign extension of an overflowing op?
+    auto *arith = asArithOp(cast->getOperand(0));
+    if (arith == nullptr)
+      continue;
+
+    // Bubble up the sign extension and widen the operation...
+    auto widenTy = cast->getDestTy();
+    IRBuilder<> builder(arith->getNextNode());
+    CastInst *sextA = (CastInst *)builder.CreateCast(
+        cast->getOpcode(), arith->getOperand(0), widenTy);
+    CastInst *sextB = (CastInst *)builder.CreateCast(
+        cast->getOpcode(), arith->getOperand(1), widenTy);
+    auto widenedOp = builder.CreateBinOp(arith->getOpcode(), sextA, sextB);
+
+    // add new sext's to worklist
+    // FIXME: Why doesn't this work?
+    // worklist.push_back((CastInst*)sextA);
+    // worklist.push_back((CastInst*)sextB);
+
+    // replace this sext with the widened op
+    cast->replaceAllUsesWith(widenedOp);
+    cast->eraseFromParent();
   }
 }

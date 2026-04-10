@@ -57,7 +57,7 @@ GlobalVariable *initSanitizerMap(Function &F) {
   gSanitizerMap->setConstant(false);
 
   if (!gSanitizerMap->hasInitializer()) {
-    std::vector<Constant *> elems(7, ConstantInt::get(i1_ty, 1));
+    std::vector<Constant *> elems(6, ConstantInt::get(i1_ty, 1));
     gSanitizerMap->setInitializer(ConstantArray::get(arr_ty, elems));
   }
 
@@ -200,6 +200,7 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
     sanitizeNullPointers(&F, strategy);
     sanitizeDivideByZero(&F, strategy);
     sanitizeIntOverflow(&F, strategy);
+    sanitizeBitShift(&F, strategy);
   }
 
   /// Return true if F's name (raw or demangled) contains `targetName
