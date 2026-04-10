@@ -233,7 +233,7 @@ static Function *getOrCreateBoundsCheckStoreSanitizer(
   } else {
     builder.CreateRetVoid();
   }
-  
+
   validateIR(resolveStoreFn);
   return resolveStoreFn;
 }
@@ -366,8 +366,7 @@ static Function *getOrCreateBoundsCheckMemmoveSanitizer(
   builder.SetInsertPoint(NormalBB);
   FunctionCallee memmoveFn = M->getOrInsertFunction(
       "memmove", FunctionType::get(ptr_ty, {ptr_ty, ptr_ty, size_ty}, false));
-  Value *memmovePtr =
-      builder.CreateCall(memmoveFn, {dstPtr, srcPtr, sizeArg});
+  Value *memmovePtr = builder.CreateCall(memmoveFn, {dstPtr, srcPtr, sizeArg});
   builder.CreateRet(memmovePtr);
 
   // SanitizeMemcpyBB: Remediate memcpy returns null pointer.
@@ -378,7 +377,7 @@ static Function *getOrCreateBoundsCheckMemmoveSanitizer(
     builder.CreateUnreachable();
   } else {
     builder.CreateRet(dstPtr);
-  } 
+  }
 
   validateIR(resolveMemmoveFn);
   return resolveMemmoveFn;
