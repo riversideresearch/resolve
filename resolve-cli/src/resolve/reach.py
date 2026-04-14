@@ -227,7 +227,7 @@ class FactParser:
             if n["name"] != demangled_name:
                 n["demangled_name"] = demangled_name
 
-    def get_module_name_for_node(self, id: NodeID):
+    def get_node_module_name(self, id: NodeID):
         module_id = (id[0], id[0])
         name = self.nodes[module_id].props["source_file"]
         return name
@@ -237,15 +237,20 @@ class FactParser:
         # First try true symbol names
         for f in self.nodes.kinds["Function"]:
             # try to get the function that we are precisely looking for
-            if func_name == f.get("name", "") and file_name in f.get("source_file", ""):
+            if func_name != f.get("name", ""):
+                continue
+            # Function.source_file is based on debug info, which may or may not be populated, but is more specific in the case of i.e. header files
+            if file_name in f.get(
+                "source_file", ""
+            ) or file_name in self.get_node_module_name(f.id):
                 return f.id
 
         # Next try demangled C++ symbol names
         for f in self.nodes.kinds["Function"]:
             # If we fail to get an exact match, try a substring match on demangled names
-            if func_name in f.props.get("demangled_name", "") and file_name in f.get(
-                "source_file", ""
-            ):
+            if func_name in f.props.get(
+                "demangled_name", ""
+            ) and file_name in self.get_node_module_name(f.id):
                 matches.append(f.id)
 
         match len(matches):
@@ -339,7 +344,7 @@ class ReachabilityResult:
             self.reachability = Reachability.UNREACHABLE_NOT_FOUND
             return
 
-        file_name = fact_parser.get_module_name_for_node(func_id)
+        file_name = fact_parser.get_node_module_name(func_id)
         print(f"Found function '{self.sink.affected_function}' in module '{file_name}'")
 
         self.func_id = func_id
@@ -547,7 +552,7 @@ class Orchestrator:
         src = self.fact_parser.get_func_id(self.entrypoint)
         assert src is not None, f"Could not find source function '{self.entrypoint}'"
 
-        file_name = self.fact_parser.get_module_name_for_node(src)
+        file_name = self.fact_parser.get_node_module_name(src)
 
         print(f"Found function '{self.entrypoint}' in module '{file_name}'")
         self.src = src

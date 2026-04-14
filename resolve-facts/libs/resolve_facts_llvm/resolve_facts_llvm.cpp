@@ -40,12 +40,26 @@ void resolve::getGlobalFacts(GlobalVariable &G) {
   });
 }
 
+static std::string getFunctionNameFromDebugInfo(Function &F) {
+  // Each function may have a DISubprogram attached
+  if (auto *SP = F.getSubprogram()) {
+    if (auto *File = SP->getFile()) {
+      return (File->getDirectory() + "/" + File->getFilename()).str();
+    }
+  }
+  return "";
+}
+
 void resolve::getFunctionFacts(Function &F) {
   facts.addNode(F);
   facts.addNodeProp(F, [&](auto& node) {
     node.name = F.getName().str();
     node.linkage = (F.hasExternalLinkage() ? Linkage::ExternalLinkage : Linkage::Other);
     node.function_type = typeToString(*F.getFunctionType());
+    auto name = getFunctionNameFromDebugInfo(F);
+    if (name != "") {
+      node.source_file = name;
+    }
     if (F.hasAddressTaken()) {
       node.address_taken = true;
     }
