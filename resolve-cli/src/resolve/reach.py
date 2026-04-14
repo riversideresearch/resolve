@@ -7,7 +7,6 @@ from dataclasses import dataclass, field
 
 from operator import attrgetter
 import os
-import csv
 import json
 import argparse
 import subprocess
@@ -191,38 +190,35 @@ def demangle(names: Iterable[str]):
 class FactParser:
     def __init__(self, facts_file: Path):
         self.facts_file = facts_file
+
+        # def deserialize_edge(k: str, e: dict[str, Any]):
+        #     # glaze serializes pairs as {first:second}
+        #     d = json.loads(k)
+        #     src, dst = d
+
+        #     sid = (mid, int(src))
+        #     did = (mid, int(dst))
+        #     return Edge((sid, did), sid, did, e["kinds"], {})
+
         # Load Nodes
         with (facts_file).open() as f:
-
-            all_nodes = []
-            #all_edges = []
+            all_nodes: list[Node] = []
+            # all_edges: list[Edge] = []
             # When multiple modules are combined they will be separated by newlines.
             for line in f:
                 facts = json.loads(line.strip('\n'))
 
                 for mid, m in facts["modules"].items():
                     mid = int(mid)
-                    mnodes = [ Node((mid, int(id)), n["type"], n) for id,n in m["nodes"].items() ]
-                    all_nodes.extend(mnodes)
+                    all_nodes += [
+                        Node((mid, int(id)), n["type"], n)
+                        for id, n in m["nodes"].items()
+                    ]
 
-                    # don't require deserializing edges, but if we did this is what we could do
-                    """
-                    medges = []
-                    for k, e in m["edges"].items():
-                        # glaze serializes pairs as {first:second}
-                        d = json.loads(k)
-                        src,dst = d
-
-                        sid = (mid, int(src))
-                        did = (mid, int(dst))
-                        e = Edge((sid, did), sid, did, e["kinds"], {})
-                        medges.append(e)
-
-                    all_edges.extend(medges)
-                    """
+                    # all_edges += [deserialize_edge(k, e) for k, e in m["edges"].items()]
 
             self.nodes = Nodes(all_nodes)
-            #self.edges = Edges(all_edges)
+            # self.edges = Edges(all_edges)
 
     def demangle_names(self):
         with_names = [n for n in self.nodes if "name" in n.props]
