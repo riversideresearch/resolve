@@ -1,9 +1,31 @@
 import argparse
 import mmap
 from pathlib import Path
-
+import json
+from dataclasses import dataclass
 from elftools.elf.elffile import ELFFile
 from elftools.elf.sections import SymbolTableSection
+
+@dataclass
+class CweTarget:
+    cwe: int
+    function_name: str
+    cve_id: str
+
+
+CWE_PATCHES = {
+    0: [0, 1, 2, 3, 4, 5],
+    121: [0],
+    122: [0],
+    123: [0],
+    125: [0],
+    131: [0],
+    190: [4],
+    369: [3],
+    476: [1],
+    590: [2],
+    787: [0]
+}
 
 def find_symbol_offset(elf: ELFFile, symbol_name: str):
     """
@@ -15,7 +37,6 @@ def find_symbol_offset(elf: ELFFile, symbol_name: str):
                 if symbol.name == symbol_name:
                     return symbol
     return None
-
 
 def find_file_offset(elf: ELFFile, vaddr: int) -> int | None:
     """
@@ -29,7 +50,43 @@ def find_file_offset(elf: ELFFile, vaddr: int) -> int | None:
                 return int(segment["p_offset"] + (vaddr - start))
     return None
 
-def patch_symbol(elf_path: Path, symbol_name: str, index: int):
+def set_byte(mm: mmap.mmap, offset: int, bit: int):
+    """
+    Set byte @ offset
+    """
+    original = mm[offset]
+
+    if original == bit:
+        print(f"[INFO] set_bit and original bit match: {bit} no changes made to binary")
+        return original, bit
+
+    mm[offset] = bit
+    return original, bit
+
+def parse_cve_description(json_path: Path) -> list[CweTarget]:
+    """
+    Parses CVE descriptions and stores them in list
+    If 'cwe-id' or 'affected-function' fields cannot 
+    be found then raise ValueError
+    """
+    cwe_targets = []
+    
+    with json_path.open("r") as f:
+        json_obj = json.load(f)
+
+        if not json_obj["vulnerabilities"]:
+            raise ValueError("[ERROR] No vulnerabilities found.")
+        
+        for vuln in json_obj["vulnerabilities"]:
+            cwe_id = vuln["cwe-id"]
+            function_name = vuln["affected-function"]
+            cve_id = vuln["cve-id"]
+            cwe_targets.append(CweTarget(int(cwe_id), function_name + ".sanmap", cve_id))
+        
+        return cwe_targets
+
+
+def patch_symbol(elf_path: Path, symbol_name: str, cwe: int, bit: int):
     """
     Patch the value of a symbol inside the ELF binary
     """
@@ -43,29 +100,36 @@ def patch_symbol(elf_path: Path, symbol_name: str, index: int):
         symbol_addr = int(symbol["st_value"])
         symbol_size = int(symbol["st_size"])
 
-        if index < 0 or index >= symbol_size:
-            raise ValueError(
-                f"[ERROR] Index '{index}' out of bounds (size={symbol_size})"
-            )
-
         base_offset = find_file_offset(elf, symbol_addr)
         if base_offset is None:
             raise ValueError(
                 f"Symbol '{symbol_name}' not located in any PT_LOAD segment"
             )
-        
-        target_offset = base_offset + index
-        if target_offset >= mm.size():
-            raise ValueError("[ERROR] Target offset exceeds file size")
 
-        mm[target_offset] = 0 if mm[target_offset] != 0 else 1
-        mm.flush()
+        if cwe not in CWE_PATCHES:
+            raise ValueError(f"[ERROR] Unsupported CWE {cwe}")
 
-        print(
-            f"[INFO] Patched {symbol_name}[{index}] "
-            f"@ file offset {target_offset:#x}"
+        offsets = CWE_PATCHES[cwe]
+
+        for rel_offset in offsets:
+            if rel_offset < 0 or rel_offset >= symbol_size:
+                raise ValueError(
+                    f"[ERROR] Offset {rel_offset} out of bounds "
+                    f"(symbol size = {symbol_size})"
+                )
+
+            target_offset = base_offset + rel_offset
+
+            if target_offset >= mm.size():
+                raise ValueError(f"[ERROR] Target offset {target_offset:#x} out of range")
+            
+            original, modified = set_byte(mm, target_offset, bit)
+            print(
+                f"[INFO] Patched {symbol_name}[{rel_offset}] "
+                f"@ file offset {target_offset:#x}: {original:#x} -> {modified:#x}"
         )
 
+        mm.flush()
 
 
 def main():
@@ -76,17 +140,27 @@ def main():
     )
 
     parser.add_argument(
-        "symbol",
-        type=str,
+        "cve",
+        type=Path,
     )
 
     parser.add_argument(
-        "index",
+        "bit",
         type=int,
     )
 
+    parser.add_argument(
+        "--id",
+        nargs="*",
+        help="Vulnerability id of interest",
+    )
+
     args = parser.parse_args()
-    patch_symbol(args.target_bin, args.symbol, args.index)
+    cve_list = parse_cve_description(args.cve)
+
+    for cve in cve_list:
+        if not args.id or cve.cve_id in args.id:
+            patch_symbol(args.target_bin, cve.function_name, cve.cwe, args.bit)
 
 if __name__ == "__main__":
     main()

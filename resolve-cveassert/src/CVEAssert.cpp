@@ -45,7 +45,7 @@ GlobalVariable *initSanitizerMap(Function &F) {
   Module *M = F.getParent();
   LLVMContext &Ctx = M->getContext();
   Type *i1_ty = Type::getInt1Ty(Ctx);
-  ArrayType *arr_ty = ArrayType::get(i1_ty, 7);
+  ArrayType *arr_ty = ArrayType::get(i1_ty, 6);
 
   std::string globalName = F.getName().str() + ".sanmap";
 
@@ -58,7 +58,7 @@ GlobalVariable *initSanitizerMap(Function &F) {
   gSanitizerMap->setMetadata("cve.noinstrument", MDNode::get(Ctx, {}));
 
   if (!gSanitizerMap->hasInitializer()) {
-    std::vector<Constant *> elems(7, ConstantInt::get(i1_ty, 1));
+    std::vector<Constant *> elems(6, ConstantInt::get(i1_ty, 1));
     gSanitizerMap->setInitializer(ConstantArray::get(arr_ty, elems));
   }
   return gSanitizerMap;
@@ -200,6 +200,7 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
     sanitizeNullPointers(&F, strategy);
     sanitizeDivideByZero(&F, strategy);
     sanitizeIntOverflow(&F, strategy);
+    sanitizeBitShift(&F, strategy);
   }
 
   /// Return true if F's name (raw or demangled) contains `targetName

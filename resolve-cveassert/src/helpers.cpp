@@ -36,7 +36,7 @@ Function *getOrCreateSanitizerMapEntry(Module *M) {
   auto i1_ty = Type::getInt1Ty(Ctx);
   auto ptr_ty = PointerType::get(Ctx, 0);
   auto usize_ty = Type::getInt64Ty(Ctx);
-  auto arr_ty = ArrayType::get(i1_ty, 7);
+  auto arr_ty = ArrayType::get(i1_ty, 6);
 
   FunctionType *sanitizerMapIdxFnTy =
       FunctionType::get(i1_ty, {ptr_ty, usize_ty}, false);
