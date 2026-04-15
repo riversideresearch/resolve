@@ -114,7 +114,8 @@ def run(
 
     prepare_output_path(output_path, overwrite)
 
-    tmp_path = Path(tempfile.mkdtemp(dir="/tmp", prefix="improve_cve_"))
+    tmp_path = output_path / "tmp"
+    tmp_path.mkdir(parents=True, exist_ok=True)
     print(f"Using temporary workspace: {tmp_path}")
 
     cve_tmp_path = tmp_path / cve_name
@@ -131,7 +132,7 @@ def run(
         agent,
         preamble=cve_preamble,
         affirmation="The above CVE description is correct but possibly incomplete. Your task is to determine why it is correct.",
-        negation="The above CVE description is incorrect. Your task is to determine why it is incorrect.",
+        negation="The above CVE description is incorrect. Your task is to determine why it is incorrect. Do not confuse the described CVE with any other bugs or vulnerabilities that may be present in the project.",
         tmp_dir=cve_tmp_path,
         model=model,
     )
@@ -149,6 +150,7 @@ def run(
 `{cve_tmp_path}/synthesis.md` contains an analysis of the above CVE. Your task is to produce an improved version of the CVE in the same format and save it to `{improved_cve_path}`. Use the exact same structure and fields as the original. Don't include line numbers. Don't attempt to verify the CVE by performing additional analysis on the source code. Ensure that the scope of the improved CVE is the same as the original; it should address only the specific vulnerability described in the original. If the affected function name is a mangled C++ name, verify that it's exactly correct.
 
 Match the tone and style of the original CVE description. Assume that there is a legitimate vulnerability, but it may not be exactly as described by the original. Keep particular details to a minimum; just describe the nature of the vulnerability and conditions for causing it.
+If the CVE description file contains a json with many fields, update any/all of the fields as needed if the synthesis.md reveals the need for corrections. If fields other than cve-descrition have changed, include an end of line comment summarizing the change.    
 """
     run_prompt(agent, cve_improve_prompt, model=model)
     require_file(improved_cve_path, "CVE improvement")
@@ -238,7 +240,7 @@ Create exactly one markdown file per sufficient condition, named `SC_1.md`, `SC_
     # COPY FINAL RESULTS TO OUTPUT PATH
     ############################################################################
 
-    output_path.mkdir(parents=True, exist_ok=False)
+    output_path.mkdir(parents=True, exist_ok=True)
 
     shutil.copy(improved_cve_path, output_path / improved_cve_path.name)
     shutil.copytree(

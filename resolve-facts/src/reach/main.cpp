@@ -40,8 +40,8 @@ conf::config load_config(const argparse::ArgumentParser &program) {
         conf = conf_opt.value();
       }
     }
-    if (program.present<string>("facts_dir")) {
-      conf.facts_dir = program.get<string>("facts_dir");
+    if (program.present<string>("facts")) {
+      conf.facts_path = program.get<string>("facts");
     }
     // TODO: argument passing with new id format
     if (program.present<string>("src") && program.present<string>("dst")) {
@@ -121,8 +121,8 @@ build_loaded_syms(const optional<fs::path> &path) {
 }
 
 void validate_config(const conf::config &conf) {
-  if (!fs::exists(conf.facts_dir)) {
-    cerr << "CONFIG ERROR: facts_dir " << conf.facts_dir << " doesn't exist."
+  if (!fs::exists(conf.facts_path)) {
+    cerr << "CONFIG ERROR: facts_path " << conf.facts_path << " doesn't exist."
          << endl;
     exit(1);
   }
@@ -136,8 +136,7 @@ void print_config(const conf::config &conf) {
 int main(int argc, char *argv[]) {
   argparse::ArgumentParser program("reach");
 
-  program.add_argument("-f", "--facts_dir")
-      .help("directory containing facts files");
+  program.add_argument("-f", "--facts").help("facts file path");
   program.add_argument("-s", "--src").help("source node in graph");
   program.add_argument("-d", "--dst").help("destination node in graph");
   program.add_argument("-i", "--input").help("JSON input path");
@@ -196,7 +195,7 @@ int main(int argc, char *argv[]) {
   }
 
   time_point<system_clock> t0 = system_clock::now();
-  ifstream facts(conf.facts_dir / "facts.facts");
+  ifstream facts(conf.facts_path);
   const auto pf = resolve_facts::ProgramFacts::deserialize(facts);
   facts.close();
 

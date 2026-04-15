@@ -28,7 +28,7 @@ struct candidate_node {
 };
 
 struct config {
-  std::filesystem::path facts_dir;
+  std::filesystem::path facts_path;
   std::vector<query> queries;
   std::vector<candidate_node> candidate_path;
   bool dynlink = false;
@@ -44,7 +44,7 @@ struct config {
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(query, src, dst);
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(candidate_node, file,
                                                 function_name);
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(config, facts_dir, queries,
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(config, facts_path, queries,
                                                 candidate_path, dynlink,
                                                 out_path, dlsym_log_path,
                                                 graph_type, num_paths,
