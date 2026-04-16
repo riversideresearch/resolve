@@ -93,7 +93,7 @@ void instrumentAlloca(Function *F) {
     bool hasEnd = false;
 
     Type *allocatedType = allocaInst->getAllocatedType();
-    
+
     Value *arraySize = allocaInst->getArraySize();
     Value *totalSize;
 
@@ -102,7 +102,7 @@ void instrumentAlloca(Function *F) {
 
     if (ConstantInt *CI = dyn_cast<ConstantInt>(arraySize)) {
       uint64_t n = CI->getZExtValue();
-      totalSize = ConstantInt::get(size_ty, n * elemSizeConst); 
+      totalSize = ConstantInt::get(size_ty, n * elemSizeConst);
     } else {
       totalSize = builder.CreateMul(arraySize, elemSize);
     }
@@ -146,8 +146,7 @@ void instrumentAlloca(Function *F) {
       if (auto *intrinsic = dyn_cast<IntrinsicInst>(call)) {
         if (intrinsic->getIntrinsicID() == Intrinsic::lifetime_start) {
           builder.SetInsertPoint(call->getNextNode());
-          builder.CreateCall(allocateFn,
-                             {typedPtr, totalSize});
+          builder.CreateCall(allocateFn, {typedPtr, totalSize});
           call->setOperand(1, typedPtr);
         }
 
@@ -165,8 +164,7 @@ void instrumentAlloca(Function *F) {
     if (!hasStart) {
       if (auto *inst = dyn_cast<Instruction>(allocaInst)) {
         builder.SetInsertPoint(inst->getNextNode());
-        builder.CreateCall(allocateFn,
-                           {typedPtr, totalSize});
+        builder.CreateCall(allocateFn, {typedPtr, totalSize});
       }
     }
 
