@@ -129,6 +129,8 @@ void instrumentAlloca(Function *F) {
       }
     }
 
+    allocaInst->replaceAllUsesWith(typedPtr);
+
     // Instrument allocas that don't have lifetime markers
     // Not all llvm-ir produced hasStart == hasEnd
     if (!hasStart) {
