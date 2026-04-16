@@ -93,7 +93,35 @@ void instrumentAlloca(Function *F) {
     bool hasEnd = false;
 
     Type *allocatedType = allocaInst->getAllocatedType();
-    uint64_t typeSize = DL.getTypeAllocSize(allocatedType);
+    
+    Value *arraySize = allocaInst->getArraySize();
+    Value *totalSize;
+
+    uint64_t elemSizeConst = DL.getTypeAllocSize(allocatedType);
+    Value *elemSize = ConstantInt::get(size_ty, elemSizeConst);
+
+    if (ConstantInt *CI = dyn_cast<ConstantInt>(arraySize)) {
+      uint64_t n = CI->getZExtValue();
+      totalSize = ConstantInt::get(size_ty, n * elemSizeConst); 
+    } else {
+      totalSize = builder.CreateMul(arraySize, elemSize);
+    }
+
+    // Create padded alloca type
+    builder.SetInsertPoint(allocaInst->getNextNode());
+    StructType *paddedType =
+        StructType::get(allocatedType, Type::getInt8Ty(Ctx));
+    AllocaInst *paddedAlloca = builder.CreateAlloca(
+        paddedType, nullptr, allocaInst->getName() + ".pad");
+    paddedAlloca->setAlignment(allocaInst->getAlign());
+
+    // Emit a gep instruction to point to allocated type
+    Value *typedPtr = builder.CreateStructGEP(paddedType, paddedAlloca, 0);
+    // NOTE: attaching metadata to gep instruction to prevent instrumentation of
+    // gep
+    if (auto *inst = dyn_cast<Instruction>(typedPtr)) {
+      inst->setMetadata("cve.noinstrument", MDNode::get(Ctx, {}));
+    }
 
     // Collect lifetime calls
     SmallVector<Instruction *, 8> lifetimeCalls;
@@ -119,7 +147,8 @@ void instrumentAlloca(Function *F) {
         if (intrinsic->getIntrinsicID() == Intrinsic::lifetime_start) {
           builder.SetInsertPoint(call->getNextNode());
           builder.CreateCall(allocateFn,
-                             {allocaInst, ConstantInt::get(size_ty, typeSize)});
+                             {typedPtr, totalSize);
+          call->setOperand(1, typedPtr);
         }
 
         if (intrinsic->getIntrinsicID() == Intrinsic::lifetime_end) {
@@ -137,7 +166,7 @@ void instrumentAlloca(Function *F) {
       if (auto *inst = dyn_cast<Instruction>(allocaInst)) {
         builder.SetInsertPoint(inst->getNextNode());
         builder.CreateCall(allocateFn,
-                           {allocaInst, ConstantInt::get(size_ty, typeSize)});
+                           {typedPtr, totalSize);
       }
     }
 
