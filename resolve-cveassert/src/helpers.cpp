@@ -242,7 +242,7 @@ getOrCreateRemediationBehavior(Module *M,
   switch (strategy) {
   case Vulnerability::RemediationStrategies::EXIT: {
     FunctionType *exitTy = FunctionType::get(void_ty, {i32_ty}, false);
-    FunctionCallee exitFn = M->getOrInsertFunction("exit", exitTy);
+    FunctionCallee exitFn = M->getOrInsertFunction("_exit", exitTy);
     builder.CreateCall(exitFn, {builder.getInt32(3)});
     builder.CreateUnreachable();
     break;
