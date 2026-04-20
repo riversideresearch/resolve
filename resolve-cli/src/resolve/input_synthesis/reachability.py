@@ -146,7 +146,7 @@ If the only satisfiable sufficient condition(s) are machine-dependent (e.g., x86
 1) If `{reachability_path}` concludes that the CVE is reachable or triggerable, synthesize an input that triggers it and verify that it works. If triggerability is inconclusive, try to synthesize an input and see if it works (and if it fails still report the result as inconclusive). If `{reachability_path}` concludes that the CVE is not triggerable, skip this step. Don't second-guess the conclusion.
 2) Write a one-paragraph summary of the conclusion to `{output_path}/conclusion.md`.
 
-If you synthesize an input, ensure that it will work on any realistic system if possible. E.g., if the exploit depends on resource exhaustion then make it work on a system that has a large amount of that resource.
+If you synthesize an input, ensure that it will work on any realistic system if possible. E.g., if the CVE depends on resource exhaustion then make it work on a system that has a large amount of that resource.
 
 Put any files you create in `{output_path}/input-synthesis/`. If a triggering input is synthesized, include an explanation of how it was synthesized and how to test that it works. Don't delete any scripts/programs that were used to generate the input.
 """
