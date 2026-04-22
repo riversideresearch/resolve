@@ -79,6 +79,7 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
     STACK_BASED_BUF_OVERFLOW = 121,
     HEAP_BASED_BUF_OVERFLOW = 122,
     WRITE_WHAT_WHERE = 123,
+    OOB = 119,
     OOB_WRITE = 787,
     OOB_READ = 125, /* NOTE: This ID corresponds to CWE-ID description found in
                        stb-resize, lamartine CPs */
@@ -281,6 +282,7 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
     case VulnID::STACK_BASED_BUF_OVERFLOW: /* Stack-based buffer overflow */
     case VulnID::HEAP_BASED_BUF_OVERFLOW:  /* Heap-base buffer overflow */
     case VulnID::OOB_WRITE:                /* OOB Write */
+    case VulnID::OOB:
     case VulnID::WRITE_WHAT_WHERE:
       sanitizeMemInstBounds(&F, vuln.Strategy);
       result = PreservedAnalyses::none();
@@ -370,6 +372,7 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
         break;
 
       // default instrument both
+      case VulnID::OOB:
       case VulnID::OOB_READ:
       case VulnID::OOB_WRITE:
       case VulnID::INCORRECT_BUF_SIZE:

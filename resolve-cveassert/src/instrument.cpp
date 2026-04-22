@@ -95,22 +95,6 @@ void instrumentAlloca(Function *F) {
     Type *allocatedType = allocaInst->getAllocatedType();
     uint64_t typeSize = DL.getTypeAllocSize(allocatedType);
 
-    // Create padded alloca type
-    builder.SetInsertPoint(allocaInst->getNextNode());
-    StructType *paddedType =
-        StructType::get(allocatedType, Type::getInt8Ty(Ctx));
-    AllocaInst *paddedAlloca = builder.CreateAlloca(
-        paddedType, nullptr, allocaInst->getName() + ".pad");
-    paddedAlloca->setAlignment(allocaInst->getAlign());
-
-    // Emit a gep instruction to point to allocated type
-    Value *typedPtr = builder.CreateStructGEP(paddedType, paddedAlloca, 0);
-    // NOTE: attaching metadata to gep instruction to prevent instrumentation of
-    // gep
-    if (auto *inst = dyn_cast<Instruction>(typedPtr)) {
-      inst->setMetadata("cve.noinstrument", MDNode::get(Ctx, {}));
-    }
-
     // Collect lifetime calls
     SmallVector<Instruction *, 8> lifetimeCalls;
 
@@ -135,34 +119,29 @@ void instrumentAlloca(Function *F) {
         if (intrinsic->getIntrinsicID() == Intrinsic::lifetime_start) {
           builder.SetInsertPoint(call->getNextNode());
           builder.CreateCall(allocateFn,
-                             {typedPtr, ConstantInt::get(size_ty, typeSize)});
-          call->setOperand(1, typedPtr);
+                             {allocaInst, ConstantInt::get(size_ty, typeSize)});
         }
 
         if (intrinsic->getIntrinsicID() == Intrinsic::lifetime_end) {
           builder.SetInsertPoint(call->getNextNode());
-          builder.CreateCall(invalidateFn, {typedPtr});
-          call->setOperand(1, typedPtr);
+          builder.CreateCall(invalidateFn, {allocaInst});
         }
       }
     }
 
-    allocaInst->replaceAllUsesWith(paddedAlloca);
-
     // Instrument allocas that don't have lifetime markers
     // Not all llvm-ir produced hasStart == hasEnd
     if (!hasStart) {
-      if (auto *inst = dyn_cast<Instruction>(typedPtr)) {
+      if (auto *inst = dyn_cast<Instruction>(allocaInst)) {
         builder.SetInsertPoint(inst->getNextNode());
         builder.CreateCall(allocateFn,
-                           {typedPtr, ConstantInt::get(size_ty, typeSize)});
+                           {allocaInst, ConstantInt::get(size_ty, typeSize)});
       }
     }
 
     if (!hasEnd) {
-      toFreeList.push_back(paddedAlloca);
+      toFreeList.push_back(allocaInst);
     }
-    allocaInst->eraseFromParent();
   };
 
   for (auto &BB : *F) {

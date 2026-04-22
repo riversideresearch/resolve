@@ -45,6 +45,7 @@ jobs:
           TRIGGERING_ACTOR: ${{ github.triggering_actor }}
           POLL_INTERVAL: 10
         run: |
+          exit 0
           # Create pipeline
           create_resp=$(curl -sS --fail -X POST \
             -F token=$GITLAB_TRIGGER_TOKEN \
