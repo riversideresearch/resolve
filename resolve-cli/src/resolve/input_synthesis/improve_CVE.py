@@ -150,7 +150,7 @@ def run(
 `{cve_tmp_path}/synthesis.md` contains an analysis of the above CVE. Your task is to produce an improved version of the CVE in the same format and save it to `{improved_cve_path}`. Use the exact same structure and fields as the original. Don't include line numbers. Don't attempt to verify the CVE by performing additional analysis on the source code. Ensure that the scope of the improved CVE is the same as the original; it should address only the specific vulnerability described in the original. If the affected function name is a mangled C++ name, verify that it's exactly correct.
 
 Match the tone and style of the original CVE description. Assume that there is a legitimate vulnerability, but it may not be exactly as described by the original. Keep particular details to a minimum; just describe the nature of the vulnerability and conditions for causing it.
-If the CVE description file contains a json with many fields, update any/all of the fields as needed if the synthesis.md reveals the need for corrections. If fields other than cve-descrition have changed, include an end of line comment summarizing the change.    
+If the CVE description file contains a json with many fields, update any/all of the fields as needed if the synthesis.md reveals the need for corrections. If fields other than cve-description have changed, include an end of line comment summarizing the change.
 """
     run_prompt(agent, cve_improve_prompt, model=model)
     require_file(improved_cve_path, "CVE improvement")

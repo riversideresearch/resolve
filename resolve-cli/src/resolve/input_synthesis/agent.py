@@ -78,7 +78,7 @@ Don't look at existing thesis documents.
 
 {negation} Write a report to `{tmp_dir}/antithesis.md`.
 
-Do not read any existing files under `{tmp_dir}` (especially `{tmp_dir}/thesis.md`). Only write your output to `{tmp_dir}/antithesis.md`.
+Do not read any existing files under `{tmp_dir}`. Only write your output to `{tmp_dir}/antithesis.md`.
 """
     run_prompt(agent, antithesis_prompt, model=model)
 

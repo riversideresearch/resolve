@@ -74,19 +74,20 @@ def run(agent: str,
 # 4) Update `{agents_file}` with local build instructions. Remember to keep it brief.
 # 5) If you encountered any issues when installing deps and building the project, describe them in `build-issues.md`.
 # """
-#     setup_prompt = f"""
-# # Your task
-
-# 1) Read `README.md` if it exists. Map the project architecture, dependencies, and build instructions and save them along with a summary overview of the repo to `{agents_file}`. Keep it brief and concise.
-# 2) Figure out how to do a local build in `build/`. Ensure source code is available for vcpkg dependencies, not just pre-built binaries. Ensure that the poller script works as expected against the local build and that we can test PoVs against it. Ensure that the local build uses the same versions of all dependencies as the Docker build. Save local build instructions to `local-build.md`. Add pointers in `{agents_file}` to `local-build.md` and the location of  dependencies' source code.
-# """
 
     setup_prompt = f"""
 # Your task
 
 1) Read `README.md` if it exists. Map the project architecture, dependencies, and build instructions and save them along with a summary overview of the repo to `{agents_file}`. Keep it brief and concise.
-2) Ensure source code is available for all of the application's dependencies. Some of them may be vendored, in which case we don't have to do anything. Others may be pulled down using vcpkg or something similar; in those cases pull down their source code (not just pre-built binaries) to a local location. Add a pointer in `{agents_file}` to the location(s) of dependencies' source code.
+2) Figure out how to do a local build in `build/`. Ensure source code is available for vcpkg dependencies, not just pre-built binaries. Ensure that the poller script works as expected against the local build and that we can test PoVs against it. Ensure that the local build uses the same versions of all dependencies as the Docker build. Save local build instructions to `local-build.md`. Add pointers in `{agents_file}` to `local-build.md` and the location of dependencies' source code.
 """
+
+#     setup_prompt = f"""
+# # Your task
+
+# 1) Read `README.md` if it exists. Map the project architecture, dependencies, and build instructions and save them along with a summary overview of the repo to `{agents_file}`. Keep it brief and concise.
+# 2) Ensure source code is available for all of the application's dependencies. Some of them may be vendored, in which case we don't have to do anything. Others may be pulled down using vcpkg or something similar; in those cases pull down their source code (not just pre-built binaries) to a local location. Add a pointer in `{agents_file}` to the location(s) of dependencies' source code.
+# """
 
     run_prompt(agent, setup_prompt, model=model)
 
