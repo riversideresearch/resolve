@@ -282,7 +282,8 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
     case VulnID::STACK_BASED_BUF_OVERFLOW: /* Stack-based buffer overflow */
       instrumentAlloca(&F);
     case VulnID::HEAP_BASED_BUF_OVERFLOW: /* Heap-base buffer overflow */
-    case VulnID::OOB_WRITE:               /* OOB Write */
+      instrumentLibraryAllocations(&F);
+    case VulnID::OOB_WRITE: /* OOB Write */
     case VulnID::OOB:
     case VulnID::WRITE_WHAT_WHERE:
       sanitizeMemInstBounds(&F, vuln.Strategy);
@@ -368,9 +369,9 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
       //   break;
 
       // 122 heap-based
-      case VulnID::HEAP_BASED_BUF_OVERFLOW:
-        instrument_mem_inst.instrumentMemAllocator = true;
-        break;
+      // case VulnID::HEAP_BASED_BUF_OVERFLOW:
+      //   instrument_mem_inst.instrumentMemAllocator = true;
+      //   break;
 
       // default instrument both
       case VulnID::OOB:
