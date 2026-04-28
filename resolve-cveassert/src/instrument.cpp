@@ -146,14 +146,15 @@ void instrumentAlloca(Function *F) {
     for (auto *call : lifetimeCalls) {
       if (auto *intrinsic = dyn_cast<IntrinsicInst>(call)) {
         if (intrinsic->getIntrinsicID() == Intrinsic::lifetime_start) {
-          builder.SetInsertPoint(call->getNextNode());
+          Instruction *typedInst = cast<Instruction>(typedPtr);
+          builder.SetInsertPoint(typedInst->getNextNode());
           builder.CreateCall(allocateFn, {typedPtr, totalSize});
           call->setOperand(1, typedPtr);
         }
 
         if (intrinsic->getIntrinsicID() == Intrinsic::lifetime_end) {
           builder.SetInsertPoint(call->getNextNode());
-          builder.CreateCall(invalidateFn, {allocaInst});
+          builder.CreateCall(invalidateFn, {typedPtr});
         }
       }
     }
