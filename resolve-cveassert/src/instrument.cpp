@@ -6,6 +6,7 @@
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Twine.h"
+#include "llvm/Analysis/CaptureTracking.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/IRBuilder.h"
@@ -182,7 +183,10 @@ void instrumentAlloca(Function *F) {
   }
 
   for (auto *alloca : allocas) {
-    handle_alloca(alloca);
+    // Fast filter to prune non-escaping allocas
+    if (PointerMayBeCaptured(alloca, false) {
+      handle_alloca(alloca);
+    }
   }
 
   if (toFreeList.empty()) {
