@@ -164,7 +164,8 @@ void instrumentAlloca(Function *F) {
     // Not all llvm-ir produced hasStart == hasEnd
     if (!hasStart) {
       if (auto *inst = dyn_cast<Instruction>(allocaInst)) {
-        builder.SetInsertPoint(inst->getNextNode());
+        Instruction *typedInst = cast<Instruction>(typedPtr);
+        builder.SetInsertPoint(typedInst->getNextNode());        
         builder.CreateCall(allocateFn, {typedPtr, totalSize});
       }
     }
