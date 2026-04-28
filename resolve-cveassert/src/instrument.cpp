@@ -184,7 +184,7 @@ void instrumentAlloca(Function *F) {
 
   for (auto *alloca : allocas) {
     // Fast filter to prune non-escaping allocas
-    if (PointerMayBeCaptured(alloca, false) {
+    if (PointerMayBeCaptured(alloca, true, true)) {
       handle_alloca(alloca);
     }
   }
