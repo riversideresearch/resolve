@@ -166,7 +166,7 @@ void instrumentAlloca(Function *F) {
     if (!hasStart) {
       if (auto *inst = dyn_cast<Instruction>(allocaInst)) {
         Instruction *typedInst = cast<Instruction>(typedPtr);
-        builder.SetInsertPoint(typedInst->getNextNode());        
+        builder.SetInsertPoint(typedInst->getNextNode());
         builder.CreateCall(allocateFn, {typedPtr, totalSize});
       }
     }
