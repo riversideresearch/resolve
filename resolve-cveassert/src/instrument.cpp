@@ -10,6 +10,7 @@
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/IRBuilder.h"
+#include "llvm/IR/Instructions.h"
 #include "llvm/IR/IntrinsicInst.h"
 
 using namespace llvm;
@@ -89,26 +90,19 @@ void instrumentAlloca(Function *F) {
       M->getOrInsertFunction("__resolve_invalidate_stack",
                              FunctionType::get(void_ty, {ptr_ty}, false));
 
-  auto handle_alloca = [&](auto *allocaInst) {
-    bool hasStart = false;
-    bool hasEnd = false;
-
+  auto handle_static_alloca = [&](auto *allocaInst) {
     Type *allocatedType = allocaInst->getAllocatedType();
 
+    uint64_t elemSize = DL.getTypeAllocSize(allocatedType);
+    Value *elemSizeVal = ConstantInt::get(size_ty, elemSize);
+
     Value *arraySize = allocaInst->getArraySize();
-    Value *totalSize;
-
-    uint64_t elemSizeConst = DL.getTypeAllocSize(allocatedType);
-    Value *elemSize = ConstantInt::get(size_ty, elemSizeConst);
-
-    if (ConstantInt *CI = dyn_cast<ConstantInt>(arraySize)) {
-      uint64_t n = CI->getZExtValue();
-      totalSize = ConstantInt::get(size_ty, n * elemSizeConst);
-    } else {
-      totalSize = builder.CreateMul(arraySize, elemSize);
+    if (arraySize->getType() != size_ty) {
+      arraySize = builder.CreateZExt(arraySize, size_ty);
     }
 
-    // Create padded alloca type
+    Value *totalSize = builder.CreateMul(elemSizeVal, arraySize);
+    // Create padded alloca
     builder.SetInsertPoint(allocaInst->getNextNode());
     StructType *paddedType =
         StructType::get(allocatedType, Type::getInt8Ty(Ctx));
@@ -116,66 +110,125 @@ void instrumentAlloca(Function *F) {
         paddedType, nullptr, allocaInst->getName() + ".pad");
     paddedAlloca->setAlignment(allocaInst->getAlign());
 
-    // Emit a gep instruction to point to allocated type
     Value *typedPtr = builder.CreateStructGEP(paddedType, paddedAlloca, 0);
-    // NOTE: attaching metadata to gep instruction to prevent instrumentation of
-    // gep
+    // Attaching metadata to prevent instrumentation
     if (auto *inst = dyn_cast<Instruction>(typedPtr)) {
       inst->setMetadata("cve.noinstrument", MDNode::get(Ctx, {}));
     }
 
-    // Collect lifetime calls
-    SmallVector<Instruction *, 8> lifetimeCalls;
-
-    for (auto *user : allocaInst->users()) {
-      if (auto *call = dyn_cast<CallInst>(user)) {
-        if (auto *intrinsic = dyn_cast<IntrinsicInst>(call)) {
-          if (intrinsic->getIntrinsicID() == Intrinsic::lifetime_start) {
-            hasStart = true;
-            lifetimeCalls.push_back(call);
-          }
-
-          if (intrinsic->getIntrinsicID() == Intrinsic::lifetime_end) {
-            hasEnd = true;
-            lifetimeCalls.push_back(call);
-          }
-        }
-      }
-    }
-
-    for (auto *call : lifetimeCalls) {
-      if (auto *intrinsic = dyn_cast<IntrinsicInst>(call)) {
-        if (intrinsic->getIntrinsicID() == Intrinsic::lifetime_start) {
-          Instruction *typedInst = cast<Instruction>(typedPtr);
-          builder.SetInsertPoint(typedInst->getNextNode());
-          builder.CreateCall(allocateFn, {typedPtr, totalSize});
-          call->setOperand(1, typedPtr);
-        }
-
-        if (intrinsic->getIntrinsicID() == Intrinsic::lifetime_end) {
-          builder.SetInsertPoint(call->getNextNode());
-          builder.CreateCall(invalidateFn, {typedPtr});
-        }
-      }
-    }
-
+    builder.CreateCall(allocateFn, {typedPtr, totalSize});
+    toFreeList.push_back(paddedAlloca);
     allocaInst->replaceAllUsesWith(typedPtr);
+  };
 
-    // Instrument allocas that don't have lifetime markers
-    // Not all llvm-ir produced hasStart == hasEnd
-    if (!hasStart) {
-      if (auto *inst = dyn_cast<Instruction>(allocaInst)) {
-        Instruction *typedInst = cast<Instruction>(typedPtr);
-        builder.SetInsertPoint(typedInst->getNextNode());
-        builder.CreateCall(allocateFn, {typedPtr, totalSize});
-      }
+  auto handle_dyn_alloca = [&](auto *allocaInst) {
+    Type *allocatedType = allocaInst->getAllocatedType();
+    uint64_t elemSize = DL.getTypeAllocSize(allocatedType);
+    Value *elemSizeVal = ConstantInt::get(size_ty, elemSize);
+
+    Value *arraySize = allocaInst->getArraySize();
+    if (arraySize->getType() != size_ty) {
+      arraySize = builder.CreateZExt(arraySize, size_ty);
     }
 
-    if (!hasEnd) {
-      toFreeList.push_back(allocaInst);
+    Value *dynSize = builder.CreateMul(elemSizeVal, arraySize);
+    Value *totalSize = builder.CreateAdd(dynSize, ConstantInt::get(size_ty, 1));
+    builder.CreateCall(allocateFn, {allocaInst, totalSize});
+    toFreeList.push_back(allocaInst);
+  };
+
+  auto handle_alloca = [&](auto *allocaInst) {
+    if (allocaInst->isStaticAlloca()) {
+      handle_static_alloca(allocaInst);
+    } else {
+      handle_dyn_alloca(allocaInst);
     }
   };
 
+  // bool hasStart = false;
+  // bool hasEnd = false;
+
+  // Type *allocatedType = allocaInst->getAllocatedType();
+
+  // Value *arraySize = allocaInst->getArraySize();
+  // Value *totalSize;
+
+  // uint64_t elemSizeConst = DL.getTypeAllocSize(allocatedType);
+  // Value *elemSize = ConstantInt::get(size_ty, elemSizeConst);
+
+  // if (ConstantInt *CI = dyn_cast<ConstantInt>(arraySize)) {
+  //   uint64_t n = CI->getZExtValue();
+  //   totalSize = ConstantInt::get(size_ty, n * elemSizeConst);
+  // } else {
+  //   totalSize = builder.CreateMul(arraySize, elemSize);
+  // }
+
+  // // Create padded alloca type
+  // builder.SetInsertPoint(allocaInst->getNextNode());
+  // StructType *paddedType =
+  //     StructType::get(allocatedType, Type::getInt8Ty(Ctx));
+  // AllocaInst *paddedAlloca = builder.CreateAlloca(
+  //     paddedType, nullptr, allocaInst->getName() + ".pad");
+  // paddedAlloca->setAlignment(allocaInst->getAlign());
+
+  // // Emit a gep instruction to point to allocated type
+  // Value *typedPtr = builder.CreateStructGEP(paddedType, paddedAlloca, 0);
+  // // NOTE: attaching metadata to gep instruction to prevent instrumentation
+  // of
+  // // gep
+  // if (auto *inst = dyn_cast<Instruction>(typedPtr)) {
+  //   inst->setMetadata("cve.noinstrument", MDNode::get(Ctx, {}));
+  // }
+
+  // // Collect lifetime calls
+  // SmallVector<Instruction *, 8> lifetimeCalls;
+
+  // for (auto *user : allocaInst->users()) {
+  //   if (auto *call = dyn_cast<CallInst>(user)) {
+  //     if (auto *intrinsic = dyn_cast<IntrinsicInst>(call)) {
+  //       if (intrinsic->getIntrinsicID() == Intrinsic::lifetime_start) {
+  //         hasStart = true;
+  //         lifetimeCalls.push_back(call);
+  //       }
+
+  //       if (intrinsic->getIntrinsicID() == Intrinsic::lifetime_end) {
+  //         hasEnd = true;
+  //         lifetimeCalls.push_back(call);
+  //       }
+  //     }
+  //   }
+  // }
+
+  // for (auto *call : lifetimeCalls) {
+  //   if (auto *intrinsic = dyn_cast<IntrinsicInst>(call)) {
+  //     if (intrinsic->getIntrinsicID() == Intrinsic::lifetime_start) {
+  //       Instruction *typedInst = cast<Instruction>(typedPtr);
+  //       builder.SetInsertPoint(typedInst->getNextNode());
+  //       builder.CreateCall(allocateFn, {typedPtr, totalSize});
+  //     }
+
+  //     if (intrinsic->getIntrinsicID() == Intrinsic::lifetime_end) {
+  //       builder.SetInsertPoint(call->getNextNode());
+  //       builder.CreateCall(invalidateFn, {typedPtr});
+  //     }
+  //   }
+  // }
+
+  // allocaInst->replaceAllUsesWith(typedPtr);
+
+  // // Instrument allocas that don't have lifetime markers
+  // // Not all llvm-ir produced hasStart == hasEnd
+  // if (!hasStart) {
+  //   if (auto *inst = dyn_cast<Instruction>(allocaInst)) {
+  //     Instruction *typedInst = cast<Instruction>(typedPtr);
+  //     builder.SetInsertPoint(typedInst->getNextNode());
+  //     builder.CreateCall(allocateFn, {typedPtr, totalSize});
+  //   }
+  // }
+
+  // if (!hasEnd) {
+  //   toFreeList.push_back(allocaInst);
+  // }
   for (auto &BB : *F) {
     for (auto &instr : BB) {
       if (auto *inst = dyn_cast<AllocaInst>(&instr)) {
@@ -186,9 +239,9 @@ void instrumentAlloca(Function *F) {
 
   for (auto *alloca : allocas) {
     // Fast filter to prune non-escaping allocas
-    if (PointerMayBeCaptured(alloca, true, true)) {
-      handle_alloca(alloca);
-    }
+    // if (PointerMayBeCaptured(alloca, true, true)) {
+    handle_alloca(alloca);
+    //}
   }
 
   if (toFreeList.empty()) {
