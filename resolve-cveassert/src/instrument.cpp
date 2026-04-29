@@ -90,10 +90,8 @@ void instrumentAlloca(Function *F) {
       M->getOrInsertFunction("__resolve_invalidate_stack",
                              FunctionType::get(void_ty, {ptr_ty}, false));
 
-  auto handle_static_alloca = [&](auto *allocaInst) {
-    Type *allocatedType = allocaInst->getAllocatedType();
-
-    uint64_t elemSize = DL.getTypeAllocSize(allocatedType);
+  auto compute_alloca_size = [&](auto *allocaInst, Type *allocType) {
+    uint64_t elemSize = DL.getTypeAllocSize(allocType);
     Value *elemSizeVal = ConstantInt::get(size_ty, elemSize);
 
     Value *arraySize = allocaInst->getArraySize();
@@ -102,6 +100,12 @@ void instrumentAlloca(Function *F) {
     }
 
     Value *totalSize = builder.CreateMul(elemSizeVal, arraySize);
+    return totalSize;
+  };
+  auto handle_static_alloca = [&](auto *allocaInst) {
+    Type *allocatedType = allocaInst->getAllocatedType();
+    Value *totalSize = compute_alloca_size(allocaInst, allocatedType);
+
     // Create padded alloca
     builder.SetInsertPoint(allocaInst->getNextNode());
     StructType *paddedType =
@@ -123,16 +127,9 @@ void instrumentAlloca(Function *F) {
 
   auto handle_dyn_alloca = [&](auto *allocaInst) {
     Type *allocatedType = allocaInst->getAllocatedType();
-    uint64_t elemSize = DL.getTypeAllocSize(allocatedType);
-    Value *elemSizeVal = ConstantInt::get(size_ty, elemSize);
-
-    Value *arraySize = allocaInst->getArraySize();
-    if (arraySize->getType() != size_ty) {
-      arraySize = builder.CreateZExt(arraySize, size_ty);
-    }
-
-    Value *dynSize = builder.CreateMul(elemSizeVal, arraySize);
-    Value *totalSize = builder.CreateAdd(dynSize, ConstantInt::get(size_ty, 1));
+    Value *allocaSize = compute_alloca_size(allocaInst, allocatedType);
+    Value *totalSize =
+        builder.CreateAdd(allocaSize, ConstantInt::get(size_ty, 1));
     builder.CreateCall(allocateFn, {allocaInst, totalSize});
     toFreeList.push_back(allocaInst);
   };
