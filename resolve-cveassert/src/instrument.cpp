@@ -121,7 +121,6 @@ void instrumentAlloca(Function *F) {
     }
 
     builder.CreateCall(allocateFn, {typedPtr, totalSize});
-    toFreeList.push_back(paddedAlloca);
     allocaInst->replaceAllUsesWith(typedPtr);
   };
 
