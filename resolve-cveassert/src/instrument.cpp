@@ -142,59 +142,13 @@ void instrumentAlloca(Function *F) {
     }
   };
 
-  // bool hasStart = false;
-  // bool hasEnd = false;
-
-  // Type *allocatedType = allocaInst->getAllocatedType();
-
-  // Value *arraySize = allocaInst->getArraySize();
-  // Value *totalSize;
-
-  // uint64_t elemSizeConst = DL.getTypeAllocSize(allocatedType);
-  // Value *elemSize = ConstantInt::get(size_ty, elemSizeConst);
-
-  // if (ConstantInt *CI = dyn_cast<ConstantInt>(arraySize)) {
-  //   uint64_t n = CI->getZExtValue();
-  //   totalSize = ConstantInt::get(size_ty, n * elemSizeConst);
-  // } else {
-  //   totalSize = builder.CreateMul(arraySize, elemSize);
-  // }
-
-  // // Create padded alloca type
-  // builder.SetInsertPoint(allocaInst->getNextNode());
-  // StructType *paddedType =
-  //     StructType::get(allocatedType, Type::getInt8Ty(Ctx));
-  // AllocaInst *paddedAlloca = builder.CreateAlloca(
-  //     paddedType, nullptr, allocaInst->getName() + ".pad");
-  // paddedAlloca->setAlignment(allocaInst->getAlign());
-
-  // // Emit a gep instruction to point to allocated type
-  // Value *typedPtr = builder.CreateStructGEP(paddedType, paddedAlloca, 0);
-  // // NOTE: attaching metadata to gep instruction to prevent instrumentation
-  // of
-  // // gep
-  // if (auto *inst = dyn_cast<Instruction>(typedPtr)) {
-  //   inst->setMetadata("cve.noinstrument", MDNode::get(Ctx, {}));
-  // }
-
-  // // Collect lifetime calls
-  // SmallVector<Instruction *, 8> lifetimeCalls;
-
-  // for (auto *user : allocaInst->users()) {
-  //   if (auto *call = dyn_cast<CallInst>(user)) {
-  //     if (auto *intrinsic = dyn_cast<IntrinsicInst>(call)) {
-  //       if (intrinsic->getIntrinsicID() == Intrinsic::lifetime_start) {
-  //         hasStart = true;
-  //         lifetimeCalls.push_back(call);
-  //       }
-
-  //       if (intrinsic->getIntrinsicID() == Intrinsic::lifetime_end) {
-  //         hasEnd = true;
-  //         lifetimeCalls.push_back(call);
-  //       }
-  //     }
-  //   }
-  // }
+  for (auto &BB : *F) {
+    for (auto &instr : BB) {
+      if (auto *inst = dyn_cast<AllocaInst>(&instr)) {
+        allocas.push_back(inst);
+      }
+    }
+  }
 
   // for (auto *call : lifetimeCalls) {
   //   if (auto *intrinsic = dyn_cast<IntrinsicInst>(call)) {
@@ -210,8 +164,6 @@ void instrumentAlloca(Function *F) {
   //     }
   //   }
   // }
-
-  // allocaInst->replaceAllUsesWith(typedPtr);
 
   // // Instrument allocas that don't have lifetime markers
   // // Not all llvm-ir produced hasStart == hasEnd
