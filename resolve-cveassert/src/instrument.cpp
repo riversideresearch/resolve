@@ -120,6 +120,7 @@ void instrumentAlloca(Function *F) {
       inst->setMetadata("cve.noinstrument", MDNode::get(Ctx, {}));
     }
 
+    toFreeList.push_back(allocaInst);
     builder.CreateCall(allocateFn, {typedPtr, totalSize});
     allocaInst->replaceAllUsesWith(typedPtr);
   };
@@ -248,8 +249,8 @@ void instrumentAlloca(Function *F) {
     for (auto &instr : BB) {
       if (auto *inst = dyn_cast<ReturnInst>(&instr)) {
         builder.SetInsertPoint(inst);
-        for (auto *padded : toFreeList) {
-          builder.CreateCall(invalidateFn, {padded});
+        for (auto *alloca : toFreeList) {
+          builder.CreateCall(invalidateFn, {alloca});
         }
       }
     }
