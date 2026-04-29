@@ -280,8 +280,8 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
 
     switch (vuln.WeaknessID) {
     case VulnID::STACK_BASED_BUF_OVERFLOW: /* Stack-based buffer overflow */
-    case VulnID::HEAP_BASED_BUF_OVERFLOW: /* Heap-base buffer overflow */
-    case VulnID::OOB_WRITE: /* OOB Write */
+    case VulnID::HEAP_BASED_BUF_OVERFLOW:  /* Heap-base buffer overflow */
+    case VulnID::OOB_WRITE:                /* OOB Write */
     case VulnID::OOB:
     case VulnID::WRITE_WHAT_WHERE:
       sanitizeMemInstBounds(&F, vuln.Strategy);
