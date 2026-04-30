@@ -90,58 +90,105 @@ void instrumentAlloca(Function *F) {
       M->getOrInsertFunction("__resolve_invalidate_stack",
                              FunctionType::get(void_ty, {ptr_ty}, false));
 
-  auto compute_alloca_size = [&](auto *allocaInst, Type *allocType) {
+  auto compute_alloca_size = [&](auto *allocaInst, Type *allocType) -> Value * {
+    // works for both dynamic and static allocas
+    // size of one element
     uint64_t elemSize = DL.getTypeAllocSize(allocType);
     Value *elemSizeVal = ConstantInt::get(size_ty, elemSize);
 
+    // number of elements
+    // getArraySize returns the number of elements, not size in bytes
     Value *arraySize = allocaInst->getArraySize();
+
+    // convert arraySize to size_ty for multiplication
     if (arraySize->getType() != size_ty) {
       arraySize = builder.CreateZExt(arraySize, size_ty);
     }
 
+    // totalSize = (# of elements) * (size of element in bytes)
     Value *totalSize = builder.CreateMul(elemSizeVal, arraySize);
     return totalSize;
   };
-  auto handle_static_alloca = [&](auto *allocaInst) {
+
+  auto handle_alloca = [&](auto *allocaInst) {
+    Value *totalSize;
     Type *allocatedType = allocaInst->getAllocatedType();
-    Value *totalSize = compute_alloca_size(allocaInst, allocatedType);
+    // Compute the size of the alloca
+    // if the size of the alloca is known at compile-time then use it
+    // otherwise call compute_alloca_size
+    if (auto maybeSize = allocaInst->getAllocationSize(DL)) {
+      TypeSize ts = *maybeSize;
+      uint64_t size = ts.getFixedValue();
+      totalSize = ConstantInt::get(size_ty, size);
+    } else {
+      totalSize = compute_alloca_size(allocaInst, allocatedType);
+    }
 
-    // Create padded alloca
-    builder.SetInsertPoint(allocaInst->getNextNode());
-    StructType *paddedType =
-        StructType::get(allocatedType, Type::getInt8Ty(Ctx));
-    AllocaInst *paddedAlloca = builder.CreateAlloca(
-        paddedType, nullptr, allocaInst->getName() + ".pad");
-    paddedAlloca->setAlignment(allocaInst->getAlign());
+    // Build the new alloca
+    // %new_ptr = alloca n + 1
+    // call void __resolve_alloca(old_ptr, n)
+    // %ptr = alloca n
+    // alloca n + 1
+    // __resolve_alloca ptr , sizeof()
+    builder.SetInsertPoint(F->getEntryBlock().begin());
+    Value *rawSize = builder.CreateAdd(totalSize, ConstantInt::get(size_ty, 1));
+    AllocaInst *rawAlloca = builder.CreateAlloca(Type::getInt8Ty(Ctx), rawSize);
 
-    Value *typedPtr = builder.CreateStructGEP(paddedType, paddedAlloca, 0);
-    // Attaching metadata to prevent instrumentation
+    rawAlloca->setAlignment(allocaInst->getAlign());
+    rawAlloca->setMetadata("cve.noinstrument", MDNode::get(Ctx, {}));
+
+    // Cast back to original type
+    Value *typedPtr = builder.CreateBitCast(rawAlloca, ptr_ty);
     if (auto *inst = dyn_cast<Instruction>(typedPtr)) {
       inst->setMetadata("cve.noinstrument", MDNode::get(Ctx, {}));
     }
 
-    toFreeList.push_back(allocaInst);
-    builder.CreateCall(allocateFn, {typedPtr, totalSize});
-    allocaInst->replaceAllUsesWith(typedPtr);
-  };
+    bool hasStart = false;
+    bool hasEnd = false;
+    SmallVector<IntrinsicInst *, 8> lifetimeStarts;
+    SmallVector<IntrinsicInst *, 8> lifetimeEnds;
+    for (auto *user : allocaInst->users()) {
+      if (auto *ii = dyn_cast<IntrinsicInst>(user)) {
+        if (ii->getIntrinsicID() == Intrinsic::lifetime_start) {
+          lifetimeStarts.push_back(ii);
+          hasStart = true;
+        } else if (ii->getIntrinsicID() == Intrinsic::lifetime_end) {
+          lifetimeEnds.push_back(ii);
+          hasEnd = true;
+        }
+      }
+    }
 
-  auto handle_dyn_alloca = [&](auto *allocaInst) {
-    Type *allocatedType = allocaInst->getAllocatedType();
-    Value *allocaSize = compute_alloca_size(allocaInst, allocatedType);
-    Value *totalSize =
-        builder.CreateAdd(allocaSize, ConstantInt::get(size_ty, 1));
-    builder.CreateCall(allocateFn, {allocaInst, totalSize});
-    toFreeList.push_back(allocaInst);
-  };
-
-  auto handle_alloca = [&](auto *allocaInst) {
-    if (allocaInst->isStaticAlloca()) {
-      handle_static_alloca(allocaInst);
+    if (hasStart) {
+      for (auto *ii : lifetimeStarts) {
+        builder.SetInsertPoint(ii->getNextNode());
+        builder.CreateCall(allocateFn, {typedPtr, rawSize});
+        ii->setOperand(0, rawSize);
+        ii->setOperand(1, typedPtr);
+      }
     } else {
-      handle_dyn_alloca(allocaInst);
+      builder.CreateCall(allocateFn, {typedPtr, rawSize});
     }
+
+    if (hasEnd) {
+      for (auto *ii : lifetimeEnds) {
+        builder.SetInsertPoint(ii->getNextNode());
+        builder.CreateCall(invalidateFn, {typedPtr});
+        ii->setOperand(1, typedPtr);
+      }
+    } else {
+      toFreeList.push_back(rawAlloca);
+    }
+
+    allocaInst->replaceAllUsesWith(typedPtr);
+    allocaInst->eraseFromParent();
   };
 
+  // proposing new padding logic
+  // increasing array size by 1 of alloca by sizeof(elemType)
+  // if array size is constant int then we need to replace it with constant + 1
+  // to look like static alloca no control flow in handle_alloca its increases
+  // allocas are implicitly arrays even allocas with of size 1
   for (auto &BB : *F) {
     for (auto &instr : BB) {
       if (auto *inst = dyn_cast<AllocaInst>(&instr)) {
@@ -150,41 +197,8 @@ void instrumentAlloca(Function *F) {
     }
   }
 
-  // for (auto *call : lifetimeCalls) {
-  //   if (auto *intrinsic = dyn_cast<IntrinsicInst>(call)) {
-  //     if (intrinsic->getIntrinsicID() == Intrinsic::lifetime_start) {
-  //       Instruction *typedInst = cast<Instruction>(typedPtr);
-  //       builder.SetInsertPoint(typedInst->getNextNode());
-  //       builder.CreateCall(allocateFn, {typedPtr, totalSize});
-  //     }
-
-  //     if (intrinsic->getIntrinsicID() == Intrinsic::lifetime_end) {
-  //       builder.SetInsertPoint(call->getNextNode());
-  //       builder.CreateCall(invalidateFn, {typedPtr});
-  //     }
-  //   }
-  // }
-
-  // // Instrument allocas that don't have lifetime markers
-  // // Not all llvm-ir produced hasStart == hasEnd
-  // if (!hasStart) {
-  //   if (auto *inst = dyn_cast<Instruction>(allocaInst)) {
-  //     Instruction *typedInst = cast<Instruction>(typedPtr);
-  //     builder.SetInsertPoint(typedInst->getNextNode());
-  //     builder.CreateCall(allocateFn, {typedPtr, totalSize});
-  //   }
-  // }
-
-  // if (!hasEnd) {
-  //   toFreeList.push_back(allocaInst);
-  // }
-  for (auto &BB : *F) {
-    for (auto &instr : BB) {
-      if (auto *inst = dyn_cast<AllocaInst>(&instr)) {
-        allocas.push_back(inst);
-      }
-    }
-  }
+  // We want our instrumentation to reflect llvm lifetime view
+  // (so we dont break optimizations)
 
   for (auto *alloca : allocas) {
     // Fast filter to prune non-escaping allocas
@@ -201,8 +215,8 @@ void instrumentAlloca(Function *F) {
     for (auto &instr : BB) {
       if (auto *inst = dyn_cast<ReturnInst>(&instr)) {
         builder.SetInsertPoint(inst);
-        for (auto *alloca : toFreeList) {
-          builder.CreateCall(invalidateFn, {alloca});
+        for (auto *padded : toFreeList) {
+          builder.CreateCall(invalidateFn, {padded});
         }
       }
     }
