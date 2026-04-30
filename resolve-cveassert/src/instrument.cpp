@@ -93,6 +93,7 @@ void instrumentAlloca(Function *F) {
   auto compute_alloca_size = [&](auto *allocaInst, Type *allocType) -> Value * {
     // works for both dynamic and static allocas
     // size of one element
+    builder.SetInsertPoint(allocaInst);
     uint64_t elemSize = DL.getTypeAllocSize(allocType);
     Value *elemSizeVal = ConstantInt::get(size_ty, elemSize);
 
@@ -130,7 +131,7 @@ void instrumentAlloca(Function *F) {
     // %ptr = alloca n
     // alloca n + 1
     // __resolve_alloca ptr , sizeof()
-    builder.SetInsertPoint(F->getEntryBlock().begin());
+    builder.SetInsertPoint(allocaInst);
     Value *rawSize = builder.CreateAdd(totalSize, ConstantInt::get(size_ty, 1));
     AllocaInst *rawAlloca = builder.CreateAlloca(Type::getInt8Ty(Ctx), rawSize);
 
