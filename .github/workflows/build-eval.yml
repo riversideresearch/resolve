@@ -39,11 +39,8 @@ jobs:
 
       - name: Swap out Dockerfile and vulnerabilities.json
         run: |
-          rm "dockerfiles/*" && rmdir dockerfiles/
           mv examples/eboss_eval/src/analyze-images/analyze-image-remediated.dockerfile Dockerfile
-          rm vulnerabilities.json
           mv examples/eboss_eval/src/analyze-images/analyze-image-vulns.json vulnerabilities.json
-          rm -r "examples/"
 
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v1
