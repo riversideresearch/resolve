@@ -31,7 +31,7 @@ jobs:
       - name: Checkout analyze-images Dockerfile 
         uses: actions/checkout@v5
         with:
-          path: $GITHUB_WORKSPACE
+          path: .
           sparse-checkout: |
             examples/eboss_eval/src/analyze-images/analyze-image-remediated.dockerfile
             examples/eboss_eval/src/analyze-images/analyze-image-vulns.json
@@ -41,10 +41,10 @@ jobs:
         run: |
           cd $GITHUB_WORKSPACE
           rm dockerfiles/* && rmdir dockerfiles/
-          mv $GITHUB_WORKSPACE/examples/eboss_eval/src/analyze-images/analyze-image-remediated.dockerfile Dockerfile
+          mv examples/eboss_eval/src/analyze-images/analyze-image-remediated.dockerfile Dockerfile
           rm vulnerabilities.json
-          mv $GITHUB_WORKSPACE/examples/eboss_eval/src/analyze-images/analyze-image-vulns.json vulnerabilities.json
-          rm -r $GITHUB_WORKSPACE/examples
+          mv examples/eboss_eval/src/analyze-images/analyze-image-vulns.json vulnerabilities.json
+          rm -r examples
 
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v1
