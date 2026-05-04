@@ -1,0 +1,53 @@
+# TODO: Build the  *-remediated containers and push them private to GHCR.io
+# TODO: Build the following supporting images:
+#         lamartime stuff
+#         guestbook-builds stuff (includes variants)
+#         ffmpeg: is there a better way to upload the POC POV's?
+name: Build and Publish Remediated Challenge Containers
+
+on: 
+  workflow_dispatch:
+
+jobs:
+  # Should prob have separate jobs f/e remediation step
+  build-:
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/${{ github.repository_owner }}/${{ github.repository }}:latest
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    steps:
+      - name: Checkout ebossproject/analyze-images-v2
+        uses: actions/checkout@v4
+        with:
+          repository: https://github.com/ebossproject/analyze-images-v2.git
+
+      - name: Checkout analyze-images Dockerfile 
+        uses: actions/checkout@v4
+        with:
+          path: .
+          sparse-checkout: |
+            examples/eboss_eval/src/analyze-images/analyze-image-remediated.dockerfile
+            examples/eboss_eval/src/analyze-images/analyze-image-vulns.json
+
+      - name: Swap out Dockerfile and vulnerabilities.json
+        run: |
+          rm dockerfiles/* && rmdir dockerfiles/
+          mv analyze-image-remediated.dockerfile Dockerfile
+          rm vulnerabilities.json && mv analyze-image-vulns.json vulnerabilities.json
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v1
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          push: true
+          tags: ghcr.io/${{ github.repository_owner }}/${{ github.repository }}/analyze-image/server-remediated:latest
