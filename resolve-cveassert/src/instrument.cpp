@@ -206,7 +206,7 @@ void instrumentAlloca(Function *F) {
     // if (PointerMayBeCaptured(alloca, true, true)) {
     // NOTE: Skip allocas that contain a single value
     Type *allocatedType = alloca->getAllocatedType();
-    if (allocatedType->isSingleValue()) {
+    if (allocatedType->isSingleValueType()) {
       continue;
     }
     handle_alloca(alloca);
