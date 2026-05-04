@@ -6,7 +6,11 @@
 name: Build and Publish Remediated Challenge Containers
 
 on: 
-  workflow_dispatch:
+  push:
+    branches:
+      - feature/add-more-examples
+    paths:
+      - examples/eboss_eval/hacky_trigger.log
 
 jobs:
   # Should prob have separate jobs f/e remediation step
