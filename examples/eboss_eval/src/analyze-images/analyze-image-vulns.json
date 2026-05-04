@@ -1,0 +1,49 @@
+{
+    "vulnerabilities": [
+        {
+            "cve-id": "CVE-libtiff-00001",
+            "cve-description": "A stack-based buffer overflow exists in `libtiff` version 4.4.0 and earlier when processing a TIFF file containing a specially crafted tag ID. The vulnerability is triggered when a TIFF file includes a directory tag that is not properly validated by `TIFFReadDirectory()` but is later accessed via `TIFFGetField()`.",
+            "package-name": "tiff",
+            "package-version": "4.3.0",
+            "cwe-id": "121",
+            "cwe-name": "Stack-based Buffer Overflow",
+            "affected-function": "_TIFFVGetField",
+            "affected-file": "libtiff/tif_dir.c",
+            "remediation-strategy": "recover"
+        },
+        {
+            "cve-id": "CVE-openjpeg-00001",
+            "cve-description": "A divide-by-zero vulnerability exists in OpenJPEG 2.1.2 when decoding malformed JPEG 2000 .jp2 files using the PCRL progression order. Insufficient validation in opj_pi_next_pcrl allows opj_int_ceildiv to be called with a zero divisor, triggering SIGFPE and a crash.",
+            "package-name": "openjpeg",
+            "package-version": "2.1.2",
+            "cwe-id": "369",
+            "cwe-name": "Divide by Zero",
+            "affected-function": "opj_pi_next_pcrl",
+            "affected-file": "lib/openjp2/pi.c",
+            "undesirable-function": "opj_int_ceildiv"
+        },
+        {
+            "cve-id": "CVE-openjpeg-00002",
+            "cve-description": "A divide-by-zero vulnerability exists in OpenJPEG 2.1.2 when decoding malformed JPEG 2000 .jp2 files using the CPLR progression order. Insufficient validation in opj_pi_next_cprl allows opj_int_ceildiv to be called with a zero divisor, triggering SIGFPE and a crash.",
+            "package-name": "openjpeg",
+            "package-version": "2.1.2",
+            "cwe-id": "369",
+            "cwe-name": "Divide by Zero",
+            "affected-function": "opj_pi_next_cprl",
+            "affected-file": "lib/openjp2/pi.c",
+            "undesirable-function": "opj_int_ceildiv"
+        },
+        {
+            "cve-id": "CVE-turbojpeg-00001",
+            "cve-description": "A heap buffer overflow exists in `libjpeg-turbo` 2.0.1 when processing specially crafted BMP image files using the `tjLoadImage()` function. The issue arises due to unchecked multiplication of image width and pixel size during calculation of the image pitch and total buffer size. This allows a crafted BMP file to trigger a write outside the bounds of allocated memory.",
+            "package-name": "libjpeg-turbo",
+            "package-version": "2.0.1",
+            "cwe-id": "131",
+            "cwe-name": "Incorrect Calculation of Buffer Size",
+            "affected-function": "tjLoadImage",
+            "affected-file": "src/turbojpeg.c",
+            "remediation-strategy": "recover"
+        }
+
+    ]
+}
