@@ -93,7 +93,6 @@ void instrumentAlloca(Function *F) {
   auto compute_alloca_size = [&](auto *allocaInst, Type *allocType) -> Value * {
     // works for both dynamic and static allocas
     // size of one element
-    builder.SetInsertPoint(allocaInst);
     uint64_t elemSize = DL.getTypeAllocSize(allocType);
     Value *elemSizeVal = ConstantInt::get(size_ty, elemSize);
 
@@ -133,7 +132,8 @@ void instrumentAlloca(Function *F) {
     // __resolve_alloca ptr , sizeof()
     builder.SetInsertPoint(allocaInst);
     Value *rawSize = builder.CreateAdd(totalSize, ConstantInt::get(size_ty, 1));
-    AllocaInst *rawAlloca = builder.CreateAlloca(Type::getInt8Ty(Ctx), rawSize);
+    AllocaInst *rawAlloca =
+        builder.CreateAlloca(allocaInst->getAllocatedType(), rawSize);
 
     rawAlloca->setAlignment(allocaInst->getAlign());
     rawAlloca->setMetadata("cve.noinstrument", MDNode::get(Ctx, {}));
@@ -204,6 +204,11 @@ void instrumentAlloca(Function *F) {
   for (auto *alloca : allocas) {
     // Fast filter to prune non-escaping allocas
     // if (PointerMayBeCaptured(alloca, true, true)) {
+    // NOTE: Skip allocas that contain a single value
+    Type *allocatedType = alloca->getAllocationType();
+    if (allocatedType->isSingleValue()) {
+      continue;
+    }
     handle_alloca(alloca);
     //}
   }
