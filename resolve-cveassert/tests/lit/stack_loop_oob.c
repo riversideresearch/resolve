@@ -4,7 +4,6 @@
  */
 
 // Test that the remediation is successful 
-// XFAIL: *
 // RUN: RESOLVE_LABEL_CVE=vulnerabilities/stack_loop_oob.json %clang -S -emit-llvm \
 // RUN: -fpass-plugin=%plugin \
 // RUN: %s -o - | %FileCheck %s 
