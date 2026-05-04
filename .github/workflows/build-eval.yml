@@ -31,13 +31,14 @@ jobs:
       - name: Checkout analyze-images Dockerfile 
         uses: actions/checkout@v5
         with:
-          path: .
+          path: $GITHUB_WORKSPACE
           sparse-checkout: |
             examples/eboss_eval/src/analyze-images/analyze-image-remediated.dockerfile
             examples/eboss_eval/src/analyze-images/analyze-image-vulns.json
 
       - name: Swap out Dockerfile and vulnerabilities.json
         run: |
+          cd $GITHUB_WORKSPACE
           rm dockerfiles/* && rmdir dockerfiles/
           mv analyze-image-remediated.dockerfile Dockerfile
           rm vulnerabilities.json && mv analyze-image-vulns.json vulnerabilities.json
