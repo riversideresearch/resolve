@@ -14,7 +14,7 @@ on:
 
 jobs:
   # Should prob have separate jobs f/e remediation step
-  build-:
+  build:
     runs-on: ubuntu-latest
     container:
       image: ghcr.io/${{ github.repository_owner }}/${{ github.repository }}:latest
@@ -24,12 +24,12 @@ jobs:
 
     steps:
       - name: Checkout ebossproject/analyze-images-v2
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
-          repository: https://github.com/ebossproject/analyze-images-v2.git
+          repository: ebossproject/analyze-images-v2
 
       - name: Checkout analyze-images Dockerfile 
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           path: .
           sparse-checkout: |
