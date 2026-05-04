@@ -35,14 +35,16 @@ jobs:
           sparse-checkout: |
             examples/eboss_eval/src/analyze-images/analyze-image-remediated.dockerfile
             examples/eboss_eval/src/analyze-images/analyze-image-vulns.json
+          sparse-checkout-cone-mode: false
 
       - name: Swap out Dockerfile and vulnerabilities.json
         run: |
-          find . -type f -name "*.dockerfile" && echo "===" && find . -type f -name "*.json"
           cd $GITHUB_WORKSPACE
           rm dockerfiles/* && rmdir dockerfiles/
-          mv analyze-image-remediated.dockerfile Dockerfile
-          rm vulnerabilities.json && mv analyze-image-vulns.json vulnerabilities.json
+          mv $GITHUB_WORKSPACE/examples/eboss_eval/src/analyze-images/analyze-image-remediated.dockerfile Dockerfile
+          rm vulnerabilities.json
+          mv $GITHUB_WORKSPACE/examples/eboss_eval/src/analyze-images/analyze-image-vulns.json vulnerabilities.json
+          rm -r $GITHUB_WORKSPACE/examples
 
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v1
