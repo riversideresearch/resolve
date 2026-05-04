@@ -38,6 +38,7 @@ jobs:
 
       - name: Swap out Dockerfile and vulnerabilities.json
         run: |
+          find . -type f -name "*.dockerfile" && echo "===" && find . -type f -name "*.json"
           cd $GITHUB_WORKSPACE
           rm dockerfiles/* && rmdir dockerfiles/
           mv analyze-image-remediated.dockerfile Dockerfile
