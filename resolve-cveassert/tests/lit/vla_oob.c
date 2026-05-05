@@ -26,3 +26,4 @@ int main() {
     example(n);
     return 0;
 }
+
