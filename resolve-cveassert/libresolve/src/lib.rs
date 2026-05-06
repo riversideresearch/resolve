@@ -4,7 +4,6 @@
 #![feature(btree_cursors)]
 
 mod remediate;
-mod shadowobjs;
 mod provenance;
 mod trace;
 
