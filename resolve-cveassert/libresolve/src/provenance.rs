@@ -54,3 +54,8 @@ impl MetadataTable {
         todo!("Implement search fn ");
     }
 }
+
+pub static TRACKED_PTRS: MutexWrap<MetadataTable> = MutexWrap::new(MetadataTable::new());
+
+//#[cfg(test)]
+
