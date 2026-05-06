@@ -4,7 +4,7 @@
 use crate::MutexWrap;
 use std::collections::BTreeMap;
 use std::ops::RangeInclusive;
-//use std::ops::Bound::Included;
+use std::ops::Bound::Included;
 
 pub type Vaddr = usize;
 
@@ -52,11 +52,33 @@ impl MetadataTable {
     }
 
     pub fn search(&self, addr: Vaddr) -> Option<&Provenance> {
-        todo!("Implement search fn ");
+        let cursor = self.table
+            .upper_bound(Included(&addr));
+        
+        cursor.peek_prev()
+            .filter(|(_, o)| o.contains(addr));
     }
 }
 
 pub static TRACKED_PTRS: MutexWrap<MetadataTable> = MutexWrap::new(MetadataTable::new());
 
-//#[cfg(test)]
+#[cfg(test)]
+mod tests {
+    use crate::provenance::{MetadataTable};
+
+    #[test]
+    fn test_add_ptrs() {
+        let mut table = MetadataTable::new();
+        table.add_ptr_metadata(0x1000, 4);
+        table.add_ptr_metadata(0x2000, 8);
+    }
+
+    #[test]
+    fn test_remove_ptrs() {
+        let mut table = MetadataTable::new();
+        table.add_ptr_metadata(0x1000, 8);
+        table.invalidate_at(0x1000);
+        assert_eq!(table.table.len(), 0);
+    }
+}
 
