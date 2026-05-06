@@ -51,12 +51,13 @@ impl MetadataTable {
         let _ = self.table.remove(&base);
     }
 
-    pub fn search(&self, addr: Vaddr) -> Option<&Provenance> {
+    pub fn search_intersection(&self, addr: Vaddr) -> Option<&Provenance> {
         let cursor = self.table
             .upper_bound(Included(&addr));
         
         cursor.peek_prev()
-            .filter(|(_, o)| o.contains(addr));
+            .filter(|(_, o)| o.contains(addr))
+            .map(|(_, o)| o)
     }
 }
 
