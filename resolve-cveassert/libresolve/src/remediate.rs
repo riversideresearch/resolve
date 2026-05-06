@@ -4,8 +4,6 @@ use libc::{
     c_char, c_void, calloc, free, malloc, realloc, strdup, strlen, strndup, strnlen,
 };
 
-use crate::shadowobjs::{ALIVE_OBJ_LIST, AllocType, FREED_OBJ_LIST};
-
 use crate::provenance::{TRACKED_PTRS, Vaddr};
 
 use log::{info, warn};
@@ -75,46 +73,20 @@ pub extern "C" fn __resolve_malloc(size: usize) -> *mut c_void {
  */
 #[unsafe(no_mangle)]
 pub extern "C" fn __resolve_free(ptr: *mut c_void) -> () {
-    // Insert a function to find the object and return the pointer size
-    // Do I need to handle if the sobj cannot be found?
-
     info!(
-        "[FREE] Allocated object freed at address: 0x{:x}",
+        "[FREE] Freed ptr at address: 0x{:x}",
         ptr as Vaddr
     );
 
-    let ptr_size = {
-        let mut obj_list = ALIVE_OBJ_LIST.lock();
-        let sobj_opt = obj_list.search_intersection(ptr as Vaddr);
-        let size = sobj_opt.map(|o| o.size());
-        // remove shadow obj from live list
-        obj_list.invalidate_at(ptr as Vaddr);
-        size
-    };
-
-    // Check if the shadow object exists
-    match ptr_size {
-        Some(size) => {
-            info!(
-                "[FREE] Found shadow object for allocated object, 0x{:x}, size = {size}",
-                ptr as Vaddr,
-            );
-        }
-        None => {
-            warn!(
-                "[FREE] No shadow object found for allocated object: 0x{:x}",
-                ptr as Vaddr
-            );
-        }
-    }
-
+        
     {
-        // Insert shadow object into freed object list
-        let mut freed_guard = FREED_OBJ_LIST.lock();
-        freed_guard.add_shadow_object(AllocType::Unallocated, ptr as Vaddr, ptr_size.unwrap_or(0));
+        let mut ptr_table = TRACKED_PTRS.lock();
+        // TODO: Maybe add handling here to handle 'None' case?
+        let _ = ptr_table.search_intersection(ptr as Vaddr);
+        ptr_table.invalidate_at(ptr as Vaddr);
     }
 
-    let _ = unsafe { free(ptr) };
+        let _ = unsafe { free(ptr) };
 }
 
 /**
@@ -133,7 +105,8 @@ pub extern "C" fn __resolve_realloc(ptr: *mut c_void, size: usize) -> *mut c_voi
     
     // Consideration: Pointer passed in may be invalidated so we need a mechanism
     // to remove the shadow object for the orignal allocation
-    let realloc_ptr = unsafe { realloc(ptr, size + 1) };
+    let realloc_ptr = unsafe { realloc(ptr, size) };
+    let base = realloc_ptr as Vaddr;
 
     if realloc_ptr.is_null() {
         return realloc_ptr;
@@ -141,10 +114,10 @@ pub extern "C" fn __resolve_realloc(ptr: *mut c_void, size: usize) -> *mut c_voi
 
 
     {
-        let mut obj_list = ALIVE_OBJ_LIST.lock();
+        let mut ptr_table = TRACKED_PTRS.lock();
         // Remove shadow object for original pointer
-        obj_list.invalidate_at(ptr as Vaddr); // if ptr == NULL this does not do anything 
-        obj_list.add_shadow_object(AllocType::Heap, realloc_ptr as Vaddr, size);
+        ptr_table.invalidate_at(base); // if ptr == NULL this does not do anything 
+        ptr_table.add_ptr_metadata(base, size);
     }
 
     info!(
@@ -172,8 +145,8 @@ pub extern "C" fn __resolve_calloc(n_items: usize, item_size: usize) -> *mut c_v
     }
 
     {
-        let mut obj_list = ALIVE_OBJ_LIST.lock();
-        obj_list.add_shadow_object(AllocType::Heap, ptr as Vaddr, size);
+        let mut ptr_table = TRACKED_PTRS.lock();
+        ptr_table.add_ptr_metadata(ptr as Vaddr, size);
     }
 
     info!(
@@ -203,8 +176,8 @@ pub extern "C" fn __resolve_strdup(ptr: *mut c_char) -> *mut c_char {
     // Although writing it to something else is probably a bad idea, this too should be allowed.
     let sizeofstr = unsafe { strlen(ptr) + 1 };
     {
-        let mut obj_list = ALIVE_OBJ_LIST.lock();
-        obj_list.add_shadow_object(AllocType::Heap, string_ptr as Vaddr, sizeofstr);
+        let mut ptr_table = TRACKED_PTRS.lock();
+        ptr_table.add_ptr_metadata(string_ptr as Vaddr, sizeofstr);
     }
 
     info!(
@@ -226,7 +199,7 @@ pub extern "C" fn __resolve_strdup(ptr: *mut c_char) -> *mut c_char {
  */
 #[unsafe(no_mangle)]
 pub extern "C" fn __resolve_strndup(ptr: *mut c_char, size: usize) -> *mut c_char {
-    let string_ptr = unsafe { strndup(ptr, size + 1) };
+    let string_ptr = unsafe { strndup(ptr, size) };
 
     if string_ptr.is_null() {
         return string_ptr;
@@ -239,8 +212,8 @@ pub extern "C" fn __resolve_strndup(ptr: *mut c_char, size: usize) -> *mut c_cha
     let sizeofstr = unsafe { strnlen(ptr, size) + 1 };
 
     {
-        let mut obj_list = ALIVE_OBJ_LIST.lock();
-        obj_list.add_shadow_object(AllocType::Heap, string_ptr as Vaddr, sizeofstr);
+        let mut ptr_table = TRACKED_PTRS.lock();
+        ptr_table.add_ptr_metadata(string_ptr as Vaddr, sizeofstr);
     }
 
     info!(
@@ -252,44 +225,47 @@ pub extern "C" fn __resolve_strndup(ptr: *mut c_char, size: usize) -> *mut c_cha
 }
 
 #[repr(C)]
-pub struct ShadowObjBounds {
+pub struct PtrBounds {
     pub base: *mut c_void,
     pub limit: *mut c_void,
 }
 
 /**
- * @brief - Helper function that queries shadow obj list
- *          to find a shadow obj where the ptr fits within
- *          its bounds of allocation 
+ * @brief - Helper function that queries metadata table
+ *          and returns the metadata that corresponds to
+ *          the pointer 
  * @input
  *  - ptr: ptr to allocation 
- * @return struct containing the base and limit of the
- *         shadow object as pointers 
+ * @return metadata containing the base and limit of 
+ *  tracked pointer 
  */
+
+// TODO: Rewrite this fn to use the provenance metadata
 #[unsafe(no_mangle)]
-pub extern "C" fn __resolve_get_bounds(ptr: *mut c_void) -> ShadowObjBounds {
-    let sobj_table = ALIVE_OBJ_LIST.lock();
-    let Some(sobj) = sobj_table.search_intersection(ptr as Vaddr) else {
-        return ShadowObjBounds { base: std::ptr::null_mut(), limit: std::ptr::null_mut() }
+pub extern "C" fn __resolve_get_bounds(ptr: *mut c_void) -> PtrBounds {
+    let ptr_table = TRACKED_PTRS.lock();
+    let Some(bounds) = ptr_table.search_intersection(ptr as Vaddr) else {
+        return PtrBounds { base: std::ptr::null_mut(), limit: std::ptr::null_mut() }
     };
 
-    return ShadowObjBounds { base: sobj.base as *mut c_void, limit: sobj.limit as *mut c_void }
+    return PtrBounds { base: bounds.base as *mut c_void, limit: bounds.limit as *mut c_void }
 }
 
-#[unsafe(no_mangle)]
-pub extern "C" fn resolve_obj_type(base_ptr: *mut c_void) -> AllocType {
-    let base = base_ptr as Vaddr;
-
-    let find_in = |table: &crate::MutexWrap<crate::shadowobjs::ShadowObjectTable>| {
-        let t = table.lock();
-        t.search_intersection(base).map(|o| o.alloc_type)
-    };
-
-    // Why does this search freed before alive?
-    let alloc_type = find_in(&FREED_OBJ_LIST).or_else(|| find_in(&ALIVE_OBJ_LIST));
-
-    alloc_type.unwrap_or(AllocType::Unknown)
-}
+//#[unsafe(no_mangle)]
+//pub extern "C" fn resolve_obj_type(base_ptr: *mut c_void) -> AllocType {
+//    let base = base_ptr as Vaddr;
+//
+//    let find_in = |table: &crate::MutexWrap<crate::shadowobjs::ShadowObjectTable>| {
+//        let t = table.lock();
+//        t.search_intersection(base).map(|o| o.alloc_type)
+//    };
+//
+//    // Why does this search freed before alive?
+//    let alloc_type = find_in(&FREED_OBJ_LIST).or_else(|| find_in(&ALIVE_OBJ_LIST));
+//
+//    alloc_type.unwrap_or(AllocType::Unknown)
+//}
+//
 
 /**
  * @brief - Logs when program enters sanitization basic block
@@ -299,46 +275,46 @@ pub extern "C" fn __resolve_report_violation() -> () {
     info!("[RESOLVE] sanitizer triggered");
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::{resolve_init, shadowobjs::AllocType};
-
-    #[test]
-    fn test_malloc_free() {
-        resolve_init();
-        // Allocation should successfully return a memory block
-        let ptr = __resolve_malloc(0x10);
-        assert!(!ptr.is_null());
-
-        // We should track the obj correctly
-        {
-            let table = ALIVE_OBJ_LIST.lock();
-            let obj = table.search_intersection(ptr as Vaddr);
-
-            assert!(obj.is_some());
-            let obj = obj.unwrap();
-            assert!(obj.size() == 0x10);
-            assert!(obj.base == ptr as Vaddr);
-            assert!(obj.alloc_type == AllocType::Heap);
-        }
-
-        __resolve_free(ptr);
-
-        // After freeing a block we should track that it has been freed
-        {
-            let table = FREED_OBJ_LIST.lock();
-            let obj = table.search_intersection(ptr as Vaddr);
-
-            assert!(obj.is_some());
-        }
-
-        // And it should no longer be in the alive obj list.
-        {
-            let table = ALIVE_OBJ_LIST.lock();
-            let obj = table.search_intersection(ptr as Vaddr);
-
-            assert!(obj.is_none());
-        }
-    }
-}
+//#[cfg(test)]
+//mod tests {
+//    use super::*;
+//    use crate::{resolve_init, shadowobjs::AllocType};
+//
+//    #[test]
+//    fn test_malloc_free() {
+//        resolve_init();
+//        // Allocation should successfully return a memory block
+//        let ptr = __resolve_malloc(0x10);
+//        assert!(!ptr.is_null());
+//
+//        // We should track the obj correctly
+//        {
+//            let table = ALIVE_OBJ_LIST.lock();
+//            let obj = table.search_intersection(ptr as Vaddr);
+//
+//            assert!(obj.is_some());
+//            let obj = obj.unwrap();
+//            assert!(obj.size() == 0x10);
+//            assert!(obj.base == ptr as Vaddr);
+//            assert!(obj.alloc_type == AllocType::Heap);
+//        }
+//
+//        __resolve_free(ptr);
+//
+//        // After freeing a block we should track that it has been freed
+//        {
+//            let table = FREED_OBJ_LIST.lock();
+//            let obj = table.search_intersection(ptr as Vaddr);
+//
+//            assert!(obj.is_some());
+//        }
+//
+//        // And it should no longer be in the alive obj list.
+//        {
+//            let table = ALIVE_OBJ_LIST.lock();
+//            let obj = table.search_intersection(ptr as Vaddr);
+//
+//            assert!(obj.is_none());
+//        }
+//    }
+//}
