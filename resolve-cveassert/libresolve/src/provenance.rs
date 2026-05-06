@@ -4,7 +4,7 @@
 use crate::MutexWrap;
 use std::collections::BTreeMap;
 use std::ops::RangeInclusive;
-use std::ops::Bound::Included;
+//use std::ops::Bound::Included;
 
 pub type Vaddr = usize;
 
@@ -35,12 +35,13 @@ impl MetadataTable {
     pub const fn new() -> Self {
         Self {
             table: BTreeMap::new(),
+        }
     }
 
-    pub fn add_pointer_metadata(&mut self, base: Vaddr, limit: Vaddr) {
-        let prov = Provenance 
+    pub fn add_ptr_metadata(&mut self, base: Vaddr, limit: Vaddr) {
+        let prov = Provenance { 
             base, 
-            limit,
+            limit: base + limit,
         };
 
         self.table.insert(base, prov);

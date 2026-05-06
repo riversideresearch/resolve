@@ -4,7 +4,9 @@ use libc::{
     c_char, c_void, calloc, free, malloc, realloc, strdup, strlen, strndup, strnlen,
 };
 
-use crate::shadowobjs::{ALIVE_OBJ_LIST, AllocType, FREED_OBJ_LIST, Vaddr};
+use crate::shadowobjs::{ALIVE_OBJ_LIST, AllocType, FREED_OBJ_LIST};
+
+use crate::provenance::{TRACKED_PTRS, Vaddr};
 
 use log::{info, warn};
 
@@ -17,8 +19,8 @@ use log::{info, warn};
 pub extern "C" fn __resolve_alloca(ptr: *mut c_void, size: usize) -> () {
     let base = ptr as Vaddr;
     {
-        let mut obj_list = ALIVE_OBJ_LIST.lock();
-        obj_list.add_shadow_object(AllocType::Stack, base, size);
+        let mut ptr_table = TRACKED_PTRS.lock();
+        ptr_table.add_ptr_metadata(base, size);
     }
 
     info!("[STACK] Object allocated with size: {size}, address: 0x{base:x}");
@@ -29,8 +31,8 @@ pub extern "C" fn __resolve_invalidate_stack(base: *mut c_void) {
     let base = base as Vaddr;
 
     {
-        let mut obj_list = ALIVE_OBJ_LIST.lock();
-        obj_list.invalidate_at(base);
+        let mut ptr_table = TRACKED_PTRS.lock();
+        ptr_table.invalidate_at(base);
     }
 
     info!("[STACK] Free addr 0x{base:x}");
@@ -43,15 +45,19 @@ pub extern "C" fn __resolve_invalidate_stack(base: *mut c_void) {
  */
 #[unsafe(no_mangle)]
 pub extern "C" fn __resolve_malloc(size: usize) -> *mut c_void {
-    let ptr = unsafe { malloc(size + 1) };
+    let ptr = unsafe { malloc(size) };
+    let base = ptr as Vaddr;
 
     if ptr.is_null() {
+        info!("[ERROR]
+        Failed to allocate memory of size: {size}, returning a null pointer
+        ");
         return ptr;
     }
 
     {
-        let mut obj_list = ALIVE_OBJ_LIST.lock();
-        obj_list.add_shadow_object(AllocType::Heap, ptr as Vaddr, size);
+        let mut ptr_table = TRACKED_PTRS.lock();
+        ptr_table.add_ptr_metadata(base, size);
     }
 
     info!(

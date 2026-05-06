@@ -5,6 +5,7 @@
 
 mod remediate;
 mod shadowobjs;
+mod provenance;
 mod trace;
 
 use libc::{Dl_info, atexit, c_void, dladdr, dlsym};
