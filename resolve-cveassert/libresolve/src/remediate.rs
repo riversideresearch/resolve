@@ -5,7 +5,6 @@ use libc::{
 };
 
 use crate::provenance::{TRACKED_PTRS, Vaddr};
-
 use log::{info, warn};
 
 /**
@@ -23,6 +22,7 @@ pub extern "C" fn __resolve_alloca(ptr: *mut c_void, size: usize) -> () {
 
     info!("[STACK] Object allocated with size: {size}, address: 0x{base:x}");
 }
+
 
 #[unsafe(no_mangle)]
 pub extern "C" fn __resolve_invalidate_stack(base: *mut c_void) {
@@ -115,7 +115,7 @@ pub extern "C" fn __resolve_realloc(ptr: *mut c_void, size: usize) -> *mut c_voi
 
     {
         let mut ptr_table = TRACKED_PTRS.lock();
-        // Remove shadow object for original pointer
+        // Remove metadata for original pointer
         ptr_table.invalidate_at(base); // if ptr == NULL this does not do anything 
         ptr_table.add_ptr_metadata(base, size);
     }
