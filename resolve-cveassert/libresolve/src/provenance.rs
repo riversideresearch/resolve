@@ -3,7 +3,7 @@
 
 use crate::MutexWrap;
 use std::collections::BTreeMap;
-use std::ops::RangeInclusive;
+use std::ops::Range;
 use std::ops::Bound::Included;
 
 pub type Vaddr = usize;
@@ -18,8 +18,8 @@ pub struct Provenance {
 
 impl Provenance {
     
-    pub fn bounds(&self) -> RangeInclusive<Vaddr> {
-        self.base..=self.limit
+    pub fn bounds(&self) -> Range<Vaddr> {
+        self.base..self.limit
     }
 
     pub fn contains(&self, addr: Vaddr) -> bool {
@@ -38,14 +38,17 @@ impl MetadataTable {
         }
     }
 
-    pub fn add_ptr_metadata(&mut self, base: Vaddr, limit: Vaddr) {
+    pub fn add_ptr_metadata(&mut self, base: Vaddr, size: Vaddr) {
         let prov = Provenance { 
             base, 
-            limit: base + limit,
+            limit: base + size,
         };
 
         self.table.insert(base, prov);
     }
+
+    // TODO: Create a method that propogates bounds metadata
+    // // to derived ptr
 
     pub fn invalidate_at(&mut self, base: Vaddr) {
         let _ = self.table.remove(&base);
