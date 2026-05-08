@@ -1,0 +1,98 @@
+services:
+  server:
+    image: analyze-image/server
+    build:
+      context: analyze-image-v2/
+      dockerfile: dockerfiles/Dockerfile.server
+    container_name: analyze-image-server
+    # ports:
+    #   - "5000:5000"
+    restart: unless-stopped
+
+  server-remediated:
+    image: analyze-image/server:remediated
+    build:
+      context: analyze-image-v2/
+      dockerfile: dockerfiles/Dockerfile.remediated
+      args:
+        RESOLVE_LABEL_CVE: /challenge/vulnerabilities.json
+    container_name: analyze-image-server-remediated
+    # ports:
+    #   - "5000:5000"
+    restart: unless-stopped
+
+  poller:
+    image: analyze-image/poller
+    build:
+      context: analyze-image-v2/
+      dockerfile: poller/Dockerfile.poller
+    container_name: poller
+    environment:
+      - SERVER=server
+      - PORT=5000
+    depends_on:
+      - server
+    container_name: analyze-image-poller
+
+  pov:
+    image: analyze-image/pov
+    build:
+      context: analyze-image-v2/
+      dockerfile: pov/Dockerfile.pov
+    container_name: pov
+    environment:
+      - SERVER=server
+      - PORT=5000
+      - FILE=/pov/pov-01
+    volumes:
+      - ./pov:/pov
+    depends_on:
+      - server
+    container_name: analyze-image-pov
+
+  pov1:
+    image: analyze-image/pov:latest
+    command: >
+      bash -c "HOST=server PORT=5000 FILE=/pov/pov-01 python /pov/pov.py"
+
+  pov2:
+    image: analyze-image/pov:latest
+    command: >
+      bash -c "HOST=server PORT=5000 FILE=/pov/pov-02 python /pov/pov.py"
+
+  pov3:
+    image: analyze-image/pov:latest
+    command: >
+      bash -c "HOST=server PORT=5000 FILE=/pov/pov-03 python /pov/pov.py"
+
+  report-build:
+    build:
+      dockerfile_inline: |
+        FROM analyze-image/server:remediated AS cp
+        FROM resolve AS build-base
+        COPY --from=cp /challenge/build/server /analyze-image
+        RUN chmod +r /analyze-image
+    volumes:
+      - ./analyze-image-facts:/facts-dir
+    command: >
+      bash -c "
+      chmod -R 777 /facts-dir &&
+      mkdir -p /facts-dir/build &&
+      rm -f /facts-dir/build/* &&
+      /opt/resolve/bin/extract_facts.py --in_bin /analyze-image --out_dir /facts-dir/build/
+      "
+    depends_on: [analyze-image]
+
+  run-reach:
+    image: analyze-image/server:remediated
+    volumes:
+      - ./analyze-image-facts:/facts-dir
+    command: >
+      bash -c "
+      /opt/resolve/bin/resolve-reach \
+      -i /challenge/vulnerabilities.json \
+      -o /facts-dir/reach_out.json \
+      -f /facts-dir/build/ \
+      -r /opt/resolve/bin/reach
+      "
+    depends_on: [analyze-image]
