@@ -22,7 +22,7 @@ jobs:
         run: docker pull ghcr.io/${{ github.repository_owner }}/${{ github.repository }}:latest
 
       - name: Checkout Resolve Builder Docker Image
-        run: docker pull ghcr.io/${{ github.repository_owner }}/${{ github.repository }}/resolve-builder:latest
+        run: docker pull ghcr.io/${{ github.repository_owner }}/resolve/resolve-builder:latest
 
       - name: Checkout ebossproject/analyze-images-v2
         uses: actions/checkout@v5
