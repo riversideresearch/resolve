@@ -5,6 +5,7 @@ services:
       context: analyze-image-v2/
       dockerfile: dockerfiles/Dockerfile.server
     container_name: analyze-image-server
+    hostname: server
     # ports:
     #   - "5000:5000"
     restart: unless-stopped
@@ -17,6 +18,7 @@ services:
       args:
         RESOLVE_LABEL_CVE: /challenge/vulnerabilities.json
     container_name: analyze-image-server-remediated
+    hostname: server
     # ports:
     #   - "5000:5000"
     restart: unless-stopped
