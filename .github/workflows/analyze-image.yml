@@ -61,4 +61,59 @@ jobs:
           push: true
           tags: ghcr.io/${{ github.repository_owner }}/resolve/analyze-image/server-remediated:latest
 
+  run-reach:
+    runs-on: ubuntu:latest
+    container:
+      image: docker pull ghcr.io/${{ github.repository_owner }}/resolve/analyze-image/server-remediated:latest
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Extract facts from fat binary
+        run: |
+          chmod -R 777 /facts-dir &&
+          mkdir -p /facts-dir/build &&
+          rm -f /facts-dir/build/* &&
+          /opt/resolve/bin/extract_facts.py --in_bin "CHALLENGE_BINARY" --out_dir /facts-dir/build/
 
+      - name: Run reachability
+        run: |
+          /opt/resolve/bin/resolve-reach \
+            -i /challenge/vulnerabilities.json \
+            -o /facts-dir/reach_out.json \
+            -f /facts-dir/build/ \
+            -r /opt/resolve/bin/reach
+
+  run-povs:
+    runs-on: ubuntu:latest
+    steps:
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v1
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Pull Images
+        run: |
+          docker pull ghcr.io/${{ github.repository_owner }}/resolve/analyze-image/server-remediated:latest &
+          docker pull ghcr.io/${{ github.repository_owner }}/resolve/analyze-image/pov:latest &
+          docker pull ghcr.io/${{ github.repository_owner }}/resolve/analyze-image/poller:latest &
+          wait
+          docker tag ghcr.io/${{ github.repository_owner }}/resolve/analyze-image/server-remediated:latest analyze-image/server:latest
+          docker tag ghcr.io/${{ github.repository_owner }}/resolve/analyze-image/pov:latest analyze-image/pov:latest
+          docker tag ghcr.io/${{ github.repository_owner }}/resolve/analyze-image/poller:latest analyze-image/poller:latest
+
+      - name: Checkout docker compose
+        uses: actions/checkout@v5
+        with:
+          path: sparse
+          sparse-checkout: |
+            examples/eboss_eval/src/analyze-images/compose-analyze-image.yml
+          sparse-checkout-cone-mode: false
+
+      - name: Rename compose file
+        run: mv sparse/examples/eboss_eval/src/analyze-images/compose-analyze-image.yml ./docker-compose.yml
+
+      - name: POV 1
+        run: docker compose up --abort-on-container-exit server-remediated poller pov1
