@@ -1,13 +1,13 @@
 services:
-  server:
-    image: analyze-image/server
-    build:
-      context: analyze-image-v2/
-      dockerfile: dockerfiles/Dockerfile.server
-    container_name: analyze-image-server
-    # ports:
-    #   - "5000:5000"
-    restart: unless-stopped
+  # server:
+  #   image: analyze-image/server
+  #   build:
+  #     context: analyze-image-v2/
+  #     dockerfile: dockerfiles/Dockerfile.server
+  #   container_name: analyze-image-server
+  #   # ports:
+  #   #   - "5000:5000"
+  #   restart: unless-stopped
 
   server-remediated:
     image: 19eb21108749
