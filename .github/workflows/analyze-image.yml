@@ -84,6 +84,7 @@ jobs:
             -o ./facts-dir/reach_out.json \
             -f ./facts-dir/build/server.facts \
             -r /opt/resolve/bin/reach
+          cat facts-dir/reach_out.json
 
   run-povs:
     runs-on: ubuntu-latest
@@ -104,6 +105,7 @@ jobs:
           docker tag ghcr.io/${{ github.repository_owner }}/resolve/analyze-image/server-remediated:latest analyze-image/server:latest
           docker tag ghcr.io/${{ github.repository_owner }}/resolve/analyze-image/pov:latest analyze-image/pov:latest
           docker tag ghcr.io/${{ github.repository_owner }}/resolve/analyze-image/poller:latest analyze-image/poller:latest
+          docker images
 
       - name: Checkout docker compose
         uses: actions/checkout@v5
@@ -117,4 +119,6 @@ jobs:
         run: mv sparse/examples/eboss_eval/src/analyze-images/compose-analyze-image.yml ./docker-compose.yml
 
       - name: POV 1
-        run: docker compose up --abort-on-container-exit server-remediated poller pov1
+        run: |
+          docker images && printf '%.0s#' {1..10} && echo "" && docker ps -a
+          docker compose up --abort-on-container-exit server-remediated poller pov1
