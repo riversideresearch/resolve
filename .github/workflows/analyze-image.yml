@@ -52,7 +52,7 @@ jobs:
           mv examples/eboss_eval/src/analyze-images/analyze-image-remediated.dockerfile Dockerfile
           mv examples/eboss_eval/src/analyze-images/analyze-image-vulns.json vulnerabilities.json
           printf '%.0s#' {1..50}
-          for dir in "${ls -A}"; do echo dir && ls dir; done
+          for dir in $(ls -A); do echo -en "$dir\n\t" && ls $dir; done
  
       - name: Build and push Docker image
         uses: docker/build-push-action@v2
