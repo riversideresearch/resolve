@@ -119,4 +119,6 @@ jobs:
         run: mv sparse/examples/eboss_eval/src/analyze-images/compose-analyze-image.yml ./docker-compose.yml
 
       - name: POV 1
-        run: docker compose up --abort-on-container-exit server-remediated poller pov1
+        run: |
+          docker images && echo -e "\n\n\n"
+          docker compose up --abort-on-container-exit server-remediated poller pov1
