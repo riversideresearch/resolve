@@ -37,6 +37,7 @@ jobs:
         uses: actions/checkout@v5
         with:
           repository: ebossproject/analyze-images-v2
+          path: main
 
       - name: Checkout remediated build files
         uses: actions/checkout@v5
