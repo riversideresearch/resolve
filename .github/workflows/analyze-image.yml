@@ -7,6 +7,10 @@ on:
     paths:
       - examples/eboss_eval/hacky_trigger.log
 
+permissions:
+  packages: write
+  contents: read
+
 jobs:
   build:
     runs-on: ubuntu-latest
