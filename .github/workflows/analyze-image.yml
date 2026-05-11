@@ -71,8 +71,8 @@ jobs:
     steps:
       - name: Extract facts from fat binary
         run: |
-          chmod -R 777 /facts-dir &&
           mkdir -p /facts-dir/build &&
+          chmod -R 777 /facts-dir &&
           rm -f /facts-dir/build/* &&
           /opt/resolve/bin/extract_facts.py --in_bin "$CHALLENGE_BINARY" --out_dir /facts-dir/build/
 
