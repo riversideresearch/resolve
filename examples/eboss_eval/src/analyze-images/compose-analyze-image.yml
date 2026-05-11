@@ -10,7 +10,7 @@ services:
     restart: unless-stopped
 
   server-remediated:
-    image: analyze-image/server:remediated
+    image: 19eb21108749
     build:
       context: analyze-image-v2/
       dockerfile: dockerfiles/Dockerfile.remediated
