@@ -5,6 +5,7 @@
 
 #include "llvm/IR/Function.h"
 #include "llvm/IR/IRBuilder.h"
+#include "llvm/IR/InlineAsm.h"
 
 #include "Vulnerability.hpp"
 #include "helpers.hpp"
@@ -49,7 +50,7 @@ Function *getOrCreateCveIsHeap(Function *F) {
   });
 
   // return !(is_stack || is_static)
-  auto result = builder.CreateNot(builder.CreateOr({is_stack, is_static}));
+  auto result = builder.CreateNot(builder.CreateOr(is_stack, is_static));
   builder.CreateRet(result);
 
   validateIR(cveIsHeapFn);
