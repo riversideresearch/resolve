@@ -28,6 +28,11 @@ jobs:
       - name: Checkout Resolve Builder Docker Image
         run: docker pull ghcr.io/${{ github.repository_owner }}/resolve/resolve-builder:latest
 
+      - name: Re-tag docker images
+        run: |
+          docker tag ghcr.io/${{ github.repository_owner }}/${{ github.repository }}:latest resolve:latest
+          docker tag ghcr.io/${{ github.repository_owner }}/resolve/resolve-builder:latest resolve-builder:latest
+
       - name: Checkout ebossproject/analyze-images-v2
         uses: actions/checkout@v5
         with:
