@@ -42,7 +42,7 @@ jobs:
       - name: Checkout remediated build files
         uses: actions/checkout@v5
         with:
-          path: .
+          path: sparse
           sparse-checkout: |
             examples/eboss_eval/src/analyze-images/analyze-image-remediated.dockerfile
             examples/eboss_eval/src/analyze-images/analyze-image-vulns.json
