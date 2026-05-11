@@ -62,7 +62,7 @@ jobs:
           tags: ghcr.io/${{ github.repository_owner }}/resolve/analyze-image/server-remediated:latest
 
   run-reach:
-    runs-on: ubuntu:latest
+    runs-on: ubuntu-latest
     container:
       image: docker pull ghcr.io/${{ github.repository_owner }}/resolve/analyze-image/server-remediated:latest
       credentials:
@@ -85,7 +85,7 @@ jobs:
             -r /opt/resolve/bin/reach
 
   run-povs:
-    runs-on: ubuntu:latest
+    runs-on: ubuntu-latest
     steps:
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v1
