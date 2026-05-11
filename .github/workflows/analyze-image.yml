@@ -101,11 +101,9 @@ jobs:
         run: |
           docker pull ghcr.io/${{ github.repository_owner }}/resolve/analyze-image/server-remediated:latest &
           docker pull ghcr.io/${{ github.repository_owner }}/resolve/analyze-image/pov:latest &
-          docker pull ghcr.io/${{ github.repository_owner }}/resolve/analyze-image/poller:latest &
           wait
           docker tag ghcr.io/${{ github.repository_owner }}/resolve/analyze-image/server-remediated:latest analyze-image/server:remediated
           docker tag ghcr.io/${{ github.repository_owner }}/resolve/analyze-image/pov:latest analyze-image/pov:latest
-          docker tag ghcr.io/${{ github.repository_owner }}/resolve/analyze-image/poller:latest analyze-image/poller:latest
 
       - name: Checkout docker compose
         uses: actions/checkout@v5
@@ -119,6 +117,4 @@ jobs:
         run: mv sparse/examples/eboss_eval/src/analyze-images/compose-analyze-image.yml ./docker-compose.yml
 
       - name: POV 1
-        run: |
-          docker images && echo -e "\n\n\n"
-          docker compose up --abort-on-container-exit server-remediated poller pov1
+        run: docker compose up --abort-on-container-exit server-remediated pov1
