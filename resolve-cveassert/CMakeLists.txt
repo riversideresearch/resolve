@@ -20,6 +20,7 @@ add_library(CVEAssert SHARED
   src/CVEAssert.cpp
   src/helpers.cpp
   src/instrument.cpp
+  src/nonheap_free.cpp
   src/null_ptr.cpp
   src/undesirableop.cpp
 )

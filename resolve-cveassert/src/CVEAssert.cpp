@@ -32,6 +32,7 @@
 #include "bounds_check.hpp"
 #include "helpers.hpp"
 #include "instrument.hpp"
+#include "nonheap_free.hpp"
 #include "null_ptr.hpp"
 #include "undesirableop.hpp"
 
@@ -100,97 +101,6 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
     CVE_ASSERT_DEBUG = strlen(std::getenv("CVE_ASSERT_DEBUG") ?: "") > 0;
 
     vulnerabilities = Vulnerability::parseVulnerabilityFile();
-  }
-
-  Function *getOrCreateFreeOfNonHeapSanitizer(
-      Function *F, Vulnerability::RemediationStrategies strategy) {
-    std::string handlerName = "__cve_san_nonheap_free";
-    Module *M = F->getParent();
-    LLVMContext &Ctx = M->getContext();
-    GlobalVariable *map = SanitizerMaps[F];
-
-    IRBuilder<> builder(Ctx);
-    // TODO: handle address spaces other than 0
-    auto ptr_ty = PointerType::get(Ctx, 0);
-    auto usize_ty = Type::getInt64Ty(Ctx);
-    auto i1_ty = Type::getInt1Ty(Ctx);
-
-    // TODO: write this in asm as some kind of sanitzer_rt?
-    FunctionType *resolveFreeNonHeapFnTy =
-        FunctionType::get(Type::getVoidTy(Ctx), {ptr_ty}, false);
-    Function *resolveFreeNonHeapFn =
-        getOrCreateResolveHelper(M, handlerName, resolveFreeNonHeapFnTy);
-    if (!resolveFreeNonHeapFn->empty()) {
-      return resolveFreeNonHeapFn;
-    }
-
-    BasicBlock *EntryBB =
-        BasicBlock::Create(Ctx, "entry", resolveFreeNonHeapFn);
-    BasicBlock *CheckOnHeapBB =
-        BasicBlock::Create(Ctx, "check_heap", resolveFreeNonHeapFn);
-    BasicBlock *SanitizeNonHeapBB =
-        BasicBlock::Create(Ctx, "sanitize_nonheap", resolveFreeNonHeapFn);
-    BasicBlock *FreeHeapBB =
-        BasicBlock::Create(Ctx, "free_heap", resolveFreeNonHeapFn);
-
-    // Set insertion point to entry block
-    builder.SetInsertPoint(EntryBB);
-    Argument *inputPtr = resolveFreeNonHeapFn->getArg(0);
-
-    Value *mapPtr = builder.CreateGEP(
-        map->getValueType(), map, {builder.getInt64(0), builder.getInt64(0)});
-    Value *mapEntry =
-        builder.CreateCall(getOrCreateSanitizerMapEntry(M),
-                           {mapPtr, ConstantInt::get(usize_ty, 2)});
-    Value *isZero = builder.CreateICmpEQ(mapEntry, ConstantInt::get(i1_ty, 0));
-    builder.CreateCondBr(isZero, FreeHeapBB, CheckOnHeapBB);
-
-    // Call Is Heap Func
-    // Branch if True
-    builder.SetInsertPoint(CheckOnHeapBB);
-    Value *IsHeap = builder.CreateCall(getOrCreateIsHeap(M, Ctx), {inputPtr});
-    builder.CreateCondBr(IsHeap, FreeHeapBB, SanitizeNonHeapBB);
-
-    builder.SetInsertPoint(SanitizeNonHeapBB);
-    if (Function *fn = getOrCreateRemediationBehavior(M, strategy)) {
-      builder.CreateCall(fn);
-    }
-    builder.CreateRetVoid();
-
-    // Free Block: call Free
-    builder.SetInsertPoint(FreeHeapBB);
-    builder.CreateCall(M->getFunction("free"), {inputPtr});
-    builder.CreateRetVoid();
-
-    validateIR(resolveFreeNonHeapFn);
-    return resolveFreeNonHeapFn;
-  }
-
-  void sanitizeFreeOfNonHeap(Function *F,
-                             Vulnerability::RemediationStrategies strategy) {
-    LLVMContext &Ctx = F->getContext();
-    IRBuilder<> builder(Ctx);
-    std::vector<CallInst *> workList;
-
-    for (auto &BB : *F) {
-      for (auto &Inst : BB) {
-        if (auto *call = dyn_cast<CallInst>(&Inst)) {
-          if (auto callee = call->getCalledFunction())
-            if (callee->getName() == "free") {
-              workList.push_back(call);
-            }
-        }
-      }
-    }
-
-    for (auto call : workList) {
-      builder.SetInsertPoint(call);
-      auto sanitizerFn = getOrCreateFreeOfNonHeapSanitizer(F, strategy);
-
-      builder.CreateCall(sanitizerFn, {call->getArgOperand(0)});
-      call->removeFromParent();
-      call->deleteValue();
-    }
   }
 
   void applyAutomaticSanitizers(Function &F,

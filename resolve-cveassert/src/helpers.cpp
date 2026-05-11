@@ -116,52 +116,6 @@ Function *getOrCreateResolveHelper(Module *M, std::string fn_name,
   return resolveHelperFn;
 }
 
-Function *getOrCreateIsHeap(Module *M, LLVMContext &Ctx) {
-  // TODO: handle address spaces other than 0
-  auto ptr_ty = PointerType::get(Ctx, 0);
-  auto i1_ty = Type::getInt1Ty(Ctx);
-
-  // TODO: write this in asm as some kind of sanitzer_rt?
-  FunctionType *resolveIsHeapFnTy = FunctionType::get(i1_ty, {ptr_ty}, false);
-
-  Function *resolveIsHeapFn =
-      getOrCreateResolveHelper(M, "__cve_is_heap", resolveIsHeapFnTy);
-
-  if (!resolveIsHeapFn->empty()) {
-    return resolveIsHeapFn;
-  }
-
-  IRBuilder<> Builder(Ctx);
-  BasicBlock *Entry = BasicBlock::Create(Ctx, "entry", resolveIsHeapFn);
-  Builder.SetInsertPoint(Entry);
-
-  // Get function argument
-  Argument *InputPtr = resolveIsHeapFn->getArg(0);
-
-  FunctionType *AsmType = FunctionType::get(ptr_ty, {});
-  auto read_sp_asm = InlineAsm::get(AsmType, "mov %rsp, $0",
-                                    "=r,~{dirflag},~{fpsr},~{flags}", true);
-  auto read_sp = Builder.CreateCall(read_sp_asm, {});
-  // ($rsp <= InputPtr)
-  auto is_stack = Builder.CreateICmpULE(read_sp, InputPtr);
-
-  auto start = M->getOrInsertGlobal("_start", Type::getInt8Ty(Ctx));
-  auto end = M->getOrInsertGlobal("_end", Type::getInt8Ty(Ctx));
-
-  // ((InputPtr >= _start) && (InputPtr <= _end))
-  auto is_static = Builder.CreateAnd({
-      Builder.CreateICmpUGE(InputPtr, start),
-      Builder.CreateICmpULE(InputPtr, end),
-  });
-
-  // return !(is_stack || is_static);
-  auto result = Builder.CreateNot(Builder.CreateOr({is_stack, is_static}));
-  Builder.CreateRet(result);
-
-  validateIR(resolveIsHeapFn);
-  return resolveIsHeapFn;
-}
-
 Function *getOrCreateResolveReportSanitizerTriggered(Module *M) {
   auto &Ctx = M->getContext();
   auto void_ty = Type::getVoidTy(Ctx);
