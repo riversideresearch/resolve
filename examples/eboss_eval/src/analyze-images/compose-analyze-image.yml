@@ -38,7 +38,6 @@ services:
     build:
       context: analyze-image-v2/
       dockerfile: pov/Dockerfile.pov
-    container_name: pov
     environment:
       - SERVER=server
       - PORT=5000
