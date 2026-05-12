@@ -122,21 +122,21 @@ jobs:
         continue-on-error: true
         run: |
           docker compose up --abort-on-container-exit server-remediated pov1 || echo $? > pov1_exit.txt
-          if [ ! -f pov1_exit.txt ]; then echo "0" > pov1_exit.txt fi
+          [ -f pov1_exit.txt ] || echo "0" > pov1_exit.txt
           exit $(cat pov1_exit.txt)
 
       - name: POV 2
         continue-on-error: true
         run: |
           docker compose up --abort-on-container-exit server-remediated pov2 || echo $? > pov2_exit.txt
-          if [ ! -f pov2_exit.txt ]; then echo "0" > pov2_exit.txt fi
+          [ -f pov2_exit.txt ] || echo "0" > pov2_exit.txt
           exit $(cat pov2_exit.txt)
 
       - name: POV 3
         continue-on-error: true
         run: |
           docker compose up --abort-on-container-exit server-remediated pov3 || echo $? > pov3_exit.txt
-          if [ ! -f pov3_exit.txt ]; then echo "0" > pov3_exit.txt fi
+          [ -f pov3_exit.txt ] || echo "0" > pov3_exit.txt
           exit $(cat pov3_exit.txt)
 
       - name: Aggregate results
