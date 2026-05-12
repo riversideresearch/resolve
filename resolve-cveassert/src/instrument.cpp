@@ -12,8 +12,36 @@
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/IntrinsicInst.h"
+#include "llvm/Support/raw_ostream.h"
+#include "llvm/Transforms/Utils/BasicBlockUtils.h"
 
 using namespace llvm;
+
+static void dumpAllocaTransfrom(AllocaInst *preAlloca, AllocaInst *postAlloca) {
+  errs() << "=== Alloca Transform ===\n";
+  errs() << "Original alloca:\n";
+  preAlloca->dump();
+
+  errs() << "Allocated type: ";
+  preAlloca->getAllocatedType()->print(errs());
+  errs() << "\n";
+
+  errs() << "Array size: ";
+  preAlloca->getArraySize()->print(errs());
+  errs() << "\n";
+
+  errs() << "\nTransformed Alloca:\n";
+  postAlloca->dump();
+
+  errs() << "Allocated type: ";
+  postAlloca->getAllocatedType()->print(errs());
+  errs() << "\n";
+
+  errs() << "Array size: ";
+  preAlloca->getArraySize()->print(errs());
+  errs() << "\n";
+  errs() << "\n=======================\n";
+}
 
 /// Replaces all calls to `name` in `F` with calls to `__resolve_name`
 static void wrapLibraryFunction(Function *F, StringRef name, FunctionType *ty) {
@@ -84,35 +112,42 @@ void instrumentAlloca(Function *F) {
   // Initialize list to store pointers to alloca and instructions
   std::vector<AllocaInst *> toFreeList;
 
+  raw_ostream &out = llvm::errs();
+
   auto allocateFn = M->getOrInsertFunction(
       "__resolve_alloca", FunctionType::get(void_ty, {ptr_ty, size_ty}, false));
   auto invalidateFn =
       M->getOrInsertFunction("__resolve_invalidate_stack",
                              FunctionType::get(void_ty, {ptr_ty}, false));
 
-  auto compute_alloca_size = [&](auto *allocaInst, Type *allocType) -> Value * {
-    // works for both dynamic and static allocas
-    // size of one element
-    uint64_t elemSize = DL.getTypeAllocSize(allocType);
-    Value *elemSizeVal = ConstantInt::get(size_ty, elemSize);
+  auto create_transformed_array_alloca = [&](auto *oldAlloca) -> AllocaInst * {
+    builder.SetInsertPoint(oldAlloca->getNextNode());
 
-    // number of elements
-    // getArraySize returns the number of elements, not size in bytes
-    Value *arraySize = allocaInst->getArraySize();
+    Type *oldAllocaTy = oldAlloca->getAllocatedType();
+    auto *arrTy = dyn_cast<ArrayType>(oldAllocaTy);
+    uint64_t numElements = arrTy->getNumElements();
+    Type *elemTy = arrTy->getElementType();
+    uint64_t updatedSize = numElements + 1;
+    ArrayType *newArrayTy = ArrayType::get(elemTy, updatedSize);
+    AllocaInst *transformedAlloca = builder.CreateAlloca(newArrayTy);
+    transformedAlloca->setAlignment(oldAlloca->getAlign());
+    return transformedAlloca;
+  };
 
-    // convert arraySize to size_ty for multiplication
-    if (arraySize->getType() != size_ty) {
-      arraySize = builder.CreateZExt(arraySize, size_ty);
-    }
+  auto create_transformed_dynamic_alloca = [&](auto *oldAlloca, Value *originalSize) -> AllocaInst * {
+    builder.SetInsertPoint(oldAlloca->getNextNode());
 
-    // totalSize = (# of elements) * (size of element in bytes)
-    Value *totalSize = builder.CreateMul(elemSizeVal, arraySize);
-    return totalSize;
+    Type *oldAllocaTy = oldAlloca->getAllocatedType();
+    Value *updatedSize = builder.CreateAdd(originalSize, ConstantInt::get(size_ty, 1));
+    AllocaInst *transformedAlloca = builder.CreateAlloca(oldAllocaTy, updatedSize);
+    transformedAlloca->setAlignment(oldAlloca->getAlign());
+    return transformedAlloca;
   };
 
   auto handle_alloca = [&](auto *allocaInst) {
     Value *totalSize;
-    Type *allocatedType = allocaInst->getAllocatedType();
+    AllocaInst *transformedAlloca;
+
     // Compute the size of the alloca
     // if the size of the alloca is known at compile-time then use it
     // otherwise call compute_alloca_size
@@ -120,73 +155,72 @@ void instrumentAlloca(Function *F) {
       TypeSize ts = *maybeSize;
       uint64_t size = ts.getFixedValue();
       totalSize = ConstantInt::get(size_ty, size);
+      transformedAlloca = create_transformed_array_alloca(allocaInst);
+    
     } else {
-      totalSize = compute_alloca_size(allocaInst, allocatedType);
+      totalSize = allocaInst->getArraySize();
+      transformedAlloca = create_transformed_dynamic_alloca(allocaInst, totalSize);
     }
 
-    // Build the new alloca
-    // %new_ptr = alloca n + 1
-    // call void __resolve_alloca(old_ptr, n)
-    // %ptr = alloca n
-    // alloca n + 1
-    // __resolve_alloca ptr , sizeof()
-    builder.SetInsertPoint(allocaInst);
-    Value *rawSize = builder.CreateAdd(totalSize, ConstantInt::get(size_ty, 1));
-    AllocaInst *rawAlloca =
-        builder.CreateAlloca(allocaInst->getAllocatedType(), rawSize);
-
-    rawAlloca->setAlignment(allocaInst->getAlign());
-    rawAlloca->setMetadata("cve.noinstrument", MDNode::get(Ctx, {}));
-
-    // Cast back to original type
-    Value *typedPtr = builder.CreateBitCast(rawAlloca, ptr_ty);
-    if (auto *inst = dyn_cast<Instruction>(typedPtr)) {
-      inst->setMetadata("cve.noinstrument", MDNode::get(Ctx, {}));
-    }
+    transformedAlloca->setMetadata("cve.noinstrument", MDNode::get(Ctx, {}));
+    // llvm.lifetime_start(ptr %newAlloca, i64 %newSize)
+    // llvm.lifetime_end(ptr %newAlloca, i64 %newSize)
+    // update the size for the life time
+    SmallVector<IntrinsicInst*, 16> lifetimeStart;
+    SmallVector<IntrinsicInst*, 16> lifetimeEnd;
 
     bool hasStart = false;
     bool hasEnd = false;
-    SmallVector<IntrinsicInst *, 8> lifetimeStarts;
-    SmallVector<IntrinsicInst *, 8> lifetimeEnds;
     for (auto *user : allocaInst->users()) {
       if (auto *ii = dyn_cast<IntrinsicInst>(user)) {
-        if (ii->getIntrinsicID() == Intrinsic::lifetime_start) {
-          lifetimeStarts.push_back(ii);
+        Intrinsic::ID id = ii->getIntrinsicID();
+        if (id == Intrinsic::lifetime_start) {
           hasStart = true;
-        } else if (ii->getIntrinsicID() == Intrinsic::lifetime_end) {
-          lifetimeEnds.push_back(ii);
+          lifetimeStart.push_back(ii);
+        }
+
+        if (id == Intrinsic::lifetime_end) {
           hasEnd = true;
+          lifetimeEnd.push_back(ii);
         }
       }
     }
 
-    if (hasStart) {
-      for (auto *ii : lifetimeStarts) {
-        builder.SetInsertPoint(ii->getNextNode());
-        builder.CreateCall(allocateFn, {typedPtr, rawSize});
-        ii->setOperand(0, rawSize);
-        ii->setOperand(1, typedPtr);
-      }
-    } else {
-      builder.CreateCall(allocateFn, {typedPtr, rawSize});
+    for (auto *ii : lifetimeStart) {
+      ii->setArgOperand(0, totalSize);
+      builder.SetInsertPoint(ii->getNextNode());
+      builder.CreateCall(allocateFn, {transformedAlloca, totalSize});
     }
 
-    if (hasEnd) {
-      for (auto *ii : lifetimeEnds) {
-        builder.SetInsertPoint(ii->getNextNode());
-        builder.CreateCall(invalidateFn, {typedPtr});
-        ii->setOperand(1, typedPtr);
-      }
-    } else {
-      toFreeList.push_back(rawAlloca);
+    for (auto *ii : lifetimeEnd) {
+      ii->setArgOperand(0, totalSize);
+
+      builder.SetInsertPoint(ii->getNextNode());
+      builder.CreateCall(invalidateFn, {transformedAlloca});
     }
 
-    allocaInst->replaceAllUsesWith(typedPtr);
+    // Not all well-formed llvm-ir will emit both 
+    // llvm.lifetime_start and llvm.lifetime_end
+    if (!hasStart) {
+      builder.SetInsertPoint(allocaInst->getNextNode());
+      builder.CreateCall(allocateFn, {transformedAlloca, totalSize});
+    }
+
+    if (!hasEnd) {
+      toFreeList.push_back(transformedAlloca);
+    }
+
+    // DEBUGGING
+    // for (User *user : allocaInst->users()) {
+    //   errs() << "User:\n";
+    //   user->dump();
+    // }
+
+    allocaInst->replaceAllUsesWith(transformedAlloca);
     allocaInst->eraseFromParent();
+    //dumpAllocaTransfrom(allocaInst, transformedAlloca);
   };
 
-  // proposing new padding logic
-  // increasing array size by 1 of alloca by sizeof(elemType)
   // if array size is constant int then we need to replace it with constant + 1
   // to look like static alloca no control flow in handle_alloca its increases
   // allocas are implicitly arrays even allocas with of size 1
@@ -209,6 +243,7 @@ void instrumentAlloca(Function *F) {
     if (allocatedType->isSingleValueType() && alloca->isStaticAlloca()) {
       continue;
     }
+
     handle_alloca(alloca);
     //}
   }
@@ -221,8 +256,8 @@ void instrumentAlloca(Function *F) {
     for (auto &instr : BB) {
       if (auto *inst = dyn_cast<ReturnInst>(&instr)) {
         builder.SetInsertPoint(inst);
-        for (auto *padded : toFreeList) {
-          builder.CreateCall(invalidateFn, {padded});
+        for (auto *alloca : toFreeList) {
+          builder.CreateCall(invalidateFn, {alloca});
         }
       }
     }
