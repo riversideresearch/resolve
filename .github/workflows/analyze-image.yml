@@ -116,19 +116,28 @@ jobs:
       - name: Rename compose file
         run: mv sparse/examples/eboss_eval/src/analyze-images/compose-analyze-image.yml ./docker-compose.yml
 
-        # TODO: HOW TO RUN ALL TESTS EVEN IF THEY FAIL, BUT FAIL ENTIRE JOB IF EVEN ONE TEST FAILS?
-        #   see: reusable workflows / actions?
+      # TODO: integrate POLLER to test for regression test
+
       - name: POV 1
         continue-on-error: true
         run: |
           docker compose up --abort-on-container-exit server-remediated pov1 || echo $? > pov1_exit.txt
+          if [ ! -f pov1_exit.txt ]; then echo "0" > pov1_exit.txt fi
           exit $(cat pov1_exit.txt)
 
       - name: POV 2
         continue-on-error: true
         run: |
           docker compose up --abort-on-container-exit server-remediated pov2 || echo $? > pov2_exit.txt
+          if [ ! -f pov2_exit.txt ]; then echo "0" > pov2_exit.txt fi
           exit $(cat pov2_exit.txt)
+
+      - name: POV 3
+        continue-on-error: true
+        run: |
+          docker compose up --abort-on-container-exit server-remediated pov3 || echo $? > pov3_exit.txt
+          if [ ! -f pov3_exit.txt ]; then echo "0" > pov3_exit.txt fi
+          exit $(cat pov3_exit.txt)
 
       - name: Aggregate results
         run: |
