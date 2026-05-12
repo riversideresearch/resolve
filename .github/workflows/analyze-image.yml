@@ -121,17 +121,20 @@ jobs:
       - name: POV 1
         continue-on-error: true
         run: |
-          docker compose up --abort-on-container-exit --exit-code-from server-remediated pov1
+          pwd && ls -A
+          docker compose up --abort-on-container-exit pov1 --exit-code-from server-remediated
           echo $? > pov1_exit
 
       - name: POV 2
         continue-on-error: true
         run: |
-          docker compose up --abort-on-container-exit --exit-code-from server-remediated pov2
+          pwd && ls -A
+          docker compose up --abort-on-container-exit pov2 --exit-code-from server-remediated
           echo $? > pov2_exit
 
       - name: Aggregate results
         run: |
+          pwd && ls -A
           failures=0
 
           for file in $(ls *_exit.txt); do
