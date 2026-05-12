@@ -116,5 +116,35 @@ jobs:
       - name: Rename compose file
         run: mv sparse/examples/eboss_eval/src/analyze-images/compose-analyze-image.yml ./docker-compose.yml
 
+        # TODO: HOW TO RUN ALL TESTS EVEN IF THEY FAIL, BUT FAIL ENTIRE JOB IF EVEN ONE TEST FAILS?
+        #   see: reusable workflows / actions?
       - name: POV 1
-        run: docker compose up --abort-on-container-exit server-remediated pov1
+        continue-on-error: true
+        run: docker compose up --exit-code-from server-remediated pov1; echo $? >> pov1_exit.txt
+
+      - name: POV 2
+        continue-on-error: true
+        run: docker compose up --exit-code-from server-remediated pov2; echo $? >> pov2_exit.txt
+
+      - name: Aggregate results
+        run: |
+          failures=0
+
+          for file in *_exit.txt; do
+            test_name="${file%_exit.txt}"
+            exit_code=$(cat "$file")
+
+            if [ "$exit_code" -eq 0 ]; then
+              echo "$test_name result: PASSED"
+            else
+              echo "$test_name result: FAILED"
+              failures=$((failures+1))
+            fi
+          done
+
+          if [ "$failures" -gt 0 ]; then
+            echo "$failures test(s) failed"
+            exit 1
+          fi
+
+          echo "All tests passed."
