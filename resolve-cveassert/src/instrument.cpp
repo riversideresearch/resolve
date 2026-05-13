@@ -123,13 +123,12 @@ void instrumentAlloca(Function *F) {
       M->getOrInsertFunction("__resolve_invalidate_stack",
                              FunctionType::get(void_ty, {ptr_ty}, false));
 
-  auto create_transformed_array_alloca = [&](auto *oldAlloca) -> AllocaInst * {
+  auto create_transformed_static_alloca = [&](auto *oldAlloca) -> AllocaInst * {
     builder.SetInsertPoint(oldAlloca->getParent(),
                            std::next(BasicBlock::iterator(oldAlloca)));
-
     Type *oldAllocaTy = oldAlloca->getAllocatedType();
-    errs() << "oldAlloca type: ";
-    oldAllocaTy->dump();
+    // errs() << "oldAlloca type: ";
+    // oldAllocaTy->dump();
     auto *arrTy = dyn_cast<ArrayType>(oldAllocaTy);
     uint64_t numElements = arrTy->getNumElements();
     Type *elemTy = arrTy->getElementType();
@@ -155,19 +154,14 @@ void instrumentAlloca(Function *F) {
     return {transformedAlloca, updatedSize};
   };
 
-  auto handle_array_alloca = [&](auto *allocaInst) {
+  auto handle_alloca = [&](auto *allocaInst) {
     Value *totalSize;
     AllocaInst *transformedAlloca;
+    Type *allocatedType = allocaInst->getAllocatedType();
 
-    // Check if the size of the alloca is a constant
-    if (auto maybeSize = allocaInst->getAllocationSize(DL)) {
-      TypeSize ts = *maybeSize;
-      uint64_t size = ts.getFixedValue();
-      totalSize = ConstantInt::get(size_ty, size);
-      errs() << "Size of alloca: ";
-      totalSize->dump();
-      transformedAlloca = create_transformed_array_alloca(allocaInst);
-
+    if (isa<ArrayType>(allocatedType)) {
+      transformedAlloca = create_transformed_static_alloca(allocaInst);
+      totalSize = ConstantInt::get(size_ty, 1);
     } else {
       auto result = create_transformed_dynamic_alloca(allocaInst);
       transformedAlloca = result.first;
@@ -243,7 +237,7 @@ void instrumentAlloca(Function *F) {
       continue;
     }
 
-    handle_array_alloca(alloca);
+    handle_alloca(alloca);
   }
   // for (auto *alloca : allocas) {
   //   // Fast filter to prune non-escaping allocas
