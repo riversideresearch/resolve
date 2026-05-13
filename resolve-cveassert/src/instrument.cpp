@@ -15,6 +15,8 @@
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 
+#include <utility>
+
 using namespace llvm;
 
 static void dumpAllocaTransfrom(AllocaInst *preAlloca, AllocaInst *postAlloca) {
@@ -121,8 +123,8 @@ void instrumentAlloca(Function *F) {
                              FunctionType::get(void_ty, {ptr_ty}, false));
 
   auto create_transformed_array_alloca = [&](auto *oldAlloca) -> AllocaInst * {
-    builder.SetInsertPoint(oldAlloca->getNextNode());
-
+    builder.SetInsertPoint(oldAlloca->getParent(),
+                           std::next(BasicBlock::iterator(oldAlloca)));
     Type *oldAllocaTy = oldAlloca->getAllocatedType();
     auto *arrTy = dyn_cast<ArrayType>(oldAllocaTy);
     uint64_t numElements = arrTy->getNumElements();
@@ -135,22 +137,24 @@ void instrumentAlloca(Function *F) {
   };
 
   auto create_transformed_dynamic_alloca =
-      [&](auto *oldAlloca, Value *originalSize) -> AllocaInst * {
-    builder.SetInsertPoint(oldAlloca->getNextNode());
-
+      [&](auto *oldAlloca) -> std::pair<AllocaInst *, Value *> {
+    builder.SetInsertPoint(oldAlloca->getParent(),
+                           std::next(BasicBlock::iterator(oldAlloca)));
+    Value *arrSize = oldAlloca->getArraySize();
     Type *oldAllocaTy = oldAlloca->getAllocatedType();
     Value *updatedSize =
-        builder.CreateAdd(originalSize, ConstantInt::get(size_ty, 1));
+        builder.CreateAdd(arrSize, ConstantInt::get(size_ty, 1));
     AllocaInst *transformedAlloca =
         builder.CreateAlloca(oldAllocaTy, updatedSize);
     transformedAlloca->setAlignment(oldAlloca->getAlign());
-    return transformedAlloca;
+    return {transformedAlloca, updatedSize};
   };
 
   auto handle_alloca = [&](auto *allocaInst) {
     Value *totalSize;
     AllocaInst *transformedAlloca;
 
+    // Check if the size of the alloca is a constant
     if (auto maybeSize = allocaInst->getAllocationSize(DL)) {
       TypeSize ts = *maybeSize;
       uint64_t size = ts.getFixedValue();
@@ -158,15 +162,16 @@ void instrumentAlloca(Function *F) {
       transformedAlloca = create_transformed_array_alloca(allocaInst);
 
     } else {
-      totalSize = allocaInst->getArraySize();
-      transformedAlloca =
-          create_transformed_dynamic_alloca(allocaInst, totalSize);
+      auto result = create_transformed_dynamic_alloca(allocaInst);
+      transformedAlloca = result.first;
+      totalSize = result.second;
     }
 
     transformedAlloca->setMetadata("cve.noinstrument", MDNode::get(Ctx, {}));
     // llvm.lifetime_start(ptr %newAlloca, i64 %newSize)
     // llvm.lifetime_end(ptr %newAlloca, i64 %newSize)
-    // update the size for the life time
+    // We want our instrumentation to reflect llvm lifetime view
+    // (so we dont break optimizations)
     SmallVector<IntrinsicInst *, 16> lifetimeStart;
     SmallVector<IntrinsicInst *, 16> lifetimeEnd;
 
@@ -188,7 +193,10 @@ void instrumentAlloca(Function *F) {
     }
 
     for (auto *ii : lifetimeStart) {
+      // TODO: update size argument
       ii->setArgOperand(0, totalSize);
+
+      // Insert a __resolve_alloca after the intrinsic
       builder.SetInsertPoint(ii->getNextNode());
       builder.CreateCall(allocateFn, {transformedAlloca, totalSize});
     }
@@ -200,10 +208,8 @@ void instrumentAlloca(Function *F) {
       builder.CreateCall(invalidateFn, {transformedAlloca});
     }
 
-    // Not all well-formed llvm-ir will emit both
-    // llvm.lifetime_start and llvm.lifetime_end
     if (!hasStart) {
-      builder.SetInsertPoint(allocaInst->getNextNode());
+      builder.SetInsertPoint(transformedAlloca->getNextNode());
       builder.CreateCall(allocateFn, {transformedAlloca, totalSize});
     }
 
