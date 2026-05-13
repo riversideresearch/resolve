@@ -130,8 +130,8 @@ void instrumentAlloca(Function *F) {
     auto *arrTy = dyn_cast<ArrayType>(oldAllocaTy);
     uint64_t numElements = arrTy->getNumElements();
     Type *elemTy = arrTy->getElementType();
-    uint64_t updatedSize = numElements + 1;
-    ArrayType *newArrayTy = ArrayType::get(elemTy, updatedSize);
+    uint64_t size = numElements + 1;
+    ArrayType *newArrayTy = ArrayType::get(elemTy, size);
     AllocaInst *transformedAlloca = builder.CreateAlloca(
         newArrayTy, nullptr, oldAlloca->getName() + ".instrumented");
     transformedAlloca->setAlignment(oldAlloca->getAlign());
@@ -152,7 +152,7 @@ void instrumentAlloca(Function *F) {
     return {transformedAlloca, updatedSize};
   };
 
-  auto handle_alloca = [&](auto *allocaInst) {
+  auto handle_array_alloca = [&](auto *allocaInst) {
     Value *totalSize;
     AllocaInst *transformedAlloca;
 
@@ -230,16 +230,27 @@ void instrumentAlloca(Function *F) {
   }
 
   for (auto *alloca : allocas) {
-    // Fast filter to prune non-escaping allocas
-    // if (PointerMayBeCaptured(alloca, true, true)) {}
-    // NOTE: Skip allocas that contain a single value
     Type *allocatedType = alloca->getAllocatedType();
-    if (allocatedType->isSingleValueType() && alloca->isStaticAlloca()) {
+    bool isStaticArray = isa<ArrayType>(allocatedType);
+    bool isDynamicArray = alloca->isArrayAllocation();
+
+    if (!isStaticArray && !isDynamicArray) {
       continue;
     }
 
-    handle_alloca(alloca);
+    handle_array_alloca(alloca);
   }
+  // for (auto *alloca : allocas) {
+  //   // Fast filter to prune non-escaping allocas
+  //   // if (PointerMayBeCaptured(alloca, true, true)) {}
+  //   // NOTE: Skip allocas that contain a single value
+  //   Type *allocatedType = alloca->getAllocatedType();
+  //   if (allocatedType->isSingleValueType() && alloca->isStaticAlloca()) {
+  //     continue;
+  //   }
+
+  //   handle_array_alloca(alloca);
+  // }
 
   if (toFreeList.empty()) {
     return;
