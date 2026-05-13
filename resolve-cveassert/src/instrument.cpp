@@ -59,7 +59,8 @@ static void wrapLibraryFunction(Function *F, StringRef name, FunctionType *ty) {
   auto swap_call = [&](CallInst *callInst) {
     builder.SetInsertPoint(callInst);
     SmallVector<Value *, 8> args(callInst->arg_begin(), callInst->arg_end());
-    CallInst *resolveCall = builder.CreateCall(resolveCallee, args);
+    CallInst *resolveCall = builder.CreateCall(
+        resolveCallee, args, callInst->getName() + ".instrumented");
 
     callInst->replaceAllUsesWith(resolveCall);
     callInst->eraseFromParent();
@@ -131,7 +132,8 @@ void instrumentAlloca(Function *F) {
     Type *elemTy = arrTy->getElementType();
     uint64_t updatedSize = numElements + 1;
     ArrayType *newArrayTy = ArrayType::get(elemTy, updatedSize);
-    AllocaInst *transformedAlloca = builder.CreateAlloca(newArrayTy);
+    AllocaInst *transformedAlloca = builder.CreateAlloca(
+        newArrayTy, nullptr, oldAlloca->getName() + ".instrumented");
     transformedAlloca->setAlignment(oldAlloca->getAlign());
     return transformedAlloca;
   };
@@ -144,8 +146,8 @@ void instrumentAlloca(Function *F) {
     Type *oldAllocaTy = oldAlloca->getAllocatedType();
     Value *updatedSize =
         builder.CreateAdd(arrSize, ConstantInt::get(size_ty, 1));
-    AllocaInst *transformedAlloca =
-        builder.CreateAlloca(oldAllocaTy, updatedSize);
+    AllocaInst *transformedAlloca = builder.CreateAlloca(
+        oldAllocaTy, updatedSize, oldAlloca->getName() + ".instrumented");
     transformedAlloca->setAlignment(oldAlloca->getAlign());
     return {transformedAlloca, updatedSize};
   };
