@@ -127,6 +127,11 @@ void instrumentAlloca(Function *F) {
     builder.SetInsertPoint(oldAlloca->getParent(),
                            std::next(BasicBlock::iterator(oldAlloca)));
     Type *oldAllocaTy = oldAlloca->getAllocatedType();
+
+    // DEBUGGING: dump the type
+    errs() << "Old alloca type: \n";
+    oldAllocaTy->dump();
+
     auto *arrTy = dyn_cast<ArrayType>(oldAllocaTy);
     uint64_t numElements = arrTy->getNumElements();
     Type *elemTy = arrTy->getElementType();
