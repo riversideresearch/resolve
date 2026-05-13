@@ -128,9 +128,10 @@ void instrumentAlloca(Function *F) {
                            std::next(BasicBlock::iterator(oldAlloca)));
     Type *oldAllocaTy = oldAlloca->getAllocatedType();
 
-    // DEBUGGING: dump the type
-    errs() << "Old alloca type: \n";
-    oldAllocaTy->dump();
+    // Skip types that are not array types
+    if (!oldAllocaTy->isArrayTy()) {
+      return;
+    }
 
     auto *arrTy = dyn_cast<ArrayType>(oldAllocaTy);
     uint64_t numElements = arrTy->getNumElements();
