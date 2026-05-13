@@ -221,9 +221,6 @@ void instrumentAlloca(Function *F) {
     // dumpAllocaTransfrom(allocaInst, transformedAlloca);
   };
 
-  // if array size is constant int then we need to replace it with constant + 1
-  // to look like static alloca no control flow in handle_alloca its increases
-  // allocas are implicitly arrays even allocas with of size 1
   for (auto &BB : *F) {
     for (auto &instr : BB) {
       if (auto *inst = dyn_cast<AllocaInst>(&instr)) {
@@ -234,7 +231,7 @@ void instrumentAlloca(Function *F) {
 
   for (auto *alloca : allocas) {
     // Fast filter to prune non-escaping allocas
-    // if (PointerMayBeCaptured(alloca, true, true)) {
+    // if (PointerMayBeCaptured(alloca, true, true)) {}
     // NOTE: Skip allocas that contain a single value
     Type *allocatedType = alloca->getAllocatedType();
     if (allocatedType->isSingleValueType() && alloca->isStaticAlloca()) {
@@ -242,7 +239,6 @@ void instrumentAlloca(Function *F) {
     }
 
     handle_alloca(alloca);
-    //}
   }
 
   if (toFreeList.empty()) {
