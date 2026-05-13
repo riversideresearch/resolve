@@ -126,13 +126,10 @@ void instrumentAlloca(Function *F) {
   auto create_transformed_array_alloca = [&](auto *oldAlloca) -> AllocaInst * {
     builder.SetInsertPoint(oldAlloca->getParent(),
                            std::next(BasicBlock::iterator(oldAlloca)));
+
     Type *oldAllocaTy = oldAlloca->getAllocatedType();
-
-    // Skip types that are not array types
-    if (!oldAllocaTy->isArrayTy()) {
-      return;
-    }
-
+    errs() << "oldAlloca type: ";
+    oldAllocaTy->dump();
     auto *arrTy = dyn_cast<ArrayType>(oldAllocaTy);
     uint64_t numElements = arrTy->getNumElements();
     Type *elemTy = arrTy->getElementType();
@@ -167,6 +164,8 @@ void instrumentAlloca(Function *F) {
       TypeSize ts = *maybeSize;
       uint64_t size = ts.getFixedValue();
       totalSize = ConstantInt::get(size_ty, size);
+      errs() << "Size of alloca: ";
+      totalSize->dump();
       transformedAlloca = create_transformed_array_alloca(allocaInst);
 
     } else {
