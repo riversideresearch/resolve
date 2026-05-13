@@ -168,10 +168,9 @@ void instrumentAlloca(Function *F) {
     }
 
     transformedAlloca->setMetadata("cve.noinstrument", MDNode::get(Ctx, {}));
-    // llvm.lifetime_start(ptr %newAlloca, i64 %newSize)
-    // llvm.lifetime_end(ptr %newAlloca, i64 %newSize)
-    // We want our instrumentation to reflect llvm lifetime view
-    // (so we dont break optimizations)
+
+    // Because instrumenation alters the effective size of stack allocation
+    // we need to rewrite intrinsics to reflect instrumented size
     SmallVector<IntrinsicInst *, 16> lifetimeStart;
     SmallVector<IntrinsicInst *, 16> lifetimeEnd;
 
@@ -214,12 +213,6 @@ void instrumentAlloca(Function *F) {
     if (!hasEnd) {
       toFreeList.push_back(transformedAlloca);
     }
-
-    // DEBUGGING
-    // for (User *user : allocaInst->users()) {
-    //   errs() << "User:\n";
-    //   user->dump();
-    // }
 
     allocaInst->replaceAllUsesWith(transformedAlloca);
     allocaInst->eraseFromParent();
