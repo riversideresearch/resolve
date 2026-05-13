@@ -121,6 +121,7 @@ configure_flags() {
         COMPTIME_FLAGS+=("-fno-builtin-memcpy")
         COMPTIME_FLAGS+=("-fno-builtin-memmove")
         COMPTIME_FLAGS+=("-fno-builtin-memset")
+        COMPTIME_FLAGS+=("-fno-discard-value-names")
         COMPTIME_FLAGS+=("-fpass-plugin=$RESOLVE_CVEASSERT_PLUGIN")
     fi
 
