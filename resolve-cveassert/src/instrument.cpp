@@ -123,13 +123,13 @@ void instrumentAlloca(Function *F) {
       M->getOrInsertFunction("__resolve_invalidate_stack",
                              FunctionType::get(void_ty, {ptr_ty}, false));
 
-  auto create_transformed_static_alloca = [&](auto *oldAlloca) -> AllocaInst * {
+  // 2 cases
+  // 1. alloca [N x T]
+  // 2. alloca T, i64 N where N is constant
+  auto create_transformed_array_alloca = [&](auto *oldAlloca) -> AllocaInst * {
     builder.SetInsertPoint(oldAlloca->getParent(),
                            std::next(BasicBlock::iterator(oldAlloca)));
-    Type *oldAllocaTy = oldAlloca->getAllocatedType();
-    // errs() << "oldAlloca type: ";
-    // oldAllocaTy->dump();
-    auto *arrTy = dyn_cast<ArrayType>(oldAllocaTy);
+    ArrayType *arrTy = dyn_cast<ArrayType>(oldAlloca->getAllocatedType());
     uint64_t numElements = arrTy->getNumElements();
     Type *elemTy = arrTy->getElementType();
     uint64_t size = numElements + 1;
@@ -140,7 +140,7 @@ void instrumentAlloca(Function *F) {
     return transformedAlloca;
   };
 
-  auto create_transformed_dynamic_alloca =
+  auto create_transformed_alloca =
       [&](auto *oldAlloca) -> std::pair<AllocaInst *, Value *> {
     builder.SetInsertPoint(oldAlloca->getParent(),
                            std::next(BasicBlock::iterator(oldAlloca)));
@@ -160,13 +160,37 @@ void instrumentAlloca(Function *F) {
     Type *allocatedType = allocaInst->getAllocatedType();
 
     if (isa<ArrayType>(allocatedType)) {
-      transformedAlloca = create_transformed_static_alloca(allocaInst);
-      totalSize = ConstantInt::get(size_ty, 1);
+      transformedAlloca = create_transformed_array_alloca(allocaInst);
+      auto maybeSize = allocaInst->getAllocationSize(DL);
+      TypeSize ts = *maybeSize;
+      uint64_t size = ts.getFixedValue();
+      totalSize = ConstantInt::get(size_ty, size);
     } else {
-      auto result = create_transformed_dynamic_alloca(allocaInst);
+      auto result = create_transformed_alloca(allocaInst);
       transformedAlloca = result.first;
       totalSize = result.second;
     }
+
+    // if (auto maybeSize = allocaInst->getAllocationSize(DL)) {
+    //   TypeSize ts = *maybeSize;
+    //   uint64_t size = ts.getFixedValue();
+    //   totalSize = ConstantInt::get(size_ty, size);
+    //   errs() << "Size of alloca: ";
+    //   totalSize->dump();
+
+    //   if (isa<ArrayType>(allocatedType)) {
+    //     transformedAlloca = create_transformed_array_alloca(allocaInst);
+    //   } else {
+    //     auto result = create_transformed_alloca(allocaInst);
+    //     transformedAlloca = result.first;
+    //     totalSize = result.second;
+    //   }
+
+    // } else {
+    //   auto result = create_transformed_alloca(allocaInst);
+    //   transformedAlloca = result.first;
+    //   totalSize = result.second;
+    // }
 
     transformedAlloca->setMetadata("cve.noinstrument", MDNode::get(Ctx, {}));
 
