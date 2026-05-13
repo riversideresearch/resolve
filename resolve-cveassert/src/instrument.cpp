@@ -193,21 +193,19 @@ void instrumentAlloca(Function *F) {
     }
 
     for (auto *ii : lifetimeStart) {
-      // TODO: update size argument
       ii->setArgOperand(0, totalSize);
-
-      // Insert a __resolve_alloca after the intrinsic
       builder.SetInsertPoint(ii->getNextNode());
       builder.CreateCall(allocateFn, {transformedAlloca, totalSize});
     }
 
     for (auto *ii : lifetimeEnd) {
       ii->setArgOperand(0, totalSize);
-
       builder.SetInsertPoint(ii->getNextNode());
       builder.CreateCall(invalidateFn, {transformedAlloca});
     }
 
+    // Well-formed LLVM-IR may not have
+    // lifetime.start or lifetime.end instructions
     if (!hasStart) {
       builder.SetInsertPoint(transformedAlloca->getNextNode());
       builder.CreateCall(allocateFn, {transformedAlloca, totalSize});
@@ -238,9 +236,6 @@ void instrumentAlloca(Function *F) {
       }
     }
   }
-
-  // We want our instrumentation to reflect llvm lifetime view
-  // (so we dont break optimizations)
 
   for (auto *alloca : allocas) {
     // Fast filter to prune non-escaping allocas
