@@ -127,8 +127,7 @@ void instrumentAlloca(Function *F) {
   // 1. alloca [N x T]
   // 2. alloca T, i64 N where N is constant
   auto create_transformed_array_alloca = [&](auto *oldAlloca) -> AllocaInst * {
-    builder.SetInsertPoint(oldAlloca->getParent(),
-                           std::next(BasicBlock::iterator(oldAlloca)));
+    builder.SetInsertPoint(oldAlloca->getNextNode());
     ArrayType *arrTy = dyn_cast<ArrayType>(oldAlloca->getAllocatedType());
     uint64_t numElements = arrTy->getNumElements();
     Type *elemTy = arrTy->getElementType();
@@ -142,8 +141,7 @@ void instrumentAlloca(Function *F) {
 
   auto create_transformed_alloca =
       [&](auto *oldAlloca) -> std::pair<AllocaInst *, Value *> {
-    builder.SetInsertPoint(oldAlloca->getParent(),
-                           std::next(BasicBlock::iterator(oldAlloca)));
+    builder.SetInsertPoint(oldAlloca->getNextNonDebugInstruction());
     Value *arrSize = oldAlloca->getArraySize();
     Type *oldAllocaTy = oldAlloca->getAllocatedType();
     Value *updatedSize =
