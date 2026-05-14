@@ -171,27 +171,6 @@ void instrumentAlloca(Function *F) {
       totalSize = result.second;
     }
 
-    // if (auto maybeSize = allocaInst->getAllocationSize(DL)) {
-    //   TypeSize ts = *maybeSize;
-    //   uint64_t size = ts.getFixedValue();
-    //   totalSize = ConstantInt::get(size_ty, size);
-    //   errs() << "Size of alloca: ";
-    //   totalSize->dump();
-
-    //   if (isa<ArrayType>(allocatedType)) {
-    //     transformedAlloca = create_transformed_array_alloca(allocaInst);
-    //   } else {
-    //     auto result = create_transformed_alloca(allocaInst);
-    //     transformedAlloca = result.first;
-    //     totalSize = result.second;
-    //   }
-
-    // } else {
-    //   auto result = create_transformed_alloca(allocaInst);
-    //   transformedAlloca = result.first;
-    //   totalSize = result.second;
-    // }
-
     transformedAlloca->setMetadata("cve.noinstrument", MDNode::get(Ctx, {}));
 
     // Because instrumenation alters the effective size of stack allocation
