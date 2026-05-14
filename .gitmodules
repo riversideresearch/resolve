@@ -1,0 +1,9 @@
+[submodule "test/shiva/libdwarf-code"]
+	path = test/shiva/libdwarf-code
+	url = https://github.com/davea42/libdwarf-code.git
+[submodule "test/shiva/libelfmaster"]
+	path = test/shiva/libelfmaster
+	url = https://github.com/elfmaster/libelfmaster.git
+[submodule "test/shiva/shiva"]
+	path = test/shiva/shiva
+	url = https://github.com/advanced-microcode-patching/shiva.git
