@@ -217,7 +217,10 @@ void instrumentAlloca(Function *F) {
     }
 
     allocaInst->replaceAllUsesWith(transformedAlloca);
-    allocaInst->eraseFromParent();
+    // DEBUGGING: Comment this out to see if inst
+    // insertion invalidation occurs
+    // let ADCE handle removing allocas
+    // allocaInst->eraseFromParent();
     // dumpAllocaTransfrom(allocaInst, transformedAlloca);
   };
 
@@ -238,19 +241,9 @@ void instrumentAlloca(Function *F) {
       continue;
     }
 
+    // TODO: Add fast filter to prune non-escaping allocas
     handle_alloca(alloca);
   }
-  // for (auto *alloca : allocas) {
-  //   // Fast filter to prune non-escaping allocas
-  //   // if (PointerMayBeCaptured(alloca, true, true)) {}
-  //   // NOTE: Skip allocas that contain a single value
-  //   Type *allocatedType = alloca->getAllocatedType();
-  //   if (allocatedType->isSingleValueType() && alloca->isStaticAlloca()) {
-  //     continue;
-  //   }
-
-  //   handle_array_alloca(alloca);
-  // }
 
   if (toFreeList.empty()) {
     return;
