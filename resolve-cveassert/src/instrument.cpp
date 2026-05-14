@@ -15,6 +15,7 @@
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 
+#include "helpers.hpp"
 #include <utility>
 
 using namespace llvm;
@@ -261,4 +262,6 @@ void instrumentAlloca(Function *F) {
       alloca->eraseFromParent();
     }
   }
+
+  validateIR(F);
 }
