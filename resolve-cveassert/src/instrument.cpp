@@ -15,36 +15,11 @@
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 
-#include "helpers.hpp"
 #include <utility>
 
+#include "helpers.hpp"
+
 using namespace llvm;
-
-static void dumpAllocaTransfrom(AllocaInst *preAlloca, AllocaInst *postAlloca) {
-  errs() << "=== Alloca Transform ===\n";
-  errs() << "Original alloca:\n";
-  preAlloca->dump();
-
-  errs() << "Allocated type: ";
-  preAlloca->getAllocatedType()->print(errs());
-  errs() << "\n";
-
-  errs() << "Array size: ";
-  preAlloca->getArraySize()->print(errs());
-  errs() << "\n";
-
-  errs() << "\nTransformed Alloca:\n";
-  postAlloca->dump();
-
-  errs() << "Allocated type: ";
-  postAlloca->getAllocatedType()->print(errs());
-  errs() << "\n";
-
-  errs() << "Array size: ";
-  preAlloca->getArraySize()->print(errs());
-  errs() << "\n";
-  errs() << "\n=======================\n";
-}
 
 /// Replaces all calls to `name` in `F` with calls to `__resolve_name`
 static void wrapLibraryFunction(Function *F, StringRef name, FunctionType *ty) {
@@ -113,10 +88,7 @@ void instrumentAlloca(Function *F) {
   auto void_ty = Type::getVoidTy(Ctx);
 
   SmallVector<AllocaInst *, 16> allocas;
-  // Initialize list to store pointers to alloca and instructions
-  std::vector<AllocaInst *> toFreeList;
-
-  raw_ostream &out = llvm::errs();
+  SmallVector<AllocaInst *, 16> toFreeList;
 
   auto allocateFn = M->getOrInsertFunction(
       "__resolve_alloca", FunctionType::get(void_ty, {ptr_ty, size_ty}, false));
@@ -263,5 +235,6 @@ void instrumentAlloca(Function *F) {
     }
   }
 
+  // [DEBUGGING]
   validateIR(F);
 }
