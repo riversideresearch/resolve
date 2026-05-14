@@ -217,10 +217,6 @@ void instrumentAlloca(Function *F) {
     }
 
     allocaInst->replaceAllUsesWith(transformedAlloca);
-    // DEBUGGING: Comment this out to see if inst
-    // insertion invalidation occurs
-    // let ADCE handle removing allocas
-    // allocaInst->eraseFromParent();
     // dumpAllocaTransfrom(allocaInst, transformedAlloca);
   };
 
@@ -257,6 +253,12 @@ void instrumentAlloca(Function *F) {
           builder.CreateCall(invalidateFn, {alloca});
         }
       }
+    }
+  }
+
+  for (auto *alloca : allocas) {
+    if (alloca->use_empty()) {
+      alloca->eraseFromParent();
     }
   }
 }
