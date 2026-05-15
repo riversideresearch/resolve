@@ -30,8 +30,7 @@ jobs:
       - name: Check for New Commits 
         id: check
         run: |
-          DEFAULT_BRANCH=$(git symbolic-ref refs/remotes/origin/HEAD | sed 's@^refs/remotes/origin/@@')
-          COUNT=$(git rev-list --count --since="7 days ago" "$DEFAULT_BRANCH")
+          COUNT=$(git rev-list --count --since="7 days ago" ${{ github.event.repository.default_branch }})
           if [ "$COUNT" -gt 0 ]; then
             echo "should_build=true" >> $GITHUB_OUTPUT
           else
