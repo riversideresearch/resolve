@@ -1,4 +1,4 @@
-name: Build and Publish Remediated Analyze-Image
+name: Build, Publish, and Test Analyze-Image Remediations
 
 on:
   push:
@@ -6,14 +6,40 @@ on:
       - feature/add-more-examples
     paths:
       - examples/eboss_eval/hacky_trigger.log
+  schedule:
+    # Monday, 0800 EST
+    - cron: '0 12 * * 1'
+  workflow_dispatch:
+    # Manual trigger
 
 permissions:
   packages: write
   contents: read
 
 jobs:
+  check_changes:
+    runs-on: ubuntu-latest
+    outputs: 
+      should_build: ${{ steps.check.outputs.should_build }}
+    steps:
+      - name: Fetch History
+        uses: actions/checkout@v5
+        with: 
+          fetch-depth: 0
+      
+      - name: Check for New Commits 
+        id: check
+        run: |
+          COUNT=$(git rev-list --count --since="7 days ago" HEAD)
+          if [ "$COUNT" -gt 0 ]; then
+            echo "should_build=true" >> $GITHUB_OUTPUT
+          else
+            echo "should_build=false" >> $GITHUB_OUTPUT
+          fi
+        
   build:
-    if: contains(github.event.head_commit.message, '[build cp]')
+    needs: check_changes
+    if: needs.check_changes.outputs.should_build == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Login to GitHub Container Registry
