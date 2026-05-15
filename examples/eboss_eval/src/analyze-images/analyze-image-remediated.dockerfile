@@ -1,10 +1,3 @@
-##### The PLAN(tm) #####
-# Build the resolve builder if it doesn't exist: 
-# $ docker build --target builder -t resolve-builder:latest .
-#
-# And then make sure that the resolve image exists:
-# $ foobar
-
 FROM resolve-builder:latest AS build
 
 # Disable interactive prompts during package installs
@@ -70,7 +63,7 @@ RUN /usr/bin/time --format="CHALLENGE_METRICS - Elapsed: %E sec | User: %U sec |
     /usr/bin/time --format="CHALLENGE_METRICS - Elapsed: %E sec | User: %U sec | System: %S sec | CPU %P" \
     cmake --build /challenge/build --target server --verbose
 
-# Stage 2: Runtime Stage (previously run-base)(previously ubuntu:24.04)
+# Stage 2: Runtime Stage (previously run-base)
 FROM resolve:latest AS runtime
 
 # Disable interactive prompts during package installs

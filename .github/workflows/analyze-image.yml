@@ -153,6 +153,7 @@ jobs:
 
       - name: Poller regression test
         env: 
+          # This env var used in compose-analyze-image.yml
           AICP_SERVER: "server-remediated"
         continue-on-error: true
         run: |
