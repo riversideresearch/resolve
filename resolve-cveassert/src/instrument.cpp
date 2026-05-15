@@ -235,5 +235,8 @@ void instrumentAlloca(Function *F) {
   }
 
   // [DEBUGGING]
+  if (F->getName() == "bn_mod_exp_mont_fixed_top") {
+    validateIR(F);
+  }
   // validateIR(F);
 }
