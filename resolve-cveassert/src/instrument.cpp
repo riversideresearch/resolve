@@ -235,5 +235,5 @@ void instrumentAlloca(Function *F) {
   }
 
   // [DEBUGGING]
-  validateIR(F);
+  // validateIR(F);
 }
