@@ -1,0 +1,5 @@
+*.ll
+*.bc
+*build
+*.tar*
+vcpkg_ubuntu-22.04_llvm-16_amd64

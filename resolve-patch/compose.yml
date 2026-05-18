@@ -1,0 +1,6 @@
+services:
+  bin:
+    build: .
+    volumes:
+      - .:/resolve-patch
+    working_dir: /resolve-patch

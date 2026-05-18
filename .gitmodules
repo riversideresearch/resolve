@@ -1,0 +1,6 @@
+[submodule "resolve-patch/anvill"]
+	path = resolve-patch/anvill
+	url = https://github.com/lifting-bits/anvill.git
+[submodule "resolve-patch/vcpkg"]
+	path = resolve-patch/vcpkg
+	url = https://github.com/microsoft/vcpkg.git
