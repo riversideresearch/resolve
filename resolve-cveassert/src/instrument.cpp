@@ -34,8 +34,8 @@ static void wrapLibraryFunction(Function *F, StringRef name, FunctionType *ty) {
   auto swap_call = [&](CallInst *callInst) {
     builder.SetInsertPoint(callInst);
     SmallVector<Value *, 8> args(callInst->arg_begin(), callInst->arg_end());
-    CallInst *resolveCall = builder.CreateCall(
-        resolveCallee, args, callInst->getName() + ".instrumented");
+    CallInst *resolveCall =
+        builder.CreateCall(resolveCallee, args, callInst->getName() + ".inst");
 
     callInst->replaceAllUsesWith(resolveCall);
     callInst->eraseFromParent();
@@ -88,6 +88,7 @@ void instrumentAlloca(Function *F) {
 
   SmallVector<AllocaInst *, 16> allocas;
   SmallVector<AllocaInst *, 16> toFreeList;
+  SmallVector<AllocaInst *, 16> stackVars;
 
   auto allocateFn = M->getOrInsertFunction(
       "__resolve_alloca", FunctionType::get(void_ty, {ptr_ty, size_ty}, false));
@@ -106,7 +107,7 @@ void instrumentAlloca(Function *F) {
     uint64_t size = numElements + 1;
     ArrayType *newArrayTy = ArrayType::get(elemTy, size);
     AllocaInst *transformedAlloca = builder.CreateAlloca(
-        newArrayTy, nullptr, oldAlloca->getName() + ".instrumented");
+        newArrayTy, nullptr, oldAlloca->getName() + ".inst");
     transformedAlloca->setAlignment(oldAlloca->getAlign());
     return transformedAlloca;
   };
@@ -119,14 +120,29 @@ void instrumentAlloca(Function *F) {
     Value *updatedSize =
         builder.CreateAdd(arrSize, ConstantInt::get(size_ty, 1));
     AllocaInst *transformedAlloca = builder.CreateAlloca(
-        oldAllocaTy, updatedSize, oldAlloca->getName() + ".instrumented");
+        oldAllocaTy, updatedSize, oldAlloca->getName() + ".inst");
     transformedAlloca->setAlignment(oldAlloca->getAlign());
     return {transformedAlloca, updatedSize};
+  };
+
+  auto create_stack_addr_var = [&](auto *transformedAlloca) -> AllocaInst * {
+    Function *F = transformedAlloca->getFunction();
+    BasicBlock &entry = F->getEntryBlock();
+    Instruction *insertPt = &*entry.getFirstInsertionPt();
+    builder.SetInsertPoint(insertPt);
+    AllocaInst *addrOrNull =
+        builder.CreateAlloca(ptr_ty, nullptr, "saved.stackaddr");
+    builder.SetInsertPoint(transformedAlloca->getNextNonDebugInstruction());
+    builder.CreateStore(ConstantPointerNull::get(ptr_ty), addrOrNull);
+    StoreInst *storeStackAddr =
+        builder.CreateStore(transformedAlloca, addrOrNull);
+    return addrOrNull;
   };
 
   auto handle_alloca = [&](auto *allocaInst) {
     Value *totalSize;
     AllocaInst *transformedAlloca;
+    AllocaInst *stackAddrVar;
     Type *allocatedType = allocaInst->getAllocatedType();
 
     if (isa<ArrayType>(allocatedType)) {
@@ -139,6 +155,9 @@ void instrumentAlloca(Function *F) {
       auto result = create_transformed_alloca(allocaInst);
       transformedAlloca = result.first;
       totalSize = result.second;
+      if (!isa<ConstantInt>(totalSize)) {
+        stackAddrVar = create_stack_addr_var(transformedAlloca);
+      }
     }
 
     transformedAlloca->setMetadata("cve.noinstrument", MDNode::get(Ctx, {}));
@@ -188,6 +207,11 @@ void instrumentAlloca(Function *F) {
       toFreeList.push_back(transformedAlloca);
     }
 
+    if (!hasStart && !hasEnd &&
+        !isa<ConstantInt>(transformedAlloca->getArraySize())) {
+      stackVars.push_back(stackAddrVar);
+    }
+
     allocaInst->replaceAllUsesWith(transformedAlloca);
     // dumpAllocaTransfrom(allocaInst, transformedAlloca);
   };
@@ -221,6 +245,10 @@ void instrumentAlloca(Function *F) {
     for (auto &instr : BB) {
       if (auto *inst = dyn_cast<ReturnInst>(&instr)) {
         builder.SetInsertPoint(inst);
+        for (auto *stackvar : stackVars) {
+          builder.CreateCall(invalidateFn, {stackvar});
+        }
+
         for (auto *alloca : toFreeList) {
           builder.CreateCall(invalidateFn, {alloca});
         }
