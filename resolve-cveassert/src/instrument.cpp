@@ -196,13 +196,6 @@ void instrumentAlloca(Function *F) {
       builder.CreateCall(invalidateFn, {transformedAlloca});
     }
 
-    if (!hasStart && !hasEnd &&
-        !isa<ConstantInt>(transformedAlloca->getArraySize())) {
-      stackVars.push_back(stackAddrVar);
-      allocaInst->replaceAllUsesWith(transformedAlloca);
-      return;
-    }
-
     // Well-formed LLVM-IR may not have
     // lifetime.start or lifetime.end instructions
     if (!hasStart) {
