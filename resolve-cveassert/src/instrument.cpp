@@ -139,6 +139,53 @@ void instrumentAlloca(Function *F) {
     return addrOrNull;
   };
 
+  auto handle_lifetimes = [&](auto *oldAlloca, auto *newAlloca,
+                              Value *totalSize) {
+    // Because instrumenation alters the effective size of stack allocation
+    // we need to rewrite intrinsics to reflect instrumented size
+    SmallVector<IntrinsicInst *, 16> lifetimeStart;
+    SmallVector<IntrinsicInst *, 16> lifetimeEnd;
+
+    bool hasStart = false;
+    bool hasEnd = false;
+
+    for (auto *user : oldAlloca->users()) {
+      if (auto *ii = dyn_cast<IntrinsicInst>(user)) {
+        Intrinsic::ID id = ii->getIntrinsicID();
+        if (id == Intrinsic::lifetime_start) {
+          hasStart = true;
+          lifetimeStart.push_back(ii);
+        }
+
+        if (id == Intrinsic::lifetime_end) {
+          hasEnd = true;
+          lifetimeEnd.push_back(ii);
+        }
+      }
+    }
+
+    for (auto *start : lifetimeStart) {
+      start->setArgOperand(0, totalSize);
+      builder.SetInsertPoint(start->getNextNode());
+      builder.CreateCall(allocateFn, {newAlloca, totalSize});
+    }
+
+    for (auto *end : lifetimeEnd) {
+      end->setArgOperand(0, totalSize);
+      builder.SetInsertPoint(end->getNextNode());
+      builder.CreateCall(invalidateFn, {newAlloca});
+    }
+
+    if (!hasStart) {
+      builder.SetInsertPoint(newAlloca->getNextNode());
+      builder.CreateCall(allocateFn, {newAlloca, totalSize});
+    }
+
+    if (!hasEnd) {
+      toFreeList.push_back(newAlloca);
+    }
+  };
+
   auto handle_alloca = [&](auto *allocaInst) {
     Value *totalSize;
     AllocaInst *transformedAlloca;
@@ -162,50 +209,9 @@ void instrumentAlloca(Function *F) {
 
     transformedAlloca->setMetadata("cve.noinstrument", MDNode::get(Ctx, {}));
 
-    // Because instrumenation alters the effective size of stack allocation
-    // we need to rewrite intrinsics to reflect instrumented size
-    SmallVector<IntrinsicInst *, 16> lifetimeStart;
-    SmallVector<IntrinsicInst *, 16> lifetimeEnd;
-
-    bool hasStart = false;
-    bool hasEnd = false;
-    for (auto *user : allocaInst->users()) {
-      if (auto *ii = dyn_cast<IntrinsicInst>(user)) {
-        Intrinsic::ID id = ii->getIntrinsicID();
-        if (id == Intrinsic::lifetime_start) {
-          hasStart = true;
-          lifetimeStart.push_back(ii);
-        }
-
-        if (id == Intrinsic::lifetime_end) {
-          hasEnd = true;
-          lifetimeEnd.push_back(ii);
-        }
-      }
-    }
-
-    for (auto *ii : lifetimeStart) {
-      ii->setArgOperand(0, totalSize);
-      builder.SetInsertPoint(ii->getNextNode());
-      builder.CreateCall(allocateFn, {transformedAlloca, totalSize});
-    }
-
-    for (auto *ii : lifetimeEnd) {
-      ii->setArgOperand(0, totalSize);
-      builder.SetInsertPoint(ii->getNextNode());
-      builder.CreateCall(invalidateFn, {transformedAlloca});
-    }
-
     // Well-formed LLVM-IR may not have
     // lifetime.start or lifetime.end instructions
-    if (!hasStart) {
-      builder.SetInsertPoint(transformedAlloca->getNextNode());
-      builder.CreateCall(allocateFn, {transformedAlloca, totalSize});
-    }
-
-    if (!hasEnd) {
-      toFreeList.push_back(transformedAlloca);
-    }
+    handle_lifetimes(allocaInst, transformedAlloca, totalSize);
 
     allocaInst->replaceAllUsesWith(transformedAlloca);
     // dumpAllocaTransfrom(allocaInst, transformedAlloca);
