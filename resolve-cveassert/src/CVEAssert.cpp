@@ -253,48 +253,24 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
                                   Vulnerability &vuln) {
     auto result = PreservedAnalyses::all();
 
-    Function *Target = &F;
-    Function *PatchClone = nullptr;
-
-    // reset patch file contents if we are writing patch
-    if(vuln.Output == Vulnerability::InstrumentationOutput::FILE) {
-      std::error_code EC;
-      llvm::raw_fd_ostream patchFile("resolve-patch.ll", EC);
-      patchFile.close();
-
-      beginPatchRecording();
-      
-      // clone so the pass modifies a fake version of the il
-      ValueToValueMapTy VMap;
-      PatchClone = CloneFunction(&F, VMap);
-      PatchClone->setName(F.getName() + ".resolve_patch");
-  
-      F.getParent()->getFunctionList().push_back(PatchClone);
-  
-      Target = PatchClone;
-  
-      // Important if sanitizer maps are keyed by Function *
-      SanitizerMaps[PatchClone] = SanitizerMaps[&F];
-    }
-
-    if (!shouldInstrument(*Target, vuln)) {
+    if (!shouldInstrument(F, vuln)) {
       return result;
     }
 
     raw_ostream &out = errs();
 
     out << "[CVEAssert] === Pre Instrumented IR === \n";
-    out << Target;
+    out << F;
     out << "[CVEAssert] === Inserted Sanitizer Helpers === \n";
 
     if (vuln.UndesirableFunction.has_value()) {
       /* NOTE: We are using '0' as a temporary this will be updated future PRs
        */
-      sanitizeUndesirableOperationInFunction(Target, *vuln.UndesirableFunction, 0);
+      sanitizeUndesirableOperationInFunction(&F, *vuln.UndesirableFunction, 0);
       result = PreservedAnalyses::none();
       out << "[CVEAssert] === Post Sanitization of Undesirable Operation IR "
              "=== \n";
-      out << Target;
+      out << F;
     }
 
     if (vuln.Strategy == Vulnerability::RemediationStrategies::NONE) {
@@ -311,7 +287,7 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
     case VulnID::HEAP_BASED_BUF_OVERFLOW:  /* Heap-base buffer overflow */
     case VulnID::OOB_WRITE:                /* OOB Write */
     case VulnID::WRITE_WHAT_WHERE:
-      sanitizeMemInstBounds(Target, vuln.Strategy);
+      sanitizeMemInstBounds(&F, vuln.Strategy);
       result = PreservedAnalyses::none();
       break;
 
@@ -319,35 +295,35 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
                               problems */
     case VulnID::INCORRECT_BUF_SIZE: /* Incorrect buffer size calculation; found
                                         in analyze-image */
-      sanitizeMemInstBounds(Target, vuln.Strategy);
+      sanitizeMemInstBounds(&F, vuln.Strategy);
       result = PreservedAnalyses::none();
       break;
 
     case VulnID::DIVIDE_BY_ZERO: /* Divide by Zero; found in ros2 and
                                     analyze-image */
       /* Workaround for ambiguous CWE description in analyze-image */
-      sanitizeDivideByZero(Target, vuln.Strategy);
+      sanitizeDivideByZero(&F, vuln.Strategy);
       result = PreservedAnalyses::none();
       break;
 
     case VulnID::INT_OVERFLOW: /* Integer Overflow */
-      sanitizeIntOverflow(Target, vuln.Strategy);
+      sanitizeIntOverflow(&F, vuln.Strategy);
       result = PreservedAnalyses::none();
       break;
 
     case VulnID::NULL_PTR_DEREF: /* Null Pointer Dereference; Found in openalpr,
                                     nasa-cfs, stb-convert*/
-      sanitizeNullPointers(Target, vuln.Strategy);
+      sanitizeNullPointers(&F, vuln.Strategy);
       result = PreservedAnalyses::none();
       break;
 
     case VulnID::STACK_FREE: /* Stack free;  Found in nasa-cfs */
-      sanitizeFreeOfNonHeap(Target, vuln.Strategy);
+      sanitizeFreeOfNonHeap(&F, vuln.Strategy);
       result = PreservedAnalyses::none();
       break;
 
     case VulnID::ALL:
-      applyAutomaticSanitizers(*Target, vuln.Strategy);
+      applyAutomaticSanitizers(F, vuln.Strategy);
       result = PreservedAnalyses::none();
       break;
 
@@ -358,26 +334,31 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
     }
 
     out << "[CVEAssert] === Post Instrumented IR === \n";
-    validateIR(Target); // TODO: WRITE FINAL PATCH
-    if(vuln.Output == Vulnerability::InstrumentationOutput::FILE) {
-      endPatchRecordingAndWrite(Target);
-      PatchClone->eraseFromParent();
-      out << "[CVEAssert] Finalized patch file resolve-patch.ll \n";
-      return PreservedAnalyses::all();
-    }
+    validateIR(&F);
 
     out << "[CVEAssert] Inserted vulnerability handler calls in function "
         << vuln.TargetFileName << ":" << vuln.TargetFunctionName << "\n";
     return result;
   }
 
-  PreservedAnalyses run(Module &M, ModuleAnalysisManager &MAM) {
+  PreservedAnalyses
+  runInstrumentationPipeline(Module &M, ModuleAnalysisManager &MAM,
+                             std::vector<Vulnerability> &vulns,
+                             bool writePatch) {
     auto result = PreservedAnalyses::all();
     InstrumentMemInst instrument_mem_inst;
 
+    SanitizerMaps.clear();
+
+    if (writePatch) {
+      std::error_code EC;
+      raw_fd_ostream patchFile("resolve-patch.ll", EC);
+      patchFile.close();
+    }
+
     /// Precompute globals before instrumentation
     for (auto &F : M) {
-      for (auto &vuln : vulnerabilities) {
+      for (auto &vuln : vulns) {
         if (F.isDeclaration())
           continue;
 
@@ -387,7 +368,7 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
       }
     }
 
-    for (auto &vuln : vulnerabilities) {
+    for (auto &vuln : vulns) {
       // Also skip instrumentation for skipped vulnerabilities
       if (vuln.Strategy == Vulnerability::RemediationStrategies::NONE) {
         continue;
@@ -416,6 +397,9 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
     }
 
     for (auto &F : M) {
+      if (F.isDeclaration())
+        continue;
+
       if (instrument_mem_inst.instrumentAlloca) {
         instrumentAlloca(&F);
       }
@@ -426,8 +410,20 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
     }
 
     for (auto &F : M) {
-      for (auto &vuln : vulnerabilities) {
-        result.intersect(runOnFunction(F, MAM, vuln));
+      if (F.isDeclaration())
+        continue;
+
+      for (auto &vuln : vulns) {
+        if (writePatch) {
+          if (!shouldInstrument(F, vuln))
+            continue;
+
+          beginPatchRecording();
+          result.intersect(runOnFunction(F, MAM, vuln));
+          endPatchRecordingAndWrite(&F);
+        } else {
+          result.intersect(runOnFunction(F, MAM, vuln));
+        }
       }
     }
 
@@ -437,6 +433,28 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
     }
     return result;
   }
+
+  PreservedAnalyses run(Module &M, ModuleAnalysisManager &MAM) {
+    std::vector<Vulnerability> fileVulns;
+    std::vector<Vulnerability> inlineVulns;
+
+    for (auto &vuln : vulnerabilities) {
+      if (vuln.Output == Vulnerability::InstrumentationOutput::FILE) {
+        fileVulns.push_back(vuln);
+      } else {
+        inlineVulns.push_back(vuln);
+      }
+    }
+
+    for (auto &vuln : fileVulns) {
+      auto patchModule = CloneModule(M);
+      std::vector<Vulnerability> singleVuln = {vuln};
+      runInstrumentationPipeline(*patchModule, MAM, singleVuln, true);
+    }
+
+    return runInstrumentationPipeline(M, MAM, inlineVulns, false);
+  }
+
 };
 
 } // end anonymous namespace
