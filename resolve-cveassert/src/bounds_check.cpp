@@ -510,7 +510,7 @@ static Function *getOrCreateResolveGep(Function *F) {
   return resolveGepFn;
 }
 
-void instrumentGEP(Function *F) {
+void instrumentGep(Function *F) {
   Module *M = F->getParent();
   LLVMContext &Ctx = M->getContext();
   IRBuilder<> builder(Ctx);
@@ -833,7 +833,7 @@ void instrumentLoadStore(Function *F,
 
 void sanitizeMemInstBounds(Function *F,
                            Vulnerability::RemediationStrategies strategy) {
-  instrumentGEP(F);
+  instrumentGep(F);
   instrumentMemcpy(F, strategy);
   instrumentMemmove(F, strategy);
   instrumentMemset(F, strategy);
