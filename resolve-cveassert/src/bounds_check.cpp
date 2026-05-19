@@ -775,8 +775,15 @@ void instrumentLoadStore(Function *F,
   for (auto &BB : *F) {
     for (auto &I : BB) {
       if (auto *load = dyn_cast<LoadInst>(&I)) {
+        if (load->getMetadata("cve.noinstrument")) {
+          continue;
+        }
         loadList.push_back(load);
+
       } else if (auto *store = dyn_cast<StoreInst>(&I)) {
+        if (store->getMetadata("cve.noinstrument")) {
+          continue;
+        }
         storeList.push_back(store);
       }
     }
