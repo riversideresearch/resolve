@@ -87,7 +87,6 @@ void instrumentAlloca(Function *F) {
   auto void_ty = Type::getVoidTy(Ctx);
 
   SmallVector<AllocaInst *, 16> allocas;
-  // SmallVector<AllocaInst *, 16> toFreeList;
   SmallVector<AllocaInst *, 16> shadowSlots;
 
   auto allocateFn = M->getOrInsertFunction(
@@ -178,6 +177,8 @@ void instrumentAlloca(Function *F) {
       builder.CreateStore(ConstantPointerNull::get(ptr_ty), shadowSlot);
     }
 
+    // Well-formed LLVM-IR may not have
+    // lifetime.start or lifetime.end instructions
     if (!hasStart) {
       builder.SetInsertPoint(newAlloca->getNextNode());
       builder.CreateCall(allocateFn, {newAlloca, totalSize});
@@ -206,17 +207,11 @@ void instrumentAlloca(Function *F) {
       totalSize = result.second;
     }
 
-    // DEBUGGING: Create a shadow slot for each transformed alloca
     shadowSlot = create_stack_slot(transformedAlloca);
     shadowSlot->setMetadata("cve.noinstrument", MDNode::get(Ctx, {}));
-
     transformedAlloca->setMetadata("cve.noinstrument", MDNode::get(Ctx, {}));
-
-    // Well-formed LLVM-IR may not have
-    // lifetime.start or lifetime.end instructions
     handle_lifetimes(allocaInst, transformedAlloca, shadowSlot, totalSize);
     allocaInst->replaceAllUsesWith(transformedAlloca);
-    // dumpAllocaTransfrom(allocaInst, transformedAlloca);
   };
 
   for (auto &BB : *F) {
@@ -240,10 +235,6 @@ void instrumentAlloca(Function *F) {
     handle_alloca(alloca);
   }
 
-  // if (toFreeList.empty()) {
-  //   return;
-  // }
-
   for (auto &BB : *F) {
     for (auto &instr : BB) {
       if (auto *inst = dyn_cast<ReturnInst>(&instr)) {
@@ -261,10 +252,4 @@ void instrumentAlloca(Function *F) {
       alloca->eraseFromParent();
     }
   }
-
-  // [DEBUGGING]
-  if (F->getName() == "bn_mod_exp_mont_fixed_top") {
-    validateIR(F);
-  }
-  // validateIR(F);
 }
