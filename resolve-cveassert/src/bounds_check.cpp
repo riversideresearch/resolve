@@ -61,6 +61,7 @@ static Function *getOrCreateAccessOk(Module *M) {
       getOrCreateResolveHelper(M, handlerName, resolveAccessOkFnTy);
 
   if (!resolveAccessOkFn->empty()) {
+    recordPatchFunction(resolveAccessOkFn);
     return resolveAccessOkFn;
   }
 
@@ -103,6 +104,7 @@ static Function *getOrCreateAccessOk(Module *M) {
   builder.CreateRet(ConstantInt::getFalse(Ctx));
 
   validateIR(resolveAccessOkFn);
+  recordPatchFunction(resolveAccessOkFn);
   return resolveAccessOkFn;
 }
 
@@ -124,6 +126,7 @@ static Function *getOrCreateBoundsCheckLoadSanitizer(
       getOrCreateResolveHelper(M, handlerName, resolveLoadFnTy);
 
   if (!resolveLoadFn->empty()) {
+    recordPatchFunction(resolveLoadFn);
     return resolveLoadFn;
   }
 
@@ -165,6 +168,7 @@ static Function *getOrCreateBoundsCheckLoadSanitizer(
   builder.CreateRet(Constant::getNullValue(ty));
 
   validateIR(resolveLoadFn);
+  recordPatchFunction(resolveLoadFn);
   return resolveLoadFn;
 }
 
@@ -189,6 +193,7 @@ static Function *getOrCreateBoundsCheckStoreSanitizer(
   Function *resolveStoreFn =
       getOrCreateResolveHelper(M, handlerName, resolveStoreFnTy);
   if (!resolveStoreFn->empty()) {
+    recordPatchFunction(resolveStoreFn);
     return resolveStoreFn;
   }
 
@@ -231,6 +236,7 @@ static Function *getOrCreateBoundsCheckStoreSanitizer(
   builder.CreateRetVoid();
 
   validateIR(resolveStoreFn);
+  recordPatchFunction(resolveStoreFn);
   return resolveStoreFn;
 }
 
@@ -253,6 +259,7 @@ static Function *getOrCreateBoundsCheckMemcpySanitizer(
   Function *resolveMemmoveFn =
       getOrCreateResolveHelper(M, handlerName, resolveMemmoveFnTy);
   if (!resolveMemmoveFn->empty()) {
+    recordPatchFunction(resolveMemmoveFn);
     return resolveMemmoveFn;
   }
 
@@ -302,6 +309,7 @@ static Function *getOrCreateBoundsCheckMemcpySanitizer(
   builder.CreateRet(dst_ptr);
 
   validateIR(resolveMemmoveFn);
+  recordPatchFunction(resolveMemmoveFn);
   return resolveMemmoveFn;
 }
 
@@ -324,6 +332,7 @@ static Function *getOrCreateBoundsCheckMemmoveSanitizer(
   Function *resolveMemmoveFn =
       getOrCreateResolveHelper(M, handlerName, resolveMemmoveFnTy);
   if (!resolveMemmoveFn->empty()) {
+    recordPatchFunction(resolveMemmoveFn);
     return resolveMemmoveFn;
   }
 
@@ -374,6 +383,7 @@ static Function *getOrCreateBoundsCheckMemmoveSanitizer(
   builder.CreateRet(dst_ptr);
 
   validateIR(resolveMemmoveFn);
+  recordPatchFunction(resolveMemmoveFn);
   return resolveMemmoveFn;
 }
 
@@ -397,6 +407,7 @@ static Function *getOrCreateBoundsCheckMemsetSanitizer(
   Function *resolveMemsetFn =
       getOrCreateResolveHelper(M, handlerName, resolveMemsetFnTy);
   if (!resolveMemsetFn->empty()) {
+    recordPatchFunction(resolveMemsetFn);
     return resolveMemsetFn;
   }
 
@@ -444,6 +455,7 @@ static Function *getOrCreateBoundsCheckMemsetSanitizer(
   builder.CreateRet(basePtr);
 
   validateIR(resolveMemsetFn);
+  recordPatchFunction(resolveMemsetFn);
   return resolveMemsetFn;
 }
 
@@ -465,6 +477,7 @@ static Function *getOrCreateResolveGep(Function *F) {
   Function *resolveGepFn =
       getOrCreateResolveHelper(M, handlerName, resolveGepFnTy);
   if (!resolveGepFn->empty()) {
+    recordPatchFunction(resolveGepFn);
     return resolveGepFn;
   }
 
@@ -524,6 +537,7 @@ static Function *getOrCreateResolveGep(Function *F) {
   builder.CreateRet(onePastPtr);
 
   validateIR(resolveGepFn);
+  recordPatchFunction(resolveGepFn);
   return resolveGepFn;
 }
 

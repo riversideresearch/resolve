@@ -36,6 +36,7 @@ getOrCreateNullPtrLoadSanitizer(Function *F, Type *ty,
   Function *resolveNullPtrLdFn =
       getOrCreateResolveHelper(M, handlerName, resolveNullPtrLdFnTy);
   if (!resolveNullPtrLdFn->empty()) {
+    recordPatchFunction(resolveNullPtrLdFn);
     return resolveNullPtrLdFn;
   }
 
@@ -88,6 +89,7 @@ getOrCreateNullPtrLoadSanitizer(Function *F, Type *ty,
   builder.CreateRet(ld);
 
   validateIR(resolveNullPtrLdFn);
+  recordPatchFunction(resolveNullPtrLdFn);
   return resolveNullPtrLdFn;
 }
 
@@ -110,6 +112,7 @@ static Function *getOrCreateNullPtrStoreSanitizer(
   Function *resolveNullPtrStFn =
       getOrCreateResolveHelper(M, handlerName, resolveNullPtrStFnTy);
   if (!resolveNullPtrStFn->empty()) {
+    recordPatchFunction(resolveNullPtrStFn);
     return resolveNullPtrStFn;
   }
 
@@ -167,6 +170,7 @@ static Function *getOrCreateNullPtrStoreSanitizer(
   builder.CreateRetVoid();
 
   validateIR(resolveNullPtrStFn);
+  recordPatchFunction(resolveNullPtrStFn);
   return resolveNullPtrStFn;
 }
 

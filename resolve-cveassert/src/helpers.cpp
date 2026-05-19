@@ -10,6 +10,7 @@
 #include "llvm/IR/InlineAsm.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Verifier.h"
+#include "llvm/Support/FileSystem.h"
 
 #include "CVEAssert.hpp"
 #include "Vulnerability.hpp"
@@ -18,6 +19,8 @@
 #include <cctype>
 #include <iomanip>
 #include <sstream>
+#include <algorithm>
+#include <vector>
 
 using namespace llvm;
 
@@ -28,6 +31,45 @@ void validateIR(Function *F) {
   out << *F;
   if (verifyFunction(*F, &out)) {
     return;
+  }
+}
+
+// is this bad practice?
+static bool patchRecording = false;
+static std::vector<llvm::Function *> patchHelpers;
+
+void beginPatchRecording(void) {
+  patchRecording = true;
+  patchHelpers.clear();
+}
+
+void recordPatchFunction(Function *F) {
+  if (!patchRecording) return;
+  if (std::find(patchHelpers.begin(), patchHelpers.end(), F) == patchHelpers.end()) {
+    patchHelpers.push_back(F);
+  }
+}
+
+void endPatchRecordingAndWrite(Function *F) {
+  patchRecording = false;
+
+  raw_ostream &out = errs();
+  std::error_code EC;
+  llvm::raw_fd_ostream patchFile("resolve-patch.ll", EC, llvm::sys::fs::OF_Append);
+  if(!EC) {
+    // patch helpers
+    for (auto helperFn : patchHelpers) {
+      patchFile << *helperFn;
+      patchFile << "\n"; // TODO: is needed?
+    }
+
+    // final instrumented override fn
+    patchFile << *F;
+    patchFile.close();
+    out << "[CVEAssert] Wrote to patch file (resolve-patch.ll).\n";
+  }
+  else {
+    out << "[CVEAssert] Error: COULD NOT OPEN PATCH FILE.\n";
   }
 }
 
@@ -44,6 +86,7 @@ Function *getOrCreateSanitizerMapEntry(Module *M) {
   Function *sanitizerMapIdxFn =
       getOrCreateResolveHelper(M, "__cve_get_flag", sanitizerMapIdxFnTy);
   if (!sanitizerMapIdxFn->empty()) {
+    recordPatchFunction(sanitizerMapIdxFn);
     return sanitizerMapIdxFn;
   }
 
@@ -65,6 +108,7 @@ Function *getOrCreateSanitizerMapEntry(Module *M) {
   builder.CreateRet(flag);
 
   validateIR(sanitizerMapIdxFn);
+  recordPatchFunction(sanitizerMapIdxFn);
   return sanitizerMapIdxFn;
 }
 
@@ -128,6 +172,7 @@ Function *getOrCreateIsHeap(Module *M, LLVMContext &Ctx) {
       getOrCreateResolveHelper(M, "__cve_is_heap", resolveIsHeapFnTy);
 
   if (!resolveIsHeapFn->empty()) {
+    recordPatchFunction(resolveIsHeapFn);
     return resolveIsHeapFn;
   }
 
@@ -159,6 +204,7 @@ Function *getOrCreateIsHeap(Module *M, LLVMContext &Ctx) {
   Builder.CreateRet(result);
 
   validateIR(resolveIsHeapFn);
+  recordPatchFunction(resolveIsHeapFn);
   return resolveIsHeapFn;
 }
 
@@ -172,6 +218,7 @@ Function *getOrCreateResolveReportSanitizerTriggered(Module *M) {
       getOrCreateResolveHelper(M, "__resolve_report_violation",
                                resolveReportFnTy, GlobalValue::WeakAnyLinkage);
   if (!resolveReportFn->empty()) {
+    recordPatchFunction(resolveReportFn);
     return resolveReportFn;
   }
 
@@ -180,6 +227,7 @@ Function *getOrCreateResolveReportSanitizerTriggered(Module *M) {
   builder.CreateRetVoid();
 
   validateIR(resolveReportFn);
+  recordPatchFunction(resolveReportFn);
   return resolveReportFn;
 }
 
@@ -194,6 +242,7 @@ Function *getOrCreateRecoverBufferFunction(Module *M) {
       M, "resolve_get_recover_longjmp_buf", resolve_recover_buf_fn_ty,
       GlobalValue::WeakAnyLinkage);
   if (!resolveRecoverFn->empty()) {
+    recordPatchFunction(resolveRecoverFn);
     return resolveRecoverFn;
   }
 
@@ -205,6 +254,7 @@ Function *getOrCreateRecoverBufferFunction(Module *M) {
 
   resolveRecoverFn->setMetadata("cve.noinstrument", MDNode::get(Ctx, {}));
   validateIR(resolveRecoverFn);
+  recordPatchFunction(resolveRecoverFn);
 
   return resolveRecoverFn;
 }
@@ -233,6 +283,7 @@ getOrCreateRemediationBehavior(Module *M,
 
   Function *fn = getOrCreateResolveHelper(M, fnName, fnTy);
   if (!fn->empty()) {
+    recordPatchFunction(fn);
     return fn;
   }
 
@@ -264,5 +315,6 @@ getOrCreateRemediationBehavior(Module *M,
   }
 
   validateIR(fn);
+  recordPatchFunction(fn);
   return fn;
 }

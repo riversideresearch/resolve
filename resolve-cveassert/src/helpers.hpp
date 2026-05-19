@@ -24,4 +24,9 @@ getOrCreateResolveHelper(llvm::Module *M, std::string fn_name,
                          llvm::GlobalValue::LinkageTypes link_type =
                              llvm::Function::InternalLinkage);
 void validateIR(llvm::Function *F);
+
+void beginPatchRecording(void);
+void recordPatchFunction(llvm::Function *F);
+void endPatchRecordingAndWrite(llvm::Function *F);
+
 llvm::Function *getOrCreateSanitizerMapEntry(llvm::Module *M);
