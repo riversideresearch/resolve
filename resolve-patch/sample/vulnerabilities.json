@@ -9,7 +9,8 @@
         "cwe-name": "Null pointer dereference",
         "affected-file": "main.c",
         "affected-function": "main",
-        "remediation-strategy": "exit"
+        "remediation-strategy": "exit",
+        "output": "file" 
     }
   ]
 }

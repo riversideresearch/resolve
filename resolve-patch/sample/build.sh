@@ -26,6 +26,8 @@ export LIBRARY_PATH="$LIBRESOLVE_LIB:$RESOLVE_CC_LIB:$CVEASSERT_LIB:$ROOT_DIR/re
 mkdir -p "$SCRIPT_DIR/build"
 cd "$SCRIPT_DIR/build"
 
+rm -rf CMakeFiles CMakeCache.txt main main-dis.ll main-patched.ll resolve-patch.ll
+
 cmake ..
 make # produces resolve-patch.ll
 
