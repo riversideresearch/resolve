@@ -87,8 +87,8 @@ void instrumentAlloca(Function *F) {
   auto void_ty = Type::getVoidTy(Ctx);
 
   SmallVector<AllocaInst *, 16> allocas;
-  SmallVector<AllocaInst *, 16> toFreeList;
-  SmallVector<AllocaInst *, 16> stackVars;
+  // SmallVector<AllocaInst *, 16> toFreeList;
+  SmallVector<AllocaInst *, 16> shadowSlots;
 
   auto allocateFn = M->getOrInsertFunction(
       "__resolve_alloca", FunctionType::get(void_ty, {ptr_ty, size_ty}, false));
@@ -125,24 +125,24 @@ void instrumentAlloca(Function *F) {
     return {transformedAlloca, updatedSize};
   };
 
-  auto create_stack_addr_var = [&](auto *transformedAlloca) -> AllocaInst * {
+  auto create_stack_slot = [&](auto *transformedAlloca) -> AllocaInst * {
     Function *F = transformedAlloca->getFunction();
-    BasicBlock &entry = F->getEntryBlock();
-    Instruction *insertPt = &*entry.getFirstInsertionPt();
+    BasicBlock &entryBB = F->getEntryBlock();
+    Instruction *insertPt = &*entryBB.getFirstInsertionPt();
     builder.SetInsertPoint(insertPt);
-    AllocaInst *addrOrNull =
-        builder.CreateAlloca(ptr_ty, nullptr, "saved.stackaddr");
+    AllocaInst *shadowSlot =
+        builder.CreateAlloca(ptr_ty, nullptr, "shadow.slot");
+    builder.CreateStore(ConstantPointerNull::get(ptr_ty), shadowSlot);
     builder.SetInsertPoint(transformedAlloca->getNextNonDebugInstruction());
-    builder.CreateStore(ConstantPointerNull::get(ptr_ty), addrOrNull);
     StoreInst *storeStackAddr =
-        builder.CreateStore(transformedAlloca, addrOrNull);
-    return addrOrNull;
+        builder.CreateStore(transformedAlloca, shadowSlot);
+    return shadowSlot;
   };
 
   auto handle_lifetimes = [&](auto *oldAlloca, auto *newAlloca,
-                              Value *totalSize) {
+                              auto *shadowSlot, Value *totalSize) {
     // Because instrumenation alters the effective size of stack allocation
-    // we need to rewrite intrinsics to reflect instrumented size
+    // we need to rewrite intrinsics to use instrumented ptr and old size
     SmallVector<IntrinsicInst *, 16> lifetimeStart;
     SmallVector<IntrinsicInst *, 16> lifetimeEnd;
 
@@ -173,7 +173,9 @@ void instrumentAlloca(Function *F) {
     for (auto *end : lifetimeEnd) {
       end->setArgOperand(0, totalSize);
       builder.SetInsertPoint(end->getNextNode());
-      builder.CreateCall(invalidateFn, {newAlloca});
+      LoadInst *load = builder.CreateLoad(ptr_ty, shadowSlot);
+      builder.CreateCall(invalidateFn, {load});
+      builder.CreateStore(ConstantPointerNull::get(ptr_ty), shadowSlot);
     }
 
     if (!hasStart) {
@@ -182,14 +184,14 @@ void instrumentAlloca(Function *F) {
     }
 
     if (!hasEnd) {
-      toFreeList.push_back(newAlloca);
+      shadowSlots.push_back(shadowSlot);
     }
   };
 
   auto handle_alloca = [&](auto *allocaInst) {
     Value *totalSize;
     AllocaInst *transformedAlloca;
-    AllocaInst *stackAddrVar;
+    AllocaInst *shadowSlot;
     Type *allocatedType = allocaInst->getAllocatedType();
 
     if (isa<ArrayType>(allocatedType)) {
@@ -202,17 +204,17 @@ void instrumentAlloca(Function *F) {
       auto result = create_transformed_alloca(allocaInst);
       transformedAlloca = result.first;
       totalSize = result.second;
-      if (!isa<ConstantInt>(totalSize)) {
-        stackAddrVar = create_stack_addr_var(transformedAlloca);
-      }
     }
+
+    // DEBUGGING: Create a shadow slot for each transformed alloca
+    shadowSlot = create_stack_slot(transformedAlloca);
+    shadowSlot->setMetadata("cve.noinstrument", MDNode::get(Ctx, {}));
 
     transformedAlloca->setMetadata("cve.noinstrument", MDNode::get(Ctx, {}));
 
     // Well-formed LLVM-IR may not have
     // lifetime.start or lifetime.end instructions
-    handle_lifetimes(allocaInst, transformedAlloca, totalSize);
-
+    handle_lifetimes(allocaInst, transformedAlloca, shadowSlot, totalSize);
     allocaInst->replaceAllUsesWith(transformedAlloca);
     // dumpAllocaTransfrom(allocaInst, transformedAlloca);
   };
@@ -238,20 +240,17 @@ void instrumentAlloca(Function *F) {
     handle_alloca(alloca);
   }
 
-  if (toFreeList.empty()) {
-    return;
-  }
+  // if (toFreeList.empty()) {
+  //   return;
+  // }
 
   for (auto &BB : *F) {
     for (auto &instr : BB) {
       if (auto *inst = dyn_cast<ReturnInst>(&instr)) {
         builder.SetInsertPoint(inst);
-        for (auto *stackvar : stackVars) {
-          builder.CreateCall(invalidateFn, {stackvar});
-        }
-
-        for (auto *alloca : toFreeList) {
-          builder.CreateCall(invalidateFn, {alloca});
+        for (auto *slot : shadowSlots) {
+          LoadInst *load = builder.CreateLoad(ptr_ty, slot);
+          builder.CreateCall(invalidateFn, {load});
         }
       }
     }
