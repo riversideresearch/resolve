@@ -28,6 +28,7 @@ FetchContent_Declare(
   GIT_SHALLOW TRUE
 )
 
+set(glaze_INSTALL ON CACHE BOOL "Generate installation rules for glaze" FORCE)
 FetchContent_MakeAvailable(glaze)
 
 # Collect source files for checks
