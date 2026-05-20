@@ -10,7 +10,8 @@
         "affected-file": "main.c",
         "affected-function": "main",
         "remediation-strategy": "exit",
-        "output": "patch"
+        "output": "patch",
+        "gated": false
     }
   ]
 }
