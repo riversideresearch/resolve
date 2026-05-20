@@ -124,7 +124,7 @@ void instrumentAlloca(Function *F) {
     return {transformedAlloca, updatedSize};
   };
 
-  auto create_stack_slot = [&](auto *transformedAlloca) -> AllocaInst * {
+  auto create_shadow_slot = [&](auto *transformedAlloca) -> AllocaInst * {
     Function *F = transformedAlloca->getFunction();
     BasicBlock &entryBB = F->getEntryBlock();
     Instruction *insertPt = &*entryBB.getFirstInsertionPt();
@@ -135,6 +135,7 @@ void instrumentAlloca(Function *F) {
     builder.SetInsertPoint(transformedAlloca->getNextNonDebugInstruction());
     StoreInst *storeStackAddr =
         builder.CreateStore(transformedAlloca, shadowSlot);
+    storeStackAddr->setMetadata("cve.noinstrument", MDNode::get(Ctx, {}));
     return shadowSlot;
   };
 
@@ -173,8 +174,11 @@ void instrumentAlloca(Function *F) {
       end->setArgOperand(0, totalSize);
       builder.SetInsertPoint(end->getNextNode());
       LoadInst *load = builder.CreateLoad(ptr_ty, shadowSlot);
+      load->setMetadata("cve.noinstrument", MDNode::get(Ctx, {}));
       builder.CreateCall(invalidateFn, {load});
-      builder.CreateStore(ConstantPointerNull::get(ptr_ty), shadowSlot);
+      StoreInst *store =
+          builder.CreateStore(ConstantPointerNull::get(ptr_ty), shadowSlot);
+      store->setMetadata("cve.noinstrument", MDNode::get(Ctx, {}));
     }
 
     // Well-formed LLVM-IR may not have
@@ -207,7 +211,7 @@ void instrumentAlloca(Function *F) {
       totalSize = result.second;
     }
 
-    shadowSlot = create_stack_slot(transformedAlloca);
+    shadowSlot = create_shadow_slot(transformedAlloca);
     shadowSlot->setMetadata("cve.noinstrument", MDNode::get(Ctx, {}));
     transformedAlloca->setMetadata("cve.noinstrument", MDNode::get(Ctx, {}));
     handle_lifetimes(allocaInst, transformedAlloca, shadowSlot, totalSize);
@@ -241,6 +245,7 @@ void instrumentAlloca(Function *F) {
         builder.SetInsertPoint(inst);
         for (auto *slot : shadowSlots) {
           LoadInst *load = builder.CreateLoad(ptr_ty, slot);
+          load->setMetadata("cve.noinstrument", MDNode::get(Ctx, {}));
           builder.CreateCall(invalidateFn, {load});
         }
       }
