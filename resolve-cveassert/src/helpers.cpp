@@ -3,14 +3,19 @@
  *   LGPL-3; See LICENSE.txt in the repo root for details.
  */
 
+#include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/IR/Function.h"
+#include "llvm/IR/GlobalVariable.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/InlineAsm.h"
+#include "llvm/IR/InstIterator.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Verifier.h"
 #include "llvm/Support/FileSystem.h"
+#include "llvm/Support/raw_ostream.h"
+#include "llvm/Transforms/Utils/Cloning.h"
 
 #include "CVEAssert.hpp"
 #include "Vulnerability.hpp"
@@ -20,6 +25,7 @@
 #include <iomanip>
 #include <sstream>
 #include <algorithm>
+#include <set>
 #include <vector>
 
 using namespace llvm;
@@ -34,19 +40,245 @@ void validateIR(Function *F) {
   }
 }
 
-// is this bad practice?
 static bool patchRecording = false;
 static std::vector<llvm::Function *> patchHelpers;
+static std::vector<llvm::GlobalVariable *> patchGlobals;
+
+static void collectReferencedGlobals(Value *V, std::set<std::string> &Names,
+                                     SmallPtrSetImpl<Value *> &Visited) {
+  if (!V || !Visited.insert(V).second) {
+    return;
+  }
+
+  if (auto *GV = dyn_cast<GlobalValue>(V->stripPointerCasts())) {
+    if (GV->hasName()) {
+      Names.insert(GV->getName().str());
+    }
+  }
+
+  if (auto *U = dyn_cast<User>(V)) {
+    for (Value *Op : U->operands()) {
+      collectReferencedGlobals(Op, Names, Visited);
+    }
+  }
+}
+
+static void collectReferencedGlobalsFromFunction(Function *F,
+                                                 std::set<std::string> &Names) {
+  if (!F || F->isDeclaration()) {
+    return;
+  }
+
+  SmallPtrSet<Value *, 32> Visited;
+  for (Instruction &I : instructions(F)) {
+    collectReferencedGlobals(&I, Names, Visited);
+  }
+}
+
+static void collectReferencedGlobalsFromGlobal(GlobalVariable *G,
+                                               std::set<std::string> &Names) {
+  if (!G || !G->hasInitializer()) {
+    return;
+  }
+
+  SmallPtrSet<Value *, 32> Visited;
+  collectReferencedGlobals(G->getInitializer(), Names, Visited);
+}
+
+static bool isRecordedFunction(Function *F,
+                               const std::set<std::string> &FunctionNames) {
+  return F && F->hasName() && FunctionNames.contains(F->getName().str());
+}
+
+static bool isRecordedGlobal(GlobalVariable *G,
+                             const std::set<std::string> &GlobalNames) {
+  return G && G->hasName() && GlobalNames.contains(G->getName().str());
+}
+
+static void stripCVEAssertMetadata(GlobalObject &GO) {
+  GO.setMetadata("cve.noinstrument", nullptr);
+}
+
+static void stripCVEAssertMetadata(Function &F) {
+  stripCVEAssertMetadata(cast<GlobalObject>(F));
+
+  unsigned CVEMetadataKind = F.getContext().getMDKindID("cve.noinstrument");
+  for (Instruction &I : instructions(F)) {
+    I.setMetadata(CVEMetadataKind, nullptr);
+  }
+}
+
+static std::string renderPatchModule(Module &SourceModule, Function *Target) {
+  std::set<std::string> FunctionDefs;
+  std::set<std::string> GlobalDefs;
+  std::set<std::string> ReferencedGlobals;
+
+  if (Target && Target->hasName()) {
+    FunctionDefs.insert(Target->getName().str());
+  }
+
+  for (Function *Helper : patchHelpers) {
+    if (Helper && Helper->hasName()) {
+      FunctionDefs.insert(Helper->getName().str());
+    }
+  }
+
+  for (GlobalVariable *G : patchGlobals) {
+    if (G && G->hasName()) {
+      GlobalDefs.insert(G->getName().str());
+    }
+  }
+
+  auto PatchModule = CloneModule(SourceModule);
+
+  bool Changed;
+  do {
+    Changed = false;
+
+    for (const std::string &Name : FunctionDefs) {
+      Function *F = PatchModule->getFunction(Name);
+      size_t OldSize = ReferencedGlobals.size();
+      collectReferencedGlobalsFromFunction(F, ReferencedGlobals);
+      Changed |= ReferencedGlobals.size() != OldSize;
+    }
+
+    for (const std::string &Name : GlobalDefs) {
+      auto *G = dyn_cast_or_null<GlobalVariable>(PatchModule->getNamedValue(Name));
+      size_t OldSize = ReferencedGlobals.size();
+      collectReferencedGlobalsFromGlobal(G, ReferencedGlobals);
+      Changed |= ReferencedGlobals.size() != OldSize;
+    }
+
+    for (const std::string &Name : ReferencedGlobals) {
+      if (FunctionDefs.contains(Name) || GlobalDefs.contains(Name)) {
+        continue;
+      }
+
+      if (Function *F = PatchModule->getFunction(Name)) {
+        if (!F->isDeclaration() && F->getMetadata("cve.noinstrument")) {
+          FunctionDefs.insert(Name);
+          Changed = true;
+        }
+      }
+    }
+  } while (Changed);
+
+  for (Function &F : *PatchModule) {
+    if (isRecordedFunction(&F, FunctionDefs)) {
+      stripCVEAssertMetadata(F);
+    }
+  }
+
+  for (GlobalVariable &G : PatchModule->globals()) {
+    if (isRecordedGlobal(&G, GlobalDefs)) {
+      stripCVEAssertMetadata(G);
+    }
+  }
+
+  std::vector<GlobalAlias *> AliasesToErase;
+  for (GlobalAlias &A : PatchModule->aliases()) {
+    if (!A.hasName() || !ReferencedGlobals.contains(A.getName().str())) {
+      AliasesToErase.push_back(&A);
+    }
+  }
+  for (GlobalAlias *A : AliasesToErase) {
+    A->eraseFromParent();
+  }
+
+  std::vector<GlobalIFunc *> IFuncsToErase;
+  for (GlobalIFunc &I : PatchModule->ifuncs()) {
+    if (!I.hasName() || !ReferencedGlobals.contains(I.getName().str())) {
+      IFuncsToErase.push_back(&I);
+    }
+  }
+  for (GlobalIFunc *I : IFuncsToErase) {
+    I->eraseFromParent();
+  }
+
+  std::vector<GlobalVariable *> GlobalsToErase;
+  for (GlobalVariable &G : PatchModule->globals()) {
+    if (isRecordedGlobal(&G, GlobalDefs)) {
+      continue;
+    }
+
+    if (G.hasName() && ReferencedGlobals.contains(G.getName().str())) {
+      G.setInitializer(nullptr);
+      G.setLinkage(GlobalValue::ExternalLinkage);
+      continue;
+    }
+
+    GlobalsToErase.push_back(&G);
+  }
+  for (GlobalVariable *G : GlobalsToErase) {
+    G->eraseFromParent();
+  }
+
+  std::vector<Function *> FunctionsToErase;
+  for (Function &F : *PatchModule) {
+    if (isRecordedFunction(&F, FunctionDefs)) {
+      continue;
+    }
+
+    if (F.hasName() && ReferencedGlobals.contains(F.getName().str())) {
+      F.deleteBody();
+      F.setLinkage(GlobalValue::ExternalLinkage);
+      continue;
+    }
+
+    FunctionsToErase.push_back(&F);
+  }
+  for (Function *F : FunctionsToErase) {
+    F->eraseFromParent();
+  }
+
+  PatchModule->setSourceFileName("");
+  PatchModule->setTargetTriple("");
+  PatchModule->setDataLayout("");
+
+  while (!PatchModule->named_metadata_empty()) {
+    PatchModule->eraseNamedMetadata(&*PatchModule->named_metadata_begin());
+  }
+
+  std::string IR;
+  raw_string_ostream OS(IR);
+  PatchModule->print(OS, nullptr);
+  OS.flush();
+
+  std::string FilteredIR;
+  raw_string_ostream FilteredOS(FilteredIR);
+  SmallVector<StringRef, 128> Lines;
+  StringRef(IR).split(Lines, '\n');
+  for (StringRef Line : Lines) {
+    if (Line.starts_with("; ModuleID =") ||
+        Line.starts_with("source_filename =") ||
+        Line.starts_with("target datalayout =") ||
+        Line.starts_with("target triple =")) {
+      continue;
+    }
+
+    FilteredOS << Line << "\n";
+  }
+  FilteredOS.flush();
+  return FilteredIR;
+}
 
 void beginPatchRecording(void) {
   patchRecording = true;
   patchHelpers.clear();
+  patchGlobals.clear();
 }
 
 void recordPatchFunction(Function *F) {
   if (!patchRecording) return;
   if (std::find(patchHelpers.begin(), patchHelpers.end(), F) == patchHelpers.end()) {
     patchHelpers.push_back(F);
+  }
+}
+
+void recordPatchGlobal(GlobalVariable *G) {
+  if (!patchRecording) return;
+  if (std::find(patchGlobals.begin(), patchGlobals.end(), G) == patchGlobals.end()) {
+    patchGlobals.push_back(G);
   }
 }
 
@@ -57,14 +289,7 @@ void endPatchRecordingAndWrite(Function *F) {
   std::error_code EC;
   llvm::raw_fd_ostream patchFile("resolve-patch.ll", EC, llvm::sys::fs::OF_Append);
   if(!EC) {
-    // patch helpers
-    for (auto helperFn : patchHelpers) {
-      patchFile << *helperFn;
-      patchFile << "\n"; // TODO: is needed?
-    }
-
-    // final instrumented override fn
-    patchFile << *F;
+    patchFile << renderPatchModule(*F->getParent(), F);
     patchFile.close();
     out << "[CVEAssert] Wrote to patch file (resolve-patch.ll).\n";
   }

@@ -33,6 +33,7 @@ void sanitizeBitShift(Function *F,
   auto usize_ty = Type::getInt64Ty(Ctx);
   auto i1_ty = Type::getInt1Ty(Ctx);
   GlobalVariable *map = SanitizerMaps[F];
+  recordPatchGlobal(map);
   IRBuilder<> builder(Ctx);
   std::vector<Instruction *> worklist;
 
@@ -163,6 +164,7 @@ void sanitizeDivideByZero(Function *F,
   auto usize_ty = Type::getInt64Ty(Ctx);
   auto i1_ty = Type::getInt1Ty(Ctx);
   GlobalVariable *map = SanitizerMaps[F];
+  recordPatchGlobal(map);
   IRBuilder<> builder(Ctx);
   std::vector<Instruction *> worklist;
 
@@ -402,6 +404,7 @@ void sanitizeIntOverflow(Function *F,
   auto usize_ty = Type::getInt64Ty(Ctx);
   auto i1_ty = Type::getInt1Ty(Ctx);
   GlobalVariable *map = SanitizerMaps[F];
+  recordPatchGlobal(map);
   IRBuilder<> builder(Ctx);
 
   switch (strategy) {

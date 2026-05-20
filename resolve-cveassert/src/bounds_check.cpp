@@ -114,6 +114,7 @@ static Function *getOrCreateBoundsCheckLoadSanitizer(
   Module *M = F->getParent();
   LLVMContext &Ctx = M->getContext();
   GlobalVariable *map = SanitizerMaps[F];
+  recordPatchGlobal(map);
 
   IRBuilder<> builder(Ctx);
 
@@ -178,6 +179,7 @@ static Function *getOrCreateBoundsCheckStoreSanitizer(
   Module *M = F->getParent();
   LLVMContext &Ctx = M->getContext();
   GlobalVariable *map = SanitizerMaps[F];
+  recordPatchGlobal(map);
 
   IRBuilder<> builder(Ctx);
 
@@ -246,6 +248,7 @@ static Function *getOrCreateBoundsCheckMemcpySanitizer(
   Module *M = F->getParent();
   LLVMContext &Ctx = M->getContext();
   GlobalVariable *map = SanitizerMaps[F];
+  recordPatchGlobal(map);
 
   IRBuilder<> builder(Ctx);
 
@@ -319,6 +322,7 @@ static Function *getOrCreateBoundsCheckMemmoveSanitizer(
   Module *M = F->getParent();
   LLVMContext &Ctx = M->getContext();
   GlobalVariable *map = SanitizerMaps[F];
+  recordPatchGlobal(map);
 
   IRBuilder<> builder(Ctx);
 
@@ -393,6 +397,7 @@ static Function *getOrCreateBoundsCheckMemsetSanitizer(
   Module *M = F->getParent();
   LLVMContext &Ctx = M->getContext();
   GlobalVariable *map = SanitizerMaps[F];
+  recordPatchGlobal(map);
 
   IRBuilder<> builder(Ctx);
 
@@ -464,6 +469,7 @@ static Function *getOrCreateResolveGep(Function *F) {
   Module *M = F->getParent();
   LLVMContext &Ctx = M->getContext();
   GlobalVariable *map = SanitizerMaps[F];
+  recordPatchGlobal(map);
 
   IRBuilder<> builder(Ctx);
 

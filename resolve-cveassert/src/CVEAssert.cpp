@@ -108,6 +108,7 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
     Module *M = F->getParent();
     LLVMContext &Ctx = M->getContext();
     GlobalVariable *map = SanitizerMaps[F];
+    recordPatchGlobal(map);
 
     IRBuilder<> builder(Ctx);
     // TODO: handle address spaces other than 0
@@ -280,8 +281,6 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
       return result;
     }
 
-    // out << "[CVEAssert] === DUMMY === \n";
-
     switch (vuln.WeaknessID) {
     case VulnID::STACK_BASED_BUF_OVERFLOW: /* Stack-based buffer overflow */
     case VulnID::HEAP_BASED_BUF_OVERFLOW:  /* Heap-base buffer overflow */
@@ -351,6 +350,7 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
     SanitizerMaps.clear();
 
     if (writePatch) {
+      // reset patch file to 0 bytes
       std::error_code EC;
       raw_fd_ostream patchFile("resolve-patch.ll", EC);
       patchFile.close();

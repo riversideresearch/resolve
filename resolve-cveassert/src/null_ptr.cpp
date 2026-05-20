@@ -24,6 +24,7 @@ getOrCreateNullPtrLoadSanitizer(Function *F, Type *ty,
   Module *M = F->getParent();
   LLVMContext &Ctx = M->getContext();
   GlobalVariable *map = SanitizerMaps[F];
+  recordPatchGlobal(map);
 
   IRBuilder<> builder(Ctx);
   // TODO: handle address spaces other than 0
@@ -99,6 +100,7 @@ static Function *getOrCreateNullPtrStoreSanitizer(
   Module *M = F->getParent();
   LLVMContext &Ctx = M->getContext();
   GlobalVariable *map = SanitizerMaps[F];
+  recordPatchGlobal(map);
 
   IRBuilder<> builder(Ctx);
   // TODO: handle address spaces other than 0

@@ -7,6 +7,7 @@
 #include "Vulnerability.hpp"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/IR/Function.h"
+#include "llvm/IR/GlobalVariable.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Type.h"
 
@@ -27,6 +28,7 @@ void validateIR(llvm::Function *F);
 
 void beginPatchRecording(void);
 void recordPatchFunction(llvm::Function *F);
+void recordPatchGlobal(llvm::GlobalVariable *G);
 void endPatchRecordingAndWrite(llvm::Function *F);
 
 llvm::Function *getOrCreateSanitizerMapEntry(llvm::Module *M);
