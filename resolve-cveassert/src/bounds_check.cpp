@@ -110,7 +110,7 @@ static Function *getOrCreateAccessOk(Module *M) {
 
 static Function *getOrCreateBoundsCheckLoadSanitizer(
     Function *F, Type *ty, Vulnerability::RemediationStrategies strategy) {
-  std::string handlerName = "__cve_san_bound_ld_" + getLLVMType(ty);
+  std::string handlerName = "__cve_bound_ld_" + getLLVMType(ty);
   Module *M = F->getParent();
   LLVMContext &Ctx = M->getContext();
   GlobalVariable *map = SanitizerMaps[F];
@@ -165,8 +165,10 @@ static Function *getOrCreateBoundsCheckLoadSanitizer(
   builder.CreateCall(getOrCreateResolveReportSanitizerTriggered(M));
   if (Function *fn = getOrCreateRemediationBehavior(M, strategy)) {
     builder.CreateCall(fn);
+    builder.CreateUnreachable();
+  } else {
+    builder.CreateRet(Constant::getNullValue(ty));
   }
-  builder.CreateRet(Constant::getNullValue(ty));
 
   validateIR(resolveLoadFn);
   recordPatchFunction(resolveLoadFn);
@@ -175,7 +177,7 @@ static Function *getOrCreateBoundsCheckLoadSanitizer(
 
 static Function *getOrCreateBoundsCheckStoreSanitizer(
     Function *F, Type *ty, Vulnerability::RemediationStrategies strategy) {
-  std::string handlerName = "__cve_san_bound_st_" + getLLVMType(ty);
+  std::string handlerName = "__cve_bound_st_" + getLLVMType(ty);
   Module *M = F->getParent();
   LLVMContext &Ctx = M->getContext();
   GlobalVariable *map = SanitizerMaps[F];
@@ -234,8 +236,10 @@ static Function *getOrCreateBoundsCheckStoreSanitizer(
   builder.CreateCall(getOrCreateResolveReportSanitizerTriggered(M));
   if (Function *fn = getOrCreateRemediationBehavior(M, strategy)) {
     builder.CreateCall(fn);
+    builder.CreateUnreachable();
+  } else {
+    builder.CreateRetVoid();
   }
-  builder.CreateRetVoid();
 
   validateIR(resolveStoreFn);
   recordPatchFunction(resolveStoreFn);
@@ -244,7 +248,7 @@ static Function *getOrCreateBoundsCheckStoreSanitizer(
 
 static Function *getOrCreateBoundsCheckMemcpySanitizer(
     Function *F, Vulnerability::RemediationStrategies strategy) {
-  std::string handlerName = "__cve_san_memcpy";
+  std::string handlerName = "__cve_memcpy";
   Module *M = F->getParent();
   LLVMContext &Ctx = M->getContext();
   GlobalVariable *map = SanitizerMaps[F];
@@ -276,9 +280,9 @@ static Function *getOrCreateBoundsCheckMemcpySanitizer(
 
   builder.SetInsertPoint(EntryBB);
   // Extract dst, src, size arguments from function
-  Value *dst_ptr = resolveMemmoveFn->getArg(0);
-  Value *src_ptr = resolveMemmoveFn->getArg(1);
-  Value *size_arg = resolveMemmoveFn->getArg(2);
+  Value *dstPtr = resolveMemmoveFn->getArg(0);
+  Value *srcPtr = resolveMemmoveFn->getArg(1);
+  Value *sizeArg = resolveMemmoveFn->getArg(2);
 
   Value *mapPtr = builder.CreateGEP(map->getValueType(), map,
                                     {builder.getInt64(0), builder.getInt64(0)});
@@ -288,19 +292,19 @@ static Function *getOrCreateBoundsCheckMemcpySanitizer(
   builder.CreateCondBr(isZero, NormalBB, CheckAccessBB);
 
   builder.SetInsertPoint(CheckAccessBB);
-  Value *check_src_bd =
-      builder.CreateCall(getOrCreateAccessOk(M), {src_ptr, size_arg});
-  Value *check_dst_bd =
-      builder.CreateCall(getOrCreateAccessOk(M), {dst_ptr, size_arg});
+  Value *check_src_access =
+      builder.CreateCall(getOrCreateAccessOk(M), {srcPtr, sizeArg});
+  Value *check_dst_access =
+      builder.CreateCall(getOrCreateAccessOk(M), {dstPtr, sizeArg});
 
-  Value *withinBounds = builder.CreateAnd(check_src_bd, check_dst_bd);
+  Value *withinBounds = builder.CreateAnd(check_src_access, check_dst_access);
   builder.CreateCondBr(withinBounds, NormalBB, SanitizeMemcpyBB);
 
   // NormalBB: Call memcpy and return the ptr
   builder.SetInsertPoint(NormalBB);
   FunctionCallee memcpyFn = M->getOrInsertFunction(
       "memcpy", FunctionType::get(ptr_ty, {ptr_ty, ptr_ty, size_ty}, false));
-  Value *memcpyPtr = builder.CreateCall(memcpyFn, {dst_ptr, src_ptr, size_arg});
+  Value *memcpyPtr = builder.CreateCall(memcpyFn, {dstPtr, srcPtr, sizeArg});
   builder.CreateRet(memcpyPtr);
 
   // SanitizeMemcpyBB: Remediate memcpy returns null pointer.
@@ -308,9 +312,10 @@ static Function *getOrCreateBoundsCheckMemcpySanitizer(
   builder.CreateCall(getOrCreateResolveReportSanitizerTriggered(M));
   if (Function *fn = getOrCreateRemediationBehavior(M, strategy)) {
     builder.CreateCall(fn);
+    builder.CreateUnreachable();
+  } else {
+    builder.CreateRet(dstPtr);
   }
-  builder.CreateRet(dst_ptr);
-
   validateIR(resolveMemmoveFn);
   recordPatchFunction(resolveMemmoveFn);
   return resolveMemmoveFn;
@@ -318,7 +323,7 @@ static Function *getOrCreateBoundsCheckMemcpySanitizer(
 
 static Function *getOrCreateBoundsCheckMemmoveSanitizer(
     Function *F, Vulnerability::RemediationStrategies strategy) {
-  std::string handlerName = "__cve_san_memmove";
+  std::string handlerName = "__cve_memmove";
   Module *M = F->getParent();
   LLVMContext &Ctx = M->getContext();
   GlobalVariable *map = SanitizerMaps[F];
@@ -350,9 +355,9 @@ static Function *getOrCreateBoundsCheckMemmoveSanitizer(
 
   builder.SetInsertPoint(EntryBB);
   // Extract dst, src, size arguments from function
-  Value *dst_ptr = resolveMemmoveFn->getArg(0);
-  Value *src_ptr = resolveMemmoveFn->getArg(1);
-  Value *size_arg = resolveMemmoveFn->getArg(2);
+  Value *dstPtr = resolveMemmoveFn->getArg(0);
+  Value *srcPtr = resolveMemmoveFn->getArg(1);
+  Value *sizeArg = resolveMemmoveFn->getArg(2);
 
   Value *mapPtr = builder.CreateGEP(map->getValueType(), map,
                                     {builder.getInt64(0), builder.getInt64(0)});
@@ -362,20 +367,19 @@ static Function *getOrCreateBoundsCheckMemmoveSanitizer(
   builder.CreateCondBr(isZero, NormalBB, CheckAccessBB);
 
   builder.SetInsertPoint(CheckAccessBB);
-  Value *check_src_bd =
-      builder.CreateCall(getOrCreateAccessOk(M), {src_ptr, size_arg});
-  Value *check_dst_bd =
-      builder.CreateCall(getOrCreateAccessOk(M), {dst_ptr, size_arg});
+  Value *check_src_access =
+      builder.CreateCall(getOrCreateAccessOk(M), {srcPtr, sizeArg});
+  Value *check_dst_access =
+      builder.CreateCall(getOrCreateAccessOk(M), {dstPtr, sizeArg});
 
-  Value *withinBounds = builder.CreateAnd(check_src_bd, check_dst_bd);
+  Value *withinBounds = builder.CreateAnd(check_src_access, check_dst_access);
   builder.CreateCondBr(withinBounds, NormalBB, SanitizeMemmoveBB);
 
   // NormalBB: Call memcpy and return the ptr
   builder.SetInsertPoint(NormalBB);
   FunctionCallee memmoveFn = M->getOrInsertFunction(
       "memmove", FunctionType::get(ptr_ty, {ptr_ty, ptr_ty, size_ty}, false));
-  Value *memmovePtr =
-      builder.CreateCall(memmoveFn, {dst_ptr, src_ptr, size_arg});
+  Value *memmovePtr = builder.CreateCall(memmoveFn, {dstPtr, srcPtr, sizeArg});
   builder.CreateRet(memmovePtr);
 
   // SanitizeMemcpyBB: Remediate memcpy returns null pointer.
@@ -383,8 +387,10 @@ static Function *getOrCreateBoundsCheckMemmoveSanitizer(
   builder.CreateCall(getOrCreateResolveReportSanitizerTriggered(M));
   if (Function *fn = getOrCreateRemediationBehavior(M, strategy)) {
     builder.CreateCall(fn);
+    builder.CreateUnreachable();
+  } else {
+    builder.CreateRet(dstPtr);
   }
-  builder.CreateRet(dst_ptr);
 
   validateIR(resolveMemmoveFn);
   recordPatchFunction(resolveMemmoveFn);
@@ -393,7 +399,7 @@ static Function *getOrCreateBoundsCheckMemmoveSanitizer(
 
 static Function *getOrCreateBoundsCheckMemsetSanitizer(
     Function *F, Vulnerability::RemediationStrategies strategy) {
-  std::string handlerName = "__cve_san_memset";
+  std::string handlerName = "__cve_memset";
   Module *M = F->getParent();
   LLVMContext &Ctx = M->getContext();
   GlobalVariable *map = SanitizerMaps[F];
@@ -438,9 +444,9 @@ static Function *getOrCreateBoundsCheckMemsetSanitizer(
   builder.CreateCondBr(isZero, NormalBB, CheckAccessBB);
 
   builder.SetInsertPoint(CheckAccessBB);
-  Value *check_dst_bd =
+  Value *check_dst_access =
       builder.CreateCall(getOrCreateAccessOk(M), {basePtr, accessSize});
-  builder.CreateCondBr(check_dst_bd, NormalBB, SanitizeMemsetBB);
+  builder.CreateCondBr(check_dst_access, NormalBB, SanitizeMemsetBB);
 
   // NormalBB: call memset and return the pointer
   builder.SetInsertPoint(NormalBB);
@@ -456,8 +462,10 @@ static Function *getOrCreateBoundsCheckMemsetSanitizer(
   builder.CreateCall(getOrCreateResolveReportSanitizerTriggered(M));
   if (Function *fn = getOrCreateRemediationBehavior(M, strategy)) {
     builder.CreateCall(fn);
+    builder.CreateUnreachable();
+  } else {
+    builder.CreateRet(basePtr);
   }
-  builder.CreateRet(basePtr);
 
   validateIR(resolveMemsetFn);
   recordPatchFunction(resolveMemsetFn);
@@ -465,7 +473,7 @@ static Function *getOrCreateBoundsCheckMemsetSanitizer(
 }
 
 static Function *getOrCreateResolveGep(Function *F) {
-  std::string handlerName = "__cve_san_gep";
+  std::string handlerName = "__cve_gep";
   Module *M = F->getParent();
   LLVMContext &Ctx = M->getContext();
   GlobalVariable *map = SanitizerMaps[F];

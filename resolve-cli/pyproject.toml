@@ -18,6 +18,7 @@ dependencies = [
 resolve = "resolve.cli:main"
 resolve-reach = "resolve.reach:main"
 resolve-remediate = "resolve.remediate:main"
+resolve-get-facts = "resolve.get_facts:main"
 resolve-input-synthesis = "resolve.cli:main"
 resolve-input-synthesis-setup = "resolve.input_synthesis.setup:main"
 resolve-input-synthesis-run-all = "resolve.input_synthesis.run_all:main"

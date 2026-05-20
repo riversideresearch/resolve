@@ -9,7 +9,8 @@
             "cwe-name": "Stack-based Buffer Overflow",
             "affected-function": "main",
             "affected-file": "main.c",
-            "remediation-strategy": "recover"
+            "remediation-strategy": "recover",
+            "output": "toggle"
         }
     ]
 }

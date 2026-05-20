@@ -128,6 +128,7 @@ configure_flags() {
     # Check if USE_RESOLVE_FACTS flag is set to true
     if $USE_RESOLVE_FACTS; then 
         COMPTIME_FLAGS+=("-fpass-plugin=$RESOLVE_FACTS_PLUGIN")
+        COMPTIME_FLAGS+=("-g1")
     fi
 
     if $LINK_LIBRESOLVE; then 

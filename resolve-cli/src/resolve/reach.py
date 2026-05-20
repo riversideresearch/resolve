@@ -7,7 +7,6 @@ from dataclasses import dataclass, field
 
 from operator import attrgetter
 import os
-import csv
 import json
 import argparse
 import subprocess
@@ -191,38 +190,35 @@ def demangle(names: Iterable[str]):
 class FactParser:
     def __init__(self, facts_file: Path):
         self.facts_file = facts_file
+
+        # def deserialize_edge(k: str, e: dict[str, Any]):
+        #     # glaze serializes pairs as {first:second}
+        #     d = json.loads(k)
+        #     src, dst = d
+
+        #     sid = (mid, int(src))
+        #     did = (mid, int(dst))
+        #     return Edge((sid, did), sid, did, e["kinds"], {})
+
         # Load Nodes
         with (facts_file).open() as f:
-
-            all_nodes = []
-            #all_edges = []
+            all_nodes: list[Node] = []
+            # all_edges: list[Edge] = []
             # When multiple modules are combined they will be separated by newlines.
             for line in f:
                 facts = json.loads(line.strip('\n'))
 
                 for mid, m in facts["modules"].items():
                     mid = int(mid)
-                    mnodes = [ Node((mid, int(id)), n["type"], n) for id,n in m["nodes"].items() ]
-                    all_nodes.extend(mnodes)
+                    all_nodes += [
+                        Node((mid, int(id)), n["type"], n)
+                        for id, n in m["nodes"].items()
+                    ]
 
-                    # don't require deserializing edges, but if we did this is what we could do
-                    """
-                    medges = []
-                    for k, e in m["edges"].items():
-                        # glaze serializes pairs as {first:second}
-                        d = json.loads(k)
-                        src,dst = d
-
-                        sid = (mid, int(src))
-                        did = (mid, int(dst))
-                        e = Edge((sid, did), sid, did, e["kinds"], {})
-                        medges.append(e)
-
-                    all_edges.extend(medges)
-                    """
+                    # all_edges += [deserialize_edge(k, e) for k, e in m["edges"].items()]
 
             self.nodes = Nodes(all_nodes)
-            #self.edges = Edges(all_edges)
+            # self.edges = Edges(all_edges)
 
     def demangle_names(self):
         with_names = [n for n in self.nodes if "name" in n.props]
@@ -231,7 +227,7 @@ class FactParser:
             if n["name"] != demangled_name:
                 n["demangled_name"] = demangled_name
 
-    def get_module_name_for_node(self, id: NodeID):
+    def get_node_module_name(self, id: NodeID):
         module_id = (id[0], id[0])
         name = self.nodes[module_id].props["source_file"]
         return name
@@ -241,15 +237,20 @@ class FactParser:
         # First try true symbol names
         for f in self.nodes.kinds["Function"]:
             # try to get the function that we are precisely looking for
-            if func_name == f.get("name", "") and file_name in f.get("source_file", ""):
+            if func_name != f.get("name", ""):
+                continue
+            # Function.source_file is based on debug info, which may or may not be populated, but is more specific in the case of i.e. header files
+            if file_name in f.get(
+                "source_file", ""
+            ) or file_name in self.get_node_module_name(f.id):
                 return f.id
 
         # Next try demangled C++ symbol names
         for f in self.nodes.kinds["Function"]:
             # If we fail to get an exact match, try a substring match on demangled names
-            if func_name in f.props.get("demangled_name", "") and file_name in f.get(
-                "source_file", ""
-            ):
+            if func_name in f.props.get(
+                "demangled_name", ""
+            ) and file_name in self.get_node_module_name(f.id):
                 matches.append(f.id)
 
         match len(matches):
@@ -343,7 +344,7 @@ class ReachabilityResult:
             self.reachability = Reachability.UNREACHABLE_NOT_FOUND
             return
 
-        file_name = fact_parser.get_module_name_for_node(func_id)
+        file_name = fact_parser.get_node_module_name(func_id)
         print(f"Found function '{self.sink.affected_function}' in module '{file_name}'")
 
         self.func_id = func_id
@@ -551,7 +552,7 @@ class Orchestrator:
         src = self.fact_parser.get_func_id(self.entrypoint)
         assert src is not None, f"Could not find source function '{self.entrypoint}'"
 
-        file_name = self.fact_parser.get_module_name_for_node(src)
+        file_name = self.fact_parser.get_node_module_name(src)
 
         print(f"Found function '{self.entrypoint}' in module '{file_name}'")
         self.src = src

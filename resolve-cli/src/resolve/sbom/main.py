@@ -26,6 +26,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--id",
         nargs="*",
+        default=tuple(),
         help="Vulnerability id of interest",
     )
     parser.add_argument("--min-score", type=float, default=None)

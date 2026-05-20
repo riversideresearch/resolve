@@ -316,7 +316,7 @@ Function *getOrCreateSanitizerMapEntry(Module *M) {
   auto i1_ty = Type::getInt1Ty(Ctx);
   auto ptr_ty = PointerType::get(Ctx, 0);
   auto usize_ty = Type::getInt64Ty(Ctx);
-  auto arr_ty = ArrayType::get(i1_ty, 7);
+  auto arr_ty = ArrayType::get(i1_ty, 6);
 
   FunctionType *sanitizerMapIdxFnTy =
       FunctionType::get(i1_ty, {ptr_ty, usize_ty}, false);
@@ -531,7 +531,7 @@ getOrCreateRemediationBehavior(Module *M,
   switch (strategy) {
   case Vulnerability::RemediationStrategies::EXIT: {
     FunctionType *exitTy = FunctionType::get(void_ty, {i32_ty}, false);
-    FunctionCallee exitFn = M->getOrInsertFunction("exit", exitTy);
+    FunctionCallee exitFn = M->getOrInsertFunction("_exit", exitTy);
     builder.CreateCall(exitFn, {builder.getInt32(3)});
     builder.CreateUnreachable();
     break;

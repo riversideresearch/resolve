@@ -46,7 +46,7 @@ GlobalVariable *initSanitizerMap(Function &F) {
   Module *M = F.getParent();
   LLVMContext &Ctx = M->getContext();
   Type *i1_ty = Type::getInt1Ty(Ctx);
-  ArrayType *arr_ty = ArrayType::get(i1_ty, 7);
+  ArrayType *arr_ty = ArrayType::get(i1_ty, 6);
 
   std::string globalName = F.getName().str() + ".sanmap";
 
@@ -56,12 +56,12 @@ GlobalVariable *initSanitizerMap(Function &F) {
 
   gSanitizerMap->setLinkage(GlobalValue::LinkOnceAnyLinkage);
   gSanitizerMap->setConstant(false);
+  gSanitizerMap->setMetadata("cve.noinstrument", MDNode::get(Ctx, {}));
 
   if (!gSanitizerMap->hasInitializer()) {
-    std::vector<Constant *> elems(7, ConstantInt::get(i1_ty, 1));
+    std::vector<Constant *> elems(6, ConstantInt::get(i1_ty, 1));
     gSanitizerMap->setInitializer(ConstantArray::get(arr_ty, elems));
   }
-
   return gSanitizerMap;
 }
 
@@ -80,6 +80,7 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
     STACK_BASED_BUF_OVERFLOW = 121,
     HEAP_BASED_BUF_OVERFLOW = 122,
     WRITE_WHAT_WHERE = 123,
+    OOB = 119,
     OOB_WRITE = 787,
     OOB_READ = 125, /* NOTE: This ID corresponds to CWE-ID description found in
                        stb-resize, lamartine CPs */
@@ -204,6 +205,7 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
     sanitizeNullPointers(&F, strategy);
     sanitizeDivideByZero(&F, strategy);
     sanitizeIntOverflow(&F, strategy);
+    sanitizeBitShift(&F, strategy);
   }
 
   /// Return true if F's name (raw or demangled) contains `targetName
@@ -285,6 +287,7 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
     case VulnID::STACK_BASED_BUF_OVERFLOW: /* Stack-based buffer overflow */
     case VulnID::HEAP_BASED_BUF_OVERFLOW:  /* Heap-base buffer overflow */
     case VulnID::OOB_WRITE:                /* OOB Write */
+    case VulnID::OOB:
     case VulnID::WRITE_WHAT_WHERE:
       sanitizeMemInstBounds(&F, vuln.Strategy);
       result = PreservedAnalyses::none();
@@ -349,13 +352,6 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
 
     SanitizerMaps.clear();
 
-    if (writePatch) {
-      // reset patch file to 0 bytes
-      std::error_code EC;
-      raw_fd_ostream patchFile("resolve-patch.ll", EC);
-      patchFile.close();
-    }
-
     /// Precompute globals before instrumentation
     for (auto &F : M) {
       for (auto &vuln : vulns) {
@@ -386,6 +382,7 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
         break;
 
       // default instrument both
+      case VulnID::OOB:
       case VulnID::OOB_READ:
       case VulnID::OOB_WRITE:
       case VulnID::INCORRECT_BUF_SIZE:
@@ -435,24 +432,30 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
   }
 
   PreservedAnalyses run(Module &M, ModuleAnalysisManager &MAM) {
-    std::vector<Vulnerability> fileVulns;
-    std::vector<Vulnerability> inlineVulns;
+    std::vector<Vulnerability> patchVulns;
+    std::vector<Vulnerability> moduleVulns;
 
     for (auto &vuln : vulnerabilities) {
-      if (vuln.Output == Vulnerability::InstrumentationOutput::FILE) {
-        fileVulns.push_back(vuln);
+      if (vuln.Output == Vulnerability::RemediationOutput::PATCH) {
+        patchVulns.push_back(vuln);
       } else {
-        inlineVulns.push_back(vuln);
+        moduleVulns.push_back(vuln);
       }
     }
 
-    for (auto &vuln : fileVulns) {
+    if (!patchVulns.empty()) {
+      std::error_code EC;
+      raw_fd_ostream patchFile("resolve-patch.ll", EC);
+      patchFile.close();
+    }
+
+    for (auto &vuln : patchVulns) {
       auto patchModule = CloneModule(M);
       std::vector<Vulnerability> singleVuln = {vuln};
       runInstrumentationPipeline(*patchModule, MAM, singleVuln, true);
     }
 
-    return runInstrumentationPipeline(M, MAM, inlineVulns, false);
+    return runInstrumentationPipeline(M, MAM, moduleVulns, false);
   }
 
 };

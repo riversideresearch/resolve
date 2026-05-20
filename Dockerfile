@@ -68,6 +68,20 @@ COPY CMakeLists.txt /resolve/CMakeLists.txt
 WORKDIR /resolve/
 RUN PATH=$PATH:~/.cargo/bin make build-release install
 
+# Install toolchains
+RUN mkdir -p /opt/toolchain /opt/vcpkg-overlays/triplets
+COPY toolchains/resolve-toolchain.cmake /opt/toolchain/resolve-toolchain.cmake
+COPY toolchains/x64-linux-resolve.cmake /opt/vcpkg-overlays/triplets/x64-linux-resolve.cmake
+
+# Declare defaults for later stages (can be overridden)
+ONBUILD ARG TOOLCHAIN_FILE=/opt/toolchain/resolve-toolchain.cmake
+ONBUILD ARG TRIPLET=x64-linux-resolve
+ONBUILD ARG VCPKG_OVERLAY_TRIPLETS=/opt/vcpkg-overlays/triplets
+ONBUILD ENV TOOLCHAIN_FILE=${TOOLCHAIN_FILE}
+ONBUILD ENV TRIPLET=${TRIPLET}
+ONBUILD ENV VCPKG_OVERLAY_PORTS=${VCPKG_OVERLAY_PORTS}
+ONBUILD ENV VCPKG_OVERLAY_TRIPLETS=${VCPKG_OVERLAY_TRIPLETS}
+
 ENV CMAKE_EXPERIMENTAL_FIND_CPS_PACKAGES="e82e467b-f997-4464-8ace-b00808fff261"
 ENV CMAKE_EXPERIMENTAL_EXPORT_PACKAGE_INFO="b80be207-778e-46ba-8080-b23bba22639e" 
 ENV CMAKE_EXPERIMENTAL_GENERATE_SBOM="ca494ed3-b261-4205-a01f-603c95e4cae0"
@@ -84,6 +98,20 @@ FROM base AS resolve
 RUN --mount=from=cmake-builder,source=/build-cmake,target=/build-cmake,rw make -C /build-cmake install 
 COPY --from=builder /opt/resolve /opt/resolve
 COPY --from=git-version /RESOLVE_VERSION /RESOLVE_VERSION
+
+# Install toolchains
+RUN mkdir -p /opt/toolchain /opt/vcpkg-overlays/triplets
+COPY toolchains/resolve-toolchain.cmake /opt/toolchain/resolve-toolchain.cmake
+COPY toolchains/x64-linux-resolve.cmake /opt/vcpkg-overlays/triplets/x64-linux-resolve.cmake
+
+# Declare defaults for later stages (can be overridden)
+ONBUILD ARG TOOLCHAIN_FILE=/opt/toolchain/resolve-toolchain.cmake
+ONBUILD ARG TRIPLET=x64-linux-resolve
+ONBUILD ARG VCPKG_OVERLAY_TRIPLETS=/opt/vcpkg-overlays/triplets
+ONBUILD ENV TOOLCHAIN_FILE=${TOOLCHAIN_FILE}
+ONBUILD ENV TRIPLET=${TRIPLET}
+ONBUILD ENV VCPKG_OVERLAY_PORTS=${VCPKG_OVERLAY_PORTS}
+ONBUILD ENV VCPKG_OVERLAY_TRIPLETS=${VCPKG_OVERLAY_TRIPLETS}
 
 ENV CMAKE_EXPERIMENTAL_FIND_CPS_PACKAGES="e82e467b-f997-4464-8ace-b00808fff261"
 ENV CMAKE_EXPERIMENTAL_EXPORT_PACKAGE_INFO="b80be207-778e-46ba-8080-b23bba22639e" 

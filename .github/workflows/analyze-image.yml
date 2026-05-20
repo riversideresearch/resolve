@@ -1,0 +1,206 @@
+name: Build, Publish, and Test Analyze-Image Remediations
+
+on:
+  schedule:
+    # Monday, 0800 EST
+    - cron: '0 12 * * 1'
+  workflow_dispatch:
+    # Manual trigger
+
+permissions:
+  packages: write
+  contents: read
+
+jobs:
+  check_changes:
+    runs-on: ubuntu-latest
+    outputs:
+      should_build: ${{ steps.check.outputs.should_build }}
+    steps:
+      - name: Fetch History
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Fetch default branch
+        run: |
+          git fetch origin ${{ github.event.repository.default_branch }}
+          git checkout ${{ github.event.repository.default_branch }}
+
+      - name: Check for New Commits
+        id: check
+        run: |
+          COUNT=$(git rev-list --count --since="7 days ago" ${{ github.event.repository.default_branch }})
+          if [ "$COUNT" -gt 0 ]; then
+            echo "should_build=true" >> $GITHUB_OUTPUT
+          else
+            echo "should_build=false" >> $GITHUB_OUTPUT
+          fi
+          echo "$GITHUB_OUTPUT"
+
+  build:
+    needs: check_changes
+    if: needs.check_changes.outputs.should_build == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v1
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Checkout Resolve Docker Image
+        run: docker pull ghcr.io/${{ github.repository_owner }}/${{ github.repository }}:latest
+
+      - name: Checkout Resolve Builder Docker Image
+        run: docker pull ghcr.io/${{ github.repository_owner }}/resolve/resolve-builder:latest
+
+      - name: Re-tag docker images
+        run: |
+          docker tag ghcr.io/${{ github.repository_owner }}/${{ github.repository }}:latest resolve:latest
+          docker tag ghcr.io/${{ github.repository_owner }}/resolve/resolve-builder:latest resolve-builder:latest
+
+      - name: Checkout ebossproject/analyze-images-v2
+        uses: actions/checkout@v5
+        with:
+          repository: ebossproject/analyze-images-v2
+          path: .
+
+      - name: Checkout remediated build files
+        uses: actions/checkout@v5
+        with:
+          path: sparse
+          sparse-checkout: |
+            examples/eboss_eval/src/analyze-images/analyze-image-remediated.dockerfile
+            examples/eboss_eval/src/analyze-images/analyze-image-vulns.json
+          sparse-checkout-cone-mode: false
+
+      - name: Rename files for ease of integration
+        run: |
+          mv sparse/examples/eboss_eval/src/analyze-images/analyze-image-remediated.dockerfile Dockerfile
+          mv sparse/examples/eboss_eval/src/analyze-images/analyze-image-vulns.json vulnerabilities.json
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          push: true
+          tags: ghcr.io/${{ github.repository_owner }}/resolve/analyze-image/server-remediated:latest
+
+  run-reach:
+    # Should wait for latest version of remediation
+    needs: build
+    if: always() && !cancelled()
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/${{ github.repository_owner }}/resolve/analyze-image/server-remediated:latest
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Extract facts from fat binary
+        run: |
+          mkdir -p ./facts-dir/build &&
+          chmod -R 777 ./facts-dir &&
+          rm -f ./facts-dir/build/* &&
+          /opt/resolve/bin/extract_facts.py --in_bin "$CHALLENGE_BINARY" --out_dir ./facts-dir/build/
+
+      # Note to dev self: resolve-reach "-f" is always the facts FILE not the facts DIRECTORY
+      - name: Run reachability
+        run: |
+          /opt/resolve/bin/resolve-reach \
+            -i /challenge/vulnerabilities.json \
+            -o ./facts-dir/reach_out.json \
+            -f ./facts-dir/build/server.facts \
+            -r /opt/resolve/bin/reach
+          cat facts-dir/reach_out.json
+
+  run-povs:
+    # Should wait for latest version of remediation
+    needs: build
+    if: always() && !cancelled()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v1
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Note to dev self: double check required image names from compose file before committing
+      - name: Pull Images
+        run: |
+          docker pull ghcr.io/${{ github.repository_owner }}/resolve/analyze-image/server-remediated:latest &
+          docker pull ghcr.io/${{ github.repository_owner }}/resolve/analyze-image/pov:latest &
+          docker pull ghcr.io/${{ github.repository_owner }}/resolve/analyze-image/poller:latest &
+          wait
+          docker tag ghcr.io/${{ github.repository_owner }}/resolve/analyze-image/server-remediated:latest analyze-image/server:remediated
+          docker tag ghcr.io/${{ github.repository_owner }}/resolve/analyze-image/pov:latest analyze-image/pov:latest
+          docker tag ghcr.io/${{ github.repository_owner }}/resolve/analyze-image/poller:latest analyze-image/poller:latest
+
+      - name: Checkout docker compose
+        uses: actions/checkout@v5
+        with:
+          path: sparse
+          sparse-checkout: |
+            examples/eboss_eval/src/analyze-images/compose-analyze-image.yml
+          sparse-checkout-cone-mode: false
+
+      - name: Rename compose file
+        run: mv sparse/examples/eboss_eval/src/analyze-images/compose-analyze-image.yml ./docker-compose.yml
+
+      - name: Poller regression test
+        env:
+          # This env var used in compose-analyze-image.yml
+          AICP_SERVER: "server-remediated"
+        continue-on-error: true
+        run: |
+          docker compose up --abort-on-container-exit server-remediated poller || echo $? > poller_exit.txt
+          [ -f poller_exit.txt ] || echo "0" > poller_exit.txt
+          exit $(cat poller_exit.txt)
+
+      - name: POV 1
+        continue-on-error: true
+        run: |
+          docker compose up --abort-on-container-exit server-remediated pov1 || echo $? > pov1_exit.txt
+          [ -f pov1_exit.txt ] || echo "0" > pov1_exit.txt
+          exit $(cat pov1_exit.txt)
+
+      - name: POV 2
+        continue-on-error: true
+        run: |
+          docker compose up --abort-on-container-exit server-remediated pov2 || echo $? > pov2_exit.txt
+          [ -f pov2_exit.txt ] || echo "0" > pov2_exit.txt
+          exit $(cat pov2_exit.txt)
+
+      - name: POV 3
+        continue-on-error: true
+        run: |
+          docker compose up --abort-on-container-exit server-remediated pov3 || echo $? > pov3_exit.txt
+          [ -f pov3_exit.txt ] || echo "0" > pov3_exit.txt
+          exit $(cat pov3_exit.txt)
+
+      - name: Aggregate results
+        run: |
+          failures=0
+
+          for file in $(ls *_exit.txt); do
+            test_name="${file%_exit.txt}"
+            exit_code=$(cat "$file")
+
+            if [ "$exit_code" -eq 0 ]; then
+              echo "$test_name result: PASSED"
+            else
+              echo "$test_name result: FAILED"
+              failures=$((failures+1))
+            fi
+          done
+
+          if [ "$failures" -gt 0 ]; then
+            echo "$failures test(s) failed"
+            exit 1
+          fi
+
+          echo "All tests passed."
