@@ -6,8 +6,10 @@
 #pragma once
 #include "Vulnerability.hpp"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/GlobalVariable.h"
+#include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Type.h"
 
@@ -32,3 +34,6 @@ void recordPatchGlobal(llvm::GlobalVariable *G);
 void endPatchRecordingAndWrite(llvm::Function *F);
 
 llvm::Function *getOrCreateSanitizerMapEntry(llvm::Module *M);
+void createSanitizerGateBranch(llvm::IRBuilder<> &Builder, llvm::Function *F,
+                               uint64_t Index, llvm::BasicBlock *DisabledBB,
+                               llvm::BasicBlock *EnabledBB);

@@ -42,6 +42,14 @@ using namespace llvm;
 bool CVE_ASSERT_DEBUG;
 DenseMap<Function *, GlobalVariable *> SanitizerMaps;
 
+GlobalVariable *getSanitizerMap(Function *F) {
+  auto It = SanitizerMaps.find(F);
+  if (It == SanitizerMaps.end()) {
+    return nullptr;
+  }
+  return It->second;
+}
+
 GlobalVariable *initSanitizerMap(Function &F) {
   Module *M = F.getParent();
   LLVMContext &Ctx = M->getContext();
@@ -108,8 +116,6 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
     std::string handlerName = "__cve_san_nonheap_free";
     Module *M = F->getParent();
     LLVMContext &Ctx = M->getContext();
-    GlobalVariable *map = SanitizerMaps[F];
-    recordPatchGlobal(map);
 
     IRBuilder<> builder(Ctx);
     // TODO: handle address spaces other than 0
@@ -140,13 +146,7 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
     builder.SetInsertPoint(EntryBB);
     Argument *inputPtr = resolveFreeNonHeapFn->getArg(0);
 
-    Value *mapPtr = builder.CreateGEP(
-        map->getValueType(), map, {builder.getInt64(0), builder.getInt64(0)});
-    Value *mapEntry =
-        builder.CreateCall(getOrCreateSanitizerMapEntry(M),
-                           {mapPtr, ConstantInt::get(usize_ty, 2)});
-    Value *isZero = builder.CreateICmpEQ(mapEntry, ConstantInt::get(i1_ty, 0));
-    builder.CreateCondBr(isZero, FreeHeapBB, CheckOnHeapBB);
+    createSanitizerGateBranch(builder, F, 2, FreeHeapBB, CheckOnHeapBB);
 
     // Call Is Heap Func
     // Branch if True
@@ -358,7 +358,7 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
         if (F.isDeclaration())
           continue;
 
-        if (shouldInstrument(F, vuln)) {
+        if (vuln.Gated && shouldInstrument(F, vuln)) {
           SanitizerMaps[&F] = initSanitizerMap(F);
         }
       }
@@ -457,7 +457,6 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
 
     return runInstrumentationPipeline(M, MAM, moduleVulns, false);
   }
-
 };
 
 } // end anonymous namespace

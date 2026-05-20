@@ -21,11 +21,11 @@
 #include "Vulnerability.hpp"
 #include "helpers.hpp"
 
+#include <algorithm>
 #include <cctype>
 #include <iomanip>
-#include <sstream>
-#include <algorithm>
 #include <set>
+#include <sstream>
 #include <vector>
 
 using namespace llvm;
@@ -149,7 +149,8 @@ static std::string renderPatchModule(Module &SourceModule, Function *Target) {
     }
 
     for (const std::string &Name : GlobalDefs) {
-      auto *G = dyn_cast_or_null<GlobalVariable>(PatchModule->getNamedValue(Name));
+      auto *G =
+          dyn_cast_or_null<GlobalVariable>(PatchModule->getNamedValue(Name));
       size_t OldSize = ReferencedGlobals.size();
       collectReferencedGlobalsFromGlobal(G, ReferencedGlobals);
       Changed |= ReferencedGlobals.size() != OldSize;
@@ -282,15 +283,19 @@ void beginPatchRecording(void) {
 }
 
 void recordPatchFunction(Function *F) {
-  if (!patchRecording) return;
-  if (std::find(patchHelpers.begin(), patchHelpers.end(), F) == patchHelpers.end()) {
+  if (!patchRecording)
+    return;
+  if (std::find(patchHelpers.begin(), patchHelpers.end(), F) ==
+      patchHelpers.end()) {
     patchHelpers.push_back(F);
   }
 }
 
 void recordPatchGlobal(GlobalVariable *G) {
-  if (!patchRecording) return;
-  if (std::find(patchGlobals.begin(), patchGlobals.end(), G) == patchGlobals.end()) {
+  if (!patchRecording)
+    return;
+  if (std::find(patchGlobals.begin(), patchGlobals.end(), G) ==
+      patchGlobals.end()) {
     patchGlobals.push_back(G);
   }
 }
@@ -300,15 +305,37 @@ void endPatchRecordingAndWrite(Function *F) {
 
   raw_ostream &out = errs();
   std::error_code EC;
-  llvm::raw_fd_ostream patchFile("resolve-patch.ll", EC, llvm::sys::fs::OF_Append);
-  if(!EC) {
+  llvm::raw_fd_ostream patchFile("resolve-patch.ll", EC,
+                                 llvm::sys::fs::OF_Append);
+  if (!EC) {
     patchFile << renderPatchModule(*F->getParent(), F);
     patchFile.close();
     out << "[CVEAssert] Wrote to patch file (resolve-patch.ll).\n";
-  }
-  else {
+  } else {
     out << "[CVEAssert] Error: COULD NOT OPEN PATCH FILE.\n";
   }
+}
+
+void createSanitizerGateBranch(IRBuilder<> &Builder, Function *F,
+                               uint64_t Index, BasicBlock *DisabledBB,
+                               BasicBlock *EnabledBB) {
+  if (GlobalVariable *Map = getSanitizerMap(F)) {
+    recordPatchGlobal(Map);
+    LLVMContext &Ctx = F->getContext();
+    auto i1Ty = Type::getInt1Ty(Ctx);
+    auto usizeTy = Type::getInt64Ty(Ctx);
+    Value *Zero = Builder.getInt64(0);
+    Value *MapPtr = Builder.CreateGEP(Map->getValueType(), Map, {Zero, Zero});
+    Value *MapEntry =
+        Builder.CreateCall(getOrCreateSanitizerMapEntry(F->getParent()),
+                           {MapPtr, ConstantInt::get(usizeTy, Index)});
+    Value *IsDisabled =
+        Builder.CreateICmpEQ(MapEntry, ConstantInt::get(i1Ty, 0));
+    Builder.CreateCondBr(IsDisabled, DisabledBB, EnabledBB);
+    return;
+  }
+
+  Builder.CreateBr(EnabledBB);
 }
 
 Function *getOrCreateSanitizerMapEntry(Module *M) {

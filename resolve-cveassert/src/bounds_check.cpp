@@ -113,8 +113,6 @@ static Function *getOrCreateBoundsCheckLoadSanitizer(
   std::string handlerName = "__cve_bound_ld_" + getLLVMType(ty);
   Module *M = F->getParent();
   LLVMContext &Ctx = M->getContext();
-  GlobalVariable *map = SanitizerMaps[F];
-  recordPatchGlobal(map);
 
   IRBuilder<> builder(Ctx);
 
@@ -141,13 +139,7 @@ static Function *getOrCreateBoundsCheckLoadSanitizer(
 
   builder.SetInsertPoint(EntryBB);
   Value *basePtr = resolveLoadFn->getArg(0);
-  Value *mapPtr = builder.CreateGEP(map->getValueType(), map,
-                                    {builder.getInt64(0), builder.getInt64(0)});
-
-  Value *mapEntry = builder.CreateCall(getOrCreateSanitizerMapEntry(M),
-                                       {mapPtr, ConstantInt::get(usize_ty, 0)});
-  Value *isZero = builder.CreateICmpEQ(mapEntry, ConstantInt::get(i1_ty, 0));
-  builder.CreateCondBr(isZero, NormalLoadBB, CheckAccessBB);
+  createSanitizerGateBranch(builder, F, 0, NormalLoadBB, CheckAccessBB);
 
   builder.SetInsertPoint(CheckAccessBB);
   Value *withinBounds = builder.CreateCall(
@@ -180,8 +172,6 @@ static Function *getOrCreateBoundsCheckStoreSanitizer(
   std::string handlerName = "__cve_bound_st_" + getLLVMType(ty);
   Module *M = F->getParent();
   LLVMContext &Ctx = M->getContext();
-  GlobalVariable *map = SanitizerMaps[F];
-  recordPatchGlobal(map);
 
   IRBuilder<> builder(Ctx);
 
@@ -213,13 +203,7 @@ static Function *getOrCreateBoundsCheckStoreSanitizer(
   Value *basePtr = resolveStoreFn->getArg(0);
   Value *storedVal = resolveStoreFn->getArg(1);
 
-  Value *mapPtr = builder.CreateGEP(map->getValueType(), map,
-                                    {builder.getInt64(0), builder.getInt64(0)});
-
-  Value *mapEntry = builder.CreateCall(getOrCreateSanitizerMapEntry(M),
-                                       {mapPtr, ConstantInt::get(usize_ty, 0)});
-  Value *isZero = builder.CreateICmpEQ(mapEntry, ConstantInt::get(i1_ty, 0));
-  builder.CreateCondBr(isZero, NormalStoreBB, CheckAccessBB);
+  createSanitizerGateBranch(builder, F, 0, NormalStoreBB, CheckAccessBB);
 
   builder.SetInsertPoint(CheckAccessBB);
   Value *withinBounds = builder.CreateCall(
@@ -251,8 +235,6 @@ static Function *getOrCreateBoundsCheckMemcpySanitizer(
   std::string handlerName = "__cve_memcpy";
   Module *M = F->getParent();
   LLVMContext &Ctx = M->getContext();
-  GlobalVariable *map = SanitizerMaps[F];
-  recordPatchGlobal(map);
 
   IRBuilder<> builder(Ctx);
 
@@ -284,12 +266,7 @@ static Function *getOrCreateBoundsCheckMemcpySanitizer(
   Value *srcPtr = resolveMemmoveFn->getArg(1);
   Value *sizeArg = resolveMemmoveFn->getArg(2);
 
-  Value *mapPtr = builder.CreateGEP(map->getValueType(), map,
-                                    {builder.getInt64(0), builder.getInt64(0)});
-  Value *mapEntry = builder.CreateCall(getOrCreateSanitizerMapEntry(M),
-                                       {mapPtr, ConstantInt::get(size_ty, 0)});
-  Value *isZero = builder.CreateICmpEQ(mapEntry, ConstantInt::get(i1_ty, 0));
-  builder.CreateCondBr(isZero, NormalBB, CheckAccessBB);
+  createSanitizerGateBranch(builder, F, 0, NormalBB, CheckAccessBB);
 
   builder.SetInsertPoint(CheckAccessBB);
   Value *check_src_access =
@@ -326,8 +303,6 @@ static Function *getOrCreateBoundsCheckMemmoveSanitizer(
   std::string handlerName = "__cve_memmove";
   Module *M = F->getParent();
   LLVMContext &Ctx = M->getContext();
-  GlobalVariable *map = SanitizerMaps[F];
-  recordPatchGlobal(map);
 
   IRBuilder<> builder(Ctx);
 
@@ -359,12 +334,7 @@ static Function *getOrCreateBoundsCheckMemmoveSanitizer(
   Value *srcPtr = resolveMemmoveFn->getArg(1);
   Value *sizeArg = resolveMemmoveFn->getArg(2);
 
-  Value *mapPtr = builder.CreateGEP(map->getValueType(), map,
-                                    {builder.getInt64(0), builder.getInt64(0)});
-  Value *mapEntry = builder.CreateCall(getOrCreateSanitizerMapEntry(M),
-                                       {mapPtr, ConstantInt::get(size_ty, 0)});
-  Value *isZero = builder.CreateICmpEQ(mapEntry, ConstantInt::get(i1_ty, 0));
-  builder.CreateCondBr(isZero, NormalBB, CheckAccessBB);
+  createSanitizerGateBranch(builder, F, 0, NormalBB, CheckAccessBB);
 
   builder.SetInsertPoint(CheckAccessBB);
   Value *check_src_access =
@@ -402,8 +372,6 @@ static Function *getOrCreateBoundsCheckMemsetSanitizer(
   std::string handlerName = "__cve_memset";
   Module *M = F->getParent();
   LLVMContext &Ctx = M->getContext();
-  GlobalVariable *map = SanitizerMaps[F];
-  recordPatchGlobal(map);
 
   IRBuilder<> builder(Ctx);
 
@@ -436,12 +404,7 @@ static Function *getOrCreateBoundsCheckMemsetSanitizer(
   Value *valueArg = resolveMemsetFn->getArg(1);
   Value *accessSize = resolveMemsetFn->getArg(2);
 
-  Value *mapPtr = builder.CreateGEP(map->getValueType(), map,
-                                    {builder.getInt64(0), builder.getInt64(0)});
-  Value *mapEntry = builder.CreateCall(getOrCreateSanitizerMapEntry(M),
-                                       {mapPtr, ConstantInt::get(size_ty, 0)});
-  Value *isZero = builder.CreateICmpEQ(mapEntry, ConstantInt::get(i1_ty, 0));
-  builder.CreateCondBr(isZero, NormalBB, CheckAccessBB);
+  createSanitizerGateBranch(builder, F, 0, NormalBB, CheckAccessBB);
 
   builder.SetInsertPoint(CheckAccessBB);
   Value *check_dst_access =
@@ -476,8 +439,6 @@ static Function *getOrCreateResolveGep(Function *F) {
   std::string handlerName = "__cve_gep";
   Module *M = F->getParent();
   LLVMContext &Ctx = M->getContext();
-  GlobalVariable *map = SanitizerMaps[F];
-  recordPatchGlobal(map);
 
   IRBuilder<> builder(Ctx);
 
@@ -512,13 +473,7 @@ static Function *getOrCreateResolveGep(Function *F) {
   // Extract the base and derived pointer
   Value *basePtr = resolveGepFn->getArg(0);
   Value *derivedPtr = resolveGepFn->getArg(1);
-  Value *mapPtr = builder.CreateGEP(map->getValueType(), map,
-                                    {builder.getInt64(0), builder.getInt64(0)});
-
-  Value *mapEntry = builder.CreateCall(getOrCreateSanitizerMapEntry(M),
-                                       {mapPtr, ConstantInt::get(size_ty, 0)});
-  Value *isZero = builder.CreateICmpEQ(mapEntry, ConstantInt::get(i1_ty, 0));
-  builder.CreateCondBr(isZero, NormalBB, GetBaseAndLimitBB);
+  createSanitizerGateBranch(builder, F, 0, NormalBB, GetBaseAndLimitBB);
 
   builder.SetInsertPoint(GetBaseAndLimitBB);
   Value *baseAndLimit =

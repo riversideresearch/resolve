@@ -78,8 +78,9 @@ def parse_cve_description(json_path: Path) -> list[CweTarget]:
             raise ValueError("[ERROR] No vulnerabilities found.")
 
         for vuln in json_obj["vulnerabilities"]:
-            output = vuln.get("output", "toggle")
-            if output not in ("toggle", "sanitizer-toggle"):
+            output = vuln.get("output", "inline")
+            gated = vuln.get("gated", True)
+            if not gated:
                 continue
             cwe_id = vuln["cwe-id"]
             function_name = vuln["affected-function"]
