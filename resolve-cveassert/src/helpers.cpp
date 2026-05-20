@@ -112,9 +112,15 @@ static std::string renderPatchModule(Module &SourceModule, Function *Target) {
   std::set<std::string> FunctionDefs;
   std::set<std::string> GlobalDefs;
   std::set<std::string> ReferencedGlobals;
+  std::string TargetIRName;
+  std::string TargetDefinitionNeedle;
 
   if (Target && Target->hasName()) {
     FunctionDefs.insert(Target->getName().str());
+    raw_string_ostream TargetNameOS(TargetIRName);
+    Target->printAsOperand(TargetNameOS, false);
+    TargetNameOS.flush();
+    TargetDefinitionNeedle = TargetIRName + "(";
   }
 
   for (Function *Helper : patchHelpers) {
@@ -246,6 +252,7 @@ static std::string renderPatchModule(Module &SourceModule, Function *Target) {
 
   std::string FilteredIR;
   raw_string_ostream FilteredOS(FilteredIR);
+  bool ReplacementMarkerEmitted = false;
   SmallVector<StringRef, 128> Lines;
   StringRef(IR).split(Lines, '\n');
   for (StringRef Line : Lines) {
@@ -254,6 +261,12 @@ static std::string renderPatchModule(Module &SourceModule, Function *Target) {
         Line.starts_with("target datalayout =") ||
         Line.starts_with("target triple =")) {
       continue;
+    }
+
+    if (!ReplacementMarkerEmitted && !TargetIRName.empty() &&
+        Line.starts_with("define ") && Line.contains(TargetDefinitionNeedle)) {
+      FilteredOS << "; resolve.patch.replace\n";
+      ReplacementMarkerEmitted = true;
     }
 
     FilteredOS << Line << "\n";
