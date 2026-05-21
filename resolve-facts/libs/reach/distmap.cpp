@@ -19,9 +19,13 @@ distmap::gen(const reach_facts::database &db, const NNodeId &dst, bool dynlink,
              const optional<vector<dlsym::loaded_symbol>> &loaded_syms) {
   const auto g = graph::build_instr_cfg(db, dynlink, loaded_syms);
 
-  if (!g.edges.contains(dst)) {
+  if (!db.node_type.contains(dst)) {
     throw runtime_error("distmap::gen: node not found");
   }
+  if (db.node_type.at(dst) != resolve_facts::NodeType::Function) {
+    throw runtime_error("distmap::gen: node is not a function");
+  }
+
   auto distmap = search::min_distances(g.edges, dst);
 
   // Add zero-distance entries for all BBs contained within the

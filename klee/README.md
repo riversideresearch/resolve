@@ -15,7 +15,7 @@ KLEE Symbolic Virtual Machine
 ## Directed KLEE via static instruction-level CFG reachability
 
 - [tools/klee/main.cpp](./tools/klee/main.cpp)
-  + uses EnhancedFacts from RESOLVE llvm-plugin to generate facts from the LLVM modules under test and passes them to [reachlib](../reach/lib) to generate an instruction blacklist for pruning (see `KleeHandler::buildDistMapAndBlackList`)
+  + uses EnhancedFacts from RESOLVE llvm-plugin to generate facts from the LLVM modules under test and passes them to [reachlib](../reach/lib) to compute a distance map of instructions that can reach the target function (see `KleeHandler::buildDistMapAndBlackList`)
 - [lib/core/Executor.cpp](./lib/Core/Executor.cpp)
   + pruning of states from which the target function isn't reachable (see `Executor::transferToBasicBlock`)
   + when concretizing symbolic size argument to malloc, create additional fork with size=0 (see `Executor::executeAlloc`)
@@ -61,6 +61,32 @@ The directory to link to was found by running:
 ```bash
 find /usr/include -name "param.h" | grep asm
 ```
+
+### Run directed KLEE
+
+```bash
+build/bin/klee --target=<function-name> [normal KLEE options] prog.bc [args...]
+```
+
+`--target` takes a function name only. It does not currently support
+`file:function` or a separate source-file qualifier.
+
+Example:
+
+```bash
+build/bin/klee \
+  --target=parse_request \
+  --only-output-states-covering-new \
+  --libc=uclibc \
+  -posix-runtime \
+  prog.bc arg1 arg2
+```
+
+Notes:
+
+- Matching is by suffix of the LLVM function name.
+- If multiple functions match, KLEE warns and picks one match.
+- If no function matches, KLEE warns and runs without directed pruning.
 
 ## Modifications in klee-uclibc
 
