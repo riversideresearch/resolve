@@ -24,10 +24,11 @@ include(FetchContent)
 FetchContent_Declare(
   glaze
   GIT_REPOSITORY https://github.com/stephenberry/glaze.git
-  GIT_TAG main
+  GIT_TAG 94222ecb0de39c5e6c83e708f0825ecb6aeae11f
   GIT_SHALLOW TRUE
 )
 
+set(glaze_INSTALL ON CACHE BOOL "Generate installation rules for glaze" FORCE)
 FetchContent_MakeAvailable(glaze)
 
 # Collect source files for checks
