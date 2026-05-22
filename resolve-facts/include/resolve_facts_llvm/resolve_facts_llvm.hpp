@@ -30,8 +30,8 @@
 using namespace llvm;
 
 namespace resolve {
-static ProgramFacts all_facts;
-static LLVMFacts facts(all_facts);
+extern ProgramFacts all_facts;
+extern LLVMFacts facts;
 
 std::string debugLocToString(DebugLoc dbgLoc);
 

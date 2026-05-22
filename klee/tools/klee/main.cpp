@@ -688,7 +688,7 @@ std::optional<NNodeId> findMatchingFunctionNodeId(const reach_facts::database &d
     return {};
   }
   if (matches.size() > 1) {
-    klee_warning("multiple matches for function name %s:", functionName);
+    klee_warning("multiple matches for function name %s:", functionName.c_str());
     // for (const auto &node_id : matches) {
     //   std::cout << node_id << std::endl;
     // }
@@ -721,7 +721,7 @@ bool KleeHandler::buildDistMapAndBlackList
   // Map target name to node ID
   const auto targetNodeId_opt = findMatchingFunctionNodeId(db, targetFunctionName);
   if (!targetNodeId_opt.has_value()) {
-    klee_warning("no matching node ID for target function %s", targetFunctionName);
+    klee_warning("no matching node ID for target function %s", targetFunctionName.c_str());
     return false;
   }
   const auto targetNodeId = targetNodeId_opt.value();

@@ -25,3 +25,5 @@ reach_wrap_output.json
 \#*\#
 .\#*
 
+# Environment variables
+.env
