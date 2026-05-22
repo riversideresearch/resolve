@@ -278,6 +278,10 @@ resolve_facts::NodeMap<size_t> search::min_distances(const graph::E &g,
 
     const auto d = dist.at(u);
 
+    if (!g.contains(u)) {
+      continue;
+    }
+
     for (const auto &e : g.at(u)) {
       if (!dist.contains(e.node)) {
         dist.emplace(e.node, d + 1.0);

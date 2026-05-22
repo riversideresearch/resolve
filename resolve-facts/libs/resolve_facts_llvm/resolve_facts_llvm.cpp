@@ -19,6 +19,9 @@ using Linkage = resolve_facts::Linkage;
 using CallType = resolve_facts::CallType;
 using EdgeKind = resolve_facts::EdgeKind;
 
+ProgramFacts resolve::all_facts;
+LLVMFacts resolve::facts(resolve::all_facts);
+
 std::string resolve::debugLocToString(DebugLoc dbgLoc) {
   auto line = std::to_string(dbgLoc.getLine());
   auto col = std::to_string(dbgLoc.getCol());
