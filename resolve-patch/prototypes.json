@@ -1,0 +1,14 @@
+{
+  "printf": "int printf(const char *format, ...);",
+  "puts": "int puts(const char *s);",
+  "exit": "void exit(int status);",
+  "malloc": "void *malloc(unsigned long size);",
+  "free": "void free(void *ptr);",
+  "memcpy": "void *memcpy(void *dest, const void *src, unsigned long n);",
+  "strlen": "unsigned long strlen(const char *s);",
+  "main": "int main(int argc, char *argv[]);",
+  "_exit": "void _exit(int status);",
+  "__resolve_malloc": "void *__resolve_malloc(unsigned long size);",
+  "__resolve_free": "void __resolve_free(void *ptr);",
+  "__resolve_get_bounds": "struct __resolve_bounds { void *base; void *limit; };\nstruct __resolve_bounds __resolve_get_bounds(void *ptr);"
+}
