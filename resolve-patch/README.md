@@ -33,4 +33,18 @@ llvm-mctoll cannot lift the following:
 - Windows/OSX binaries
 - some C++ patterns (unclear)
 
+llvm-mctoll requires prototypes for external/libc symbols to be passed to it with `-I` when lifting. Currently we must create this by hand, but I'm planning to introduce an automated tool. See `samples/mctoll-prototypes.h`.
+
 See [llvm-mctoll current status](https://github.com/microsoft/llvm-mctoll/tree/master#current-status) for more information.
+
+## patcher semantics
+
+`patcher.py` is a text-based tool that tries to merge the resolve patch `.ll` with the mctoll dissassembled `.ll`.
+While this produces `.ll` that can be recompiled without the need for CVEAssert, it also must try to reconcile semantics between each module, such as comdat, attributes, and metadata.
+
+The current patcher must strip metadata annotations like `!dbg` and `!llvm.loop` patch functions before insertion.
+It also treats top-level comdat declarations as merge items, tracking which ones already exist and append missing ones from the patch module.
+
+Remaining edge cases include duplicate comdat names with different meanings, C++ templates/inline/vtables/RTTI creating many comdats, and attributes/linkage/visibility choices that are valid in resolve IR but awkward in the lifted IR.
+
+<small>(these samples were produced by Codex 5.5 High, then hand-edited and verified)</small>

@@ -1,0 +1,17 @@
+{
+  "vulnerabilities": [
+    {
+      "cve-id": "CVE-resolve-sample-cpp-null-ptr",
+      "cve-description": "Resolve patch sample for null ptr.",
+      "package-name": "resolve-samples",
+      "package-version": "0.0.1",
+      "cwe-id": "476",
+      "cwe-name": "Null Pointer Dereference",
+      "affected-file": "main.cpp",
+      "affected-function": "Widget::refresh",
+      "remediation-strategy": "continue",
+      "output": "patch",
+      "gated": false
+    }
+  ]
+}

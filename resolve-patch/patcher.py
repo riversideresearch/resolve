@@ -11,7 +11,9 @@ SYMBOL = r'[-a-zA-Z$._][-a-zA-Z$._0-9]*'
 FUNC_RE = re.compile(rf'^\s*define\b.*@(?P<name>{SYMBOL})\s*\(')
 DECLARE_RE = re.compile(rf'^\s*declare\b.*@(?P<name>{SYMBOL})\s*\(')
 GLOBAL_RE = re.compile(rf'^\s*@(?P<name>{SYMBOL})\s*=')
+COMDAT_RE = re.compile(rf'^\s*\$(?P<name>{SYMBOL})\s*=\s*comdat\b')
 PATCH_MARKER_RE = re.compile(r'^\s*;\s*resolve\.patch\.replace\s*$')
+NONSEMANTIC_METADATA_REF_RE = re.compile(r',\s*!(?:dbg|llvm\.loop)\s*!\d+')
 
 
 @dataclass
@@ -69,6 +71,16 @@ def parse_ir(text: str) -> list[Item]:
             replace_next_func = False
             continue
 
+        m = COMDAT_RE.match(line)
+        if m:
+            if pending:
+                items.append(Item("text", None, "".join(pending)))
+                pending.clear()
+
+            items.append(Item("comdat", m.group("name"), line))
+            i += 1
+            continue
+
         m = DECLARE_RE.match(line)
         if m:
             if pending:
@@ -106,6 +118,14 @@ def strip_patch_marker(text: str) -> str:
     )
 
 
+def normalize_patch_text(text: str) -> str:
+    # Debug and loop metadata are nonsemantic for replacement patches. The
+    # patch module can legally reference metadata nodes that are not present in
+    # mctoll-raised input IR, so remove those references during merge instead
+    # of emitting invalid IR.
+    return NONSEMANTIC_METADATA_REF_RE.sub("", strip_patch_marker(text))
+
+
 def merge(input_ir: str, patch_ir: str) -> str:
     input_items = parse_ir(input_ir)
     patch_items = parse_ir(patch_ir)
@@ -135,12 +155,13 @@ def merge(input_ir: str, patch_ir: str) -> str:
     emitted_funcs = set()
     emitted_decls = set()
     emitted_globals = set()
+    emitted_comdats = set()
 
     out: list[str] = []
 
     for item in input_items:
         if item.kind == "func" and item.name in replacements:
-            out.append(strip_patch_marker(replacements[item.name].text))
+            out.append(normalize_patch_text(replacements[item.name].text))
             emitted_funcs.add(item.name)
             continue
 
@@ -152,6 +173,8 @@ def merge(input_ir: str, patch_ir: str) -> str:
             emitted_decls.add(item.name)
         elif item.kind == "global" and item.name:
             emitted_globals.add(item.name)
+        elif item.kind == "comdat" and item.name:
+            emitted_comdats.add(item.name)
 
     # Append patch helpers/globals/declarations.
     for item in patch_items:
@@ -162,7 +185,12 @@ def merge(input_ir: str, patch_ir: str) -> str:
             # Skip patch module headers/comments/preamble.
             continue
 
-        if item.kind == "func":
+        if item.kind == "comdat":
+            if item.name in emitted_comdats:
+                continue
+            emitted_comdats.add(item.name)
+
+        elif item.kind == "func":
             if item.name in emitted_funcs:
                 continue
             emitted_funcs.add(item.name)
@@ -180,7 +208,7 @@ def merge(input_ir: str, patch_ir: str) -> str:
         if out and not out[-1].endswith("\n\n"):
             out.append("\n")
 
-        out.append(strip_patch_marker(item.text))
+        out.append(normalize_patch_text(item.text) if item.kind == "func" else strip_patch_marker(item.text))
 
     return "".join(out)
 

@@ -1,0 +1,17 @@
+{
+  "vulnerabilities": [
+    {
+      "cve-id": "CVE-resolve-sample-cpp-stack-oob",
+      "cve-description": "Resolve patch sample for stack oob.",
+      "package-name": "resolve-samples",
+      "package-version": "0.0.1",
+      "cwe-id": "121",
+      "cwe-name": "Stack-based Buffer Overflow",
+      "affected-file": "main.cpp",
+      "affected-function": "StackWindow::copy",
+      "remediation-strategy": "continue",
+      "output": "patch",
+      "gated": false
+    }
+  ]
+}

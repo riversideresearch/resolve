@@ -1,0 +1,17 @@
+{
+  "vulnerabilities": [
+    {
+      "cve-id": "CVE-resolve-sample-c-heap-oob",
+      "cve-description": "Resolve patch sample for heap oob.",
+      "package-name": "resolve-samples",
+      "package-version": "0.0.1",
+      "cwe-id": "122",
+      "cwe-name": "Heap-based Buffer Overflow",
+      "affected-file": "main.c",
+      "affected-function": "decode_packet",
+      "remediation-strategy": "continue",
+      "output": "patch",
+      "gated": false
+    }
+  ]
+}

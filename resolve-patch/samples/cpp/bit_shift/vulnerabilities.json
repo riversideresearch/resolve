@@ -1,0 +1,17 @@
+{
+  "vulnerabilities": [
+    {
+      "cve-id": "CVE-resolve-sample-cpp-bit-shift",
+      "cve-description": "Resolve patch sample for bit shift.",
+      "package-name": "resolve-samples",
+      "package-version": "0.0.1",
+      "cwe-id": "1335",
+      "cwe-name": "Incorrect Bitwise Shift",
+      "affected-file": "main.cpp",
+      "affected-function": "FlagEncoder::encode",
+      "remediation-strategy": "exit",
+      "output": "patch",
+      "gated": false
+    }
+  ]
+}

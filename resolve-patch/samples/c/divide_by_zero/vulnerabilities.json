@@ -1,0 +1,17 @@
+{
+  "vulnerabilities": [
+    {
+      "cve-id": "CVE-resolve-sample-c-divide-by-zero",
+      "cve-description": "Resolve patch sample for divide by zero.",
+      "package-name": "resolve-samples",
+      "package-version": "0.0.1",
+      "cwe-id": "369",
+      "cwe-name": "Divide By Zero",
+      "affected-file": "main.c",
+      "affected-function": "compute_ratio",
+      "remediation-strategy": "continue",
+      "output": "patch",
+      "gated": false
+    }
+  ]
+}

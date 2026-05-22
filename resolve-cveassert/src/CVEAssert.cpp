@@ -101,7 +101,8 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
     NULL_PTR_DEREF = 476, /* NOTE: This ID has been found in OpenALPR, NASA CFS,
                              stb-convert CPs */
     STACK_FREE =
-        590 /* NOTE: This ID has been found in NASA CFS challenge problem */
+        590, /* NOTE: This ID has been found in NASA CFS challenge problem */
+    INCORRECT_BITWISE_SHIFT = 1335 /* https://cwe.mitre.org/data/definitions/1335.html */
   };
 
   LabelCVEPass() {
@@ -321,6 +322,11 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
 
     case VulnID::STACK_FREE: /* Stack free;  Found in nasa-cfs */
       sanitizeFreeOfNonHeap(&F, vuln.Strategy);
+      result = PreservedAnalyses::none();
+      break;
+
+    case VulnID::INCORRECT_BITWISE_SHIFT:
+      sanitizeBitShift(&F, vuln.Strategy);
       result = PreservedAnalyses::none();
       break;
 

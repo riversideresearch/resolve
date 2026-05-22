@@ -1,0 +1,18 @@
+{
+  "vulnerabilities": [
+    {
+      "cve-id": "CVE-resolve-sample-cpp-operation-masking",
+      "cve-description": "Resolve patch sample for operation masking.",
+      "package-name": "resolve-samples",
+      "package-version": "0.0.1",
+      "cwe-id": "999",
+      "cwe-name": "Undesirable Operation",
+      "affected-file": "main.cpp",
+      "affected-function": "Policy::apply",
+      "undesirable-function": "mask_candidate",
+      "remediation-strategy": "continue",
+      "output": "patch",
+      "gated": false
+    }
+  ]
+}

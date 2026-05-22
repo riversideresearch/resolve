@@ -1,0 +1,17 @@
+{
+  "vulnerabilities": [
+    {
+      "cve-id": "CVE-resolve-sample-cpp-free-nonheap",
+      "cve-description": "Resolve patch sample for free nonheap.",
+      "package-name": "resolve-samples",
+      "package-version": "0.0.1",
+      "cwe-id": "590",
+      "cwe-name": "Free of Memory Not on the Heap",
+      "affected-file": "main.cpp",
+      "affected-function": "BufferOwner::bad_release",
+      "remediation-strategy": "continue",
+      "output": "patch",
+      "gated": false
+    }
+  ]
+}
