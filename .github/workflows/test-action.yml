@@ -1,0 +1,15 @@
+name: test resolve github action
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  test-action:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Run local setup-resolve action
+        uses: ./action/setup-resolve

@@ -1,0 +1,28 @@
+name: setup-resolve
+description: Install Resolve from this repository.
+
+runs:
+  using: composite
+  steps:
+    - name: Locate Resolve source tree
+      id: paths
+      shell: bash
+      run: |
+        set -euo pipefail
+        RESOLVE_REPO_ROOT="$(cd "${GITHUB_ACTION_PATH}/../.." && pwd)"
+        echo "repo_root=${RESOLVE_REPO_ROOT}" >> "$GITHUB_OUTPUT"
+
+    - name: Install Resolve
+      shell: bash
+      run: |
+        set -euo pipefail
+        cd ${{ steps.paths.outputs.repo_root }}
+
+        make install-deps
+
+        # Add Cargo bin install location to PATH
+        export PATH="$HOME/.cargo/bin:$PATH"
+        echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+
+        make build
+        make install
