@@ -3,7 +3,7 @@ name: test resolve github action
 on:
   workflow_dispatch:
   push:
-    branches: [ "main" ]
+    branches: [ "ci/resolve-action" ]
 
 jobs:
   test-action:
