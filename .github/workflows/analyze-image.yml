@@ -6,6 +6,9 @@ on:
     - cron: '0 12 * * 1'
   workflow_dispatch:
     # Manual trigger
+  push:
+    branches:
+      - fix/update-test-exit
 
 permissions:
   packages: write
@@ -171,7 +174,7 @@ jobs:
       - name: POV 2
         continue-on-error: true
         run: |
-          docker compose up --abort-on-container-exit server-remediated pov2 || echo $? > pov2_exit.txt
+          docker compose up --abort-on-container-exit server-remediated pov2 || if [ "$?" -ne 1 ]; then echo "$?" > pov2_exit.txt fi
           [ -f pov2_exit.txt ] || echo "0" > pov2_exit.txt
           exit $(cat pov2_exit.txt)
 
