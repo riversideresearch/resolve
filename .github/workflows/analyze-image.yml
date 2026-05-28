@@ -6,9 +6,6 @@ on:
     - cron: '0 12 * * 1'
   workflow_dispatch:
     # Manual trigger
-  push:
-    branches:
-      - fix/update-test-exit
 
 permissions:
   packages: write
