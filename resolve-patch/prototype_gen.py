@@ -1,7 +1,25 @@
+import json
 import argparse
 import subprocess
-import json
 from pathlib import Path
+
+
+UNDEFINED_SYMBOL_TYPES = {"U", "w", "v"}
+
+
+def parse_undefined_symbols(nm_output):
+    symbols = set()
+    for line in nm_output.splitlines():
+        fields = line.split()
+        if len(fields) < 2:
+            continue
+
+        symbol_type, symbol = fields[0], fields[1]
+        if symbol_type not in UNDEFINED_SYMBOL_TYPES:
+            continue
+
+        symbols.add(symbol.split("@")[0])
+    return sorted(symbols)
 
 parser = argparse.ArgumentParser(description="Resolve prototype generator")
 parser.add_argument("-i", "--input", help="Input binary", required=True)
@@ -23,11 +41,7 @@ with open(prototype_db, "r") as f:
 
         result = subprocess.run(["nm", "-D", "--undefined-only", args.input], stdout=subprocess.PIPE, text=True)
 
-        prototypes = sorted({
-            line.strip()[2:].split("@")[0]
-            for line in result.stdout.splitlines()
-            if line.strip().startswith("U")
-        })
+        prototypes = parse_undefined_symbols(result.stdout)
         binary_size = len(prototypes)
 
         for proto in prototypes:
