@@ -12,17 +12,19 @@ use log::{info, warn};
 #[repr(C)]
 struct ResolveInfo {
     page_id: u64,
-    block_size: usize,
+    block_index: usize,
     page_start: *mut c_void,
 }
 
 #[link(name = "mimalloc")]
-unsafe extern "C" { 
+unsafe extern "C" {
+    // Allocator API 
     fn mi_malloc(size: usize) -> *mut c_void;
     fn mi_calloc(size: usize, count: usize) -> *mut c_void;
     fn mi_realloc(ptr: *mut c_void, size: usize) -> *mut c_void;
     fn mi_free(ptr: *mut c_void);
-
+    
+    // Shim API
     fn mi_resolve_ptr(ptr: *mut c_void) -> ResolveInfo;
 }
 
@@ -411,9 +413,9 @@ mod tests {
     fn test_mi_malloc_page() {
         resolve_init();
         unsafe {
-            let ptr = __resolve_malloc(128);
+            let ptr = __resolve_malloc(0x10);
             let info = mi_resolve_ptr(ptr);
-            println!("ptr        = {:p}", p);
+            println!("ptr        = {:p}", ptr);
             println!("page_id    = {}", info.page_id);
             println!("block_idx  = {}", info.block_index);
             println!("page_start = {:p}", info.page_start);
