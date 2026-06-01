@@ -37,11 +37,7 @@ def print_unresolved_symbols(missing_symbols):
     print(f"Missing prototypes ({len(missing_symbols)}):")
     for symbol, raw_symbols in sorted(missing_symbols.items()):
         raw_symbol_list = ", ".join(sorted(raw_symbols))
-        print(f"  - {symbol} (from: {raw_symbol_list})")
-
-    print("\nAdd entries like the following to prototypes.json:")
-    for symbol in sorted(missing_symbols):
-        print(f"  \"{symbol}\": \"TODO: prototype for {symbol};\",")
+        print(f"    {symbol} (from: {raw_symbol_list})")
 
 parser = argparse.ArgumentParser(description="Resolve prototype generator")
 parser.add_argument("-i", "--input", help="Input binary", required=True)
