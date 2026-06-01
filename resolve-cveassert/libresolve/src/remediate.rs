@@ -11,20 +11,23 @@ use crate::shadowobjs::{
 };
 
 use log::{info, warn};
-use std::ffi::CStr;
 
+
+#[repr(C)]
+struct ResolveInfo {
+    page_id: u64,
+    block_size: usize,
+    page_start: *mut c_void,
+}
 
 #[link(name = "mimalloc")]
 unsafe extern "C" { 
     fn mi_malloc(size: usize) -> *mut c_void;
-}
+    fn mi_calloc(size: usize, count: usize) -> *mut c_void;
+    fn mi_realloc(ptr: *mut c_void, size: usize) -> *mut c_void;
+    fn mi_free(ptr: *mut c_void);
 
-#[unsafe(no_mangle)]
-pub extern "C" fn test_mi() {
-    unsafe {
-        let p = mi_malloc(16);
-        let _ = p;
-    }
+    fn mi_resolve_ptr(ptr: *mut c_void) -> ResolveInfo;
 }
 
 /**
@@ -79,7 +82,7 @@ pub extern "C" fn __resolve_invalidate_stack_range(ptr: *mut c_void, size: usize
  */
 #[unsafe(no_mangle)]
 pub extern "C" fn __resolve_malloc(size: usize) -> *mut c_void {
-    let ptr = unsafe { malloc(size + 1) };
+    let ptr = unsafe { mi_malloc(size + 1) };
 
     if ptr.is_null() {
         return ptr;
@@ -141,7 +144,7 @@ pub extern "C" fn __resolve_free(ptr: *mut c_void) -> () {
         freed_guard.add_shadow_object(AllocType::Unallocated, ptr as Vaddr, obj_size.unwrap_or(0));
     }
 
-    let _ = unsafe { free(ptr) };
+    let _ = unsafe { mi_free(ptr) };
 }
 
 /**
@@ -161,7 +164,7 @@ pub extern "C" fn __resolve_realloc(ptr: *mut c_void, size: usize) -> *mut c_voi
 
     // Consideration: Pointer passed in may be invalidated so we need a mechanism
     // to remove the shadow object for the orignal allocation
-    let realloc_ptr = unsafe { realloc(ptr, size + 1) };
+    let realloc_ptr = unsafe { mi_realloc(ptr, size + 1) };
 
     if realloc_ptr.is_null() {
         return realloc_ptr;
@@ -191,9 +194,9 @@ pub extern "C" fn __resolve_realloc(ptr: *mut c_void, size: usize) -> *mut c_voi
  *         requested size
  */
 #[unsafe(no_mangle)]
-pub extern "C" fn __resolve_calloc(nelems: usize, elsize: usize) -> *mut c_void {
-    let ptr = unsafe { calloc(nelems, elsize) };
-    let size = nelems * elsize;
+pub extern "C" fn __resolve_calloc(n_items: usize, item_size: usize) -> *mut c_void {
+    let ptr = unsafe { mi_calloc(n_items, item_size) };
+    let size = n_items * item_size;
 
     if ptr.is_null() {
         return ptr;
@@ -534,6 +537,20 @@ mod tests {
             let obj = table.search_intersection(ptr as Vaddr);
 
             assert!(obj.is_none());
+        }
+    }
+
+    #[test]
+    fn test_mi_malloc_page() {
+        resolve_init();
+        unsafe {
+            let ptr = __resolve_malloc(128);
+            let info = mi_resolve_ptr(ptr);
+            println!("ptr        = {:p}", p);
+            println!("page_id    = {}", info.page_id);
+            println!("block_idx  = {}", info.block_index);
+            println!("page_start = {:p}", info.page_start);
+            __resolve_free(ptr);
         }
     }
 }
