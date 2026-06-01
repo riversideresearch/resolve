@@ -8,6 +8,20 @@ use crate::shadowobjs::{ALIVE_OBJ_LIST, AllocType, FREED_OBJ_LIST, Vaddr};
 
 use log::{info, warn};
 
+
+#[link(name = "mimalloc")]
+unsafe extern "C" { 
+    fn mi_malloc(size: usize) -> *mut c_void;
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn test_mi() {
+    unsafe {
+        let p = mi_malloc(16);
+        let _ = p;
+    }
+}
+
 /**
  * @brief - Allocator interface for stack objects
  * @input - size of the pointer allocation in bytes
