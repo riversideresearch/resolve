@@ -63,19 +63,6 @@ COPY resolve-cli /resolve/resolve-cli
 COPY Makefile /resolve/Makefile
 COPY CMakeLists.txt /resolve/CMakeLists.txt
 
-# Build/Install mimalloc
-ARG MIMALLOC_REPO_URL="https://github.com/microsoft/mimalloc"
-ARG MIMALLOC_VERSION="v3.3.2"
-RUN git clone --depth 1 --branch "${MIMALLOC_VERSION}" "${MIMALLOC_REPO_URL}" \
-    && cd /mimalloc \
-    && mkdir -p build \
-    && cd build \
-    && cmake .. \ 
-        -DMI_BUILD_SHARED=OFF \
-        -DMI_BUILD_STATIC=ON \
-        -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
-    && make
-
 # Build
 WORKDIR /resolve/
 RUN PATH=$PATH:~/.cargo/bin make build-release install
