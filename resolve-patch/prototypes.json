@@ -184,6 +184,7 @@
   "timer_create": "int timer_create(int clockid, void *sevp, void **timerid);",
   "timer_delete": "int timer_delete(void *timerid);",
   "timer_settime": "struct itimerspec;\nint timer_settime(void *timerid, int flags, const struct itimerspec *new_value, struct itimerspec *old_value);",
+  "tolower": "int tolower(int c);",
   "toupper": "int toupper(int c);",
   "vsnprintf": "struct __va_list_tag;\nint vsnprintf(char *str, unsigned long size, const char *format, struct __va_list_tag *ap);",
   "waitpid": "int waitpid(int pid, int *wstatus, int options);",
