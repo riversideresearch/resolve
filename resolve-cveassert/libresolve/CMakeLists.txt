@@ -5,24 +5,28 @@ include(GNUInstallDirs)
 include(ExternalProject)
 include(FetchContent)
 
-# ### Pulling and building mimalloc project 
+#### Fetching and building mimalloc project 
 FetchContent_Declare(
     mimalloc
     GIT_REPOSITORY https://github.com/microsoft/mimalloc.git
     GIT_TAG v3.3.2
 )
 
-# # Force static build 
+## Force static build 
 set(MI_BUILD_SHARED OFF CACHE BOOL "" FORCE)
 set(MI_BUILD_STATIC ON CACHE BOOL "" FORCE)
 
 FetchContent_MakeAvailable(mimalloc)
 
+# Add the shim source to the mimalloc proj
 target_sources(mimalloc-static PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/mimalloc_shadow.c
 )
-set(MIMALLOC_LIB_DIR ${mimalloc_BINARY_DIR})
 
+set(MIMALLOC_LIB_DIR ${mimalloc_BINARY_DIR})
+message(STATUS "MIMALLOC_LIB_DIR=${MIMALLOC_LIB_DIR}")
+
+## mimalloc proj must be PIC to ensure compatibility with libresolve
 set_target_properties(mimalloc-static PROPERTIES
     POSITION_INDEPENDENT_CODE ON
 )
@@ -49,7 +53,7 @@ add_custom_command(
     COMMAND 
         ${CMAKE_COMMAND} -E env
         CARGO_TARGET_DIR=${RUST_OUT_DIR}
-        MIMALLOC_LIB_DIR=${MIMALLOC_LIB_DIR}
+        MIMALLOC_LIB_DIR=${MIMALLOC_LIB_DIR} # pass the static mimalloc path
         cargo build ${CARGO_FLAGS} 
     WORKING_DIRECTORY ${RUST_CRATE_DIR}
     COMMENT "Building libresolve.so" VERBATIM
@@ -57,7 +61,10 @@ add_custom_command(
 )
 
 add_custom_target(test-libresolve
-    COMMAND cargo test
+    COMMAND 
+        ${CMAKE_COMMAND} -E env
+        MIMALLOC_LIB_DIR=${MIMALLOC_LIB_DIR} # Note: Pass the static mimalloc loc so that build.rs does not panic
+        cargo test
     WORKING_DIRECTORY ${RUST_CRATE_DIR}
     COMMENT "Running regression tests for libresolve"
 )
