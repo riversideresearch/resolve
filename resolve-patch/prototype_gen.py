@@ -7,8 +7,18 @@ from pathlib import Path
 UNDEFINED_SYMBOL_TYPES = {"U", "w", "v"}
 
 
+def normalize_symbol(symbol):
+    symbol = symbol.split("@")[0]
+
+    # special case: find main (could be __libc_start_main)
+    if symbol.endswith("main"):
+        return "main"
+
+    return symbol
+
+
 def parse_undefined_symbols(nm_output):
-    symbols = set()
+    symbols = {}
     for line in nm_output.splitlines():
         fields = line.split()
         if len(fields) < 2:
@@ -18,8 +28,20 @@ def parse_undefined_symbols(nm_output):
         if symbol_type not in UNDEFINED_SYMBOL_TYPES:
             continue
 
-        symbols.add(symbol.split("@")[0])
-    return sorted(symbols)
+        normalized_symbol = normalize_symbol(symbol)
+        symbols.setdefault(normalized_symbol, set()).add(symbol)
+    return symbols
+
+
+def print_unresolved_symbols(missing_symbols):
+    print(f"Missing prototypes ({len(missing_symbols)}):")
+    for symbol, raw_symbols in sorted(missing_symbols.items()):
+        raw_symbol_list = ", ".join(sorted(raw_symbols))
+        print(f"  - {symbol} (from: {raw_symbol_list})")
+
+    print("\nAdd entries like the following to prototypes.json:")
+    for symbol in sorted(missing_symbols):
+        print(f"  \"{symbol}\": \"TODO: prototype for {symbol};\",")
 
 parser = argparse.ArgumentParser(description="Resolve prototype generator")
 parser.add_argument("-i", "--input", help="Input binary", required=True)
@@ -34,6 +56,7 @@ with open(prototype_db, "r") as f:
     db_size = len(prototypes_json)
     binary_size = 0
     resolved = 0
+    missing_symbols = {}
 
     with open(args.output, "w") as out:
         out.write(f"// Auto-generated resolve prototypes for ELF: {args.input}.\n")
@@ -44,22 +67,19 @@ with open(prototype_db, "r") as f:
         prototypes = parse_undefined_symbols(result.stdout)
         binary_size = len(prototypes)
 
-        for proto in prototypes:
-
-            # special case: find main (could be __libc_start_main)
-            if proto.endswith("main"):
-                proto = "main"
-
+        for proto in sorted(prototypes):
             if proto in prototypes_json:
                 resolved += 1
                 out.write(f"{prototypes_json[proto]}\n\n")
             else:
+                missing_symbols[proto] = prototypes[proto]
                 out.write(f"// Prototype for {proto} not found. Please update prototypes.json.\n\n")
             
     print(f"Resolved {resolved}/{binary_size} prototypes from the binary. Database size: {db_size}.")
 
-    if resolved < binary_size:
+    if missing_symbols:
         print("WARNING: Not all prototypes were resolved. Please update prototypes.json to include missing prototypes.")
+        print_unresolved_symbols(missing_symbols)
         exit(1)
     
     exit(0)
