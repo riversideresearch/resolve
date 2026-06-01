@@ -1,5 +1,6 @@
 [package]
 name = "resolve"
+build = "src/build.rs"
 version = "0.1.0"
 edition = "2024"
 
@@ -7,6 +8,7 @@ edition = "2024"
 crate-type = ["cdylib"]
 
 [dependencies]
+cc = "1.2.63"
 env_logger = "0.11.8"
 libc = "0.2.174"
 log = "0.4.29"

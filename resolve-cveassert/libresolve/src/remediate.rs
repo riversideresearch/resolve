@@ -13,6 +13,20 @@ use crate::shadowobjs::{
 use log::{info, warn};
 use std::ffi::CStr;
 
+
+#[link(name = "mimalloc")]
+unsafe extern "C" { 
+    fn mi_malloc(size: usize) -> *mut c_void;
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn test_mi() {
+    unsafe {
+        let p = mi_malloc(16);
+        let _ = p;
+    }
+}
+
 /**
  * @brief - Registers stack allocations in shadow memory
  * @input
