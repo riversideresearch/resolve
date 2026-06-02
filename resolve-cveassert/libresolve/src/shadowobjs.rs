@@ -24,11 +24,8 @@ pub enum AllocType {
 
 #[derive(Debug, Clone)]
 pub struct ShadowObject {
-    /// Allocation type (Heap, Stack, Global, etc..)
     pub alloc_type: AllocType,
-    // Base address of the allocated object mapped to u64
     pub base: Vaddr,
-    /// Last address of the allocated object
     pub limit: Vaddr,
     size: usize,
 }
