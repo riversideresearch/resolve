@@ -102,7 +102,8 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
                              stb-convert CPs */
     STACK_FREE =
         590, /* NOTE: This ID has been found in NASA CFS challenge problem */
-    INCORRECT_BITWISE_SHIFT = 1335 /* https://cwe.mitre.org/data/definitions/1335.html */
+    INCORRECT_BITWISE_SHIFT =
+        1335 /* https://cwe.mitre.org/data/definitions/1335.html */
   };
 
   LabelCVEPass() {
@@ -209,14 +210,20 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
     sanitizeBitShift(&F, strategy);
   }
 
-  /// Return true if F's name (raw or demangled) contains `targetName
-  ///
+  /// Return true if F's name (raw or demangled) matches or contains targetName.
+  /// Caret/dollar anchors request exact matching
   /// Always returns true if targetName is empty
   bool nameMatches(Function &F, const std::string &demangledName,
                    const std::string &targetName) {
     // Empty function name matches all functions
     if (targetName.empty()) {
       return true;
+    }
+
+    if (targetName.size() >= 2 && targetName.front() == '^' &&
+        targetName.back() == '$') {
+      std::string exactName = targetName.substr(1, targetName.size() - 2);
+      return demangledName == exactName || F.getName() == exactName;
     }
 
     // First check demangled name
