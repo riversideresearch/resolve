@@ -12,12 +12,12 @@ use crate::shadowobjs::{
 
 use log::{info, warn};
 
-
 #[repr(C)]
-struct ResolveInfo {
-    page_id: u64,
+struct BoundsInfo {
+    base: *mut c_void,
+    limit: *mut c_void,
+    block_size: usize,
     block_index: usize,
-    page_start: *mut c_void,
 }
 
 #[link(name = "mimalloc")]
@@ -26,10 +26,12 @@ unsafe extern "C" {
     fn mi_malloc(size: usize) -> *mut c_void;
     fn mi_calloc(size: usize, count: usize) -> *mut c_void;
     fn mi_realloc(ptr: *mut c_void, size: usize) -> *mut c_void;
+    fn mi_strdup(ptr: *mut c_char) -> *mut c_char;
+    fn mi_strndup(ptr: *mut c_char, size: usize) -> *mut c_char;
     fn mi_free(ptr: *mut c_void);
     
     // Shim API
-    fn mi_resolve_ptr(ptr: *mut c_void) -> ResolveInfo;
+    fn mi_resolve_ptr(ptr: *mut c_void) -> BoundsInfo;
 }
 
 /**
@@ -85,6 +87,7 @@ pub extern "C" fn __resolve_invalidate_stack_range(ptr: *mut c_void, size: usize
 #[unsafe(no_mangle)]
 pub extern "C" fn __resolve_malloc(size: usize) -> *mut c_void {
     let ptr = unsafe { mi_malloc(size + 1) };
+    let bounds_info = unsafe { mi_resolve_ptr(ptr) };
 
     if ptr.is_null() {
         return ptr;
@@ -100,6 +103,9 @@ pub extern "C" fn __resolve_malloc(size: usize) -> *mut c_void {
         ptr, size
     );
 
+    info!("[RESOLVE] bounds: (0x{:x}, 0x{:x})", bounds_info.base as Vaddr, bounds_info.limit as Vaddr);
+    info!("[RESOLVE] block index: {}", bounds_info.block_index);
+    info!("[RESOLVE] block size: {}", bounds_info.block_size);
     ptr
 }
 
@@ -146,9 +152,9 @@ pub extern "C" fn __resolve_free(ptr: *mut c_void) -> () {
         freed_guard.add_shadow_object(AllocType::Unallocated, ptr as Vaddr, obj_size.unwrap_or(0));
     }
 
-    let _ = unsafe { mi_free(ptr) };
+   let _ = unsafe { mi_free(ptr) };
 }
-
+//
 /**
  * @brief - RESOLVE wrapper for libc realloc
  * @input
@@ -226,7 +232,7 @@ pub extern "C" fn __resolve_calloc(n_items: usize, item_size: usize) -> *mut c_v
  */
 #[unsafe(no_mangle)]
 pub extern "C" fn __resolve_strdup(ptr: *mut c_char) -> *mut c_char {
-    let string_ptr = unsafe { strdup(ptr) };
+    let string_ptr = unsafe { mi_strdup(ptr) };
 
     if string_ptr.is_null() {
         return string_ptr;
@@ -260,7 +266,7 @@ pub extern "C" fn __resolve_strdup(ptr: *mut c_char) -> *mut c_char {
  */
 #[unsafe(no_mangle)]
 pub extern "C" fn __resolve_strndup(ptr: *mut c_char, size: usize) -> *mut c_char {
-    let string_ptr = unsafe { strndup(ptr, size + 1) };
+    let string_ptr = unsafe { mi_strndup(ptr, size + 1) };
 
     if string_ptr.is_null() {
         return string_ptr;
@@ -459,21 +465,21 @@ pub extern "C" fn __resolve_get_bounds(ptr: *mut c_void) -> ShadowObjBounds {
 
     sobj
 }
-
-#[unsafe(no_mangle)]
-pub extern "C" fn resolve_obj_type(base_ptr: *mut c_void) -> AllocType {
-    let base = base_ptr as Vaddr;
-
-    let find_in = |table: &crate::MutexWrap<crate::shadowobjs::ShadowObjectTable>| {
-        let t = table.lock();
-        t.search_intersection(base).map(|o| o.alloc_type)
-    };
-
-    // Why does this search freed before alive?
-    let alloc_type = find_in(&FREED_OBJ_LIST).or_else(|| find_in(&ALIVE_OBJ_LIST));
-
-    alloc_type.unwrap_or(AllocType::Unknown)
-}
+//
+//#[unsafe(no_mangle)]
+//pub extern "C" fn resolve_obj_type(base_ptr: *mut c_void) -> AllocType {
+//    let base = base_ptr as Vaddr;
+//
+//    let find_in = |table: &crate::MutexWrap<crate::shadowobjs::ShadowObjectTable>| {
+//        let t = table.lock();
+//        t.search_intersection(base).map(|o| o.alloc_type)
+//    };
+//
+//    // Why does this search freed before alive?
+//    let alloc_type = find_in(&FREED_OBJ_LIST).or_else(|| find_in(&ALIVE_OBJ_LIST));
+//
+//    alloc_type.unwrap_or(AllocType::Unknown)
+//}
 
 /**
  * @brief - Logs invalid memory access for a given function
@@ -504,55 +510,41 @@ mod tests {
     use crate::file::resolve_init;
     use crate::shadowobjs::AllocType;
 
-    #[test]
-    fn test_malloc_free() {
-        resolve_init();
-        // Allocation should successfully return a memory block
-        let ptr = __resolve_malloc(0x10);
-        assert!(!ptr.is_null());
+   #[test]
+   fn test_malloc_free() {
+       resolve_init();
+       // Allocation should successfully return a memory block
+       let ptr = __resolve_malloc(0x10);
+       assert!(!ptr.is_null());
 
-        // We should track the obj correctly
-        {
-            let table = ALIVE_OBJ_LIST.lock();
-            let obj = table.search_intersection(ptr as Vaddr);
+       // We should track the obj correctly
+       {
+           let table = ALIVE_OBJ_LIST.lock();
+           let obj = table.search_intersection(ptr as Vaddr);
 
-            assert!(obj.is_some());
-            let obj = obj.unwrap();
-            assert!(obj.size() == 0x10);
-            assert!(obj.base == ptr as Vaddr);
-            assert!(obj.alloc_type == AllocType::Heap);
-        }
+           assert!(obj.is_some());
+           let obj = obj.unwrap();
+           assert!(obj.size() == 0x10);
+           assert!(obj.base == ptr as Vaddr);
+           assert!(obj.alloc_type == AllocType::Heap);
+       }
 
-        __resolve_free(ptr);
+       __resolve_free(ptr);
 
-        // After freeing a block we should track that it has been freed
-        {
-            let table = FREED_OBJ_LIST.lock();
-            let obj = table.search_intersection(ptr as Vaddr);
+       // After freeing a block we should track that it has been freed
+       {
+           let table = FREED_OBJ_LIST.lock();
+           let obj = table.search_intersection(ptr as Vaddr);
 
-            assert!(obj.is_some());
-        }
+           assert!(obj.is_some());
+       }
 
-        // And it should no longer be in the alive obj list.
-        {
-            let table = ALIVE_OBJ_LIST.lock();
-            let obj = table.search_intersection(ptr as Vaddr);
+       // And it should no longer be in the alive obj list.
+       {
+           let table = ALIVE_OBJ_LIST.lock();
+           let obj = table.search_intersection(ptr as Vaddr);
 
-            assert!(obj.is_none());
-        }
-    }
-
-    #[test]
-    fn test_mi_malloc_page() {
-        resolve_init();
-        unsafe {
-            let ptr = __resolve_malloc(0x10);
-            let info = mi_resolve_ptr(ptr);
-            println!("ptr        = {:p}", ptr);
-            println!("page_id    = {}", info.page_id);
-            println!("block_idx  = {}", info.block_index);
-            println!("page_start = {:p}", info.page_start);
-            __resolve_free(ptr);
-        }
-    }
+           assert!(obj.is_none());
+       }
+   }
 }
