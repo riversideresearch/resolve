@@ -57,15 +57,9 @@ curl -LsSf https://astral.sh/uv/0.10.9/install.sh | env UV_INSTALL_DIR="/usr/loc
 uvx pipx install --global wllvm lit
 
 # Install rust
-if ! command -v rustc >/dev/null 2>&1; then
-    echo "[*] Installing Rust via rustup..."
-    sudo apt-install -y rustup
-    # curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- --default-toolchain nightly -y  
-    source "$HOME/.cargo/env"
-else 
-    echo "[*] Rust is already installed."
-    rustc --version 
-    cargo --version
-fi 
+# Install Rust using the official installer
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
+    | sh -s -- -y --default-toolchain nightly
 
+source "$HOME/.cargo/env"
 echo " All dependencies installed successfully."
