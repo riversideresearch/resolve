@@ -59,7 +59,8 @@ uvx pipx install --global wllvm lit
 # Install rust
 if ! command -v rustc >/dev/null 2>&1; then
     echo "[*] Installing Rust via rustup..."
-    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- --default-toolchain nightly -y  
+    sudo apt-install -y rustup
+    # curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- --default-toolchain nightly -y  
     source "$HOME/.cargo/env"
 else 
     echo "[*] Rust is already installed."

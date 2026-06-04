@@ -25,7 +25,7 @@ RUN git clone --depth 1 --branch 2026.03.18 https://github.com/microsoft/vcpkg.g
 
 # Install deps
 COPY scripts /opt/resolve/scripts
-RUN /opt/resolve/scripts/install-deps.sh && apt-get clean && rm -rf /var/lib/apt/lists/*
+RUN /opt/resolve/scripts/install-deps-ci.sh && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Add resolve to PATH
 ENV PATH="/opt/resolve/bin:${PATH}"

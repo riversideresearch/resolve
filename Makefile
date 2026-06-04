@@ -37,5 +37,5 @@ clean:
 
 .PHONY: install-deps
 install-deps:
-	chmod u+x ./scripts/install-deps.sh
-	./scripts/install-deps.sh
+	chmod u+x ./scripts/install-deps-ci.sh
+	./scripts/install-deps-ci.sh
