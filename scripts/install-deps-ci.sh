@@ -57,9 +57,9 @@ curl -LsSf https://astral.sh/uv/0.10.9/install.sh | env UV_INSTALL_DIR="/usr/loc
 uvx pipx install --global wllvm lit
 
 # Install rust
-eval "$INSTALL_CMD rustup"
-source "$HOME/.cargo/env"
-rustup toolchain install nightly 
-rustup default nightly
+# Install Rust using the official installer
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
+    | sh -s -- -y --default-toolchain nightly
 
+source "$HOME/.cargo/env"
 echo " All dependencies installed successfully."
