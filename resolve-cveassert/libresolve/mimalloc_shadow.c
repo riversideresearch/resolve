@@ -4,23 +4,28 @@
 #include <stdio.h>
 
 typedef struct {
-  uint64_t page_id;
+  void *base;
+  void *limit;
+  size_t block_size;
   size_t block_index;
-  void *page_start;
-} resolve_info_t;
+} bounds_info_t;
 
-resolve_info_t mi_resolve_ptr(void *p) {
+
+bounds_info_t mi_resolve_ptr(void* p) {
   mi_page_t *page = _mi_ptr_page(p);
+  
+  const size_t block_size = page->block_size;
 
-  resolve_info_t info;
+  uintptr_t page_start = (uintptr_t)page->page_start;
+  uintptr_t ptr = (uintptr_t)p;
 
-  info.page_start = mi_page_start(p);
-  info.page_id = (uint64_t)(uintptr_t)page;
+  size_t block_index = (ptr - page_start) / block_size; 
+  uintptr_t base_addr = page_start + block_index * block_size;
 
-  size_t block_size = page->block_size;
-  uintptr_t offset = (uintptr_t)p - (uintptr_t)info.page_start;
-
-  info.block_index = offset / block_size;
-
-  return info;
+  bounds_info_t bounds;
+  bounds.base = (void*)base_addr;
+  bounds.limit = (void*)(base_addr + block_size);
+  bounds.block_size = block_size;
+  bounds.block_index = block_index;
+  return bounds;
 }
