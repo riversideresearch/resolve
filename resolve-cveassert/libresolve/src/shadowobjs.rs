@@ -79,7 +79,6 @@ impl ShadowObjectTable {
             base,
             limit: ShadowObject::limit(base, size),
             size,
-            allocid,
         };
         self.table.insert(base, sobj);
     }
