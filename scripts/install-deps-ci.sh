@@ -58,8 +58,8 @@ uvx pipx install --global wllvm lit
 
 # Install rust
 eval "$INSTALL_CMD rustup"
+source "$HOME/.cargo/env"
 rustup toolchain install nightly 
 rustup default nightly
-source "$HOME/.cargo/env"
 
 echo " All dependencies installed successfully."
