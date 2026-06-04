@@ -60,6 +60,6 @@ uvx pipx install --global wllvm lit
 eval "$INSTALL_CMD rustup"
 rustup toolchain install nightly 
 rustup default nightly
-export PATH="$HOME/.cargo/bin:$PATH"
+source "$HOME/.cargo/env"
 
 echo " All dependencies installed successfully."
