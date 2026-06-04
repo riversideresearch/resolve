@@ -1,19 +1,19 @@
 // Copyright (c) 2025 Riverside Research.
 // LGPL-3; See LICENSE.txt in the repo root for details.
 use libc::{
-    c_char, c_void, strdup, strlen, strndup, strnlen,
+    c_char, c_void, strlen,strnlen,
 };
 
 use crate::shadowobjs::{SHADOW_STACK, ALIVE_OBJ_LIST, AllocType, FREED_OBJ_LIST, Vaddr};
 
 use log::{info, warn};
 
-
 #[repr(C)]
-struct ResolveInfo {
-    page_id: u64,
+struct BoundsInfo {
+    base: *mut c_void,
+    limit: *mut c_void,
+    block_size: usize,
     block_index: usize,
-    page_start: *mut c_void,
 }
 
 #[link(name = "mimalloc")]
@@ -22,10 +22,12 @@ unsafe extern "C" {
     fn mi_malloc(size: usize) -> *mut c_void;
     fn mi_calloc(size: usize, count: usize) -> *mut c_void;
     fn mi_realloc(ptr: *mut c_void, size: usize) -> *mut c_void;
+    fn mi_strdup(ptr: *mut c_char) -> *mut c_char;
+    fn mi_strndup(ptr: *mut c_char, size: usize) -> *mut c_char;
     fn mi_free(ptr: *mut c_void);
     
     // Shim API
-    fn mi_resolve_ptr(ptr: *mut c_void) -> ResolveInfo;
+    fn mi_resolve_ptr(ptr: *mut c_void) -> BoundsInfo;
 }
 
 /**
@@ -65,6 +67,7 @@ pub extern "C" fn __resolve_invalidate_stack_range(base: *mut c_void, size: usiz
 #[unsafe(no_mangle)]
 pub extern "C" fn __resolve_malloc(size: usize) -> *mut c_void {
     let ptr = unsafe { mi_malloc(size + 1) };
+    let bounds_info = unsafe { mi_resolve_ptr(ptr) };
 
     if ptr.is_null() {
         return ptr;
@@ -80,6 +83,9 @@ pub extern "C" fn __resolve_malloc(size: usize) -> *mut c_void {
         ptr as Vaddr
     );
 
+    info!("[RESOLVE] bounds: (0x{:x}, 0x{:x})", bounds_info.base as Vaddr, bounds_info.limit as Vaddr);
+    info!("[RESOLVE] block index: {}", bounds_info.block_index);
+    info!("[RESOLVE] block size: {}", bounds_info.block_size);
     ptr
 }
 
@@ -90,48 +96,48 @@ pub extern "C" fn __resolve_malloc(size: usize) -> *mut c_void {
  */
 #[unsafe(no_mangle)]
 pub extern "C" fn __resolve_free(ptr: *mut c_void) -> () {
-    // Insert a function to find the object and return the pointer size
-    // Do I need to handle if the sobj cannot be found?
+   // Insert a function to find the object and return the pointer size
+   // Do I need to handle if the sobj cannot be found?
 
-    info!(
-        "[FREE] Allocated object freed at address: 0x{:x}",
-        ptr as Vaddr
-    );
+   info!(
+       "[FREE] Allocated object freed at address: 0x{:x}",
+       ptr as Vaddr
+   );
 
-    let ptr_size = {
-        let mut obj_list = ALIVE_OBJ_LIST.lock();
-        let sobj_opt = obj_list.search_intersection(ptr as Vaddr);
-        let size = sobj_opt.map(|o| o.size());
-        // remove shadow obj from live list
-        obj_list.invalidate_at(ptr as Vaddr);
-        size
-    };
+   let ptr_size = {
+       let mut obj_list = ALIVE_OBJ_LIST.lock();
+       let sobj_opt = obj_list.search_intersection(ptr as Vaddr);
+       let size = sobj_opt.map(|o| o.size());
+       // remove shadow obj from live list
+       obj_list.invalidate_at(ptr as Vaddr);
+       size
+   };
 
-    // Check if the shadow object exists
-    match ptr_size {
-        Some(size) => {
-            info!(
-                "[FREE] Found shadow object for allocated object, 0x{:x}, size = {size}",
-                ptr as Vaddr,
-            );
-        }
-        None => {
-            warn!(
-                "[FREE] No shadow object found for allocated object: 0x{:x}",
-                ptr as Vaddr
-            );
-        }
-    }
+   // Check if the shadow object exists
+   match ptr_size {
+       Some(size) => {
+           info!(
+               "[FREE] Found shadow object for allocated object, 0x{:x}, size = {size}",
+               ptr as Vaddr,
+           );
+       }
+       None => {
+           warn!(
+               "[FREE] No shadow object found for allocated object: 0x{:x}",
+               ptr as Vaddr
+           );
+       }
+   }
 
-    {
-        // Insert shadow object into freed object list
-        let mut freed_guard = FREED_OBJ_LIST.lock();
-        freed_guard.add_shadow_object(AllocType::Unallocated, ptr as Vaddr, ptr_size.unwrap_or(0));
-    }
+   {
+       // Insert shadow object into freed object list
+       let mut freed_guard = FREED_OBJ_LIST.lock();
+       freed_guard.add_shadow_object(AllocType::Unallocated, ptr as Vaddr, ptr_size.unwrap_or(0));
+   }
 
-    let _ = unsafe { mi_free(ptr) };
+   let _ = unsafe { mi_free(ptr) };
 }
-
+//
 /**
  * @brief - Allocator logging interface for realloc
  * @input
@@ -170,13 +176,13 @@ pub extern "C" fn __resolve_realloc(ptr: *mut c_void, size: usize) -> *mut c_voi
     realloc_ptr
 }
 
-/**
- * @brief - Allocator logging interface for calloc
- * @input
- *  - n_items: number of items in the allocation
- *  - size: size of the allocation in bytes
- * @return - none
- */
+// /**
+//  * @brief - Allocator logging interface for calloc
+//  * @input
+//  *  - n_items: number of items in the allocation
+//  *  - size: size of the allocation in bytes
+//  * @return - none
+//  */
 #[unsafe(no_mangle)]
 pub extern "C" fn __resolve_calloc(n_items: usize, item_size: usize) -> *mut c_void {
     let ptr = unsafe { mi_calloc(n_items, item_size) };
@@ -199,15 +205,15 @@ pub extern "C" fn __resolve_calloc(n_items: usize, item_size: usize) -> *mut c_v
     ptr
 }
 
-/**
- * @brief - Allocator logging interface for strdup
- * @input
- *  - ptr: ptr to the original allocation
- * @return - pointer to the copied string
- */
-#[unsafe(no_mangle)]
+// /**
+//  * @brief - Allocator logging interface for strdup
+//  * @input
+//  *  - ptr: ptr to the original allocation
+//  * @return - pointer to the copied string
+//  */
+// #[unsafe(no_mangle)]
 pub extern "C" fn __resolve_strdup(ptr: *mut c_char) -> *mut c_char {
-    let string_ptr = unsafe { strdup(ptr) };
+    let string_ptr = unsafe { mi_strdup(ptr) };
 
     if string_ptr.is_null() {
         return string_ptr;
@@ -230,18 +236,18 @@ pub extern "C" fn __resolve_strdup(ptr: *mut c_char) -> *mut c_char {
     string_ptr
 }
 
-/**
- * @brief - Allocator logging interface for strdup
- * @input
- *  - ptr: ptr to the original allocation
- *  - size: number of bytes to copied
- * @return - pointer to the copied string
- * NOTE: Read this link to understand the nature of strdup & strndup
- * https://pubs.opengroup.org/onlinepubs/9699919799/functions/strdup.html
- */
-#[unsafe(no_mangle)]
+// /**
+//  * @brief - Allocator logging interface for strdup
+//  * @input
+//  *  - ptr: ptr to the original allocation
+//  *  - size: number of bytes to copied
+//  * @return - pointer to the copied string
+//  * NOTE: Read this link to understand the nature of strdup & strndup
+//  * https://pubs.opengroup.org/onlinepubs/9699919799/functions/strdup.html
+//  */
+// #[unsafe(no_mangle)]
 pub extern "C" fn __resolve_strndup(ptr: *mut c_char, size: usize) -> *mut c_char {
-    let string_ptr = unsafe { strndup(ptr, size + 1) };
+    let string_ptr = unsafe { mi_strndup(ptr, size + 1) };
 
     if string_ptr.is_null() {
         return string_ptr;
@@ -342,21 +348,21 @@ pub extern "C" fn __resolve_get_bounds(ptr: *mut c_void) -> ShadowObjBounds {
 
     sobj
 }
-
-#[unsafe(no_mangle)]
-pub extern "C" fn resolve_obj_type(base_ptr: *mut c_void) -> AllocType {
-    let base = base_ptr as Vaddr;
-
-    let find_in = |table: &crate::MutexWrap<crate::shadowobjs::ShadowObjectTable>| {
-        let t = table.lock();
-        t.search_intersection(base).map(|o| o.alloc_type)
-    };
-
-    // Why does this search freed before alive?
-    let alloc_type = find_in(&FREED_OBJ_LIST).or_else(|| find_in(&ALIVE_OBJ_LIST));
-
-    alloc_type.unwrap_or(AllocType::Unknown)
-}
+//
+//#[unsafe(no_mangle)]
+//pub extern "C" fn resolve_obj_type(base_ptr: *mut c_void) -> AllocType {
+//    let base = base_ptr as Vaddr;
+//
+//    let find_in = |table: &crate::MutexWrap<crate::shadowobjs::ShadowObjectTable>| {
+//        let t = table.lock();
+//        t.search_intersection(base).map(|o| o.alloc_type)
+//    };
+//
+//    // Why does this search freed before alive?
+//    let alloc_type = find_in(&FREED_OBJ_LIST).or_else(|| find_in(&ALIVE_OBJ_LIST));
+//
+//    alloc_type.unwrap_or(AllocType::Unknown)
+//}
 
 /**
  * @brief - Logs when program enters sanitization basic block
@@ -368,58 +374,44 @@ pub extern "C" fn __resolve_report_violation() -> () {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::{resolve_init, shadowobjs::AllocType};
+   use super::*;
+   use crate::{resolve_init, shadowobjs::AllocType};
 
-    #[test]
-    fn test_malloc_free() {
-        resolve_init();
-        // Allocation should successfully return a memory block
-        let ptr = __resolve_malloc(0x10);
-        assert!(!ptr.is_null());
+   #[test]
+   fn test_malloc_free() {
+       resolve_init();
+       // Allocation should successfully return a memory block
+       let ptr = __resolve_malloc(0x10);
+       assert!(!ptr.is_null());
 
-        // We should track the obj correctly
-        {
-            let table = ALIVE_OBJ_LIST.lock();
-            let obj = table.search_intersection(ptr as Vaddr);
+       // We should track the obj correctly
+       {
+           let table = ALIVE_OBJ_LIST.lock();
+           let obj = table.search_intersection(ptr as Vaddr);
 
-            assert!(obj.is_some());
-            let obj = obj.unwrap();
-            assert!(obj.size() == 0x10);
-            assert!(obj.base == ptr as Vaddr);
-            assert!(obj.alloc_type == AllocType::Heap);
-        }
+           assert!(obj.is_some());
+           let obj = obj.unwrap();
+           assert!(obj.size() == 0x10);
+           assert!(obj.base == ptr as Vaddr);
+           assert!(obj.alloc_type == AllocType::Heap);
+       }
 
-        __resolve_free(ptr);
+       __resolve_free(ptr);
 
-        // After freeing a block we should track that it has been freed
-        {
-            let table = FREED_OBJ_LIST.lock();
-            let obj = table.search_intersection(ptr as Vaddr);
+       // After freeing a block we should track that it has been freed
+       {
+           let table = FREED_OBJ_LIST.lock();
+           let obj = table.search_intersection(ptr as Vaddr);
 
-            assert!(obj.is_some());
-        }
+           assert!(obj.is_some());
+       }
 
-        // And it should no longer be in the alive obj list.
-        {
-            let table = ALIVE_OBJ_LIST.lock();
-            let obj = table.search_intersection(ptr as Vaddr);
+       // And it should no longer be in the alive obj list.
+       {
+           let table = ALIVE_OBJ_LIST.lock();
+           let obj = table.search_intersection(ptr as Vaddr);
 
-            assert!(obj.is_none());
-        }
-    }
-
-    #[test]
-    fn test_mi_malloc_page() {
-        resolve_init();
-        unsafe {
-            let ptr = __resolve_malloc(0x10);
-            let info = mi_resolve_ptr(ptr);
-            println!("ptr        = {:p}", ptr);
-            println!("page_id    = {}", info.page_id);
-            println!("block_idx  = {}", info.block_index);
-            println!("page_start = {:p}", info.page_start);
-            __resolve_free(ptr);
-        }
-    }
+           assert!(obj.is_none());
+       }
+   }
 }
