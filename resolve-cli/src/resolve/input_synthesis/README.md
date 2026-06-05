@@ -17,7 +17,7 @@ python3 -m resolve.input_synthesis reachability claude cve.json out/improve_cve 
 
 ## Overview
 
-The scripts work by delegating reasoning to coding agents (Claude, Codex, or OpenCode) through carefully structured prompts. Two patterns from `agent.py` are used throughout:
+The scripts work by delegating reasoning to coding agents (Claude, Codex, or OpenCode) through carefully structured prompts. Two patterns from `../agent_utils/agent.py` are used throughout:
 
 **Debate** (`run_dialectic`): A variant of the multi-agent debate (MAD) pattern for analyzing a claim from scratch. One pass argues that the claim is correct, another argues that it is incorrect without seeing the first answer, and a final pass reconciles the two.
 

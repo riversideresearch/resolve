@@ -9,13 +9,7 @@ from pathlib import Path
 
 import __main__
 
-from .agent import run_prompt
-
-AGENTS_FILE = {
-    "claude": "CLAUDE.md",
-    "codex": "AGENTS.md",
-    "opencode": "AGENTS.md",
-}
+from resolve.agent_utils.agent import run_prompt, AGENTS_FILE
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:

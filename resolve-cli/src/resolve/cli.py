@@ -5,6 +5,7 @@ import argparse
 import os
 from pathlib import Path
 import subprocess
+import sys
 
 def find_subcommands(program: str):
     """Return a dict of {subcommand: full_path_to_executable}."""
@@ -24,6 +25,10 @@ def find_subcommands(program: str):
     
     subcommands = {}
     path_dirs = [Path(f) for f in os.environ["PATH"].split(os.pathsep)]
+
+    argv0_path = Path(sys.argv[0])
+    if argv0_path.parent != Path("."):
+        path_dirs.insert(0, argv0_path.resolve().parent)
     for file in files_in_path_dirs(path_dirs):
         if (sub := is_subcommand(file)) and os.access(file, os.X_OK):
             subcommands[sub] = file
@@ -32,9 +37,9 @@ def find_subcommands(program: str):
 def subcommand_cli(program: str):
     """
     Given `program`, presents a cli of the form '`program` <subcommand>', 
-    where <subcommand> is any program in PATH of the form '`program`-<subcommand>'
+    where <subcommand> is any program in PATH, or next to the currently running executable, of the form '`program`-<subcommand>'
 
-    i.e., if `program` == "resolve" and `resolve-reach` and `resolve-input-synthesis` are binaries in a folder in PATH,
+    i.e., if `program` == "resolve" and `resolve-reach` and `resolve-input-synthesis` are binaries in the same folder as `resolve` or in a folder in PATH,
     then this cli would have two subcommands accessed as 'resolve reach' and 'resolve input-syntheis'
     """
     subcommands = find_subcommands(program)
