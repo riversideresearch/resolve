@@ -121,7 +121,6 @@ def run(
     synthesis_path = output_path / "synthesis.md"
     thesis_path = output_path / "thesis.md"
     antithesis_path = output_path / "antithesis.md"
-    reconciliation_path = output_path / "reconciliation.md"
     vulnerabilities_path = output_path / "vulnerabilities.json"
     report_path = output_path / "report.md"
     common_context = _common_context(crash_dir, source_dir, output_path, tmp_path)
@@ -197,31 +196,6 @@ Do not produce `vulnerabilities.json` in this stage.
     run_prompt(agent, antithesis_prompt, model=model)
     require_file(antithesis_path, "crash antithesis")
 
-    reconciliation_prompt = f"""
-{common_context}
-
-Inputs:
-- Evidence synthesis: `{synthesis_path}`
-- Thesis: `{thesis_path}`
-- Antithesis: `{antithesis_path}`
-
-# Your task
-
-Resolve the disagreement and write `{reconciliation_path}`.
-
-The reconciliation is the final decision document before JSON generation. It must:
-- List the final set of distinct root-cause vulnerabilities to emit, or explicitly state that the set is empty.
-- For each emitted vulnerability, lock the exact values for `cve-id`, `cve-description`, `package-name`, `package-version`, `cwe-id`, `cwe-name`, `affected-function`, `affected-file`, `remediation-strategy`, and optional `undesirable-function`. The `cwe-id` value must be the numeric string only, such as `121`, not `CWE-121`.
-- Explain rejected thesis candidates and why they must not appear in JSON.
-- Explain any antithesis objections that were overruled and the evidence that supports overruling them.
-- Keep claims concise and tied to inspected evidence.
-
-Do not produce `vulnerabilities.json` in this stage.
-"""
-
-    run_prompt(agent, reconciliation_prompt, model=model)
-    require_file(reconciliation_path, "crash reconciliation")
-
     final_prompt = f"""
 {common_context}
 
@@ -229,13 +203,14 @@ Inputs:
 - Evidence synthesis: `{synthesis_path}`
 - Thesis: `{thesis_path}`
 - Antithesis: `{antithesis_path}`
-- Reconciliation: `{reconciliation_path}`
 
 # Your task
 
 Write exactly two final public artifacts:
 1. `{vulnerabilities_path}`
 2. `{report_path}`
+
+First resolve the disagreement between the thesis and antithesis. Use that final reconciliation decision to write both artifacts. Do not create a separate `reconciliation.md`.
 
 `{vulnerabilities_path}` must be valid JSON with this exact top-level shape:
 
@@ -290,7 +265,12 @@ RESOLVE remediation guidance:
 - Use `"continue"` for divide-by-zero or invalid operation masking only when continuing with a neutral value is appropriate.
 - Use `"none"` only if the vulnerability should be recorded but not remediated.
 
-`{report_path}` must be markdown. It should summarize the final vulnerability set, supporting evidence, rejected candidates, unresolved gaps, and any reproduction/debugger commands that materially influenced the final result.
+`{report_path}` must be markdown and must serve as the reconciliation decision document. It must:
+- List the final set of distinct root-cause vulnerabilities emitted to `{vulnerabilities_path}`, or explicitly state that the set is empty.
+- For each emitted vulnerability, give the exact JSON field values and the evidence supporting them.
+- Explain rejected thesis candidates and why they do not appear in JSON.
+- Explain antithesis objections that were accepted or overruled.
+- Summarize unresolved gaps and any reproduction/debugger commands that materially influenced the final result.
 """
 
     run_prompt(agent, final_prompt, model=model)
