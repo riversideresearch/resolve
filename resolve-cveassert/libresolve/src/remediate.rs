@@ -87,25 +87,25 @@ pub extern "C" fn __resolve_invalidate_stack_range(ptr: *mut c_void, size: usize
 #[unsafe(no_mangle)]
 pub extern "C" fn __resolve_malloc(size: usize) -> *mut c_void {
     let ptr = unsafe { mi_malloc(size + 1) };
-    let bounds_info = unsafe { mi_resolve_ptr(ptr) };
+    //let bounds_info = unsafe { mi_resolve_ptr(ptr) };
 
     if ptr.is_null() {
         return ptr;
     }
 
-    {
-        let mut obj_list = ALIVE_OBJ_LIST.lock();
-        obj_list.add_shadow_object(AllocType::Heap, ptr as Vaddr, size);
-    }
+    //{
+    //    let mut obj_list = ALIVE_OBJ_LIST.lock();
+    //    obj_list.add_shadow_object(AllocType::Heap, ptr as Vaddr, size);
+    //}
 
     info!(
         "[HEAP] Registered heap object (malloc): addr={:p}, size={}",
         ptr, size
     );
 
-    info!("[RESOLVE] bounds: (0x{:x}, 0x{:x})", bounds_info.base as Vaddr, bounds_info.limit as Vaddr);
-    info!("[RESOLVE] block index: {}", bounds_info.block_index);
-    info!("[RESOLVE] block size: {}", bounds_info.block_size);
+    //info!("[RESOLVE] bounds: (0x{:x}, 0x{:x})", bounds_info.base as Vaddr, bounds_info.limit as Vaddr);
+    //info!("[RESOLVE] block index: {}", bounds_info.block_index);
+    //info!("[RESOLVE] block size: {}", bounds_info.block_size);
     ptr
 }
 
@@ -152,7 +152,7 @@ pub extern "C" fn __resolve_free(ptr: *mut c_void) -> () {
         freed_guard.add_shadow_object(AllocType::Unallocated, ptr as Vaddr, obj_size.unwrap_or(0));
     }
 
-   let _ = unsafe { mi_free(ptr) };
+  let _ = unsafe { mi_free(ptr) };
 }
 //
 /**
@@ -190,7 +190,7 @@ pub extern "C" fn __resolve_realloc(ptr: *mut c_void, size: usize) -> *mut c_voi
         realloc_ptr, size
     );
 
-    realloc_ptr
+   realloc_ptr
 }
 
 /**
@@ -210,10 +210,10 @@ pub extern "C" fn __resolve_calloc(n_items: usize, item_size: usize) -> *mut c_v
         return ptr;
     }
 
-    {
-        let mut obj_list = ALIVE_OBJ_LIST.lock();
-        obj_list.add_shadow_object(AllocType::Heap, ptr as Vaddr, size);
-    }
+    //{
+    //    let mut obj_list = ALIVE_OBJ_LIST.lock();
+    //    obj_list.add_shadow_object(AllocType::Heap, ptr as Vaddr, size);
+    //}
 
     info!(
         "[HEAP] Registered heap object (calloc): addr={:p}, size={}",
@@ -241,11 +241,11 @@ pub extern "C" fn __resolve_strdup(ptr: *mut c_char) -> *mut c_char {
     // +1 to include null termination byte. We should allow program to read this value.
     // Otherwise how would the program find the end of the string?
     // Although writing it to something else is probably a bad idea, this too should be allowed.
-    let sizeofstr = unsafe { strlen(ptr) + 1 };
-    {
-        let mut obj_list = ALIVE_OBJ_LIST.lock();
-        obj_list.add_shadow_object(AllocType::Heap, string_ptr as Vaddr, sizeofstr);
-    }
+   // let sizeofstr = unsafe { strlen(ptr) + 1 };
+   // {
+   //     let mut obj_list = ALIVE_OBJ_LIST.lock();
+   //     obj_list.add_shadow_object(AllocType::Heap, string_ptr as Vaddr, sizeofstr);
+   // }
 
     info!(
         "[HEAP] Registered heap object (strdup): addr={:p}, size={}",
@@ -276,12 +276,12 @@ pub extern "C" fn __resolve_strndup(ptr: *mut c_char, size: usize) -> *mut c_cha
     // We don't actually know how much memory the libc will allocate, but
     // strnlen(ptr, size) + 1 is a safe lower bound.
     // strlen(string_ptr) + 1 would also be valid I think.
-    let sizeofstr = unsafe { strnlen(ptr, size) + 1 };
+    //let sizeofstr = unsafe { strnlen(ptr, size) + 1 };
 
-    {
-        let mut obj_list = ALIVE_OBJ_LIST.lock();
-        obj_list.add_shadow_object(AllocType::Heap, string_ptr as Vaddr, sizeofstr);
-    }
+    //{
+    //    let mut obj_list = ALIVE_OBJ_LIST.lock();
+    //    obj_list.add_shadow_object(AllocType::Heap, string_ptr as Vaddr, sizeofstr);
+    //}
 
     info!(
         "[HEAP] Registered heap object (strndup): addr={:p}, size={}",
