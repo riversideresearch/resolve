@@ -289,6 +289,13 @@ pub struct ShadowObjBounds {
  */
 #[unsafe(no_mangle)]
 pub extern "C" fn __resolve_get_bounds(ptr: *mut c_void) -> ShadowObjBounds {
+    if ptr.is_null() {
+        return ShadowObjBounds {
+            base: std::ptr::null_mut(),
+            limit: std::ptr::null_mut(),
+        };
+    }
+    
     let bounds = unsafe { mi_resolve_ptr(ptr) };
     return ShadowObjBounds { base: bounds.base, limit: bounds.limit }
     //let sobj_table = ALIVE_OBJ_LIST.lock();
