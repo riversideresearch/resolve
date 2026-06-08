@@ -68,7 +68,7 @@ pub extern "C" fn __resolve_getline(line: *mut *mut c_char, size: *mut size_t, s
     unsafe {
         if (*line).is_null() || *size == 0 {
             *size = 128;
-            *line = __resolve_malloc(*size + 1) as *mut c_char;
+            *line = __resolve_malloc(*size) as *mut c_char;
 
             // check if the pointer is null
             if (*line).is_null() { return -1; }
