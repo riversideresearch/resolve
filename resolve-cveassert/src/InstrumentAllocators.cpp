@@ -85,6 +85,9 @@ void instrumentLibraryAllocations(Function *F) {
                         false));
   wrapLibraryFunction(
       F, "munmap", FunctionType::get(integerType, {ptrType, sizeType}, false));
+  wrapLibraryFunction(
+      F, "getline",
+      FunctionType::get(size_ty, {ptr_ty, ptr_ty, ptr_ty}, false));
 }
 
 void instrumentAlloca(Function *F) {
