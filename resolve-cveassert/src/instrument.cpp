@@ -66,6 +66,9 @@ void instrumentLibraryAllocations(Function *F) {
   wrapLibraryFunction(F, "strdup", FunctionType::get(ptr_ty, {ptr_ty}, false));
   wrapLibraryFunction(F, "strndup",
                       FunctionType::get(ptr_ty, {ptr_ty, size_ty}, false));
+  wrapLibraryFunction(
+      F, "getline",
+      FunctionType::get(size_ty, {ptr_ty, ptr_ty, ptr_ty}, false));
 }
 
 void instrumentAlloca(Function *F) {
