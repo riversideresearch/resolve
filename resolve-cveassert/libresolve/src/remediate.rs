@@ -60,18 +60,18 @@ pub extern "C" fn __resolve_invalidate_stack_range(base: *mut c_void, size: usiz
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn __resolve_getline(line: *mut *mut c_char, size: *mut size_t, stream: *mut FILE) -> ssize_t {
-    if line.is_null() || size.is_null() || stream.is_null() {
+pub extern "C" fn __resolve_getline(lineptr: *mut *mut c_char, size: *mut size_t, stream: *mut FILE) -> ssize_t {
+    if lineptr.is_null() || size.is_null() || stream.is_null() {
         return -1;
     }
 
     unsafe {
-        if (*line).is_null() || *size == 0 {
+        if (*lineptr).is_null() || *size == 0 {
             *size = 128;
-            *line = __resolve_malloc(*size) as *mut c_char;
+            *lineptr = __resolve_malloc(*size) as *mut c_char;
 
             // check if the pointer is null
-            if (*line).is_null() { return -1; }
+            if (*lineptr).is_null() { return -1; }
         }
 
         let mut pos: size_t = 0;
@@ -83,18 +83,18 @@ pub extern "C" fn __resolve_getline(line: *mut *mut c_char, size: *mut size_t, s
 
             if pos + 1 >= *size { // Expand buffer
                 let new_size = *size * 2;
-                let new_ptr = __resolve_realloc(*line as *mut c_void, new_size);
+                let new_buf = __resolve_realloc(*lineptr as *mut c_void, new_size);
 
-                if new_ptr.is_null() {
+                if new_buf.is_null() {
                     return -1;
                 }
 
-                *line = new_ptr as *mut c_char;
+                *lineptr = new_buf as *mut c_char;
                 *size = new_size;
             }
 
             // (*lineptr)[pos++] = (char)c;
-            (*line).add(pos).write(c as c_char);
+            (*lineptr).add(pos).write(c as c_char);
             pos += 1;
 
             if c == b'\n' as c_int {
@@ -107,12 +107,52 @@ pub extern "C" fn __resolve_getline(line: *mut *mut c_char, size: *mut size_t, s
             return -1;
         }
 
-        (*line).add(pos).write(0); // (*lineptr)[pos] = '\0'
+        (*lineptr).add(pos).write(0); // (*lineptr)[pos] = '\0'
         pos as ssize_t
     }
 }
 
+#[unsafe(no_mangle)]
+pub extern "C" fn __resolve_getdelim(lineptr: *mut *mut c_char, size: *mut size_t, delim: c_int, stream: *mut FILE) -> ssize_t {
+    if lineptr.is_null() || size.is_null() || stream.is_null() {
+        return -1;
+    }
 
+    unsafe {
+        if (*lineptr).is_null() || *size == 0 {
+            *size = 128;
+            *lineptr = __resolve_malloc(*size) as *mut c_char;
+
+            if (*lineptr).is_null() { return -1; }
+        }
+
+        let mut pos: size_t = 0;
+        let mut c: c_int;
+
+        loop {
+            c = fgetc(stream);
+            if c == EOF { break; }
+
+            if pos + 1 >= *size {
+                let new_size = *size * 2;
+                let new_buf = __resolve_realloc(*lineptr as *mut c_void, new_size);
+
+                if new_buf.is_null() { return -1; }
+            
+                *lineptr = new_buf as *mut c_char;
+                *size = new_size;
+            }
+
+            (*lineptr).add(pos).write(c as c_char);
+            pos += 1;
+
+            if c == delim { break; }
+        }
+
+        (*lineptr).add(pos).write(0);
+        pos as ssize_t
+    }
+}
 
 /**
  * @brief - Allocator logging interface for malloc
@@ -298,7 +338,7 @@ pub extern "C" fn __resolve_strdup(ptr: *mut c_char) -> *mut c_char {
 //  *  - size: number of bytes to copied
 //  * @return - pointer to the copied string
 //  * NOTE: Read this link to understand the nature of strdup & strndup
-//  * https://pubs.opengroup.org/onlinepubs/9699919799/functions/strdup.html
+//  * https://pubs.opengroup.org/onlineptrpubs/9699919799/functions/strdup.html
 //  */
 #[unsafe(no_mangle)]
 pub extern "C" fn __resolve_strndup(ptr: *mut c_char, size: usize) -> *mut c_char {

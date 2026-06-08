@@ -77,6 +77,9 @@ void instrumentLibraryAllocations(Function *F) {
   wrapLibraryFunction(
       F, "getline",
       FunctionType::get(size_ty, {ptr_ty, ptr_ty, ptr_ty}, false));
+  wrapLibraryFunction(
+      F, "getdelim",
+      FunctionType::get(size_ty, {ptr_ty, ptr_ty, size_ty, ptr_ty}, false));
 }
 
 void instrumentAlloca(Function *F) {
