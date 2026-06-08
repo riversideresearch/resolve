@@ -1,7 +1,7 @@
 // Copyright (c) 2025 Riverside Research.
 // LGPL-3; See LICENSE.txt in the repo root for details.
 use libc::{
-    EOF, c_char, c_void, fgetc, getdelim, strlen, strnlen, ssize_t, 
+    EOF, FILE, c_char, c_int, c_void, fgetc, strlen, strnlen, size_t, ssize_t, 
 };
 
 use crate::shadowobjs::{
@@ -108,9 +108,8 @@ pub extern "C" fn __resolve_getline(line: *mut *mut c_char, size: *mut size_t, s
         }
 
         (*line).add(pos).write(0); // (*lineptr)[pos] = '\0'
+        pos as ssize_t
     }
-
-    pos as ssize_t
 }
 
 
