@@ -1,7 +1,8 @@
 // Copyright (c) 2025 Riverside Research.
 // LGPL-3; See LICENSE.txt in the repo root for details.
 use libc::{
-    EOF, FILE, c_char, c_int, c_void, fgetc, strlen, strnlen, size_t, ssize_t, 
+    EOF, FILE, c_char, c_int, c_void, fgetc, free, strlen, strnlen, size_t, ssize_t,
+    write, STDERR_FILENO, 
 };
 
 use crate::shadowobjs::{
@@ -229,8 +230,15 @@ pub extern "C" fn __resolve_free(ptr: *mut c_void) -> () {
   //     let mut freed_guard = FREED_OBJ_LIST.lock();
   //     freed_guard.add_shadow_object(AllocType::Unallocated, ptr as Vaddr, ptr_size.unwrap_or(0));
   // }
-
-  let _ = unsafe { mi_free(ptr) };
+  if mi_is_in_heap_region(ptr) {
+    let _ = unsafe { mi_free(ptr) };
+  } else {
+    unsafe {
+        let msg = b"foreign allocation not owned by mimalloc\n";
+        write(STDERR_FILENO, msg.as_ptr().cast(), msg.len());
+        free(ptr);
+    }
+  }
 }
 //
 /**
