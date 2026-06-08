@@ -123,9 +123,8 @@ pub extern "C" fn __resolve_getline(line: *mut *mut c_char, size: *mut size_t, s
         }
 
         (*line).add(pos).write(0); // (*lineptr)[pos] = '\0'
+        pos as ssize_t
     }
-
-    pos as ssize_t
 }
 
 
