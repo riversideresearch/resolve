@@ -1,7 +1,7 @@
 // Copyright (c) 2025 Riverside Research.
 // LGPL-3; See LICENSE.txt in the repo root for details.
 use libc::{
-    c_char, c_void, strlen,strnlen,
+    EOF, c_char, c_void, fgetc, getdelim, strlen, strnlen, ssize_t, 
 };
 
 use crate::shadowobjs::{SHADOW_STACK, ALIVE_OBJ_LIST, AllocType, FREED_OBJ_LIST, Vaddr};
@@ -58,6 +58,62 @@ pub extern "C" fn __resolve_invalidate_stack_range(base: *mut c_void, size: usiz
 
     info!("[STACK] Free addr 0x{base:x} size {size}");
 }
+
+#[unsafe(no_mangle)]
+pub extern "C" fn __resolve_getline(line: *mut *mut c_char, size: *mut size_t, stream: *mut FILE) -> ssize_t {
+    if line.is_null() || size.is_null() || stream.is_null() {
+        return -1;
+    }
+
+    unsafe {
+        if (*line).is_null() || *size == 0 {
+            *size = 128;
+            *line = __resolve_malloc(*size + 1) as *mut c_char;
+
+            // check if the pointer is null
+            if (*line).is_null() { return -1; }
+        }
+
+        let mut pos: size_t = 0;
+        let mut c: c_int;
+
+        loop {
+            c = fgetc(stream);
+            if c == EOF { break; }
+
+            if pos + 1 >= *size { // Expand buffer
+                let new_size = *size * 2;
+                let new_ptr = __resolve_realloc(*line as *mut c_void, new_size);
+
+                if new_ptr.is_null() {
+                    return -1;
+                }
+
+                *line = new_ptr as *mut c_char;
+                *size = new_size;
+            }
+
+            // (*lineptr)[pos++] = (char)c;
+            (*line).add(pos).write(c as c_char);
+            pos += 1;
+
+            if c == b'\n' as c_int {
+                break;
+            }                                 
+
+        }
+
+        if pos == 0 && c == EOF { // No data read
+            return -1;
+        }
+
+        (*line).add(pos).write(0); // (*lineptr)[pos] = '\0'
+    }
+
+    pos as ssize_t
+}
+
+
 
 /**
  * @brief - Allocator logging interface for malloc
