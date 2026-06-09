@@ -6,6 +6,8 @@ all: build
 
 ifeq ($(origin BUILD_DIR),command line)
 RESOLVE_CMAKE_BUILD_DIR ?= $(BUILD_DIR)
+else ifeq ($(RESOLVE_BUILD_KLEE),ON)
+RESOLVE_CMAKE_BUILD_DIR ?= build-with-klee
 else
 RESOLVE_CMAKE_BUILD_DIR ?= build
 endif
@@ -20,7 +22,7 @@ build: configure-default
 	cmake --build $(RESOLVE_CMAKE_BUILD_DIR)
 
 build-with-klee:
-	$(MAKE) build RESOLVE_CMAKE_BUILD_DIR=build-with-klee RESOLVE_BUILD_KLEE=ON
+	$(MAKE) build RESOLVE_BUILD_KLEE=ON
 
 configure-default: 
 	cmake -B$(RESOLVE_CMAKE_BUILD_DIR) $(CMAKE_ARGS) -DCMAKE_BUILD_TYPE=
@@ -29,7 +31,7 @@ build-release: configure-release
 	cmake --build $(RESOLVE_CMAKE_BUILD_DIR)
 
 build-release-with-klee:
-	$(MAKE) build-release RESOLVE_CMAKE_BUILD_DIR=build-with-klee RESOLVE_BUILD_KLEE=ON
+	$(MAKE) build-release RESOLVE_BUILD_KLEE=ON
 
 configure-release: 
 	cmake -B$(RESOLVE_CMAKE_BUILD_DIR) $(CMAKE_ARGS) -DCMAKE_BUILD_TYPE=Release
@@ -38,19 +40,19 @@ check: configure
 	cmake --build $(RESOLVE_CMAKE_BUILD_DIR) --target check
 
 check-with-klee:
-	$(MAKE) check RESOLVE_CMAKE_BUILD_DIR=build-with-klee RESOLVE_BUILD_KLEE=ON
+	$(MAKE) check RESOLVE_BUILD_KLEE=ON
 
 test: configure
 	cmake --build $(RESOLVE_CMAKE_BUILD_DIR) --target test-CVEAssert test-libresolve
 
 test-with-klee:
-	$(MAKE) test RESOLVE_CMAKE_BUILD_DIR=build-with-klee RESOLVE_BUILD_KLEE=ON
+	$(MAKE) test RESOLVE_BUILD_KLEE=ON
 
 install: configure
 	cmake --install $(RESOLVE_CMAKE_BUILD_DIR)
 
 install-with-klee:
-	$(MAKE) install RESOLVE_CMAKE_BUILD_DIR=build-with-klee RESOLVE_BUILD_KLEE=ON
+	$(MAKE) install RESOLVE_BUILD_KLEE=ON
 
 install-local: configure
 	cmake --install $(RESOLVE_CMAKE_BUILD_DIR) --prefix install
