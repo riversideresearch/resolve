@@ -235,9 +235,14 @@ pub extern "C" fn __resolve_free(ptr: *mut c_void) -> () {
       if mi_is_heap_owned(ptr) {
           let _ = mi_free(ptr);
       } else {
-          let msg = b"allocation not owned by mimalloc\n";
-          write(STDERR_FILENO, msg.as_ptr().cast(), msg.len());
-          let _ = free(ptr);
+          let mut buf = [0u8; 64];
+          let n = libc::snprintf(
+            buf.as_mut_ptr().cast(),
+            buf.len(),
+            b"free(%p)\n\0".as_ptr().cast(),
+            ptr,
+          );
+          write(STDERR_FILENO, buf.as_ptr().cast(), n as usize);
       }
   }
 }
