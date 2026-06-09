@@ -24,6 +24,7 @@ CWE_PATCHES = {
     369: [3],
     476: [1],
     590: [2],
+    1335: [5],
     787: [0]
 }
 
@@ -79,8 +80,13 @@ def parse_cve_description(json_path: Path) -> list[CweTarget]:
 
         for vuln in json_obj["vulnerabilities"]:
             output = vuln.get("output", "inline")
+            if output in ("patch", "file"):
+                print("Skipping vulnerability with output type:", output)
+                continue
+
             gated = vuln.get("gated", True)
             if not gated:
+                print("Skipping ungated vulnerability")
                 continue
             cwe_id = vuln["cwe-id"]
             function_name = vuln["affected-function"]
