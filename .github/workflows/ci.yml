@@ -15,13 +15,13 @@ jobs:
       - name: Install deps
         run: make install-deps
       - name: Build
-        run: make build-klee
+        run: make build-with-klee
       - name: Install
-        run: make install-klee
+        run: make install-with-klee
       - name: Test
-        run: make test-klee
+        run: make test-with-klee
       - name: Check
-        run: make check-klee
+        run: make check-with-klee
       - name: Build Examples
         run: ./examples/openssl.sh
 
