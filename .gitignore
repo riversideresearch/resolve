@@ -1,5 +1,6 @@
 # no build files
 **/build/*
+**/build-klee/*
 __pycache__
 CMakeFiles
 CMakeCache.txt
