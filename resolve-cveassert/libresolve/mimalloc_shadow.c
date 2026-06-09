@@ -29,3 +29,9 @@ bounds_info_t mi_resolve_ptr(void* p) {
   bounds.block_index = block_index;
   return bounds;
 }
+
+bool mi_is_heap_owned(const void* p) {
+  return mi_check_owned(p);
+}
+
+
