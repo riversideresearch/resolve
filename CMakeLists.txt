@@ -17,7 +17,11 @@ set(CMAKE_CXX_STANDARD 20 STRING "")
 add_subdirectory(resolve-cc)
 add_subdirectory(resolve-cveassert)
 add_subdirectory(resolve-facts)
-include(${CMAKE_SOURCE_DIR}/cmake/InstallKlee.cmake)
+
+option(RESOLVE_BUILD_KLEE "Build bundled KLEE support" OFF)
+if(RESOLVE_BUILD_KLEE)
+    include(${CMAKE_SOURCE_DIR}/cmake/InstallKlee.cmake)
+endif()
 add_subdirectory(resolve-cli)
 
 install(EXPORT resolve_targets 
