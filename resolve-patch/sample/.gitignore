@@ -1,5 +1,0 @@
-*.ll
-*.bc
-build
-resolvemain
-testinst
