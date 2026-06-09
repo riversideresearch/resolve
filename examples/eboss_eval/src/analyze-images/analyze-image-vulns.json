@@ -9,8 +9,7 @@
             "cwe-name": "Stack-based Buffer Overflow",
             "affected-function": "_TIFFVGetField",
             "affected-file": "libtiff/tif_dir.c",
-            "remediation-strategy": "recover",
-            "output": "inline"
+            "remediation-strategy": "recover"
         },
         {
             "cve-id": "CVE-openjpeg-00001",
@@ -21,8 +20,7 @@
             "cwe-name": "Divide by Zero",
             "affected-function": "opj_pi_next_pcrl",
             "affected-file": "lib/openjp2/pi.c",
-            "undesirable-function": "opj_int_ceildiv",
-            "output": "inline"
+            "undesirable-function": "opj_int_ceildiv"
         },
         {
             "cve-id": "CVE-openjpeg-00002",
@@ -33,8 +31,7 @@
             "cwe-name": "Divide by Zero",
             "affected-function": "opj_pi_next_cprl",
             "affected-file": "lib/openjp2/pi.c",
-            "undesirable-function": "opj_int_ceildiv",
-            "output": "inline"
+            "undesirable-function": "opj_int_ceildiv"
         },
         {
             "cve-id": "CVE-turbojpeg-00001",
@@ -45,8 +42,7 @@
             "cwe-name": "Incorrect Calculation of Buffer Size",
             "affected-function": "tjLoadImage",
             "affected-file": "src/turbojpeg.c",
-            "remediation-strategy": "recover",
-            "output": "inline"
+            "remediation-strategy": "recover"
         }
 
     ]

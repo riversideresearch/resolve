@@ -97,7 +97,7 @@ def main():
         if args.out_bin:
             print(f"Embedding output into {args.out_bin}")
             embed_facts(out_dir, args.out_bin)
-
+    
     if args.out_dir:
         print(f"Using out dir of {args.out_dir}")
         ingest_facts(args.out_dir)
