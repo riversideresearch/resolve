@@ -51,7 +51,6 @@ A Python wrapper, `reach.py`, provides a convenient command-line interface to in
 ## BUILDING `resolve`
 ```bash
 cd resolve/
-make install-deps      # Install necessary dependencies
 make build             # Builds compiler pass plugins, reach tool, and libresolve runtime library
 make install           # Installs executables and libraries into opt/resolve unless specified by user
 # make install-local   # Installs into <repo>/install for local development

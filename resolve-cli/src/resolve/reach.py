@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 
 from operator import attrgetter
 import os
+import gc
 import json
 import argparse
 import subprocess
@@ -588,7 +589,21 @@ class Orchestrator:
         
         unsolved_results = self.get_unsolved_results()
         self.input_manager.serialize_tool_input(unsolved_results)
+
+        #
+        # HACK: On problems with large facts, reach wrapper uses
+        #       a truly ridiculous amount of memory. In order to
+        #       prevent the EBOSS CI runners from OOM-ing, we
+        #       destroy FactParser before invoking reach, and
+        #       then pay the cost of re-building it twice after
+        #       reach exits.
+        #
+        self.fact_parser = None
+        gc.collect()
         self.input_manager.invoke_reach()
+        self.fact_parser = FactParser(self.facts_file)
+        self.fact_parser.demangle_names()
+
         tool_results = self.input_manager.get_tool_results(fact_parser=self.fact_parser)
         for result in unsolved_results:
             result.update_from_tool_results(tool_results)

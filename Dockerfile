@@ -25,7 +25,7 @@ RUN git clone --depth 1 --branch 2026.03.18 https://github.com/microsoft/vcpkg.g
 
 # Install deps
 COPY scripts /opt/resolve/scripts
-RUN /opt/resolve/scripts/install-deps.sh && apt-get clean && rm -rf /var/lib/apt/lists/*
+RUN /opt/resolve/scripts/install-deps-ci.sh && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Add resolve to PATH
 ENV PATH="/opt/resolve/bin:${PATH}"
@@ -59,7 +59,6 @@ COPY klee-uclibc-160 /resolve/klee-uclibc-160
 COPY resolve-cc /resolve/resolve-cc
 COPY resolve-cveassert /resolve/resolve-cveassert
 COPY resolve-facts /resolve/resolve-facts
-COPY mcp /resolve/mcp
 COPY resolve-cli /resolve/resolve-cli
 COPY Makefile /resolve/Makefile
 COPY CMakeLists.txt /resolve/CMakeLists.txt
