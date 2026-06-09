@@ -14,20 +14,20 @@ permissions:
 jobs:
   check_changes:
     runs-on: ubuntu-latest
-    outputs:
+    outputs: 
       should_build: ${{ steps.check.outputs.should_build }}
     steps:
       - name: Fetch History
         uses: actions/checkout@v5
-        with:
+        with: 
           fetch-depth: 0
 
       - name: Fetch default branch
         run: |
           git fetch origin ${{ github.event.repository.default_branch }}
           git checkout ${{ github.event.repository.default_branch }}
-
-      - name: Check for New Commits
+      
+      - name: Check for New Commits 
         id: check
         run: |
           COUNT=$(git rev-list --count --since="7 days ago" ${{ github.event.repository.default_branch }})
@@ -80,7 +80,7 @@ jobs:
         run: |
           mv sparse/examples/eboss_eval/src/analyze-images/analyze-image-remediated.dockerfile Dockerfile
           mv sparse/examples/eboss_eval/src/analyze-images/analyze-image-vulns.json vulnerabilities.json
-
+ 
       - name: Build and push Docker image
         uses: docker/build-push-action@v2
         with:
@@ -89,7 +89,7 @@ jobs:
           tags: ghcr.io/${{ github.repository_owner }}/resolve/analyze-image/server-remediated:latest
 
   run-reach:
-    # Should wait for latest version of remediation
+    # Should wait for latest version of remediation 
     needs: build
     if: always() && !cancelled()
     runs-on: ubuntu-latest
@@ -117,7 +117,7 @@ jobs:
           cat facts-dir/reach_out.json
 
   run-povs:
-    # Should wait for latest version of remediation
+    # Should wait for latest version of remediation 
     needs: build
     if: always() && !cancelled()
     runs-on: ubuntu-latest
@@ -152,7 +152,7 @@ jobs:
         run: mv sparse/examples/eboss_eval/src/analyze-images/compose-analyze-image.yml ./docker-compose.yml
 
       - name: Poller regression test
-        env:
+        env: 
           # This env var used in compose-analyze-image.yml
           AICP_SERVER: "server-remediated"
         continue-on-error: true

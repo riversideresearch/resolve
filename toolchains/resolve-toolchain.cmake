@@ -7,7 +7,7 @@ set(RESOLVE_PREFIX /opt/resolve)
 set(RESOLVE_PLUGINS
   "-fpass-plugin=${RESOLVE_PREFIX}/lib/libResolveFactsPlugin.so -fpass-plugin=${RESOLVE_PREFIX}/lib/libCVEAssert.so"
 )
-
+    
 # clang lowers mem* libc funtions into llvm intrinsics with additional metadata for optimization
 # We want our CVEAssert sanitizers to see the original libc functions, so we ask clang to skip the special handling
 # Ideally, we would only do that for vulnerable functions, but that requires behavior changes in clang or modifing source code
