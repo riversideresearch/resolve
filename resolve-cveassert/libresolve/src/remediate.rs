@@ -234,17 +234,17 @@ pub extern "C" fn __resolve_free(ptr: *mut c_void) -> () {
   unsafe {
       if mi_is_heap_owned(ptr) {
           let _ = mi_free(ptr);
-      } else {
-          let mut buf = [0u8; 64];
-          let n = libc::snprintf(
-            buf.as_mut_ptr().cast(),
-            buf.len(),
-            b"free(%p)\n\0".as_ptr().cast(),
-            ptr,
-          );
-          write(STDERR_FILENO, buf.as_ptr().cast(), n as usize);
       }
-  }
+    //   } else {
+    //       let mut buf = [0u8; 64];
+    //       let n = libc::snprintf(
+    //         buf.as_mut_ptr().cast(),
+    //         buf.len(),
+    //         b"free(%p)\n\0".as_ptr().cast(),
+    //         ptr,
+    //       );
+    //       write(STDERR_FILENO, buf.as_ptr().cast(), n as usize);
+    }
 }
 //
 /**
