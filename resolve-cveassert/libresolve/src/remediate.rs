@@ -32,6 +32,7 @@ unsafe extern "C" {
     
     // Shim API
     fn mi_resolve_ptr(ptr: *mut c_void) -> BoundsInfo;
+    fn mi_is_heap_owned(ptr: *mut c_void) -> bool;
 }
 
 /**
