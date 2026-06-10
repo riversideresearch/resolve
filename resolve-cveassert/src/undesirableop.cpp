@@ -49,6 +49,7 @@ static Function *replaceUndesirableFunction(Module *M, CallInst *call,
       getOrCreateResolveHelper(M, handlerName, resolveSanitizedFnTy);
 
   if (!resolveSanitizedFn->empty()) {
+    recordPatchFunction(resolveSanitizedFn);
     return resolveSanitizedFn;
   }
 
@@ -58,6 +59,7 @@ static Function *replaceUndesirableFunction(Module *M, CallInst *call,
   builder.CreateRet(resolveSanitizedFn->getArg(argNum));
 
   validateIR(resolveSanitizedFn);
+  recordPatchFunction(resolveSanitizedFn);
   return resolveSanitizedFn;
 }
 
