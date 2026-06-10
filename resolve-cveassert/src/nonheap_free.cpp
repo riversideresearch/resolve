@@ -12,7 +12,7 @@
 
 using namespace llvm;
 
-Function *getOrCreateCveIsHeap(Function *F) {
+Function *getOrCreateIsHeap(Function *F) {
   auto *M = F->getParent();
   LLVMContext &Ctx = M->getContext();
   auto ptr_ty = PointerType::get(Ctx, 0);
@@ -101,7 +101,7 @@ Function *getOrCreateFreeOfNonHeapSanitizer(
   // Call Is Heap Func
   // Branch if True
   builder.SetInsertPoint(CheckOnHeapBB);
-  Value *IsHeap = builder.CreateCall(getOrCreateCveIsHeap(F), {inputPtr});
+  Value *IsHeap = builder.CreateCall(getOrCreateIsHeap(F), {inputPtr});
   builder.CreateCondBr(IsHeap, FreeHeapBB, SanitizeNonHeapBB);
 
   builder.SetInsertPoint(SanitizeNonHeapBB);
