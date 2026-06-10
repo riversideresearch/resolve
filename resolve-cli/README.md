@@ -69,6 +69,21 @@ Current subcommands are...
     - `conclusion.md` -- one-paragraph summary
     - `input-synthesis/` -- synthesized inputs and supporting scripts (if applicable)
 
+- [`crash-analyzer`](resolve-cli/src/resolve/crash_analyzer/README.md)
+
+  Runs a crash analysis workflow, agnostic to the specifics of the input.
+
+  Inputs: 
+    - Crash Folder (can contain any relevant files)
+    - Source Folder (optional, but specifying source code path is useful for matching function symbols and examining logic)
+
+  Outputs:
+    - `vulnerabilities.json` -- for use with resolve tools or deduplication
+    - `report.md` -- a final explanation of the analysis performed
+    - `synthesis.md` -- (Internal) Original insights gleaned from cursory analysis
+    - `thesis.md` -- (Internal) Thesis containing conclusion on crash origin
+    - `antithesis.md` -- (Internal) Pushback against the thesis
+
 - [`sbom`](-src/resolve/sbom/README.md)
 
   Searches NVD for known vulnerabilities in an SBOM and generates vulnerabilities.json with the results.

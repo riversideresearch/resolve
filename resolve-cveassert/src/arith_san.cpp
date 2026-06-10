@@ -97,7 +97,6 @@ void sanitizeDivideByZero(Function *F,
   auto &Ctx = M->getContext();
   auto usize_ty = Type::getInt64Ty(Ctx);
   auto i1_ty = Type::getInt1Ty(Ctx);
-  GlobalVariable *map = SanitizerMaps[F];
   IRBuilder<> builder(Ctx);
   std::vector<Instruction *> worklist;
 
@@ -145,14 +144,7 @@ void sanitizeDivideByZero(Function *F,
 
     checkMapEntryBB->getTerminator()->eraseFromParent();
     builder.SetInsertPoint(checkMapEntryBB);
-    Value *zero = builder.getInt64(0);
-    Value *mapPtr = builder.CreateGEP(map->getValueType(), map, {zero, zero});
-    Value *mapEntry =
-        builder.CreateCall(getOrCreateSanitizerMapEntry(M),
-                           {mapPtr, ConstantInt::get(usize_ty, 3)});
-    Value *isMapEntryZero =
-        builder.CreateICmpEQ(mapEntry, ConstantInt::get(i1_ty, 0));
-    builder.CreateCondBr(isMapEntryZero, preserveDivBB, checkZeroBB);
+    createSanitizerGateBranch(builder, F, 3, preserveDivBB, checkZeroBB);
 
     builder.SetInsertPoint(checkZeroBB);
 
@@ -271,7 +263,6 @@ void sanitizeIntOverflow(Function *F,
   auto &Ctx = M->getContext();
   auto usize_ty = Type::getInt64Ty(Ctx);
   auto i1_ty = Type::getInt1Ty(Ctx);
-  GlobalVariable *map = SanitizerMaps[F];
   IRBuilder<> builder(Ctx);
 
   switch (strategy) {
@@ -412,14 +403,7 @@ void sanitizeIntOverflow(Function *F,
 
     checkMapEntryBB->getTerminator()->eraseFromParent();
     builder.SetInsertPoint(checkMapEntryBB);
-    Value *zero = builder.getInt64(0);
-    Value *mapPtr = builder.CreateGEP(map->getValueType(), map, {zero, zero});
-    Value *mapEntry =
-        builder.CreateCall(getOrCreateSanitizerMapEntry(M),
-                           {mapPtr, ConstantInt::get(usize_ty, 4)});
-    Value *isMapEntryZero =
-        builder.CreateICmpEQ(mapEntry, ConstantInt::get(i1_ty, 0));
-    builder.CreateCondBr(isMapEntryZero, joinResultBB, checkOverflowBB);
+    createSanitizerGateBranch(builder, F, 4, joinResultBB, checkOverflowBB);
 
     builder.SetInsertPoint(checkOverflowBB);
     builder.CreateCondBr(isOverflow, remedOverflowBB, joinResultBB);
@@ -448,7 +432,6 @@ void sanitizeBitShift(Function *F,
   auto &Ctx = M->getContext();
   auto usize_ty = Type::getInt64Ty(Ctx);
   auto i1_ty = Type::getInt1Ty(Ctx);
-  GlobalVariable *map = SanitizerMaps[F];
   IRBuilder<> builder(Ctx);
   std::vector<Instruction *> worklist;
 
@@ -496,14 +479,7 @@ void sanitizeBitShift(Function *F,
 
     checkMapEntryBB->getTerminator()->eraseFromParent();
     builder.SetInsertPoint(checkMapEntryBB);
-    Value *zero = builder.getInt64(0);
-    Value *mapPtr = builder.CreateGEP(map->getValueType(), map, {zero, zero});
-    Value *mapEntry =
-        builder.CreateCall(getOrCreateSanitizerMapEntry(M),
-                           {mapPtr, ConstantInt::get(usize_ty, 5)});
-    Value *isMapEntryZero =
-        builder.CreateICmpEQ(mapEntry, ConstantInt::get(i1_ty, 0));
-    builder.CreateCondBr(isMapEntryZero, preserveShiftBB, remedShiftBB);
+    createSanitizerGateBranch(builder, F, 5, preserveShiftBB, checkShiftBB);
 
     builder.SetInsertPoint(checkShiftBB);
     Value *shifted_value = binary_inst->getOperand(0);

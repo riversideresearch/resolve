@@ -16,6 +16,7 @@
 #include "llvm/Passes/PassBuilder.h"
 #include "llvm/Passes/PassPlugin.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/Transforms/Utils/Cloning.h"
 
 #include <cstdio>
 #include <cstdlib>
@@ -41,6 +42,14 @@ using namespace llvm;
 // Global env var
 bool CVE_ASSERT_DEBUG;
 DenseMap<Function *, GlobalVariable *> SanitizerMaps;
+
+GlobalVariable *getSanitizerMap(Function *F) {
+  auto It = SanitizerMaps.find(F);
+  if (It == SanitizerMaps.end()) {
+    return nullptr;
+  }
+  return It->second;
+}
 
 GlobalVariable *initSanitizerMap(Function &F) {
   Module *M = F.getParent();
@@ -93,7 +102,9 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
     NULL_PTR_DEREF = 476, /* NOTE: This ID has been found in OpenALPR, NASA CFS,
                              stb-convert CPs */
     STACK_FREE =
-        590 /* NOTE: This ID has been found in NASA CFS challenge problem */
+        590, /* NOTE: This ID has been found in NASA CFS challenge problem */
+    INCORRECT_BITWISE_SHIFT =
+        1335 /* https://cwe.mitre.org/data/definitions/1335.html */
   };
 
   LabelCVEPass() {
@@ -101,6 +112,92 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
     CVE_ASSERT_DEBUG = strlen(std::getenv("CVE_ASSERT_DEBUG") ?: "") > 0;
 
     vulnerabilities = Vulnerability::parseVulnerabilityFile();
+  }
+
+  Function *getOrCreateFreeOfNonHeapSanitizer(
+      Function *F, Vulnerability::RemediationStrategies strategy) {
+    std::string handlerName = "__cve_san_nonheap_free";
+    Module *M = F->getParent();
+    LLVMContext &Ctx = M->getContext();
+
+    IRBuilder<> builder(Ctx);
+    // TODO: handle address spaces other than 0
+    auto ptr_ty = PointerType::get(Ctx, 0);
+    auto usize_ty = Type::getInt64Ty(Ctx);
+    auto i1_ty = Type::getInt1Ty(Ctx);
+
+    // TODO: write this in asm as some kind of sanitzer_rt?
+    FunctionType *resolveFreeNonHeapFnTy =
+        FunctionType::get(Type::getVoidTy(Ctx), {ptr_ty}, false);
+    Function *resolveFreeNonHeapFn =
+        getOrCreateResolveHelper(M, handlerName, resolveFreeNonHeapFnTy);
+    if (!resolveFreeNonHeapFn->empty()) {
+      recordPatchFunction(resolveFreeNonHeapFn);
+      return resolveFreeNonHeapFn;
+    }
+
+    BasicBlock *EntryBB =
+        BasicBlock::Create(Ctx, "entry", resolveFreeNonHeapFn);
+    BasicBlock *CheckOnHeapBB =
+        BasicBlock::Create(Ctx, "check_heap", resolveFreeNonHeapFn);
+    BasicBlock *SanitizeNonHeapBB =
+        BasicBlock::Create(Ctx, "sanitize_nonheap", resolveFreeNonHeapFn);
+    BasicBlock *FreeHeapBB =
+        BasicBlock::Create(Ctx, "free_heap", resolveFreeNonHeapFn);
+
+    // Set insertion point to entry block
+    builder.SetInsertPoint(EntryBB);
+    Argument *inputPtr = resolveFreeNonHeapFn->getArg(0);
+
+    createSanitizerGateBranch(builder, F, 2, FreeHeapBB, CheckOnHeapBB);
+
+    // Call Is Heap Func
+    // Branch if True
+    builder.SetInsertPoint(CheckOnHeapBB);
+    Value *IsHeap = builder.CreateCall(getOrCreateIsHeap(M, Ctx), {inputPtr});
+    builder.CreateCondBr(IsHeap, FreeHeapBB, SanitizeNonHeapBB);
+
+    builder.SetInsertPoint(SanitizeNonHeapBB);
+    if (Function *fn = getOrCreateRemediationBehavior(M, strategy)) {
+      builder.CreateCall(fn);
+    }
+    builder.CreateRetVoid();
+
+    // Free Block: call Free
+    builder.SetInsertPoint(FreeHeapBB);
+    builder.CreateCall(M->getFunction("free"), {inputPtr});
+    builder.CreateRetVoid();
+
+    validateIR(resolveFreeNonHeapFn);
+    recordPatchFunction(resolveFreeNonHeapFn);
+    return resolveFreeNonHeapFn;
+  }
+
+  void sanitizeFreeOfNonHeap(Function *F,
+                             Vulnerability::RemediationStrategies strategy) {
+    LLVMContext &Ctx = F->getContext();
+    IRBuilder<> builder(Ctx);
+    std::vector<CallInst *> workList;
+
+    for (auto &BB : *F) {
+      for (auto &Inst : BB) {
+        if (auto *call = dyn_cast<CallInst>(&Inst)) {
+          if (auto callee = call->getCalledFunction())
+            if (callee->getName() == "free") {
+              workList.push_back(call);
+            }
+        }
+      }
+    }
+
+    for (auto call : workList) {
+      builder.SetInsertPoint(call);
+      auto sanitizerFn = getOrCreateFreeOfNonHeapSanitizer(F, strategy);
+
+      builder.CreateCall(sanitizerFn, {call->getArgOperand(0)});
+      call->removeFromParent();
+      call->deleteValue();
+    }
   }
 
   void applyAutomaticSanitizers(Function &F,
@@ -114,14 +211,20 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
     sanitizeBitShift(&F, strategy);
   }
 
-  /// Return true if F's name (raw or demangled) contains `targetName
-  ///
+  /// Return true if F's name (raw or demangled) matches or contains targetName.
+  /// Caret/dollar anchors request exact matching
   /// Always returns true if targetName is empty
   bool nameMatches(Function &F, const std::string &demangledName,
                    const std::string &targetName) {
     // Empty function name matches all functions
     if (targetName.empty()) {
       return true;
+    }
+
+    if (targetName.size() >= 2 && targetName.front() == '^' &&
+        targetName.back() == '$') {
+      std::string exactName = targetName.substr(1, targetName.size() - 2);
+      return demangledName == exactName || F.getName() == exactName;
     }
 
     // First check demangled name
@@ -170,6 +273,7 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
 
     out << "[CVEAssert] === Pre Instrumented IR === \n";
     out << F;
+    out << "[CVEAssert] === Inserted Sanitizer Helpers === \n";
 
     if (vuln.UndesirableFunction.has_value()) {
       /* NOTE: We are using '0' as a temporary this will be updated future PRs
@@ -229,6 +333,11 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
       result = PreservedAnalyses::none();
       break;
 
+    case VulnID::INCORRECT_BITWISE_SHIFT:
+      sanitizeBitShift(&F, vuln.Strategy);
+      result = PreservedAnalyses::none();
+      break;
+
     case VulnID::ALL:
       applyAutomaticSanitizers(F, vuln.Strategy);
       result = PreservedAnalyses::none();
@@ -248,23 +357,28 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
     return result;
   }
 
-  PreservedAnalyses run(Module &M, ModuleAnalysisManager &MAM) {
+  PreservedAnalyses
+  runInstrumentationPipeline(Module &M, ModuleAnalysisManager &MAM,
+                             std::vector<Vulnerability> &vulns,
+                             bool writePatch) {
     auto result = PreservedAnalyses::all();
     InstrumentMemInst instrument_mem_inst;
 
+    SanitizerMaps.clear();
+
     /// Precompute globals before instrumentation
     for (auto &F : M) {
-      for (auto &vuln : vulnerabilities) {
+      for (auto &vuln : vulns) {
         if (F.isDeclaration())
           continue;
 
-        if (shouldInstrument(F, vuln)) {
+        if (vuln.Gated && shouldInstrument(F, vuln)) {
           SanitizerMaps[&F] = initSanitizerMap(F);
         }
       }
     }
 
-    for (auto &vuln : vulnerabilities) {
+    for (auto &vuln : vulns) {
       // Also skip instrumentation for skipped vulnerabilities
       if (vuln.Strategy == Vulnerability::RemediationStrategies::NONE) {
         continue;
@@ -294,6 +408,9 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
     }
 
     for (auto &F : M) {
+      if (F.isDeclaration())
+        continue;
+
       if (instrument_mem_inst.instrumentAlloca) {
         instrumentAlloca(&F);
       }
@@ -304,8 +421,20 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
     }
 
     for (auto &F : M) {
-      for (auto &vuln : vulnerabilities) {
-        result.intersect(runOnFunction(F, MAM, vuln));
+      if (F.isDeclaration())
+        continue;
+
+      for (auto &vuln : vulns) {
+        if (writePatch) {
+          if (!shouldInstrument(F, vuln))
+            continue;
+
+          beginPatchRecording();
+          result.intersect(runOnFunction(F, MAM, vuln));
+          endPatchRecordingAndWrite(&F);
+        } else {
+          result.intersect(runOnFunction(F, MAM, vuln));
+        }
       }
     }
 
@@ -314,6 +443,33 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
       result = PreservedAnalyses::none();
     }
     return result;
+  }
+
+  PreservedAnalyses run(Module &M, ModuleAnalysisManager &MAM) {
+    std::vector<Vulnerability> patchVulns;
+    std::vector<Vulnerability> moduleVulns;
+
+    for (auto &vuln : vulnerabilities) {
+      if (vuln.Output == Vulnerability::RemediationOutput::PATCH) {
+        patchVulns.push_back(vuln);
+      } else {
+        moduleVulns.push_back(vuln);
+      }
+    }
+
+    if (!patchVulns.empty()) {
+      std::error_code EC;
+      raw_fd_ostream patchFile("resolve-patch.ll", EC);
+      patchFile.close();
+    }
+
+    for (auto &vuln : patchVulns) {
+      auto patchModule = CloneModule(M);
+      std::vector<Vulnerability> singleVuln = {vuln};
+      runInstrumentationPipeline(*patchModule, MAM, singleVuln, true);
+    }
+
+    return runInstrumentationPipeline(M, MAM, moduleVulns, false);
   }
 };
 
