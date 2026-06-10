@@ -2,6 +2,8 @@
 // LGPL-3; See LICENSE.txt in the repo root for details.
 
 use crate::MutexWrap;
+use crate::shadowobjs::ShadowStackObject::FrameFrontPtr;
+use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::ops::RangeInclusive;
 use std::ops::Bound::Included;
@@ -116,6 +118,69 @@ impl ShadowObjectTable {
 // static object lists to store all objects
 pub static ALIVE_OBJ_LIST: MutexWrap<ShadowObjectTable> = MutexWrap::new(ShadowObjectTable::new());
 pub static FREED_OBJ_LIST: MutexWrap<ShadowObjectTable> = MutexWrap::new(ShadowObjectTable::new());
+
+/*
+    Stack shadow object shape:
+    [frame 0]   [  frame 1  ]
+    [ | | | ][*][ | | | | | ][*] -> (growth direction)
+    <---------| <-------------|  
+
+    We grow by appending ShadowObjects to the end of the Vector,
+    and inserting new FrameFrontPtrs when we push new frames.
+    These FrameFrontPtrs reference the beginning of the pervious
+    frame, letting us backwards traverse in order to search
+*/
+enum ShadowStackObject {
+    ShadowObject(ShadowObject),
+    FrameFrontPtr(u64)
+}
+
+pub struct ShadowStack {
+    data: Vec<ShadowStackObject>,
+    tip: u64
+}
+
+impl ShadowStack {
+    pub fn new() -> Self {
+        Self {
+            data: vec![ShadowStackObject::FrameFrontPtr(0)],
+            tip: 1,
+        }
+    }
+
+    pub fn add_shadow_object(&mut self, base: Vaddr, size: usize) {
+        let sobj = ShadowObject {
+            alloc_type: AllocType::Stack,
+            base,
+            limit: ShadowObject::limit(base, size),
+            size,
+        };
+        self.data.push(ShadowStackObject::ShadowObject(sobj));
+
+        self.tip += 1;
+    }
+
+    pub fn invalidate_at(&self, base: Vaddr) {
+        // TODO
+    }
+
+    /*
+        Perform a backwards search from tip by jumping
+        to current frame start and comparing Vaddr. If 
+        Vaddr < FrameVaddr we jump back until the condition
+        is met, then incrementally search the found frame to
+        resolve the shadowobject.
+     */
+    pub fn search_intersection(&self, addr: Vaddr) -> Option<&ShadowObject> {
+        // TODO
+
+        None
+    }
+}
+
+thread_local! {
+    pub static SHADOW_STACK: RefCell<ShadowStack> = RefCell::new(ShadowStack::new());
+}
 
 #[cfg(test)]
 mod tests {

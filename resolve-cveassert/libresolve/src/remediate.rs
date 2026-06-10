@@ -4,7 +4,7 @@ use libc::{
     c_char, c_void, calloc, free, malloc, realloc, strdup, strlen, strndup, strnlen,
 };
 
-use crate::shadowobjs::{ALIVE_OBJ_LIST, AllocType, FREED_OBJ_LIST, Vaddr};
+use crate::shadowobjs::{SHADOW_STACK, ALIVE_OBJ_LIST, AllocType, FREED_OBJ_LIST, Vaddr};
 
 use log::{info, warn};
 
@@ -16,10 +16,11 @@ use log::{info, warn};
 #[unsafe(no_mangle)]
 pub extern "C" fn __resolve_alloca(ptr: *mut c_void, size: usize) -> () {
     let base = ptr as Vaddr;
-    {
-        let mut obj_list = ALIVE_OBJ_LIST.lock();
-        obj_list.add_shadow_object(AllocType::Stack, base, size);
-    }
+
+    SHADOW_STACK.with_borrow_mut(
+        |ss|
+         ss.add_shadow_object(base, size)
+    );
 
     info!("[STACK] Object allocated with size: {size}, address: 0x{base:x}");
 }
@@ -28,10 +29,10 @@ pub extern "C" fn __resolve_alloca(ptr: *mut c_void, size: usize) -> () {
 pub extern "C" fn __resolve_invalidate_stack(base: *mut c_void) {
     let base = base as Vaddr;
 
-    {
-        let mut obj_list = ALIVE_OBJ_LIST.lock();
-        obj_list.invalidate_at(base);
-    }
+    SHADOW_STACK.with_borrow_mut(
+        |ss|
+         ss.invalidate_at(base)
+    );
 
     info!("[STACK] Free addr 0x{base:x}");
 }
@@ -253,6 +254,31 @@ pub struct ShadowObjBounds {
 
 /**
  * @brief - Helper function that queries shadow obj list
+ *          to find a shadow obj where the ptr fits within
+ *          its bounds of allocation 
+ * @input
+ *  - ptr: ptr to allocation 
+ * @return struct containing the base and limit of the
+ *         shadow object as pointers 
+ */
+#[unsafe(no_mangle)]
+pub extern "C" fn __resolve_get_bounds_stack(ptr: *mut c_void) -> ShadowObjBounds {
+    SHADOW_STACK.with_borrow_mut(
+        |ss| {
+            match ss.search_intersection(ptr as Vaddr) {
+                Some(sobj) => { return ShadowObjBounds { base: sobj.base as *mut c_void, limit: sobj.limit as *mut c_void }; }
+                None => { return ShadowObjBounds { base: std::ptr::null_mut(), limit: std::ptr::null_mut() }; }
+            }
+        }
+    );
+
+    // This would only be reached if .with_borrow_mut failed, right?
+    // TODO: what to do in this case? 
+    return ShadowObjBounds { base: std::ptr::null_mut(), limit: std::ptr::null_mut() }; 
+}
+
+/**
+ * @brief - Helper function that queries stack shadow obj list
  *          to find a shadow obj where the ptr fits within
  *          its bounds of allocation 
  * @input
