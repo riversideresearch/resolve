@@ -37,6 +37,16 @@ pub extern "C" fn __resolve_invalidate_stack(base: *mut c_void) {
     info!("[STACK] Free addr 0x{base:x}");
 }
 
+#[unsafe(no_mangle)]
+pub extern "C" fn __resolve_push_frame() {
+    SHADOW_STACK.with_borrow_mut(
+        |ss|
+         ss.push_frame()
+    );
+
+    info!("[STACK] Pushed new frame.");
+}
+
 /**
  * @brief - Allocator logging interface for malloc
  * @input - size of the allocation in bytes
