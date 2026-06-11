@@ -2,8 +2,6 @@
 // LGPL-3; See LICENSE.txt in the repo root for details.
 
 use crate::MutexWrap;
-use crate::shadowobjs::LookupError::{AddrOOB, ObjectNotFound};
-use crate::shadowobjs::ShadowStackEntry::FFP;
 use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::ops::RangeInclusive;
@@ -146,7 +144,6 @@ pub struct ShadowStack {
 }
 
 enum LookupError {
-    AddrOOB,
     ObjectNotFound,
 }
 
