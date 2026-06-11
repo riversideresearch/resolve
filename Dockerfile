@@ -101,16 +101,25 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     autoconf \
     autoconf-archive \ 
     automake \
+    build-essential \
+    ca-certificates \
+    clang \
+    lld \
+    ninja-build \
+    git \
+    make \
+    pkg-config \
+    libssl-dev \
+    curl \
     jq \
     libtool \
     libclang-rt-dev \
+    sudo \
+    time \
     wget \
+    unzip \
+    zip \
     && apt clean && rm -rf /var/lib/apt/lists/*
-
-# Reinstall deps
-RUN /opt/resolve/scripts/install-deps-ci.sh && apt clean && rm -rf /var/lib/apt/lists/*
-
-
 # Install toolchains
 RUN mkdir -p /opt/toolchain /opt/vcpkg-overlays/triplets
 COPY toolchains/resolve-toolchain.cmake /opt/toolchain/resolve-toolchain.cmake
