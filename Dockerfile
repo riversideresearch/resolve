@@ -7,7 +7,7 @@ FROM ubuntu:24.04 AS base
 ARG RESOLVE_PREFIX=/opt/resolve
 
 ENV DEBIAN_FRONTEND=noninteractive
-RUN apt-get update && apt-get install -y --no-install-recommends \
+RUN apt update && apt install -y --no-install-recommends \
     ca-certificates \
     curl \
     git \
@@ -33,7 +33,7 @@ ENV PATH="/opt/resolve/bin:${PATH}"
 FROM ubuntu:24.04 AS cmake-builder
 ARG RESOLVE_PREFIX=/opt/resolve
 ENV DEBIAN_FRONTEND=noninteractive
-RUN apt-get update && apt-get install -y --no-install-recommends \
+RUN apt update && apt install -y --no-install-recommends \
     ca-certificates \
     curl \
     build-essential \
@@ -65,7 +65,7 @@ COPY CMakeLists.txt /resolve/CMakeLists.txt
 
 # Build
 WORKDIR /resolve/
-RUN PATH=$PATH:~/.cargo/bin make build-release install
+RUN PATH=$PATH:~/.cargo/bin make build-with-klee install-with-klee
 
 # Install toolchains
 RUN mkdir -p /opt/toolchain /opt/vcpkg-overlays/triplets
@@ -97,6 +97,19 @@ FROM base AS resolve
 RUN --mount=from=cmake-builder,source=/build-cmake,target=/build-cmake,rw make -C /build-cmake install 
 COPY --from=builder /opt/resolve /opt/resolve
 COPY --from=git-version /RESOLVE_VERSION /RESOLVE_VERSION
+RUN apt update && apt install -y --no-install-recommends \
+    autoconf \
+    autoconf-archive \ 
+    automake \
+    jq \
+    libtool \
+    libclang-rt-dev \
+    wget \
+    && apt clean && rm -rf /var/lib/apt/lists/*
+
+# Reinstall deps
+RUN /opt/resolve/scripts/install-deps-ci.sh && apt clean && rm -rf /var/lib/apt/lists/*
+
 
 # Install toolchains
 RUN mkdir -p /opt/toolchain /opt/vcpkg-overlays/triplets
