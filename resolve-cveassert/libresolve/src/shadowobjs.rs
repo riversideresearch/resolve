@@ -3,7 +3,7 @@
 
 use crate::MutexWrap;
 use crate::shadowobjs::LookupError::{AddrOOB, ObjectNotFound};
-use crate::shadowobjs::ShadowStackObject::FrameFrontPtr;
+use crate::shadowobjs::ShadowStackEntry::FFP;
 use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::ops::RangeInclusive;
@@ -131,14 +131,18 @@ pub static FREED_OBJ_LIST: MutexWrap<ShadowObjectTable> = MutexWrap::new(ShadowO
     These FrameFrontPtrs reference the beginning of the pervious
     frame, letting us backwards traverse in order to search
 */
-enum ShadowStackObject {
+enum ShadowStackValue {
     ShadowObject(ShadowObject),
-    FrameFrontPtr(usize)
+    InvalidatedObject(Vaddr)
+}
+
+enum ShadowStackEntry {
+    Value(ShadowStackValue),
+    FFP(usize),
 }
 
 pub struct ShadowStack {
-    data: Vec<ShadowStackObject>,
-    tip: usize
+    data: Vec<ShadowStackEntry>
 }
 
 enum LookupError {
@@ -149,8 +153,7 @@ enum LookupError {
 impl ShadowStack {
     pub fn new() -> Self {
         Self {
-            data: vec![ShadowStackObject::FrameFrontPtr(0)],
-            tip: 1,
+            data: vec![ShadowStackEntry::FFP(0)]
         }
     }
 
@@ -161,18 +164,51 @@ impl ShadowStack {
             limit: ShadowObject::limit(base, size),
             size,
         };
-        let ffp = self.data.pop().expect("Missing frame front pointer");
-        self.data.push(ShadowStackObject::ShadowObject(sobj));
-        self.data.push(ffp);
 
-        self.tip += 1;
+        // if addr < tip, we are re-using stack and must replace invalidated sobj
+        if self.data.len() > 1 {
+            let ShadowStackEntry::Value(prev_entry) = self.data.get(self.data.len() - 2).unwrap() else {
+                panic!("Corrupt shadow stack!")
+            };
+            let addr: usize;
+            match prev_entry {
+                ShadowStackValue::ShadowObject(sobj) => {
+                    addr = sobj.base;
+                },
+                ShadowStackValue::InvalidatedObject(baddr) => {
+                    addr = *baddr;
+                }
+            }
+            if base < addr {
+                match self.locate(base) {
+                    Ok((ssobj, idx)) => {
+                        match ssobj {
+                            ShadowStackValue::ShadowObject(_sobj) => {
+                                panic!("Trying to allocate a non-invalidated sobj");
+                            },
+                            ShadowStackValue::InvalidatedObject(_iobj) => {
+                                self.data[idx] = ShadowStackEntry::Value(ShadowStackValue::ShadowObject(sobj));
+                                return;
+                            }
+                        }
+                    },
+                    Err(_e) => {
+                        panic!("This probably shouldn't happen?");
+                    }
+                }
+            }
+        }
+
+        let ffp = self.data.pop().expect("Missing frame front pointer");
+        self.data.push(ShadowStackEntry::Value(ShadowStackValue::ShadowObject(sobj)));
+        self.data.push(ffp);
     }
 
     /*
         Walk the stack and return an index
         and object reference if found
      */
-    fn locate(&self, addr: Vaddr) -> Result<(&ShadowObject, usize), LookupError> {
+    fn locate(&self, addr: Vaddr) -> Result<(&ShadowStackValue, usize), LookupError> {
         use LookupError::*;
 
         if self.data.len() <= 1 {
@@ -180,11 +216,11 @@ impl ShadowStack {
         }
 
         // current frame's trailing ffp
-        let mut ffp_idx = self.tip - 1;
+        let mut ffp_idx = self.data.len() - 1;
 
         loop {
             // grab the frame start idx value in trailing ffp
-            let ShadowStackObject::FrameFrontPtr(frame_start_idx) =
+            let ShadowStackEntry::FFP(frame_start_idx) =
                 self.data.get(ffp_idx).expect("Malformed shadow stack head!")
             else {
                 panic!("Malformed shadow stack head!")
@@ -192,9 +228,16 @@ impl ShadowStack {
             let frame_start_idx = *frame_start_idx;
 
             // grab the first sobj in frame
-            let first = match self.data.get(frame_start_idx).expect("Malformed shadow stack") {
-                ShadowStackObject::ShadowObject(obj) => obj,
-                ShadowStackObject::FrameFrontPtr(_) => {
+            let first_base = match self.data.get(frame_start_idx).expect("Malformed shadow stack") {
+                ShadowStackEntry::Value(
+                    ShadowStackValue::ShadowObject(obj)
+                ) => obj.base,
+                
+                ShadowStackEntry::Value(
+                    ShadowStackValue::InvalidatedObject(obj)
+                ) => *obj,
+                
+                ShadowStackEntry::FFP(_) => {
                     // edge case: empty frame should skip to older frame
                     if frame_start_idx == 0 {
                         return Err(LookupError::ObjectNotFound);
@@ -206,7 +249,7 @@ impl ShadowStack {
 
             // keep jumping frames until
             // first sobj addr < desired addr
-            if first.base > addr {
+            if first_base > addr {
                 if frame_start_idx == 0 {
                     return Err(ObjectNotFound); // checked everything
                 }
@@ -218,13 +261,23 @@ impl ShadowStack {
             // addr is in (or above) this frame: scan [frame_start_idx, ffp_idx)
             let mut scan = frame_start_idx;
             while scan < ffp_idx {
-                let ShadowStackObject::ShadowObject(sobj) =
+                let ShadowStackEntry::Value(ssv) =
                     self.data.get(scan).expect("Malformed shadow stack!")
                 else {
                     panic!("Malformed shadow stack ordering!")
                 };
-                if sobj.contains(addr) {
-                    return Ok((sobj, scan));
+
+                match ssv {
+                    ShadowStackValue::ShadowObject(sobj) => {
+                        if sobj.contains(addr) {
+                            return Ok((ssv, scan));
+                        }
+                    },
+                    ShadowStackValue::InvalidatedObject(adr) => {
+                        if *adr == addr {
+                            return Ok((ssv, scan));
+                        } 
+                    }
                 }
                 scan += 1;
             }
@@ -232,8 +285,46 @@ impl ShadowStack {
         }
     }
 
-    pub fn invalidate_at(&self, base: Vaddr) {
-        // TODO
+    /*
+        3 cases:
+        1. idx(addr) - 1 is an ffp
+           - we are invalidating an entire frame
+        2. addr is last object
+           - pop last object
+        3. addr has object following it
+           - replace with Invalidated ssv
+     */
+    pub fn invalidate_at(&mut self, base: Vaddr) {
+        match self.locate(base) {
+            Ok((_ssv, idx)) => {
+                // CASE 1
+                // if we are at the beginning of the first frame,
+                // or the beginning of another frame
+                // TODO: do we need to ensure we are in specifically the latest frame?
+                if idx == 0 || matches!(self.data.get(idx - 1).expect("Malformed invalidation call"),
+                            ShadowStackEntry::FFP(_)) {
+                    self.data.truncate(idx);
+                } 
+
+                // CASE 2
+                // if sobj followed by ffp, replace
+                // sobj with said ffp
+                if idx == self.data.len() - 1 {
+                    let ffp = self.data.pop().expect("Malformed shadow stack!");
+                    self.data.pop();
+                    self.data.push(ffp);
+                }
+
+                // CASE 3
+                // if sobj has following sobj,
+                // invalidate in-place
+                if idx == 0 || matches!(self.data.get(idx + 1).expect("Malformed invalidation call"),
+                            ShadowStackEntry::FFP(_)) {
+                    self.data[idx] = ShadowStackEntry::Value(ShadowStackValue::InvalidatedObject(base));
+                }
+            },
+            Err(_e) => {}
+        }
     }
 
     /*
@@ -244,8 +335,21 @@ impl ShadowStack {
         resolve the shadowobject.
      */
     pub fn search_intersection(&self, addr: Vaddr) -> Option<&ShadowObject> {
-
-        None
+        match self.locate(addr) {
+            Ok((sobj, _idx)) => {
+                match sobj {
+                    ShadowStackValue::ShadowObject(sobj) => {
+                        return Some(sobj);
+                    },
+                    ShadowStackValue::InvalidatedObject(_iobj) => {
+                        return None;
+                    }
+                }
+            },
+            Err(e) => {
+                return None;
+            }
+        }
     }
 }
 
