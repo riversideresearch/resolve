@@ -1,0 +1,15 @@
+{
+    "vulnerabilities": [
+        {
+            "cve-id": "CVE-resolve-oob-3",
+            "cve-description": "",
+            "package-name": "resolve-test",
+            "package-version": "1.4.5",
+            "cwe-id": "121",
+            "cwe-name": "Dynamic stack OOB access",
+            "affected-function": "example",
+            "affected-file": "vla_oob.c",
+            "remediation-strategy": "exit"
+        }
+    ]
+}

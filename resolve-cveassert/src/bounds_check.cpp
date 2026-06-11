@@ -510,7 +510,7 @@ static Function *getOrCreateResolveGep(Function *F) {
   return resolveGepFn;
 }
 
-void instrumentGEP(Function *F) {
+void instrumentGep(Function *F) {
   Module *M = F->getParent();
   LLVMContext &Ctx = M->getContext();
   IRBuilder<> builder(Ctx);
@@ -775,8 +775,15 @@ void instrumentLoadStore(Function *F,
   for (auto &BB : *F) {
     for (auto &I : BB) {
       if (auto *load = dyn_cast<LoadInst>(&I)) {
+        if (load->getMetadata("cve.noinstrument")) {
+          continue;
+        }
         loadList.push_back(load);
+
       } else if (auto *store = dyn_cast<StoreInst>(&I)) {
+        if (store->getMetadata("cve.noinstrument")) {
+          continue;
+        }
         storeList.push_back(store);
       }
     }
@@ -826,7 +833,7 @@ void instrumentLoadStore(Function *F,
 
 void sanitizeMemInstBounds(Function *F,
                            Vulnerability::RemediationStrategies strategy) {
-  instrumentGEP(F);
+  instrumentGep(F);
   instrumentMemcpy(F, strategy);
   instrumentMemmove(F, strategy);
   instrumentMemset(F, strategy);
