@@ -169,67 +169,67 @@ impl ShadowStack {
     }
 
     /*
-        The search algorithm to walk the table and return an index
+        Walk the stack and return an index
         and object reference if found
-
-        Error here?
      */
     fn locate(&self, addr: Vaddr) -> Result<(&ShadowObject, usize), LookupError> {
-        if self.tip <= 1 {
-            return Err(ObjectNotFound)
+        use LookupError::*;
+
+        if self.data.len() <= 1 {
+            return Err(ObjectNotFound); // only sentinel ffp; empty
         }
 
-        let mut itr = self.tip - 1; // -1 because tip is the write head
-        let mut last = itr;
+        // current frame's trailing ffp
+        let mut ffp_idx = self.tip - 1;
 
-        while itr > 0 {
-            // get the beginning of the current frame from the cap pointer
+        loop {
+            // grab the frame start idx value in trailing ffp
             let ShadowStackObject::FrameFrontPtr(frame_start_idx) =
-                self.data.get(itr).expect("Malformed shadow stack head")
+                self.data.get(ffp_idx).expect("Malformed shadow stack head!")
             else {
                 panic!("Malformed shadow stack head!")
             };
+            let frame_start_idx = *frame_start_idx;
 
-            // get the first object in the current frame
-            let ShadowStackObject::ShadowObject(first_frame_obj) =
-                self.data.get(*frame_start_idx).expect("Malformed shadow stack")
-            else {
-                panic!("Malformed shadow stack ordering!")
+            // grab the first sobj in frame
+            let first = match self.data.get(frame_start_idx).expect("Malformed shadow stack") {
+                ShadowStackObject::ShadowObject(obj) => obj,
+                ShadowStackObject::FrameFrontPtr(_) => {
+                    // edge case: empty frame should skip to older frame
+                    if frame_start_idx == 0 {
+                        return Err(LookupError::ObjectNotFound);
+                    }
+                    ffp_idx = frame_start_idx - 1;
+                    continue;
+                }
             };
 
-            if first_frame_obj.base > addr {
-                last = itr;
-                itr = *frame_start_idx - 1;
-
-                // check if we have traversed entire stack
-                if itr <= 0 {
-                    return Err(ObjectNotFound)                    
+            // keep jumping frames until
+            // first sobj addr < desired addr
+            if first.base > addr {
+                if frame_start_idx == 0 {
+                    return Err(ObjectNotFound); // checked everything
                 }
-
+                // previous frames trailing FFP
+                ffp_idx = frame_start_idx - 1;
                 continue;
             }
 
-            // addr allegedly now exists in our current frame; iterate it
-            while itr < last {
-                // get current object
+            // addr is in (or above) this frame: scan [frame_start_idx, ffp_idx)
+            let mut scan = frame_start_idx;
+            while scan < ffp_idx {
                 let ShadowStackObject::ShadowObject(sobj) =
-                    self.data.get(itr).expect("Malformed shadow stack")
+                    self.data.get(scan).expect("Malformed shadow stack!")
                 else {
                     panic!("Malformed shadow stack ordering!")
                 };
-
                 if sobj.contains(addr) {
-                    return Ok((sobj,itr))
+                    return Ok((sobj, scan));
                 }
-                
-                itr+=1;
+                scan += 1;
             }
-
             return Err(ObjectNotFound);
         }
-
-        // I don't think this is ever reached?
-        Err(ObjectNotFound)
     }
 
     pub fn invalidate_at(&self, base: Vaddr) {
