@@ -65,7 +65,7 @@ COPY CMakeLists.txt /resolve/CMakeLists.txt
 
 # Build
 WORKDIR /resolve/
-RUN PATH=$PATH:~/.cargo/bin make build-with-klee install-with-klee
+RUN PATH=$PATH:~/.cargo/bin make build-release install
 
 # Install toolchains
 RUN mkdir -p /opt/toolchain /opt/vcpkg-overlays/triplets
