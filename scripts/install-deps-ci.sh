@@ -8,8 +8,8 @@ set -e
 echo "Installing dependencies for resolve..."
 
 # Update and install commands
-UPDATE_CMD="sudo apt update"
-INSTALL_CMD="sudo apt install -y --no-install-recommends"
+UPDATE_CMD="sudo apt-get update"
+INSTALL_CMD="sudo apt-get install -y --no-install-recommends"
 
 PKGS="build-essential \
     clang \
