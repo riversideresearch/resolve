@@ -2,6 +2,7 @@
 // LGPL-3; See LICENSE.txt in the repo root for details.
 
 use crate::MutexWrap;
+use crate::shadowobjs::LookupError::{AddrOOB, ObjectNotFound};
 use crate::shadowobjs::ShadowStackObject::FrameFrontPtr;
 use std::cell::RefCell;
 use std::collections::BTreeMap;
@@ -132,12 +133,17 @@ pub static FREED_OBJ_LIST: MutexWrap<ShadowObjectTable> = MutexWrap::new(ShadowO
 */
 enum ShadowStackObject {
     ShadowObject(ShadowObject),
-    FrameFrontPtr(u64)
+    FrameFrontPtr(usize)
 }
 
 pub struct ShadowStack {
     data: Vec<ShadowStackObject>,
-    tip: u64
+    tip: usize
+}
+
+enum LookupError {
+    AddrOOB,
+    ObjectNotFound,
 }
 
 impl ShadowStack {
@@ -155,9 +161,75 @@ impl ShadowStack {
             limit: ShadowObject::limit(base, size),
             size,
         };
+        let ffp = self.data.pop().expect("Missing frame front pointer");
         self.data.push(ShadowStackObject::ShadowObject(sobj));
+        self.data.push(ffp);
 
         self.tip += 1;
+    }
+
+    /*
+        The search algorithm to walk the table and return an index
+        and object reference if found
+
+        Error here?
+     */
+    fn locate(&self, addr: Vaddr) -> Result<(&ShadowObject, usize), LookupError> {
+        if self.tip <= 1 {
+            return Err(ObjectNotFound)
+        }
+
+        let mut itr = self.tip - 1; // -1 because tip is the write head
+        let mut last = itr;
+
+        while itr > 0 {
+            // get the beginning of the current frame from the cap pointer
+            let ShadowStackObject::FrameFrontPtr(frame_start_idx) =
+                self.data.get(itr).expect("Malformed shadow stack head")
+            else {
+                panic!("Malformed shadow stack head!")
+            };
+
+            // get the first object in the current frame
+            let ShadowStackObject::ShadowObject(first_frame_obj) =
+                self.data.get(*frame_start_idx).expect("Malformed shadow stack")
+            else {
+                panic!("Malformed shadow stack ordering!")
+            };
+
+            if first_frame_obj.base > addr {
+                last = itr;
+                itr = *frame_start_idx - 1;
+
+                // check if we have traversed entire stack
+                if itr <= 0 {
+                    return Err(ObjectNotFound)                    
+                }
+
+                continue;
+            }
+
+            // addr allegedly now exists in our current frame; iterate it
+            while itr < last {
+                // get current object
+                let ShadowStackObject::ShadowObject(sobj) =
+                    self.data.get(itr).expect("Malformed shadow stack")
+                else {
+                    panic!("Malformed shadow stack ordering!")
+                };
+
+                if sobj.contains(addr) {
+                    return Ok((sobj,itr))
+                }
+                
+                itr+=1;
+            }
+
+            return Err(ObjectNotFound);
+        }
+
+        // I don't think this is ever reached?
+        Err(ObjectNotFound)
     }
 
     pub fn invalidate_at(&self, base: Vaddr) {
@@ -172,7 +244,6 @@ impl ShadowStack {
         resolve the shadowobject.
      */
     pub fn search_intersection(&self, addr: Vaddr) -> Option<&ShadowObject> {
-        // TODO
 
         None
     }
