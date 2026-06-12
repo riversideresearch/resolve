@@ -1,7 +1,7 @@
 // Copyright (c) 2025 Riverside Research.
 // LGPL-3; See LICENSE.txt in the repo root for details.
 use libc::{
-    EOF, FILE, c_char, c_int, c_void, fgetc, strlen, strnlen, size_t, ssize_t, 
+    EOF, FILE, c_char, c_int, c_void, fgetc, free, strlen, strnlen, size_t, ssize_t, 
 };
 
 use crate::shadowobjs::{SHADOW_STACK, ALIVE_OBJ_LIST, AllocType, FREED_OBJ_LIST, Vaddr};
@@ -230,7 +230,10 @@ pub extern "C" fn __resolve_free(ptr: *mut c_void) -> () {
   //     let mut freed_guard = FREED_OBJ_LIST.lock();
   //     freed_guard.add_shadow_object(AllocType::Unallocated, ptr as Vaddr, ptr_size.unwrap_or(0));
   // }
+
   unsafe {
+    if ptr.is_null() { return; }
+     
     if mi_is_heap_owned(ptr) {
         let _ = mi_free(ptr);
     } else {
