@@ -85,9 +85,9 @@ pub extern "C" fn __resolve_malloc(size: usize) -> *mut c_void {
     //    ptr as Vaddr
     //);
 
-    info!("[RESOLVE] block bounds: (0x{:x}, 0x{:x})", bounds_info.base as Vaddr, bounds_info.limit as Vaddr);
-    info!("[RESOLVE] block index: {}", bounds_info.block_index);
-    info!("[RESOLVE] block size: {}", bounds_info.block_size);
+    //info!("[RESOLVE] block bounds: (0x{:x}, 0x{:x})", bounds_info.base as Vaddr, bounds_info.limit as Vaddr);
+    //info!("[RESOLVE] block index: {}", bounds_info.block_index);
+    //info!("[RESOLVE] block size: {}", bounds_info.block_size);
     ptr
 }
 
