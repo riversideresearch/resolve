@@ -1,7 +1,7 @@
 // Copyright (c) 2025 Riverside Research.
 // LGPL-3; See LICENSE.txt in the repo root for details.
 use libc::{
-    EOF, FILE, c_char, c_int, c_void, fgetc, free, strlen, strnlen, size_t, ssize_t, 
+    EOF, FILE, c_char, c_int, c_void, fgetc, free, delete, strlen, strnlen, size_t, ssize_t, 
 };
 
 use crate::shadowobjs::{SHADOW_STACK, ALIVE_OBJ_LIST, AllocType, FREED_OBJ_LIST, Vaddr};
@@ -25,6 +25,8 @@ unsafe extern "C" {
     fn mi_strdup(ptr: *mut c_char) -> *mut c_char;
     fn mi_strndup(ptr: *mut c_char, size: usize) -> *mut c_char;
     fn mi_free(ptr: *mut c_void);
+    fn mi_new(size: usize) -> *mut c_void;
+    fn mi_delete(ptr: *mut c_void);
     
     // Shim API
     fn mi_resolve_ptr(ptr: *mut c_void) -> BoundsInfo;
@@ -185,6 +187,18 @@ pub extern "C" fn __resolve_malloc(size: usize) -> *mut c_void {
     ptr
 }
 
+
+#[unsafe(no_mangle)]
+pub extern "C" fn __resolve_new(size: usize) -> *mut c_void {
+    let ptr = unsafe { mi_new(size + 1) };
+
+    if ptr.is_null() {
+        return ptr;
+    }
+
+    ptr
+}
+
 /**
  * @brief - Allocator logging interface for free
  * @input - ptr to the allocation
@@ -243,6 +257,21 @@ pub extern "C" fn __resolve_free(ptr: *mut c_void) -> () {
   }
 }
 //
+
+
+#[unsafe(no_mangle)]
+pub extern "C" fn __resolve_delete(ptr: *mut c_void) -> () {
+    if ptr.is_null() { return; }
+
+    unsafe {
+        let owned = mi_is_heap_owned(p);
+        if owned {
+            let_ = mi_free(ptr);
+        } else {
+            let _ = delete(ptr);
+        }
+    }
+}
 /**
  * @brief - Allocator logging interface for realloc
  * @input
