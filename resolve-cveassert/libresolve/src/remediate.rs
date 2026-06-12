@@ -26,25 +26,16 @@ pub extern "C" fn __resolve_alloca(ptr: *mut c_void, size: usize) -> () {
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn __resolve_invalidate_stack(base: *mut c_void) {
+pub extern "C" fn __resolve_invalidate_stack_range(base: *mut c_void, size: usize) {
     let base = base as Vaddr;
 
-    SHADOW_STACK.with_borrow_mut(
-        |ss|
-         ss.invalidate_at(base)
-    );
+    // TODO: COMPLETE ME
+    // SHADOW_STACK.with_borrow_mut(
+    //     |ss|
+    //      ss.invalidate_at(base)
+    // );
 
-    info!("[STACK] Free addr 0x{base:x}");
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn __resolve_push_frame() {
-    SHADOW_STACK.with_borrow_mut(
-        |ss|
-         ss.push_frame()
-    );
-
-    info!("[STACK] Pushed new frame.");
+    // info!("[STACK] Free addr 0x{base:x}");
 }
 
 /**

@@ -118,29 +118,40 @@ impl ShadowObjectTable {
 pub static ALIVE_OBJ_LIST: MutexWrap<ShadowObjectTable> = MutexWrap::new(ShadowObjectTable::new());
 pub static FREED_OBJ_LIST: MutexWrap<ShadowObjectTable> = MutexWrap::new(ShadowObjectTable::new());
 
-/*
-    Stack shadow object shape:
-    [frame 0]   [  frame 1  ]
-    [ | | | ][*][ | | | | | ][*] -> (growth direction)
-    <---------| <-------------|  
-
-    We grow by appending ShadowObjects to the end of the Vector,
-    and inserting new FrameFrontPtrs when we push new frames.
-    These FrameFrontPtrs reference the beginning of their
-    frame, letting us backwards traverse in order to search efficiently
-*/
 enum ShadowStackValue {
     ShadowObject(ShadowObject),
-    InvalidatedObject(Vaddr)
+    InvalidatedObject(Vaddr,usize)
 }
 
-enum ShadowStackEntry {
-    Value(ShadowStackValue),
-    FFP(usize),
+impl ShadowStackValue {
+    fn base(&self) -> Vaddr {
+        match self {
+            ShadowStackValue::ShadowObject(o) => o.base,
+            ShadowStackValue::InvalidatedObject(b, _s) => *b,
+        }
+    }
+
+    fn size(&self) -> usize {
+        match self {
+            ShadowStackValue::ShadowObject(o) => o.size,
+            ShadowStackValue::InvalidatedObject(_b, s) => *s,
+        }
+    }
+
+    fn contains(&self, addr: Vaddr) -> bool {
+        let base = self.base();
+
+        let Some(end) = base.checked_add(self.size() as Vaddr) else {
+            return false;
+        };
+
+        base <= addr && addr < end
+    }
 }
 
+#[derive(Default)]
 pub struct ShadowStack {
-    data: Vec<ShadowStackEntry>
+    data: Vec<ShadowStackValue>
 }
 
 enum LookupError {
@@ -149,11 +160,15 @@ enum LookupError {
 
 impl ShadowStack {
     pub fn new() -> Self {
-        Self {
-            data: vec![ShadowStackEntry::FFP(0)]
-        }
+        Self::default()
     }
 
+    /*
+        Adds a new shadow object to the vector.
+        
+        If this object is not at the end of the vector, and is not overwriting an invalid range,
+        we can drop the frame(s) following it.
+     */
     pub fn add_shadow_object(&mut self, base: Vaddr, size: usize) {
         let sobj = ShadowObject {
             alloc_type: AllocType::Stack,
@@ -192,84 +207,35 @@ impl ShadowStack {
         self.data.push(ffp);
     }
 
-    /*
-        Walk the stack and return an index
-        and object reference if found
-     */
-    fn locate(&self, addr: Vaddr) -> Result<(&ShadowStackValue, usize), LookupError> {
+    fn get_at(&self, addr: Vaddr) -> Result<(ShadowStackValue, usize), LookupError> {
         use LookupError::*;
 
-        if self.data.len() <= 1 {
-            return Err(ObjectNotFound); // only sentinel ffp; empty
-        }
-
-        // current frame's trailing ffp
-        let mut ffp_idx = self.data.len() - 1;
-
+        if self.data.len() == 0 { return Err(ObjectNotFound); }
+    
+        let mut idx = self.data.len() - 1;
+        let mut gallop_factor = 1;
         loop {
-            // grab the frame start idx value in trailing ffp
-            let ShadowStackEntry::FFP(frame_start_idx) =
-                self.data.get(ffp_idx).expect("Malformed shadow stack head!")
-            else {
-                panic!("Malformed shadow stack head!")
-            };
-            let frame_start_idx = *frame_start_idx;
+            let sobj = self.data.get(idx).expect("Malformed shadow stack state!");
 
-            // grab the first sobj in frame
-            let first_base = match self.data.get(frame_start_idx).expect("Malformed shadow stack") {
-                ShadowStackEntry::Value(
-                    ShadowStackValue::ShadowObject(obj)
-                ) => obj.base,
-                
-                ShadowStackEntry::Value(
-                    ShadowStackValue::InvalidatedObject(obj)
-                ) => *obj,
-                
-                ShadowStackEntry::FFP(_) => {
-                    // edge case: empty frame should skip to older frame
-                    if frame_start_idx == 0 {
-                        return Err(LookupError::ObjectNotFound);
-                    }
-                    ffp_idx = frame_start_idx - 1;
-                    continue;
-                }
-            };
+            let (base, size) = (sobj.base(), sobj.size());
 
-            // keep jumping frames until
-            // first sobj addr < desired addr
-            if first_base > addr {
-                if frame_start_idx == 0 {
-                    return Err(ObjectNotFound); // checked everything
-                }
-                // previous frames trailing FFP
-                ffp_idx = frame_start_idx - 1;
-                continue;
+            // if in this bucket:
+            if addr > base && addr < base + size {
+                // BINARY SEARCH THIS BUCKET
             }
 
-            // addr is in (or above) this frame: scan [frame_start_idx, ffp_idx)
-            let mut scan = frame_start_idx;
-            while scan < ffp_idx {
-                let ShadowStackEntry::Value(ssv) =
-                    self.data.get(scan).expect("Malformed shadow stack!")
-                else {
-                    panic!("Malformed shadow stack ordering!")
-                };
+            // else: giddyup!
+            gallop_factor *= 2;
+            idx = idx.saturating_sub(gallop_factor);
 
-                match ssv {
-                    ShadowStackValue::ShadowObject(sobj) => {
-                        if sobj.contains(addr) {
-                            return Ok((ssv, scan));
-                        }
-                    },
-                    ShadowStackValue::InvalidatedObject(adr) => {
-                        if *adr == addr {
-                            return Ok((ssv, scan));
-                        } 
-                    }
+            // hit end: check if addr lies outside last bucket
+            if idx == 0 {
+                if self.data.get(idx).expect("Malformed shadow stack state!").base() > addr {
+                    // bottom item in stack is somehow still out of range
+                    return Err(ObjectNotFound);
                 }
-                scan += 1;
+                // else: fall through to next iteration which binary searches this bucket
             }
-            return Err(ObjectNotFound);
         }
     }
 
