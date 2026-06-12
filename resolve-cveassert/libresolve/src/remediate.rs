@@ -14,26 +14,26 @@ use log::{info, warn};
  * @return - none
  */
 #[unsafe(no_mangle)]
-pub extern "C" fn __resolve_alloca(ptr: *mut c_void, size: usize) -> () {
-    let base = ptr as Vaddr;
-    {
-        let mut obj_list = ALIVE_OBJ_LIST.lock();
-        obj_list.add_shadow_object(AllocType::Stack, base, size);
-    }
+pub extern "C" fn __resolve_alloca(_ptr: *mut c_void, _size: usize) -> () {
+    // let base = ptr as Vaddr;
+    // {
+    //     let mut obj_list = ALIVE_OBJ_LIST.lock();
+    //     obj_list.add_shadow_object(AllocType::Stack, base, size);
+    // }
 
-    info!("[STACK] Object allocated with size: {size}, address: 0x{base:x}");
+    // info!("[STACK] Object allocated with size: {size}, address: 0x{base:x}");
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn __resolve_invalidate_stack(base: *mut c_void) {
-    let base = base as Vaddr;
+pub extern "C" fn __resolve_invalidate_stack(_base: *mut c_void) {
+    // let base = base as Vaddr;
 
-    {
-        let mut obj_list = ALIVE_OBJ_LIST.lock();
-        obj_list.invalidate_at(base);
-    }
+    // {
+    //     let mut obj_list = ALIVE_OBJ_LIST.lock();
+    //     obj_list.invalidate_at(base);
+    // }
 
-    info!("[STACK] Free addr 0x{base:x}");
+    // info!("[STACK] Free addr 0x{base:x}");
 }
 
 /**
@@ -54,10 +54,10 @@ pub extern "C" fn __resolve_malloc(size: usize) -> *mut c_void {
         obj_list.add_shadow_object(AllocType::Heap, ptr as Vaddr, size);
     }
 
-    info!(
-        "[HEAP] Object allocated with size: {size}, address: 0x{:x}",
-        ptr as Vaddr
-    );
+    // info!(
+    //     "[HEAP] Object allocated with size: {size}, address: 0x{:x}",
+    //     ptr as Vaddr
+    // );
 
     ptr
 }
@@ -72,10 +72,10 @@ pub extern "C" fn __resolve_free(ptr: *mut c_void) -> () {
     // Insert a function to find the object and return the pointer size
     // Do I need to handle if the sobj cannot be found?
 
-    info!(
-        "[FREE] Allocated object freed at address: 0x{:x}",
-        ptr as Vaddr
-    );
+    // info!(
+    //     "[FREE] Allocated object freed at address: 0x{:x}",
+    //     ptr as Vaddr
+    // );
 
     let ptr_size = {
         let mut obj_list = ALIVE_OBJ_LIST.lock();
@@ -87,20 +87,20 @@ pub extern "C" fn __resolve_free(ptr: *mut c_void) -> () {
     };
 
     // Check if the shadow object exists
-    match ptr_size {
-        Some(size) => {
-            info!(
-                "[FREE] Found shadow object for allocated object, 0x{:x}, size = {size}",
-                ptr as Vaddr,
-            );
-        }
-        None => {
-            warn!(
-                "[FREE] No shadow object found for allocated object: 0x{:x}",
-                ptr as Vaddr
-            );
-        }
-    }
+    // match ptr_size {
+    //     Some(size) => {
+    //         info!(
+    //             "[FREE] Found shadow object for allocated object, 0x{:x}, size = {size}",
+    //             ptr as Vaddr,
+    //         );
+    //     }
+    //     None => {
+    //         warn!(
+    //             "[FREE] No shadow object found for allocated object: 0x{:x}",
+    //             ptr as Vaddr
+    //         );
+    //     }
+    // }
 
     {
         // Insert shadow object into freed object list
@@ -141,10 +141,10 @@ pub extern "C" fn __resolve_realloc(ptr: *mut c_void, size: usize) -> *mut c_voi
         obj_list.add_shadow_object(AllocType::Heap, realloc_ptr as Vaddr, size);
     }
 
-    info!(
-        "[HEAP] Allocated object reallocated mem from src: {ptr:?}, size: {size}, dst ptr: 0x{:x}",
-        realloc_ptr as Vaddr
-    );
+    // info!(
+    //     "[HEAP] Allocated object reallocated mem from src: {ptr:?}, size: {size}, dst ptr: 0x{:x}",
+    //     realloc_ptr as Vaddr
+    // );
 
     realloc_ptr
 }
@@ -170,10 +170,10 @@ pub extern "C" fn __resolve_calloc(n_items: usize, item_size: usize) -> *mut c_v
         obj_list.add_shadow_object(AllocType::Heap, ptr as Vaddr, size);
     }
 
-    info!(
-        "[HEAP] Logging allocation with {n_items} items, size (bytes): {size}, dst ptr: 0x{:x}",
-        ptr as Vaddr
-    );
+    // info!(
+    //     "[HEAP] Logging allocation with {n_items} items, size (bytes): {size}, dst ptr: 0x{:x}",
+    //     ptr as Vaddr
+    // );
 
     ptr
 }
@@ -201,10 +201,10 @@ pub extern "C" fn __resolve_strdup(ptr: *mut c_char) -> *mut c_char {
         obj_list.add_shadow_object(AllocType::Heap, string_ptr as Vaddr, sizeofstr);
     }
 
-    info!(
-        "[HEAP] Logging 'strdup' function call with dst ptr: 0x{:x}",
-        string_ptr as Vaddr
-    );
+    // info!(
+    //     "[HEAP] Logging 'strdup' function call with dst ptr: 0x{:x}",
+    //     string_ptr as Vaddr
+    // );
 
     string_ptr
 }
@@ -237,10 +237,10 @@ pub extern "C" fn __resolve_strndup(ptr: *mut c_char, size: usize) -> *mut c_cha
         obj_list.add_shadow_object(AllocType::Heap, string_ptr as Vaddr, sizeofstr);
     }
 
-    info!(
-        "[HEAP] Logging 'strndup' function call with size (bytes): {size}, dst ptr: {:?}",
-        string_ptr as Vaddr
-    );
+    // info!(
+    //     "[HEAP] Logging 'strndup' function call with size (bytes): {size}, dst ptr: {:?}",
+    //     string_ptr as Vaddr
+    // );
 
     string_ptr
 }
@@ -290,7 +290,7 @@ pub extern "C" fn resolve_obj_type(base_ptr: *mut c_void) -> AllocType {
  */
 #[unsafe(no_mangle)]
 pub extern "C" fn __resolve_report_violation() -> () {
-    info!("[RESOLVE] sanitizer triggered");
+    // info!("[RESOLVE] sanitizer triggered");
 }
 
 #[cfg(test)]
