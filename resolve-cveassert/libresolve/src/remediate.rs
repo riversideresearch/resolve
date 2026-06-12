@@ -262,6 +262,18 @@ pub struct ShadowObjBounds {
     pub limit: *mut c_void,
 }
 
+impl ShadowObjBounds {
+    pub fn null() -> Self {
+        ShadowObjBounds { base: std::ptr::null_mut(), limit: std::ptr::null_mut() }
+    }
+}
+
+impl From<&crate::shadowobjs::ShadowObject> for ShadowObjBounds {
+    fn from(sobj: &crate::shadowobjs::ShadowObject) -> Self {
+        ShadowObjBounds { base: sobj.base as *mut c_void, limit: sobj.limit as *mut c_void }
+    }
+}
+
 /**
  * @brief - Helper function that queries shadow obj list
  *          to find a shadow obj where the ptr fits within
@@ -273,18 +285,14 @@ pub struct ShadowObjBounds {
  */
 #[unsafe(no_mangle)]
 pub extern "C" fn __resolve_get_bounds_stack(ptr: *mut c_void) -> ShadowObjBounds {
-    SHADOW_STACK.with_borrow_mut(
+    return SHADOW_STACK.with_borrow_mut(
         |ss| {
             match ss.search_intersection(ptr as Vaddr) {
-                Some(sobj) => { return ShadowObjBounds { base: sobj.base as *mut c_void, limit: sobj.limit as *mut c_void }; }
-                None => { return ShadowObjBounds { base: std::ptr::null_mut(), limit: std::ptr::null_mut() }; }
+                Some(sobj) => { return sobj.into() }
+                None => { return ShadowObjBounds::null(); }
             }
         }
     );
-
-    // This would only be reached if .with_borrow_mut failed, right?
-    // TODO: what to do in this case? 
-    return ShadowObjBounds { base: std::ptr::null_mut(), limit: std::ptr::null_mut() }; 
 }
 
 /**
@@ -300,10 +308,10 @@ pub extern "C" fn __resolve_get_bounds_stack(ptr: *mut c_void) -> ShadowObjBound
 pub extern "C" fn __resolve_get_bounds(ptr: *mut c_void) -> ShadowObjBounds {
     let sobj_table = ALIVE_OBJ_LIST.lock();
     let Some(sobj) = sobj_table.search_intersection(ptr as Vaddr) else {
-        return ShadowObjBounds { base: std::ptr::null_mut(), limit: std::ptr::null_mut() }
+        return ShadowObjBounds::null();
     };
 
-    return ShadowObjBounds { base: sobj.base as *mut c_void, limit: sobj.limit as *mut c_void }
+    return sobj.into();
 }
 
 #[unsafe(no_mangle)]
