@@ -252,15 +252,7 @@ pub extern "C" fn __resolve_free(ptr: *mut c_void) -> () {
 #[unsafe(no_mangle)]
 pub extern "C" fn __resolve_delete(ptr: *mut c_void) -> () {
     if ptr.is_null() { return; }
-
-    unsafe {
-        let owned = mi_is_heap_owned(p);
-        if owned {
-            let_ = mi_free(ptr);
-        } else {
-            let _ = delete(ptr);
-        }
-    }
+    let _ = unsafe { mi_free(ptr) };
 }
 /**
  * @brief - RESOLVE wrapper for libc realloc
