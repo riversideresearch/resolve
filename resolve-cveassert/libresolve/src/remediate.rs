@@ -318,7 +318,7 @@ pub extern "C" fn __resolve_get_bounds(ptr: *mut c_void) -> ShadowObjBounds {
     //};
 
     //info!("[RESOLVE] Debugging: (ptr = 0x{:x}, lower = 0x{:x}, upper = 0x{:x})", ptr as Vaddr, sobj.base as Vaddr, sobj.limit as Vaddr); 
-    return ShadowObjBounds { base: sobj.base as *mut c_void, limit: sobj.limit as *mut c_void }
+    //return ShadowObjBounds { base: sobj.base as *mut c_void, limit: sobj.limit as *mut c_void }
 }
 
 #[unsafe(no_mangle)]
