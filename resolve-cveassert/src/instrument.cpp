@@ -6,10 +6,17 @@
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Twine.h"
+#include "llvm/Analysis/CaptureTracking.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/IRBuilder.h"
+#include "llvm/IR/Instructions.h"
 #include "llvm/IR/IntrinsicInst.h"
+#include "llvm/Transforms/Utils/BasicBlockUtils.h"
+
+#include <utility>
+
+#include "helpers.hpp"
 
 using namespace llvm;
 
@@ -27,7 +34,8 @@ static void wrapLibraryFunction(Function *F, StringRef name, FunctionType *ty) {
   auto swap_call = [&](CallInst *callInst) {
     builder.SetInsertPoint(callInst);
     SmallVector<Value *, 8> args(callInst->arg_begin(), callInst->arg_end());
-    CallInst *resolveCall = builder.CreateCall(resolveCallee, args);
+    CallInst *resolveCall =
+        builder.CreateCall(resolveCallee, args, callInst->getName() + ".inst");
 
     callInst->replaceAllUsesWith(resolveCall);
     callInst->eraseFromParent();
@@ -85,8 +93,7 @@ void instrumentAlloca(Function *F) {
   auto void_ty = Type::getVoidTy(Ctx);
 
   SmallVector<AllocaInst *, 16> allocas;
-  // Initialize list to store pointers to alloca and instructions
-  std::vector<AllocaInst *> toFreeList;
+  SmallVector<AllocaInst *, 16> shadowSlots;
 
   auto allocateFn = M->getOrInsertFunction(
       "__resolve_alloca", FunctionType::get(void_ty, {ptr_ty, size_ty}, false));
@@ -94,60 +101,127 @@ void instrumentAlloca(Function *F) {
       M->getOrInsertFunction("__resolve_invalidate_stack",
                              FunctionType::get(void_ty, {ptr_ty}, false));
 
-  auto handle_alloca = [&](auto *allocaInst) {
+  // 2 cases
+  // 1. alloca [N x T]
+  // 2. alloca T, i64 N where N is constant
+  auto create_transformed_array_alloca = [&](auto *oldAlloca) -> AllocaInst * {
+    builder.SetInsertPoint(oldAlloca->getNextNode());
+    ArrayType *arrTy = dyn_cast<ArrayType>(oldAlloca->getAllocatedType());
+    uint64_t numElements = arrTy->getNumElements();
+    Type *elemTy = arrTy->getElementType();
+    uint64_t size = numElements + 1;
+    ArrayType *newArrayTy = ArrayType::get(elemTy, size);
+    AllocaInst *transformedAlloca = builder.CreateAlloca(
+        newArrayTy, nullptr, oldAlloca->getName() + ".inst");
+    transformedAlloca->setAlignment(oldAlloca->getAlign());
+    return transformedAlloca;
+  };
+
+  auto create_transformed_alloca =
+      [&](auto *oldAlloca) -> std::pair<AllocaInst *, Value *> {
+    builder.SetInsertPoint(oldAlloca->getNextNonDebugInstruction());
+    Value *arrSize = oldAlloca->getArraySize();
+    Type *oldAllocaTy = oldAlloca->getAllocatedType();
+    Value *updatedSize =
+        builder.CreateAdd(arrSize, ConstantInt::get(size_ty, 1));
+    AllocaInst *transformedAlloca = builder.CreateAlloca(
+        oldAllocaTy, updatedSize, oldAlloca->getName() + ".inst");
+    transformedAlloca->setAlignment(oldAlloca->getAlign());
+    return {transformedAlloca, updatedSize};
+  };
+
+  auto create_shadow_slot = [&](auto *transformedAlloca) -> AllocaInst * {
+    Function *F = transformedAlloca->getFunction();
+    BasicBlock &entryBB = F->getEntryBlock();
+    Instruction *insertPt = &*entryBB.getFirstInsertionPt();
+    builder.SetInsertPoint(insertPt);
+    AllocaInst *shadowSlot =
+        builder.CreateAlloca(ptr_ty, nullptr, "shadow.slot");
+    builder.CreateStore(ConstantPointerNull::get(ptr_ty), shadowSlot);
+    builder.SetInsertPoint(transformedAlloca->getNextNonDebugInstruction());
+    StoreInst *storeStackAddr =
+        builder.CreateStore(transformedAlloca, shadowSlot);
+    storeStackAddr->setMetadata("cve.noinstrument", MDNode::get(Ctx, {}));
+    return shadowSlot;
+  };
+
+  auto handle_lifetimes = [&](auto *oldAlloca, auto *newAlloca,
+                              auto *shadowSlot, Value *totalSize) {
+    // Because instrumenation alters the effective size of stack allocation
+    // we need to rewrite intrinsics to use instrumented ptr and old size
+    SmallVector<IntrinsicInst *, 16> lifetimeStart;
+    SmallVector<IntrinsicInst *, 16> lifetimeEnd;
+
     bool hasStart = false;
     bool hasEnd = false;
 
-    Type *allocatedType = allocaInst->getAllocatedType();
-    uint64_t typeSize = DL.getTypeAllocSize(allocatedType);
+    for (auto *user : oldAlloca->users()) {
+      if (auto *ii = dyn_cast<IntrinsicInst>(user)) {
+        Intrinsic::ID id = ii->getIntrinsicID();
+        if (id == Intrinsic::lifetime_start) {
+          hasStart = true;
+          lifetimeStart.push_back(ii);
+        }
 
-    // Collect lifetime calls
-    SmallVector<Instruction *, 8> lifetimeCalls;
-
-    for (auto *user : allocaInst->users()) {
-      if (auto *call = dyn_cast<CallInst>(user)) {
-        if (auto *intrinsic = dyn_cast<IntrinsicInst>(call)) {
-          if (intrinsic->getIntrinsicID() == Intrinsic::lifetime_start) {
-            hasStart = true;
-            lifetimeCalls.push_back(call);
-          }
-
-          if (intrinsic->getIntrinsicID() == Intrinsic::lifetime_end) {
-            hasEnd = true;
-            lifetimeCalls.push_back(call);
-          }
+        if (id == Intrinsic::lifetime_end) {
+          hasEnd = true;
+          lifetimeEnd.push_back(ii);
         }
       }
     }
 
-    for (auto *call : lifetimeCalls) {
-      if (auto *intrinsic = dyn_cast<IntrinsicInst>(call)) {
-        if (intrinsic->getIntrinsicID() == Intrinsic::lifetime_start) {
-          builder.SetInsertPoint(call->getNextNode());
-          builder.CreateCall(allocateFn,
-                             {allocaInst, ConstantInt::get(size_ty, typeSize)});
-        }
-
-        if (intrinsic->getIntrinsicID() == Intrinsic::lifetime_end) {
-          builder.SetInsertPoint(call->getNextNode());
-          builder.CreateCall(invalidateFn, {allocaInst});
-        }
-      }
+    for (auto *start : lifetimeStart) {
+      start->setArgOperand(0, totalSize);
+      builder.SetInsertPoint(start->getNextNode());
+      builder.CreateCall(allocateFn, {newAlloca, totalSize});
     }
 
-    // Instrument allocas that don't have lifetime markers
-    // Not all llvm-ir produced hasStart == hasEnd
+    for (auto *end : lifetimeEnd) {
+      end->setArgOperand(0, totalSize);
+      builder.SetInsertPoint(end->getNextNode());
+      LoadInst *load = builder.CreateLoad(ptr_ty, shadowSlot);
+      load->setMetadata("cve.noinstrument", MDNode::get(Ctx, {}));
+      builder.CreateCall(invalidateFn, {load});
+      StoreInst *store =
+          builder.CreateStore(ConstantPointerNull::get(ptr_ty), shadowSlot);
+      store->setMetadata("cve.noinstrument", MDNode::get(Ctx, {}));
+    }
+
+    // Well-formed LLVM-IR may not have
+    // lifetime.start or lifetime.end instructions
     if (!hasStart) {
-      if (auto *inst = dyn_cast<Instruction>(allocaInst)) {
-        builder.SetInsertPoint(inst->getNextNode());
-        builder.CreateCall(allocateFn,
-                           {allocaInst, ConstantInt::get(size_ty, typeSize)});
-      }
+      builder.SetInsertPoint(newAlloca->getNextNode());
+      builder.CreateCall(allocateFn, {newAlloca, totalSize});
     }
 
     if (!hasEnd) {
-      toFreeList.push_back(allocaInst);
+      shadowSlots.push_back(shadowSlot);
     }
+  };
+
+  auto handle_alloca = [&](auto *allocaInst) {
+    Value *totalSize;
+    AllocaInst *transformedAlloca;
+    AllocaInst *shadowSlot;
+    Type *allocatedType = allocaInst->getAllocatedType();
+
+    if (isa<ArrayType>(allocatedType)) {
+      transformedAlloca = create_transformed_array_alloca(allocaInst);
+      auto maybeSize = allocaInst->getAllocationSize(DL);
+      TypeSize ts = *maybeSize;
+      uint64_t size = ts.getFixedValue();
+      totalSize = ConstantInt::get(size_ty, size);
+    } else {
+      auto result = create_transformed_alloca(allocaInst);
+      transformedAlloca = result.first;
+      totalSize = result.second;
+    }
+
+    shadowSlot = create_shadow_slot(transformedAlloca);
+    shadowSlot->setMetadata("cve.noinstrument", MDNode::get(Ctx, {}));
+    transformedAlloca->setMetadata("cve.noinstrument", MDNode::get(Ctx, {}));
+    handle_lifetimes(allocaInst, transformedAlloca, shadowSlot, totalSize);
+    allocaInst->replaceAllUsesWith(transformedAlloca);
   };
 
   for (auto &BB : *F) {
@@ -159,21 +233,34 @@ void instrumentAlloca(Function *F) {
   }
 
   for (auto *alloca : allocas) {
-    handle_alloca(alloca);
-  }
+    Type *allocatedType = alloca->getAllocatedType();
+    bool isStaticArray = isa<ArrayType>(allocatedType);
+    bool isDynamicArray = alloca->isArrayAllocation();
 
-  if (toFreeList.empty()) {
-    return;
+    if (!isStaticArray && !isDynamicArray) {
+      continue;
+    }
+
+    // TODO: Add fast filter to prune non-escaping allocas
+    handle_alloca(alloca);
   }
 
   for (auto &BB : *F) {
     for (auto &instr : BB) {
       if (auto *inst = dyn_cast<ReturnInst>(&instr)) {
         builder.SetInsertPoint(inst);
-        for (auto *padded : toFreeList) {
-          builder.CreateCall(invalidateFn, {padded});
+        for (auto *slot : shadowSlots) {
+          LoadInst *load = builder.CreateLoad(ptr_ty, slot);
+          load->setMetadata("cve.noinstrument", MDNode::get(Ctx, {}));
+          builder.CreateCall(invalidateFn, {load});
         }
       }
+    }
+  }
+
+  for (auto *alloca : allocas) {
+    if (alloca->use_empty()) {
+      alloca->eraseFromParent();
     }
   }
 }

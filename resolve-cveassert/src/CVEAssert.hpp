@@ -12,4 +12,5 @@
 extern bool CVE_ASSERT_DEBUG;
 
 extern llvm::DenseMap<llvm::Function *, llvm::GlobalVariable *> SanitizerMaps;
+llvm::GlobalVariable *getSanitizerMap(llvm::Function *F);
 llvm::GlobalVariable *initSanitizerMap(llvm::Function &F);
