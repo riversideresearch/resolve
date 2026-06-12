@@ -233,6 +233,8 @@ pub extern "C" fn __resolve_free(ptr: *mut c_void) -> () {
   unsafe {
     if mi_is_heap_owned(ptr) {
         let _ = mi_free(ptr);
+    } else {
+        let _ = free(ptr);
     }
   }
 }
