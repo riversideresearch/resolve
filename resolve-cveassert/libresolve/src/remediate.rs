@@ -186,6 +186,7 @@ pub extern "C" fn __resolve_free(ptr: *mut c_void) -> () {
                 ptr as Vaddr,
             );
 
+<<<<<<< HEAD
             info!(
                 "[HEAP] Unregistered heap object: addr={:p}, size={}",
                 ptr, size
@@ -197,7 +198,31 @@ pub extern "C" fn __resolve_free(ptr: *mut c_void) -> () {
                 ptr as Vaddr
             );
         }
-    }
+=======
+  // let ptr_size = {
+  //     let mut obj_list = ALIVE_OBJ_LIST.lock();
+  //     let sobj_opt = obj_list.search_intersection(ptr as Vaddr);
+  //     let size = sobj_opt.map(|o| o.size());
+  //     // remove shadow obj from live list
+  //     obj_list.invalidate_at(ptr as Vaddr);
+  //     size
+  // };
+
+  // // Check if the shadow object exists
+  // match ptr_size {
+  //     Some(size) => {
+  //         info!(
+  //             "[FREE] Found shadow object for allocated object, 0x{:x}, size = {size}",
+  //             ptr as Vaddr,
+  //         );
+  //     }
+  //     None => {
+  //         warn!(
+  //             "[FREE] No shadow object found for allocated object: 0x{:x}",
+  //             ptr as Vaddr
+  //         );
+  //     }
+  // }
 
     {
         // Insert shadow object into freed object list
