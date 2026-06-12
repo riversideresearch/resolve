@@ -1,8 +1,7 @@
 // Copyright (c) 2025 Riverside Research.
 // LGPL-3; See LICENSE.txt in the repo root for details.
 use libc::{
-    EOF, FILE, c_char, c_int, c_void, fgetc, free, strlen, strnlen, size_t, ssize_t,
-    write, STDERR_FILENO, 
+    EOF, FILE, c_char, c_int, c_void, fgetc, strlen, strnlen, size_t, ssize_t, 
 };
 
 use crate::shadowobjs::{SHADOW_STACK, ALIVE_OBJ_LIST, AllocType, FREED_OBJ_LIST, Vaddr};
@@ -29,7 +28,6 @@ unsafe extern "C" {
     
     // Shim API
     fn mi_resolve_ptr(ptr: *mut c_void) -> BoundsInfo;
-    fn mi_is_heap_owned(ptr: *mut c_void) -> bool;
 }
 
 /**
@@ -180,7 +178,7 @@ pub extern "C" fn __resolve_malloc(size: usize) -> *mut c_void {
     //    ptr as Vaddr
     //);
 
-    //info!("[RESOLVE] block bounds: (0x{:x}, 0x{:x})", bounds_info.base as Vaddr, bounds_info.limit as Vaddr);
+    //info!("[RESOLVE] bounds: (0x{:x}, 0x{:x})", bounds_info.base as Vaddr, bounds_info.limit as Vaddr);
     //info!("[RESOLVE] block index: {}", bounds_info.block_index);
     //info!("[RESOLVE] block size: {}", bounds_info.block_size);
     ptr
@@ -231,20 +229,8 @@ pub extern "C" fn __resolve_free(ptr: *mut c_void) -> () {
   //     let mut freed_guard = FREED_OBJ_LIST.lock();
   //     freed_guard.add_shadow_object(AllocType::Unallocated, ptr as Vaddr, ptr_size.unwrap_or(0));
   // }
-  unsafe {
-      if mi_is_heap_owned(ptr) {
-          let _ = mi_free(ptr);
-      }
-    //   } else {
-    //       let mut buf = [0u8; 64];
-    //       let n = libc::snprintf(
-    //         buf.as_mut_ptr().cast(),
-    //         buf.len(),
-    //         b"free(%p)\n\0".as_ptr().cast(),
-    //         ptr,
-    //       );
-    //       write(STDERR_FILENO, buf.as_ptr().cast(), n as usize);
-    }
+
+  let _ = unsafe { mi_free(ptr) };
 }
 //
 /**
@@ -285,34 +271,34 @@ pub extern "C" fn __resolve_realloc(ptr: *mut c_void, size: usize) -> *mut c_voi
    realloc_ptr
 }
 
-// /**
-//  * @brief - Allocator logging interface for calloc
-//  * @input
-//  *  - n_items: number of items in the allocation
-//  *  - size: size of the allocation in bytes
-//  * @return - none
-//  */
-// #[unsafe(no_mangle)]
-// pub extern "C" fn __resolve_calloc(n_items: usize, item_size: usize) -> *mut c_void {
-//     let ptr = unsafe { mi_calloc(n_items, item_size) };
-//     let size = n_items * item_size;
+/**
+  * @brief - Allocator logging interface for calloc
+  * @input
+  *  - n_items: number of items in the allocation
+  *  - size: size of the allocation in bytes
+  * @return - none
+  */
+#[unsafe(no_mangle)]
+pub extern "C" fn __resolve_calloc(n_items: usize, item_size: usize) -> *mut c_void {
+    let ptr = unsafe { mi_calloc(n_items, item_size) };
+    let size = n_items * item_size;
 
-//     if ptr.is_null() {
-//         return ptr;
-//     }
+    if ptr.is_null() {
+        return ptr;
+    }
 
-//     {
-//         let mut obj_list = ALIVE_OBJ_LIST.lock();
-//         obj_list.add_shadow_object(AllocType::Heap, ptr as Vaddr, size);
-//     }
+    //{
+    //    let mut obj_list = ALIVE_OBJ_LIST.lock();
+    //    obj_list.add_shadow_object(AllocType::Heap, ptr as Vaddr, size);
+    //}
 
-//     info!(
-//         "[HEAP] Logging allocation with {n_items} items, size (bytes): {size}, dst ptr: 0x{:x}",
-//         ptr as Vaddr
-//     );
+    //info!(
+    //    "[HEAP] Logging allocation with {n_items} items, size (bytes): {size}, dst ptr: 0x{:x}",
+    //    ptr as Vaddr
+    //);
 
-//     ptr
-// }
+    ptr
+}
 
 // /**
 //  * @brief - Allocator logging interface for strdup
@@ -320,30 +306,30 @@ pub extern "C" fn __resolve_realloc(ptr: *mut c_void, size: usize) -> *mut c_voi
 //  *  - ptr: ptr to the original allocation
 //  * @return - pointer to the copied string
 //  */
-// #[unsafe(no_mangle)]
-// pub extern "C" fn __resolve_strdup(ptr: *mut c_char) -> *mut c_char {
-//     let string_ptr = unsafe { mi_strdup(ptr) };
+#[unsafe(no_mangle)]
+pub extern "C" fn __resolve_strdup(ptr: *mut c_char) -> *mut c_char {
+    let string_ptr = unsafe { mi_strdup(ptr) };
 
-//     if string_ptr.is_null() {
-//         return string_ptr;
-//     }
+    if string_ptr.is_null() {
+        return string_ptr;
+    }
 
-//     // +1 to include null termination byte. We should allow program to read this value.
-//     // Otherwise how would the program find the end of the string?
-//     // Although writing it to something else is probably a bad idea, this too should be allowed.
-//     let sizeofstr = unsafe { strlen(ptr) + 1 };
-//     {
-//         let mut obj_list = ALIVE_OBJ_LIST.lock();
-//         obj_list.add_shadow_object(AllocType::Heap, string_ptr as Vaddr, sizeofstr);
-//     }
+    // +1 to include null termination byte. We should allow program to read this value.
+    // Otherwise how would the program find the end of the string?
+    // Although writing it to something else is probably a bad idea, this too should be allowed.
+   // let sizeofstr = unsafe { strlen(ptr) + 1 };
+   // {
+   //     let mut obj_list = ALIVE_OBJ_LIST.lock();
+   //     obj_list.add_shadow_object(AllocType::Heap, string_ptr as Vaddr, sizeofstr);
+   // }
 
-//     info!(
-//         "[HEAP] Logging 'strdup' function call with dst ptr: 0x{:x}",
-//         string_ptr as Vaddr
-//     );
+   // info!(
+   //     "[HEAP] Logging 'strdup' function call with dst ptr: 0x{:x}",
+   //     string_ptr as Vaddr
+   // );
 
-//     string_ptr
-// }
+    string_ptr
+}
 
 // /**
 //  * @brief - Allocator logging interface for strdup
@@ -354,32 +340,32 @@ pub extern "C" fn __resolve_realloc(ptr: *mut c_void, size: usize) -> *mut c_voi
 //  * NOTE: Read this link to understand the nature of strdup & strndup
 //  * https://pubs.opengroup.org/onlineptrpubs/9699919799/functions/strdup.html
 //  */
-// #[unsafe(no_mangle)]
-// pub extern "C" fn __resolve_strndup(ptr: *mut c_char, size: usize) -> *mut c_char {
-//     let string_ptr = unsafe { mi_strndup(ptr, size + 1) };
+#[unsafe(no_mangle)]
+pub extern "C" fn __resolve_strndup(ptr: *mut c_char, size: usize) -> *mut c_char {
+    let string_ptr = unsafe { mi_strndup(ptr, size + 1) };
 
-//     if string_ptr.is_null() {
-//         return string_ptr;
-//     }
+    if string_ptr.is_null() {
+        return string_ptr;
+    }
 
-//     // +1 to include null termination byte. We should allow program to read this value.
-//     // We don't actually know how much memory the libc will allocate, but
-//     // strnlen(ptr, size) + 1 is a safe lower bound.
-//     // strlen(string_ptr) + 1 would also be valid I think.
-//     let sizeofstr = unsafe { strnlen(ptr, size) + 1 };
+    // +1 to include null termination byte. We should allow program to read this value.
+    // We don't actually know how much memory the libc will allocate, but
+    // strnlen(ptr, size) + 1 is a safe lower bound.
+    // strlen(string_ptr) + 1 would also be valid I think.
+    //let sizeofstr = unsafe { strnlen(ptr, size) + 1 };
 
-//     {
-//         let mut obj_list = ALIVE_OBJ_LIST.lock();
-//         obj_list.add_shadow_object(AllocType::Heap, string_ptr as Vaddr, sizeofstr);
-//     }
+    //{
+    //    let mut obj_list = ALIVE_OBJ_LIST.lock();
+    //    obj_list.add_shadow_object(AllocType::Heap, string_ptr as Vaddr, sizeofstr);
+    //}
 
-//     info!(
-//         "[HEAP] Logging 'strndup' function call with size (bytes): {size}, dst ptr: {:?}",
-//         string_ptr as Vaddr
-//     );
+    //info!(
+    //    "[HEAP] Logging 'strndup' function call with size (bytes): {size}, dst ptr: {:?}",
+    //    string_ptr as Vaddr
+    //);
 
-//     string_ptr
-// }
+    string_ptr
+}
 
 
 #[derive(PartialEq)]
@@ -457,21 +443,21 @@ pub extern "C" fn __resolve_get_bounds(ptr: *mut c_void) -> ShadowObjBounds {
 
     sobj
 }
-
-#[unsafe(no_mangle)]
-pub extern "C" fn resolve_obj_type(base_ptr: *mut c_void) -> AllocType {
-   let base = base_ptr as Vaddr;
-
-   let find_in = |table: &crate::MutexWrap<crate::shadowobjs::ShadowObjectTable>| {
-       let t = table.lock();
-       t.search_intersection(base).map(|o| o.alloc_type)
-   };
-
-   // Why does this search freed before alive?
-   let alloc_type = find_in(&FREED_OBJ_LIST).or_else(|| find_in(&ALIVE_OBJ_LIST));
-
-   alloc_type.unwrap_or(AllocType::Unknown)
-}
+//
+//#[unsafe(no_mangle)]
+//pub extern "C" fn resolve_obj_type(base_ptr: *mut c_void) -> AllocType {
+//    let base = base_ptr as Vaddr;
+//
+//    let find_in = |table: &crate::MutexWrap<crate::shadowobjs::ShadowObjectTable>| {
+//        let t = table.lock();
+//        t.search_intersection(base).map(|o| o.alloc_type)
+//    };
+//
+//    // Why does this search freed before alive?
+//    let alloc_type = find_in(&FREED_OBJ_LIST).or_else(|| find_in(&ALIVE_OBJ_LIST));
+//
+//    alloc_type.unwrap_or(AllocType::Unknown)
+//}
 
 /**
  * @brief - Logs when program enters sanitization basic block
