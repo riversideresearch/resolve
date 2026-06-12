@@ -1,7 +1,7 @@
 // Copyright (c) 2025 Riverside Research.
 // LGPL-3; See LICENSE.txt in the repo root for details.
 use libc::{
-    EOF, FILE, c_char, c_int, c_void, fgetc, free, delete, strlen, strnlen, size_t, ssize_t, 
+    EOF, FILE, c_char, c_int, c_void, fgetc, free, strlen, strnlen, size_t, ssize_t, 
 };
 
 use crate::shadowobjs::{
@@ -262,15 +262,7 @@ pub extern "C" fn __resolve_free(ptr: *mut c_void) -> () {
 #[unsafe(no_mangle)]
 pub extern "C" fn __resolve_delete(ptr: *mut c_void) -> () {
     if ptr.is_null() { return; }
-
-    unsafe {
-        let owned = mi_is_heap_owned(p);
-        if owned {
-            let_ = mi_free(ptr);
-        } else {
-            let _ = delete(ptr);
-        }
-    }
+    let _ = unsafe { mi_free(ptr) };
 }
 /**
  * @brief - Allocator logging interface for realloc
