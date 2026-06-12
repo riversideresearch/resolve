@@ -163,118 +163,140 @@ impl ShadowStack {
         Self::default()
     }
 
-    /*
-        Adds a new shadow object to the vector.
-        
-        If this object is not at the end of the vector, and is not overwriting an invalid range,
-        we can drop the frame(s) following it.
-     */
     pub fn add_shadow_object(&mut self, base: Vaddr, size: usize) {
-        let sobj = ShadowObject {
+        // check if we are overwriting dead obj span
+        let (idx, og_size) = match self.get_at(base) {
+            Ok((og_sobj, i)) => (i, og_sobj.size()),
+            Err(_) => {
+                debug_assert!(false, "ShadowStack::add_shadow_object: untracked addr");
+                return;
+            }
+        };
+
+        self.data[idx] = ShadowStackValue::ShadowObject(ShadowObject {
             alloc_type: AllocType::Stack,
             base,
             limit: ShadowObject::limit(base, size),
             size,
-        };
+        });
 
-        // if addr < tip, we are re-using stack and must replace invalidated sobj
-        if self.data.len() > 1 {
-            if let ShadowStackEntry::Value(prev_entry) = &self.data[self.data.len() - 2] {
-                let prev_base = match prev_entry {
-                    ShadowStackValue::ShadowObject(o) => o.base,
-                    ShadowStackValue::InvalidatedObject(b) => *b,
-                };
-                if base <= prev_base {
-                    match self.locate(base) {
-                        Ok((ShadowStackValue::InvalidatedObject(_), idx)) => {
-                            self.data[idx] =
-                                ShadowStackEntry::Value(ShadowStackValue::ShadowObject(sobj));
-                            return;
-                        }
-                        Ok((ShadowStackValue::ShadowObject(_), _)) => {
-                            panic!("reallocating a live shadow object");
-                        }
-                        Err(_) => {
-                            panic!("reuse: base below frame head but no invalidated slot found");
-                        }
-                    }
-                }
-            }
+        // retain the remaining dead space
+        // if the new object doesn't fill the full extent
+        if og_size > size {
+            self.data.insert(idx + 1, ShadowStackValue::InvalidatedObject(base + size, og_size - size));
+        }
+        // If we didn't write through an invalidated object, we can drop subsequent frames
+        else {
+            self.data.truncate(idx + 1);
         }
 
-        let ffp = self.data.pop().expect("missing frame front pointer");
-        self.data.push(ShadowStackEntry::Value(ShadowStackValue::ShadowObject(sobj)));
-        self.data.push(ffp);
     }
 
-    fn get_at(&self, addr: Vaddr) -> Result<(ShadowStackValue, usize), LookupError> {
+    fn binary_search_window(&self, addr: Vaddr, mut lo: usize, mut hi: usize) -> Result<(&ShadowStackValue, usize), LookupError> {
         use LookupError::*;
 
-        if self.data.len() == 0 { return Err(ObjectNotFound); }
-    
-        let mut idx = self.data.len() - 1;
-        let mut gallop_factor = 1;
-        loop {
-            let sobj = self.data.get(idx).expect("Malformed shadow stack state!");
+        // Find the last object in [lo, hi) whose base <= addr.
+        while lo + 1 < hi {
+            let mid = lo + (hi - lo) / 2;
 
-            let (base, size) = (sobj.base(), sobj.size());
-
-            // if in this bucket:
-            if addr > base && addr < base + size {
-                // BINARY SEARCH THIS BUCKET
+            if self.data[mid].base() <= addr {
+                lo = mid;
+            } else {
+                hi = mid;
             }
+        }
 
-            // else: giddyup!
-            gallop_factor *= 2;
-            idx = idx.saturating_sub(gallop_factor);
+        let obj = &self.data[lo];
 
-            // hit end: check if addr lies outside last bucket
-            if idx == 0 {
-                if self.data.get(idx).expect("Malformed shadow stack state!").base() > addr {
-                    // bottom item in stack is somehow still out of range
-                    return Err(ObjectNotFound);
-                }
-                // else: fall through to next iteration which binary searches this bucket
-            }
+        if obj.contains(addr) {
+            Ok((obj, lo))
+        } else {
+            Err(ObjectNotFound)
         }
     }
 
-    pub fn invalidate_at(&mut self, base: Vaddr) {
-        let Ok((_, idx)) = self.locate(base) else {
+    fn get_at(&self, addr: Vaddr) -> Result<(&ShadowStackValue, usize), LookupError> {
+        use LookupError::*;
+
+        let n = self.data.len();
+        if n == 0 { return Err(ObjectNotFound); }
+
+        let last_idx = n - 1;
+        let last = &self.data[last_idx];
+        if last.contains(addr) {
+            return Ok((last, last_idx));
+        }
+
+        // If addr is above the last object's base but not inside it,
+        // then it cannot be in any earlier object, assuming sorted non-overlapping extents.
+        if last.base() <= addr {
+            return Err(ObjectNotFound);
+        }
+
+        // Gallop backwards until we find some object with base <= addr.
+        let mut hi = last_idx; // upper bound
+        let mut step = 1;
+
+        loop {
+            let lo = hi.saturating_sub(step);
+
+            // We found a bucket that should contain the address:
+            if self.data[lo].base() <= addr {
+                // must be in [lo, hi).
+                return self.binary_search_window(addr, lo, hi);
+            }
+
+            if lo == 0 {
+                // Reached the end without finding the bucket
+                return Err(ObjectNotFound);
+            }
+
+            // Giddyup
+            hi = lo;
+            step = step.saturating_mul(2);
+        }
+    }
+
+    /*
+        Invalidate a range of shadowstack.
+
+        If that range spans to the end of the stack, we drop all the frames.
+        Else, we are prepping to re-using a piece of stack
+     */
+    pub fn invalidate_at(&mut self, base: Vaddr, length: usize) {
+        let Ok((_, start_idx )) = self.get_at(base) else {
             debug_assert!(false, "invalidate_at: untracked addr");
             return;
         };
 
-        // Case: frame start, tear down the frame and everything newer.
-        if idx == 0 || matches!(self.data[idx - 1], ShadowStackEntry::FFP(_)) {
-            self.data.truncate(idx);
-            if self.data.is_empty() {
-                self.data.push(ShadowStackEntry::FFP(0));
-            }
+        let Ok((_, end_idx )) = self.get_at(base + length) else {
+            debug_assert!(false, "invalidate_at: untracked addr");
             return;
+        };
+
+        // Dropping >=1 entire frame(s)
+        // TODO: does this need to be -1?
+        if end_idx == self.data.len() {
+            self.data.truncate(end_idx - start_idx);
         }
 
-        // Case: last object on stack
-        if idx == self.data.len() - 2 {
-            let ffp = self.data.pop().expect("missing trailing FFP");
-            self.data.pop();
-            self.data.push(ffp);
-            return;
+        // Invalidating objects within range
+        // TODO: do we need to add comprehensive checks in places to make sure sobj lengths don't overlap,
+        //       or is that a latent property of stack objects? What about in cases of re-use?
+        self.data[start_idx] = ShadowStackValue::InvalidatedObject(base, length);
+        
+        if end_idx > start_idx {
+            self.data.drain(start_idx+1..end_idx); // removes each affected obj at once (faster)
         }
-
-        // Invalidating mid-frame sobj
-        self.data[idx] = ShadowStackEntry::Value(ShadowStackValue::InvalidatedObject(base));
     }
 
+    // TODO: Does it make more sense to return something explicit
+    //       when we search and get an invalidated stack object?
     pub fn search_intersection(&self, addr: Vaddr) -> Option<&ShadowObject> {
-        match self.locate(addr) {
+        match self.get_at(addr) {
             Ok((ShadowStackValue::ShadowObject(sobj), _)) => Some(sobj),
             _ => None,
         }
-    }
-
-    pub fn push_frame(&mut self) {
-        self.data.push(ShadowStackEntry::FFP(self.data.len()));
     }
 }
 
