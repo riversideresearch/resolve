@@ -32,7 +32,6 @@ unsafe extern "C" {
     
     // Shim API
     fn mi_resolve_ptr(ptr: *mut c_void) -> BoundsInfo;
-    fn mi_is_heap_owned(ptr: *mut c_void) -> bool;
 }
 
 /**
@@ -156,7 +155,7 @@ pub extern "C" fn __resolve_malloc(size: usize) -> *mut c_void {
         ptr, size
     );
 
-    //info!("[RESOLVE] block bounds: (0x{:x}, 0x{:x})", bounds_info.base as Vaddr, bounds_info.limit as Vaddr);
+    //info!("[RESOLVE] bounds: (0x{:x}, 0x{:x})", bounds_info.base as Vaddr, bounds_info.limit as Vaddr);
     //info!("[RESOLVE] block index: {}", bounds_info.block_index);
     //info!("[RESOLVE] block size: {}", bounds_info.block_size);
     ptr
@@ -259,22 +258,22 @@ pub extern "C" fn __resolve_calloc(n_items: usize, item_size: usize) -> *mut c_v
     let ptr = unsafe { mi_calloc(n_items, item_size) };
     let size = n_items * item_size;
 
-//     if ptr.is_null() {
-//         return ptr;
-//     }
+    if ptr.is_null() {
+        return ptr;
+    }
 
-//     {
-//         let mut obj_list = ALIVE_OBJ_LIST.lock();
-//         obj_list.add_shadow_object(AllocType::Heap, ptr as Vaddr, size);
-//     }
+    //{
+    //    let mut obj_list = ALIVE_OBJ_LIST.lock();
+    //    obj_list.add_shadow_object(AllocType::Heap, ptr as Vaddr, size);
+    //}
 
     info!(
         "[HEAP] Registered heap object (calloc): addr={:p}, size={}",
         ptr, size
     );
 
-//     ptr
-// }
+    ptr
+}
 
 /**
  * @brief - RESOLVE wrapper for libc strdup
@@ -287,26 +286,26 @@ pub extern "C" fn __resolve_calloc(n_items: usize, item_size: usize) -> *mut c_v
 pub extern "C" fn __resolve_strdup(ptr: *mut c_char) -> *mut c_char {
     let string_ptr = unsafe { mi_strdup(ptr) };
 
-//     if string_ptr.is_null() {
-//         return string_ptr;
-//     }
+    if string_ptr.is_null() {
+        return string_ptr;
+    }
 
-//     // +1 to include null termination byte. We should allow program to read this value.
-//     // Otherwise how would the program find the end of the string?
-//     // Although writing it to something else is probably a bad idea, this too should be allowed.
-//     let sizeofstr = unsafe { strlen(ptr) + 1 };
-//     {
-//         let mut obj_list = ALIVE_OBJ_LIST.lock();
-//         obj_list.add_shadow_object(AllocType::Heap, string_ptr as Vaddr, sizeofstr);
-//     }
+    // +1 to include null termination byte. We should allow program to read this value.
+    // Otherwise how would the program find the end of the string?
+    // Although writing it to something else is probably a bad idea, this too should be allowed.
+   // let sizeofstr = unsafe { strlen(ptr) + 1 };
+   // {
+   //     let mut obj_list = ALIVE_OBJ_LIST.lock();
+   //     obj_list.add_shadow_object(AllocType::Heap, string_ptr as Vaddr, sizeofstr);
+   // }
 
     info!(
         "[HEAP] Registered heap object (strdup): addr={:p}, size={}",
         string_ptr, sizeofstr
     );
 
-//     string_ptr
-// }
+    string_ptr
+}
 
 /**
  * @brief - RESOLVE wrapper for libc strndup
@@ -321,20 +320,20 @@ pub extern "C" fn __resolve_strdup(ptr: *mut c_char) -> *mut c_char {
 pub extern "C" fn __resolve_strndup(ptr: *mut c_char, size: usize) -> *mut c_char {
     let string_ptr = unsafe { mi_strndup(ptr, size + 1) };
 
-//     if string_ptr.is_null() {
-//         return string_ptr;
-//     }
+    if string_ptr.is_null() {
+        return string_ptr;
+    }
 
-//     // +1 to include null termination byte. We should allow program to read this value.
-//     // We don't actually know how much memory the libc will allocate, but
-//     // strnlen(ptr, size) + 1 is a safe lower bound.
-//     // strlen(string_ptr) + 1 would also be valid I think.
-//     let sizeofstr = unsafe { strnlen(ptr, size) + 1 };
+    // +1 to include null termination byte. We should allow program to read this value.
+    // We don't actually know how much memory the libc will allocate, but
+    // strnlen(ptr, size) + 1 is a safe lower bound.
+    // strlen(string_ptr) + 1 would also be valid I think.
+    //let sizeofstr = unsafe { strnlen(ptr, size) + 1 };
 
-//     {
-//         let mut obj_list = ALIVE_OBJ_LIST.lock();
-//         obj_list.add_shadow_object(AllocType::Heap, string_ptr as Vaddr, sizeofstr);
-//     }
+    //{
+    //    let mut obj_list = ALIVE_OBJ_LIST.lock();
+    //    obj_list.add_shadow_object(AllocType::Heap, string_ptr as Vaddr, sizeofstr);
+    //}
 
     info!(
         "[HEAP] Registered heap object (strndup): addr={:p}, size={}",
@@ -518,21 +517,21 @@ pub extern "C" fn __resolve_get_bounds(ptr: *mut c_void) -> ShadowObjBounds {
 
     sobj
 }
-
-#[unsafe(no_mangle)]
-pub extern "C" fn resolve_obj_type(base_ptr: *mut c_void) -> AllocType {
-   let base = base_ptr as Vaddr;
-
-   let find_in = |table: &crate::MutexWrap<crate::shadowobjs::ShadowObjectTable>| {
-       let t = table.lock();
-       t.search_intersection(base).map(|o| o.alloc_type)
-   };
-
-   // Why does this search freed before alive?
-   let alloc_type = find_in(&FREED_OBJ_LIST).or_else(|| find_in(&ALIVE_OBJ_LIST));
-
-   alloc_type.unwrap_or(AllocType::Unknown)
-}
+//
+//#[unsafe(no_mangle)]
+//pub extern "C" fn resolve_obj_type(base_ptr: *mut c_void) -> AllocType {
+//    let base = base_ptr as Vaddr;
+//
+//    let find_in = |table: &crate::MutexWrap<crate::shadowobjs::ShadowObjectTable>| {
+//        let t = table.lock();
+//        t.search_intersection(base).map(|o| o.alloc_type)
+//    };
+//
+//    // Why does this search freed before alive?
+//    let alloc_type = find_in(&FREED_OBJ_LIST).or_else(|| find_in(&ALIVE_OBJ_LIST));
+//
+//    alloc_type.unwrap_or(AllocType::Unknown)
+//}
 
 /**
  * @brief - Logs invalid memory access for a given function
