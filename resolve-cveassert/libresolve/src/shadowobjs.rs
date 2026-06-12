@@ -2,6 +2,7 @@
 // LGPL-3; See LICENSE.txt in the repo root for details.
 
 use crate::MutexWrap;
+use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::ops::RangeInclusive;
 use std::ops::Bound::Included;
@@ -116,6 +117,192 @@ impl ShadowObjectTable {
 // static object lists to store all objects
 pub static ALIVE_OBJ_LIST: MutexWrap<ShadowObjectTable> = MutexWrap::new(ShadowObjectTable::new());
 pub static FREED_OBJ_LIST: MutexWrap<ShadowObjectTable> = MutexWrap::new(ShadowObjectTable::new());
+
+enum ShadowStackValue {
+    ShadowObject(ShadowObject),
+    InvalidatedObject(Vaddr,usize)
+}
+
+impl ShadowStackValue {
+    fn base(&self) -> Vaddr {
+        match self {
+            ShadowStackValue::ShadowObject(o) => o.base,
+            ShadowStackValue::InvalidatedObject(b, _s) => *b,
+        }
+    }
+
+    fn size(&self) -> usize {
+        match self {
+            ShadowStackValue::ShadowObject(o) => o.size,
+            ShadowStackValue::InvalidatedObject(_b, s) => *s,
+        }
+    }
+
+    fn contains(&self, addr: Vaddr) -> bool {
+        let base = self.base();
+
+        let Some(end) = base.checked_add(self.size() as Vaddr) else {
+            return false;
+        };
+
+        base <= addr && addr < end
+    }
+}
+
+#[derive(Default)]
+pub struct ShadowStack {
+    data: Vec<ShadowStackValue>
+}
+
+enum LookupError {
+    ObjectNotFound,
+}
+
+impl ShadowStack {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn add_shadow_object(&mut self, base: Vaddr, size: usize) {
+        // check if we are overwriting dead obj span
+        let (idx, og_size) = match self.get_at(base) {
+            Ok((og_sobj, i)) => (i, og_sobj.size()),
+            Err(_) => {
+                debug_assert!(false, "ShadowStack::add_shadow_object: untracked addr");
+                return;
+            }
+        };
+
+        self.data[idx] = ShadowStackValue::ShadowObject(ShadowObject {
+            alloc_type: AllocType::Stack,
+            base,
+            limit: ShadowObject::limit(base, size),
+            size,
+        });
+
+        // retain the remaining dead space
+        // if the new object doesn't fill the full extent
+        if og_size > size {
+            self.data.insert(idx + 1, ShadowStackValue::InvalidatedObject(base + size, og_size - size));
+        }
+        // If we didn't write through an invalidated object, we can drop subsequent frames
+        else {
+            self.data.truncate(idx + 1);
+        }
+
+    }
+
+    fn binary_search_window(&self, addr: Vaddr, mut lo: usize, mut hi: usize) -> Result<(&ShadowStackValue, usize), LookupError> {
+        use LookupError::*;
+
+        // Find the last object in [lo, hi) whose base <= addr.
+        while lo + 1 < hi {
+            let mid = lo + (hi - lo) / 2;
+
+            if self.data[mid].base() <= addr {
+                lo = mid;
+            } else {
+                hi = mid;
+            }
+        }
+
+        let obj = &self.data[lo];
+
+        if obj.contains(addr) {
+            Ok((obj, lo))
+        } else {
+            Err(ObjectNotFound)
+        }
+    }
+
+    fn get_at(&self, addr: Vaddr) -> Result<(&ShadowStackValue, usize), LookupError> {
+        use LookupError::*;
+
+        let n = self.data.len();
+        if n == 0 { return Err(ObjectNotFound); }
+
+        let last_idx = n - 1;
+        let last = &self.data[last_idx];
+        if last.contains(addr) {
+            return Ok((last, last_idx));
+        }
+
+        // If addr is above the last object's base but not inside it,
+        // then it cannot be in any earlier object, assuming sorted non-overlapping extents.
+        if last.base() <= addr {
+            return Err(ObjectNotFound);
+        }
+
+        // Gallop backwards until we find some object with base <= addr.
+        let mut hi = last_idx; // upper bound
+        let mut step = 1;
+
+        loop {
+            let lo = hi.saturating_sub(step);
+
+            // We found a bucket that should contain the address:
+            if self.data[lo].base() <= addr {
+                // must be in [lo, hi).
+                return self.binary_search_window(addr, lo, hi);
+            }
+
+            if lo == 0 {
+                // Reached the end without finding the bucket
+                return Err(ObjectNotFound);
+            }
+
+            // Giddyup
+            hi = lo;
+            step = step.saturating_mul(2);
+        }
+    }
+
+    /*
+        Invalidate a range of shadowstack.
+
+        If that range spans to the end of the stack, we drop all the frames.
+        Else, we are prepping to re-using a piece of stack
+     */
+    pub fn invalidate_at(&mut self, base: Vaddr, length: usize) {
+        let Ok((_, start_idx )) = self.get_at(base) else {
+            debug_assert!(false, "invalidate_at: untracked addr");
+            return;
+        };
+
+        let Ok((_, end_idx )) = self.get_at(base + length) else {
+            debug_assert!(false, "invalidate_at: untracked addr");
+            return;
+        };
+
+        // Dropping >=1 entire frame(s)
+        // TODO: does this need to be -1?
+        if end_idx == self.data.len() {
+            self.data.truncate(end_idx - start_idx);
+        }
+
+        // Invalidating objects within range
+        // TODO: do we need to add comprehensive checks in places to make sure sobj lengths don't overlap,
+        //       or is that a latent property of stack objects? What about in cases of re-use?
+        self.data[start_idx] = ShadowStackValue::InvalidatedObject(base, length);
+        
+        if end_idx > start_idx {
+            self.data.drain(start_idx+1..end_idx); // removes each affected obj at once (faster)
+        }
+    }
+
+    // TODO: Does it make more sense to return something explicit
+    //       when we search and get an invalidated stack object?
+    pub fn search_intersection(&self, addr: Vaddr) -> Option<&ShadowObject> {
+        match self.get_at(addr) {
+            Ok((ShadowStackValue::ShadowObject(sobj), _)) => Some(sobj),
+            _ => None,
+        }
+    }
+}
+
+thread_local! {
+    pub static SHADOW_STACK: RefCell<ShadowStack> = RefCell::new(ShadowStack::new());
+}
 
 #[cfg(test)]
 mod tests {
