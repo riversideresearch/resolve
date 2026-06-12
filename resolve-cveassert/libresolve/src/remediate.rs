@@ -29,6 +29,8 @@ unsafe extern "C" {
     fn mi_strdup(ptr: *mut c_char) -> *mut c_char;
     fn mi_strndup(ptr: *mut c_char, size: usize) -> *mut c_char;
     fn mi_free(ptr: *mut c_void);
+    fn mi_new(size: usize) -> *mut c_void;
+    fn mi_delete(ptr: *mut c_void);
     
     // Shim API
     fn mi_resolve_ptr(ptr: *mut c_void) -> BoundsInfo;
@@ -162,6 +164,18 @@ pub extern "C" fn __resolve_malloc(size: usize) -> *mut c_void {
     ptr
 }
 
+
+#[unsafe(no_mangle)]
+pub extern "C" fn __resolve_new(size: usize) -> *mut c_void {
+    let ptr = unsafe { mi_new(size + 1) };
+
+    if ptr.is_null() {
+        return ptr;
+    }
+
+    ptr
+}
+
 /**
  * @brief - RESOLVE wrapper for libc free
  * @input
@@ -233,6 +247,21 @@ pub extern "C" fn __resolve_free(ptr: *mut c_void) -> () {
   let _ = unsafe { mi_free(ptr) };
 }
 //
+
+
+#[unsafe(no_mangle)]
+pub extern "C" fn __resolve_delete(ptr: *mut c_void) -> () {
+    if ptr.is_null() { return; }
+
+    unsafe {
+        let owned = mi_is_heap_owned(p);
+        if owned {
+            let_ = mi_free(ptr);
+        } else {
+            let _ = delete(ptr);
+        }
+    }
+}
 /**
  * @brief - RESOLVE wrapper for libc realloc
  * @input
