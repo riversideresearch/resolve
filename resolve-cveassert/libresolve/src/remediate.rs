@@ -234,7 +234,8 @@ pub extern "C" fn __resolve_free(ptr: *mut c_void) -> () {
   unsafe {
     if ptr.is_null() { return; }
      
-    if mi_is_heap_owned(ptr) {
+    let owned = mi_is_heap_owned(ptr);
+    if owned {
         let _ = mi_free(ptr);
     } else {
         let _ = free(ptr);

@@ -31,7 +31,7 @@ bounds_info_t mi_resolve_ptr(void* p) {
 }
 
 bool mi_is_heap_owned(const void* p) {
-  return mi_check_owned(p);
+  return mi_is_in_heap_region(p);
 }
 
 
