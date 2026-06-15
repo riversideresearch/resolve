@@ -160,7 +160,7 @@ pub extern "C" fn __resolve_getdelim(lineptr: *mut *mut c_char, size: *mut size_
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn __resolve_asprintf(strp: *mut *mut c_char, fmt: *const c_char, args: ...) -> c_int {
+pub unsafe extern "C" fn __resolve_asprintf(strp: *mut *mut c_char, fmt: *const c_char, args: ...) -> c_int {
     return __asprintf(strp, fmt, args)
 }
 
