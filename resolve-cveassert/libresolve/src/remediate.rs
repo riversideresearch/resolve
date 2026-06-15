@@ -35,7 +35,7 @@ unsafe extern "C" {
 
     fn mi_resolve_ptr(ptr: *mut c_void) -> BoundsInfo;
     fn mi_is_heap_owned(ptr: *mut c_void) -> bool;
-    fn __asprintf(strp: *mut *mut c_char, fmt: *const c_char, args: ...) -> c_int;
+    fn __vasprintf(strp: *mut *mut c_char, fmt: *const c_char, args: VaList<'_>) -> c_int;
 }
 
 /**
@@ -174,8 +174,8 @@ pub extern "C" fn __resolve_getdelim(lineptr: *mut *mut c_char, size: *mut size_
 }
 
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __resolve_asprintf(strp: *mut *mut c_char, fmt: *const c_char, args: ...) -> c_int {
-    return __asprintf(strp, fmt, args)
+pub unsafe extern "C" fn __resolve_asprintf(strp: *mut *mut c_char, fmt: *const c_char, mut args: ...) -> c_int {
+    return __vasprintf(strp, fmt, args)
 }
 
 /**

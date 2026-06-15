@@ -47,10 +47,13 @@ int __vasprintf(char **strp, const char *fmt, va_list ap)
   int len = vsnprintf(NULL, 0, fmt, ap_copy);
   va_end(ap_copy);
 
-  if (len < 0) { return -1; }
+  if (len < 0) { 
+    // to match glibc behavior
+    *strp = NULL;
+    return -1; 
+  }
 
-  //char *buf = __resolve_malloc((size_t)len + 1);
-  char *buf = malloc((size_t)len + 1);
+  char *buf = __resolve_malloc((size_t)len + 1);
   if (!buf) { return -1; }
 
   va_copy(ap_copy, ap);
@@ -60,23 +63,10 @@ int __vasprintf(char **strp, const char *fmt, va_list ap)
   va_end(ap_copy);
 
   if (written < 0) {
-    //__resolve_free(buf);
-    free(buf);
+    __resolve_free(buf);
     return -1;
   }
 
   *strp = buf;
   return written;
-}
-
-
-int __asprintf(char **strp, const char *fmt, ...)
-{
-  va_list ap;
-  va_start(ap, fmt);
-
-  int rc = __vasprintf(strp, fmt, ap);
-
-  va_end(ap);
-  return rc;
 }
