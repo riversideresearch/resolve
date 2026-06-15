@@ -29,13 +29,12 @@ pub extern "C" fn __resolve_alloca(ptr: *mut c_void, size: usize) -> () {
 pub extern "C" fn __resolve_invalidate_stack_range(base: *mut c_void, size: usize) {
     let base = base as Vaddr;
 
-    // TODO: COMPLETE ME
-    // SHADOW_STACK.with_borrow_mut(
-    //     |ss|
-    //      ss.invalidate_at(base)
-    // );
+    SHADOW_STACK.with_borrow_mut(
+        |ss|
+         ss.invalidate_at(base, size)
+    );
 
-    // info!("[STACK] Free addr 0x{base:x}");
+    info!("[STACK] Free addr 0x{base:x} size {size}");
 }
 
 /**

@@ -149,6 +149,8 @@ impl ShadowStackValue {
     }
 }
 
+// data must be ordered descending (downward growing stack on x86)
+// so push/pop are O(1) at the end.
 #[derive(Default)]
 pub struct ShadowStack {
     data: Vec<ShadowStackValue>
@@ -183,7 +185,7 @@ impl ShadowStack {
         // retain the remaining dead space
         // if the new object doesn't fill the full extent
         if og_size > size {
-            self.data.insert(idx + 1, ShadowStackValue::InvalidatedObject(base + size, og_size - size));
+            self.data.insert(idx, ShadowStackValue::InvalidatedObject(base + size, og_size - size));
         }
         // If we didn't write through an invalidated object, we can drop subsequent frames
         else {
@@ -192,68 +194,31 @@ impl ShadowStack {
 
     }
 
-    fn binary_search_window(&self, addr: Vaddr, mut lo: usize, mut hi: usize) -> Result<(&ShadowStackValue, usize), LookupError> {
-        use LookupError::*;
-
-        // Find the last object in [lo, hi) whose base <= addr.
-        while lo + 1 < hi {
-            let mid = lo + (hi - lo) / 2;
-
-            if self.data[mid].base() <= addr {
-                lo = mid;
-            } else {
-                hi = mid;
-            }
-        }
-
-        let obj = &self.data[lo];
-
-        if obj.contains(addr) {
-            Ok((obj, lo))
-        } else {
-            Err(ObjectNotFound)
-        }
-    }
-
     fn get_at(&self, addr: Vaddr) -> Result<(&ShadowStackValue, usize), LookupError> {
         use LookupError::*;
 
         let n = self.data.len();
         if n == 0 { return Err(ObjectNotFound); }
 
-        let last_idx = n - 1;
-        let last = &self.data[last_idx];
-        if last.contains(addr) {
-            return Ok((last, last_idx));
+        // fast path: the top frame (should be) the most common lookup target.
+        let top_idx = n - 1;
+        let top = &self.data[top_idx];
+        if top.contains(addr) {
+            return Ok((top, top_idx));
         }
 
-        // If addr is above the last object's base but not inside it,
-        // then it cannot be in any earlier object, assuming sorted non-overlapping extents.
-        if last.base() <= addr {
-            return Err(ObjectNotFound);
+        // easy out: below every tracked object
+        if addr < top.base() {
+            return Err(ObjectNotFound); // should we return a seperate ObjectOutOfBounds?
         }
 
-        // Gallop backwards until we find some object with base <= addr.
-        let mut hi = last_idx; // upper bound
-        let mut step = 1;
-
-        loop {
-            let lo = hi.saturating_sub(step);
-
-            // We found a bucket that should contain the address:
-            if self.data[lo].base() <= addr {
-                // must be in [lo, hi).
-                return self.binary_search_window(addr, lo, hi);
-            }
-
-            if lo == 0 {
-                // Reached the end without finding the bucket
-                return Err(ObjectNotFound);
-            }
-
-            // Giddyup
-            hi = lo;
-            step = step.saturating_mul(2);
+        // binary search the shadow stack for value
+        let idx = self.data.partition_point(|o| o.base() > addr);
+        let obj = &self.data[idx];
+        if obj.contains(addr) {
+            Ok((obj, idx))
+        } else {
+            Err(ObjectNotFound)
         }
     }
 
@@ -264,30 +229,27 @@ impl ShadowStack {
         Else, we are prepping to re-using a piece of stack
      */
     pub fn invalidate_at(&mut self, base: Vaddr, length: usize) {
-        let Ok((_, start_idx )) = self.get_at(base) else {
-            debug_assert!(false, "invalidate_at: untracked addr");
+        if length == 0 { return; }
+
+        let Ok((_, start_idx)) = self.get_at(base) else {
+            debug_assert!(false, "invalidate_at: untracked base");
             return;
         };
-
-        let Ok((_, end_idx )) = self.get_at(base + length) else {
-            debug_assert!(false, "invalidate_at: untracked addr");
+        let Ok((_, end_idx)) = self.get_at(base + length - 1) else {
+            debug_assert!(false, "invalidate_at: untracked limit");
             return;
         };
+        debug_assert!(end_idx <= start_idx);
 
-        // Dropping >=1 entire frame(s)
-        // TODO: does this need to be -1?
-        if end_idx == self.data.len() {
-            self.data.truncate(end_idx - start_idx);
+        // pop all frames if range reaches the top of stack
+        if start_idx == self.data.len() - 1 {
+            self.data.truncate(end_idx);
+            return;
         }
 
-        // Invalidating objects within range
-        // TODO: do we need to add comprehensive checks in places to make sure sobj lengths don't overlap,
-        //       or is that a latent property of stack objects? What about in cases of re-use?
-        self.data[start_idx] = ShadowStackValue::InvalidatedObject(base, length);
-        
-        if end_idx > start_idx {
-            self.data.drain(start_idx+1..end_idx); // removes each affected obj at once (faster)
-        }
+        // collapse the covered frames into one dead marker.
+        self.data.drain(end_idx..start_idx);
+        self.data[end_idx] = ShadowStackValue::InvalidatedObject(base, length);
     }
 
     // TODO: Does it make more sense to return something explicit
@@ -370,5 +332,75 @@ mod tests {
     fn test_bounds_invalid_address_panic() {
         // let table = ShadowObjectTable::new();
         //table.bounds(0xDEADBEEF).unwrap(); // should panic since there is no interesection
+    }
+
+    use super::{ShadowObject, ShadowStack, ShadowStackValue, Vaddr};
+
+    fn stack_obj(base: Vaddr, size: usize) -> ShadowStackValue {
+        ShadowStackValue::ShadowObject(ShadowObject {
+            alloc_type: AllocType::Stack,
+            base,
+            limit: ShadowObject::limit(base, size),
+            size,
+        })
+    }
+
+    // NOTE: Generated by Opus 4.8
+    //
+    // Tests to ensure the stack grows descending and
+    // properly resolves common lookups
+    #[test]
+    fn shadowstack_descending_lookup() {
+        // Frames as the stack grows down: each new frame has a lower base, so
+        // the vec is descending by base (top of stack = last element).
+        let mut ss = ShadowStack::new();
+        ss.data.push(stack_obj(0x3000, 0x100));
+        ss.data.push(stack_obj(0x2000, 0x100));
+        ss.data.push(stack_obj(0x1000, 0x100)); // top
+
+        // Non-top frames must be found
+        assert_eq!(ss.search_intersection(0x3050).map(|o| o.base), Some(0x3000));
+        assert_eq!(ss.search_intersection(0x2050).map(|o| o.base), Some(0x2000));
+        assert_eq!(ss.search_intersection(0x1050).map(|o| o.base), Some(0x1000));
+
+        // Boundaries: base inclusive, base + size exclusive.
+        assert_eq!(ss.search_intersection(0x3000).map(|o| o.base), Some(0x3000));
+        assert!(ss.search_intersection(0x3100).is_none());
+
+        // Below the top frame's base => below everything; gaps are misses.
+        assert!(ss.search_intersection(0x0fff).is_none());
+        assert!(ss.search_intersection(0x2500).is_none());
+    }
+
+    // NOTE: Generated by Opus 4.8
+    //
+    // Tests stack re-use where we tombstone invalidate a region
+    // of shadow stack and then re-allocate a sobj inside of it
+    // that may or may not fill that region entirely
+    #[test]
+    fn shadowstack_reuse() {
+        // Exact reuse: a dead region reused by an equally
+        // sized object leaves no dead space behind.
+        let mut ss = ShadowStack::new();
+        ss.data.push(ShadowStackValue::InvalidatedObject(0x1000, 0x100));
+        assert!(ss.search_intersection(0x1050).is_none()); // dead before reuse
+
+        ss.add_shadow_object(0x1000, 0x100);
+        assert_eq!(ss.search_intersection(0x1050).map(|o| o.base), Some(0x1000)); // reused, live
+        assert_eq!(ss.data.len(), 1); // no leftover dead space
+
+        // Partial reuse: a smaller object reuses the base and leaves the
+        // higher-base remainder dead.
+        let mut ss = ShadowStack::new();
+        ss.data.push(ShadowStackValue::InvalidatedObject(0x1000, 0x400));
+        assert!(ss.search_intersection(0x1050).is_none()); // dead before reuse
+
+        ss.add_shadow_object(0x1000, 0x100);
+        assert_eq!(ss.search_intersection(0x1050).map(|o| o.base), Some(0x1000)); // reused, live
+        assert!(ss.search_intersection(0x1200).is_none()); // remainder still dead
+
+        // Descending invariant: dead remainder (higher base) precedes the live object.
+        let bases: Vec<_> = ss.data.iter().map(|o| o.base()).collect();
+        assert_eq!(bases, vec![0x1100, 0x1000]);
     }
 }
