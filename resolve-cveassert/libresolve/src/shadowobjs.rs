@@ -155,7 +155,8 @@ impl ShadowStack {
     }
 
     pub fn add_shadow_object(&mut self, base: Vaddr, size: usize) {
-        let new_end = base + size; // exclusive
+        let new_end = base.checked_add(size)
+            .expect("add_shadow_object: object overflows the address space"); // exclusive
         let make = || ShadowObject {
             alloc_type: AllocType::Stack,
             base,
@@ -231,62 +232,61 @@ impl ShadowStack {
 
     /*
         Invalidate the address range [base, base + length).
-        Entries are dropped and replaced by a dead marker.
+
+        `base` and `base + length` must each land exactly on a tracked object
+        boundary. The range may span several whole objects (live or dead), but
+        it may not bisect one. The spanned entries are dropped and replaced by
+        a single dead marker.
      */
     pub fn invalidate_at(&mut self, base: Vaddr, length: usize) {
         if length == 0 { return; }
-        let end = base + length; // exclusive
+        let end = base.checked_add(length)
+            .expect("invalidate_at: range overflows the address space"); // exclusive
 
-        let Ok((_, start_idx)) = self.get_at(base) else {
-            debug_assert!(false, "invalidate_at: untracked base");
-            return;
+        // entry holding `base` (lowest address in the range)
+        let (start_idx, lo_base) = match self.get_at(base) {
+            Ok((v, idx)) => (idx, v.base()),
+            Err(_) => { debug_assert!(false, "invalidate_at: untracked base"); return; }
         };
-        let Ok((_, end_idx)) = self.get_at(end - 1) else {
-            debug_assert!(false, "invalidate_at: untracked limit");
-            return;
+        assert!(lo_base == base,
+            "invalidate_at: range start 0x{base:x} is not an object boundary");
+
+        // entry holding `end - 1` (highest address in the range)
+        let (end_idx, hi_end) = match self.get_at(end - 1) {
+            Ok((v, idx)) => (idx, v.base() + v.size()),
+            Err(_) => { debug_assert!(false, "invalidate_at: untracked limit"); return; }
         };
+        assert!(hi_end == end,
+            "invalidate_at: range end 0x{end:x} is not an object boundary");
+
         debug_assert!(end_idx <= start_idx);
 
-        // ensure we don't carve into live objects
-        let eff_base = {
-            let lo = &self.data[start_idx]; // entry holding `base` (lowest address)
-            if lo.base() < base {
-                assert!(matches!(lo, ShadowStackValue::InvalidatedObject(..)),
-                    "invalidate_at: range carves into a live object");
-                lo.base()
-            } else {
-                base
-            }
-        };
-        let eff_end = {
-            let hi = &self.data[end_idx]; // entry holding `end - 1` (highest address)
-            let hi_end = hi.base() + hi.size();
-            if hi_end > end {
-                assert!(matches!(hi, ShadowStackValue::InvalidatedObject(..)),
-                    "invalidate_at: range carves into a live object");
-                hi_end
-            } else {
-                end
-            }
-        };
-
         let was_top = start_idx == self.data.len() - 1;
-
         self.data.drain(end_idx..=start_idx);
 
-        // if we didn't reach the top, insert dead marker for invalidated range
+        // if we didn't reach the top, leave a dead marker for the invalidated range
         if !was_top {
-            self.data.insert(end_idx, ShadowStackValue::InvalidatedObject(eff_base, eff_end - eff_base));
+            self.data.insert(end_idx, ShadowStackValue::InvalidatedObject(base, length));
         }
     }
 
     // TODO: Does it make more sense to return something explicit
     //       when we search and get an invalidated stack object?
     pub fn search_intersection(&self, addr: Vaddr) -> Option<&ShadowObject> {
-        match self.get_at(addr) {
-            Ok((ShadowStackValue::ShadowObject(sobj), _)) => Some(sobj),
-            _ => None,
+        // exact containment in a live object
+        if let Ok((ShadowStackValue::ShadowObject(sobj), _)) = self.get_at(addr) {
+            return Some(sobj);
         }
+
+        // edge case: GEP remediation one-past
+        if let Some(prev) = addr.checked_sub(1) {
+            if let Ok((ShadowStackValue::ShadowObject(sobj), _)) = self.get_at(prev) {
+                if sobj.past_limit() == addr {
+                    return Some(sobj);
+                }
+            }
+        }
+        None
     }
 }
 
@@ -360,16 +360,5 @@ mod tests {
     fn test_bounds_invalid_address_panic() {
         // let table = ShadowObjectTable::new();
         //table.bounds(0xDEADBEEF).unwrap(); // should panic since there is no interesection
-    }
-
-    use super::{ShadowObject, ShadowStack, ShadowStackValue, Vaddr};
-
-    fn stack_obj(base: Vaddr, size: usize) -> ShadowStackValue {
-        ShadowStackValue::ShadowObject(ShadowObject {
-            alloc_type: AllocType::Stack,
-            base,
-            limit: ShadowObject::limit(base, size),
-            size,
-        })
     }
 }
