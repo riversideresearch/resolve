@@ -2,7 +2,7 @@
 // LGPL-3; See LICENSE.txt in the repo root for details.
 
 #![feature(btree_cursors)]
-
+#![feature(c_variadic)]
 mod remediate;
 mod shadowobjs;
 mod trace;
