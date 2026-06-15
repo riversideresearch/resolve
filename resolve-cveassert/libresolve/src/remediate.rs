@@ -1,5 +1,6 @@
 // Copyright (c) 2025 Riverside Research.
 // LGPL-3; See LICENSE.txt in the repo root for details.
+
 use libc::{
     c_char, c_int, c_void, calloc, free, malloc, mmap, munmap, off_t, realloc, strdup, strlen,
     strndup, strnlen,
@@ -130,14 +131,52 @@ pub extern "C" fn __resolve_getline(lineptr: *mut *mut c_char, size: *mut size_t
     }
 }
 
+#[unsafe(no_mangle)]
+pub extern "C" fn __resolve_getdelim(lineptr: *mut *mut c_char, size: *mut size_t, delim: c_int, stream: *mut FILE) -> ssize_t {
+    if lineptr.is_null() || size.is_null() || stream.is_null() {
+        return -1;
+    }
 
+    unsafe {
+        if (*lineptr).is_null() || *size == 0 {
+            *size = 128;
+            *lineptr = __resolve_malloc(*size) as *mut c_char;
+
+            if (*lineptr).is_null() { return -1; }
+        }
+
+        let mut pos: size_t = 0;
+        let mut c: c_int;
+
+        loop {
+            c = fgetc(stream);
+            if c == EOF { break; }
+
+            if pos + 1 >= *size {
+                let new_size = *size * 2;
+                let new_buf = __resolve_realloc(*lineptr as *mut c_void, new_size);
+
+                if new_buf.is_null() { return -1; }
+            
+                *lineptr = new_buf as *mut c_char;
+                *size = new_size;
+            }
+
+            (*lineptr).add(pos).write(c as c_char);
+            pos += 1;
+
+            if c == delim { break; }
+        }
+
+        (*lineptr).add(pos).write(0);
+        pos as ssize_t
+    }
+}
 
 /**
- * @brief - RESOLVE wrapper for libc malloc
- * @input
- *  - size: size of requested heap allocation in bytes
- * @return
- *  - pointer to requested heap allocation
+ * @brief - Allocator logging interface for malloc
+ * @input - size of the allocation in bytes
+ * @return - ptr to the allocation
  */
 #[unsafe(no_mangle)]
 pub extern "C" fn __resolve_malloc(size: usize) -> *mut c_void {
