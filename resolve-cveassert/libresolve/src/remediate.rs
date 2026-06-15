@@ -19,6 +19,7 @@ struct BoundsInfo {
 }
 
 #[link(name = "mimalloc")]
+#[unsafe(no_mangle)]
 unsafe extern "C" {
     // Allocator API 
     fn mi_malloc(size: usize) -> *mut c_void;
@@ -33,6 +34,7 @@ unsafe extern "C" {
     // Shim API
     fn mi_resolve_ptr(ptr: *mut c_void) -> BoundsInfo;
     fn mi_is_heap_owned(ptr: *mut c_void) -> bool;
+    fn __resolve_asprintf(strp: *mut *mut c_char, fmt: *const c_char, args: ...) -> c_int;
 }
 
 /**
@@ -158,9 +160,6 @@ pub extern "C" fn __resolve_getdelim(lineptr: *mut *mut c_char, size: *mut size_
         pos as ssize_t
     }
 }
-
-#[unsafe(no_mangle)]
-unsafe extern "C" { fn __resolve_asprintf(strp: *mut *mut c_char, fmt: *const c_char, args: ...) -> c_int; }
 
 /**
  * @brief - Allocator logging interface for malloc
