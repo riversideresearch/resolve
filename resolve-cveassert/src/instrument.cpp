@@ -82,6 +82,13 @@ void instrumentLibraryAllocations(Function *F) {
       FunctionType::get(size_ty, {ptr_ty, ptr_ty, size_ty, ptr_ty}, false));
   wrapLibraryFunction(F, "new", FunctionType::get(ptr_ty, {size_ty}, false));
   wrapLibraryFunction(F, "delete", FunctionType::get(void_ty, {ptr_ty}, false));
+  wrapLibraryFunction(F, "asprintf",
+                      FunctionType::get(size_ty,
+                                        {
+                                            ptr_ty,
+                                            ptr_ty,
+                                        },
+                                        true));
 }
 
 void instrumentAlloca(Function *F) {

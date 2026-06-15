@@ -159,53 +159,6 @@ pub extern "C" fn __resolve_getdelim(lineptr: *mut *mut c_char, size: *mut size_
     }
 }
 
-
-// #[unsafe(no_mangle)]
-// pub extern "C" fn __resolve_asprintf(strp: *mut *mut char, fmt: *const char, mut args: ...) -> c_int {
-//     unsafe {
-//         if strp.is_null() || fmt.is_null() {
-//             return -1;
-//         }
-
-//         let mut ap = args.clone();
-
-//         let len = snprintf(
-//             ptr::null_mut(),
-//             0,
-//             fmt,
-//             ap.as_va_list(),
-//         );
-
-//         if len < 0 {
-//             return -1;
-//         }
-
-//         let size = (len as usize) + 1;
-//         let buf = __resolve_malloc(size) as *mut char;
-
-//         if buf.is_null() {
-//             return -1;
-//         }
-
-//         let mut ap2 = args;
-
-//         let written = snprintf(
-//             buf,
-//             size,
-//             fmt,
-//             ap2.as_va_list(),
-//         );
-
-//         if written < 0 {
-//             free(buf as *mut void);
-//             return -1;
-//         }
-
-//         *strp = buf;
-//         written
-//     }
-
-// }
 /**
  * @brief - Allocator logging interface for malloc
  * @input - size of the allocation in bytes

@@ -3,6 +3,9 @@
 #include <stdint.h>
 #include <stdio.h>
 
+extern void * __resolve_malloc(size_t);
+extern void *__resolve_free(void*);
+
 typedef struct {
   void *base;
   void *limit;
@@ -35,3 +38,41 @@ bool mi_is_heap_owned(const void* p) {
 }
 
 
+int __resolve_vasprintf(char **strp, const char *fmt, va_list ap)
+{
+  va_list ap_copy;
+  va_copy(ap_copy, ap);
+
+  int len = vsnprintf(NULL, 0, fmt, ap_copy);
+  va_end(ap_copy);
+
+  if (len < 0) { return -1; }
+
+  char *buf = __resolve_malloc((size_t)len + 1);
+  if (!buf) { return -1; }
+
+  va_copy(ap_copy, ap);
+
+  int written = vsnprintf(buf, (size_t)len + 1, fmt, ap_copy);
+
+  va_end(ap_copy);
+
+  if (written < 0) {
+    __resolve_free(buf);
+    return -1;
+  }
+
+  *strp = buf;
+  return written;
+}
+
+int __resolve_asprintf(char **strp, const char *fmt, ...)
+{
+  va_list ap;
+  va_start(ap, fmt);
+
+  int rc = __resolve_vasprintf(strp, fmt, ap);
+
+  va_end(ap);
+  return rc;
+}
