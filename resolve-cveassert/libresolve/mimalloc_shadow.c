@@ -1,10 +1,12 @@
 #include "mimalloc.h"
 #include "mimalloc/internal.h"
+#include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
 
-extern void * __resolve_malloc(size_t);
-extern void *__resolve_free(void*);
+extern void* __resolve_malloc(size_t);
+extern void __resolve_free(void*);
+
 
 typedef struct {
   void *base;
@@ -37,8 +39,7 @@ bool mi_is_heap_owned(const void* p) {
   return mi_is_in_heap_region(p);
 }
 
-
-int __resolve_vasprintf(char **strp, const char *fmt, va_list ap)
+int __vasprintf(char **strp, const char *fmt, va_list ap)
 {
   va_list ap_copy;
   va_copy(ap_copy, ap);
@@ -48,7 +49,8 @@ int __resolve_vasprintf(char **strp, const char *fmt, va_list ap)
 
   if (len < 0) { return -1; }
 
-  char *buf = __resolve_malloc((size_t)len + 1);
+  //char *buf = __resolve_malloc((size_t)len + 1);
+  char *buf = malloc((size_t)len + 1);
   if (!buf) { return -1; }
 
   va_copy(ap_copy, ap);
@@ -58,7 +60,8 @@ int __resolve_vasprintf(char **strp, const char *fmt, va_list ap)
   va_end(ap_copy);
 
   if (written < 0) {
-    __resolve_free(buf);
+    //__resolve_free(buf);
+    free(buf);
     return -1;
   }
 
@@ -66,12 +69,13 @@ int __resolve_vasprintf(char **strp, const char *fmt, va_list ap)
   return written;
 }
 
-int __resolve_asprintf(char **strp, const char *fmt, ...)
+
+int __asprintf(char **strp, const char *fmt, ...)
 {
   va_list ap;
   va_start(ap, fmt);
 
-  int rc = __resolve_vasprintf(strp, fmt, ap);
+  int rc = __vasprintf(strp, fmt, ap);
 
   va_end(ap);
   return rc;
