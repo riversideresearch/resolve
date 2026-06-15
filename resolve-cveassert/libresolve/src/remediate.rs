@@ -29,13 +29,17 @@ unsafe extern "C" {
     fn mi_free(ptr: *mut c_void);
     fn mi_new(size: usize) -> *mut c_void;
     fn mi_delete(ptr: *mut c_void);
-    
-    // Shim API
-    fn mi_resolve_ptr(ptr: *mut c_void) -> BoundsInfo;
-    fn mi_is_heap_owned(ptr: *mut c_void) -> bool;
-    #[unsafe(no_mangle)]
-    fn __resolve_asprintf(strp: *mut *mut c_char, fmt: *const c_char, args: ...) -> c_int;
 }
+    
+#[unsafe(no_mangle)]
+unsafe extern "C" { fn mi_resolve_ptr(ptr: *mut c_void) -> BoundsInfo; }
+
+#[unsafe(no_mangle)]
+unsafe extern "C" { fn mi_is_heap_owned(ptr: *mut c_void) -> bool; }
+
+#[unsafe(no_mangle)]
+unsafe extern "C" { fn __resolve_asprintf(strp: *mut *mut c_char, fmt: *const c_char, args: ...) -> c_int ; }
+
 
 /**
  * @brief - Allocator interface for stack objects
