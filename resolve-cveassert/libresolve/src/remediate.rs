@@ -1,7 +1,9 @@
 // Copyright (c) 2025 Riverside Research.
 // LGPL-3; See LICENSE.txt in the repo root for details.
+
 use libc::{
-    EOF, FILE, c_char, c_int, c_void, fgetc, free, strlen, strnlen, size_t, ssize_t, 
+    EOF, FILE, STDERR_FILENO, c_char, c_int, c_void, fgetc, free, strlen, strnlen, size_t, ssize_t,
+    write,
 };
 
 use crate::shadowobjs::{SHADOW_STACK, ALIVE_OBJ_LIST, AllocType, FREED_OBJ_LIST, Vaddr};
@@ -157,6 +159,53 @@ pub extern "C" fn __resolve_getdelim(lineptr: *mut *mut c_char, size: *mut size_
     }
 }
 
+
+// #[unsafe(no_mangle)]
+// pub extern "C" fn __resolve_asprintf(strp: *mut *mut char, fmt: *const char, mut args: ...) -> c_int {
+//     unsafe {
+//         if strp.is_null() || fmt.is_null() {
+//             return -1;
+//         }
+
+//         let mut ap = args.clone();
+
+//         let len = snprintf(
+//             ptr::null_mut(),
+//             0,
+//             fmt,
+//             ap.as_va_list(),
+//         );
+
+//         if len < 0 {
+//             return -1;
+//         }
+
+//         let size = (len as usize) + 1;
+//         let buf = __resolve_malloc(size) as *mut char;
+
+//         if buf.is_null() {
+//             return -1;
+//         }
+
+//         let mut ap2 = args;
+
+//         let written = snprintf(
+//             buf,
+//             size,
+//             fmt,
+//             ap2.as_va_list(),
+//         );
+
+//         if written < 0 {
+//             free(buf as *mut void);
+//             return -1;
+//         }
+
+//         *strp = buf;
+//         written
+//     }
+
+// }
 /**
  * @brief - Allocator logging interface for malloc
  * @input - size of the allocation in bytes
@@ -208,6 +257,18 @@ pub extern "C" fn __resolve_new(size: usize) -> *mut c_void {
 pub extern "C" fn __resolve_free(ptr: *mut c_void) -> () {
    // Insert a function to find the object and return the pointer size
    // Do I need to handle if the sobj cannot be found?
+   unsafe {
+    if ptr.is_null() {
+        return;
+    }
+
+    if !mi_is_heap_owned(ptr) {
+        let msg = "foreign allocation\n";
+        write(STDERR_FILENO, msg.as_ptr().cast(), msg.len());
+    } else {
+        let _ = mi_free(ptr);
+    }
+   }
 
   // info!(
   //     "[FREE] Allocated object freed at address: 0x{:x}",
