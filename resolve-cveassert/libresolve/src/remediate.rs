@@ -23,12 +23,17 @@ struct BoundsInfo {
 
 #[link(name = "mimalloc")]
 unsafe extern "C" {
-    // Allocator API 
+    // Allocator API
     fn mi_malloc(size: usize) -> *mut c_void;
     fn mi_calloc(size: usize, count: usize) -> *mut c_void;
     fn mi_realloc(ptr: *mut c_void, size: usize) -> *mut c_void;
     fn mi_strdup(ptr: *mut c_char) -> *mut c_char;
     fn mi_strndup(ptr: *mut c_char, size: usize) -> *mut c_char;
+
+    fn mi_aligned_alloc(alignment: usize, n: usize) -> *mut c_void;
+    fn mi_reallocarray(ptr: *mut c_void, n: usize, size: usize) -> *mut c_void;
+    fn mi_posix_memalign(memptr: *mut *mut c_void, alignment: usize, size: usize) -> c_int;
+
     fn mi_free(ptr: *mut c_void);
     fn mi_new(size: usize) -> *mut c_void;
     fn mi_delete(ptr: *mut c_void);
@@ -79,7 +84,11 @@ pub extern "C" fn __resolve_invalidate_stack_range(ptr: *mut c_void, size: usize
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn __resolve_getline(lineptr: *mut *mut c_char, size: *mut size_t, stream: *mut FILE) -> ssize_t {
+pub extern "C" fn __resolve_getline(
+    lineptr: *mut *mut c_char,
+    size: *mut size_t,
+    stream: *mut FILE,
+) -> ssize_t {
     if lineptr.is_null() || size.is_null() || stream.is_null() {
         return -1;
     }
@@ -90,7 +99,9 @@ pub extern "C" fn __resolve_getline(lineptr: *mut *mut c_char, size: *mut size_t
             *lineptr = __resolve_malloc(*size) as *mut c_char;
 
             // check if the pointer is null
-            if (*lineptr).is_null() { return -1; }
+            if (*lineptr).is_null() {
+                return -1;
+            }
         }
 
         let mut pos: size_t = 0;
@@ -98,9 +109,12 @@ pub extern "C" fn __resolve_getline(lineptr: *mut *mut c_char, size: *mut size_t
 
         loop {
             c = fgetc(stream);
-            if c == EOF { break; }
+            if c == EOF {
+                break;
+            }
 
-            if pos + 1 >= *size { // Expand buffer
+            if pos + 1 >= *size {
+                // Expand buffer
                 let new_size = *size * 2;
                 let new_buf = __resolve_realloc(*lineptr as *mut c_void, new_size);
 
@@ -118,11 +132,11 @@ pub extern "C" fn __resolve_getline(lineptr: *mut *mut c_char, size: *mut size_t
 
             if c == b'\n' as c_int {
                 break;
-            }                                 
-
+            }
         }
 
-        if pos == 0 && c == EOF { // No data read
+        if pos == 0 && c == EOF {
+            // No data read
             return -1;
         }
 
@@ -132,7 +146,12 @@ pub extern "C" fn __resolve_getline(lineptr: *mut *mut c_char, size: *mut size_t
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn __resolve_getdelim(lineptr: *mut *mut c_char, size: *mut size_t, delim: c_int, stream: *mut FILE) -> ssize_t {
+pub extern "C" fn __resolve_getdelim(
+    lineptr: *mut *mut c_char,
+    size: *mut size_t,
+    delim: c_int,
+    stream: *mut FILE,
+) -> ssize_t {
     if lineptr.is_null() || size.is_null() || stream.is_null() {
         return -1;
     }
@@ -142,7 +161,9 @@ pub extern "C" fn __resolve_getdelim(lineptr: *mut *mut c_char, size: *mut size_
             *size = 128;
             *lineptr = __resolve_malloc(*size) as *mut c_char;
 
-            if (*lineptr).is_null() { return -1; }
+            if (*lineptr).is_null() {
+                return -1;
+            }
         }
 
         let mut pos: size_t = 0;
@@ -150,14 +171,18 @@ pub extern "C" fn __resolve_getdelim(lineptr: *mut *mut c_char, size: *mut size_
 
         loop {
             c = fgetc(stream);
-            if c == EOF { break; }
+            if c == EOF {
+                break;
+            }
 
             if pos + 1 >= *size {
                 let new_size = *size * 2;
                 let new_buf = __resolve_realloc(*lineptr as *mut c_void, new_size);
 
-                if new_buf.is_null() { return -1; }
-            
+                if new_buf.is_null() {
+                    return -1;
+                }
+
                 *lineptr = new_buf as *mut c_char;
                 *size = new_size;
             }
@@ -165,7 +190,9 @@ pub extern "C" fn __resolve_getdelim(lineptr: *mut *mut c_char, size: *mut size_
             (*lineptr).add(pos).write(c as c_char);
             pos += 1;
 
-            if c == delim { break; }
+            if c == delim {
+                break;
+            }
         }
 
         (*lineptr).add(pos).write(0);
@@ -174,8 +201,31 @@ pub extern "C" fn __resolve_getdelim(lineptr: *mut *mut c_char, size: *mut size_
 }
 
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __resolve_asprintf(strp: *mut *mut c_char, fmt: *const c_char, mut args: ...) -> c_int {
-    return __vasprintf(strp, fmt, args)
+pub unsafe extern "C" fn __resolve_asprintf(
+    strp: *mut *mut c_char,
+    fmt: *const c_char,
+    args: ...
+) -> c_int {
+    return unsafe { __vasprintf(strp, fmt, args) };
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn __resolve_aligned_alloc(alignment: usize, n: usize) -> *mut c_void {
+    return unsafe { mi_aligned_alloc(alignment, n) };
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn __resolve_posix_memalign(
+    memptr: *mut *mut c_void,
+    alignment: usize,
+    size: usize,
+) -> c_int {
+    return unsafe { mi_posix_memalign(memptr, alignment, size) };
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn __resolve_reallocarray(ptr: *mut c_void, n: usize, size: usize) -> *mut c_void {
+    return unsafe { mi_reallocarray(ptr, n, size + 1) };
 }
 
 /**
@@ -207,7 +257,6 @@ pub extern "C" fn __resolve_malloc(size: usize) -> *mut c_void {
     //info!("[RESOLVE] block size: {}", bounds_info.block_size);
     ptr
 }
-
 
 #[unsafe(no_mangle)]
 pub extern "C" fn __resolve_new(size: usize) -> *mut c_void {
@@ -266,21 +315,21 @@ pub extern "C" fn __resolve_free(ptr: *mut c_void) -> () {
   //     size
   // };
 
-  // // Check if the shadow object exists
-  // match ptr_size {
-  //     Some(size) => {
-  //         info!(
-  //             "[FREE] Found shadow object for allocated object, 0x{:x}, size = {size}",
-  //             ptr as Vaddr,
-  //         );
-  //     }
-  //     None => {
-  //         warn!(
-  //             "[FREE] No shadow object found for allocated object: 0x{:x}",
-  //             ptr as Vaddr
-  //         );
-  //     }
-  // }
+    // // Check if the shadow object exists
+    // match ptr_size {
+    //     Some(size) => {
+    //         info!(
+    //             "[FREE] Found shadow object for allocated object, 0x{:x}, size = {size}",
+    //             ptr as Vaddr,
+    //         );
+    //     }
+    //     None => {
+    //         warn!(
+    //             "[FREE] No shadow object found for allocated object: 0x{:x}",
+    //             ptr as Vaddr
+    //         );
+    //     }
+    // }
 
     {
         // Insert shadow object into freed object list
@@ -292,10 +341,11 @@ pub extern "C" fn __resolve_free(ptr: *mut c_void) -> () {
 }
 //
 
-
 #[unsafe(no_mangle)]
 pub extern "C" fn __resolve_delete(ptr: *mut c_void) -> () {
-    if ptr.is_null() { return; }
+    if ptr.is_null() {
+        return;
+    }
     let _ = unsafe { mi_free(ptr) };
 }
 /**
@@ -333,7 +383,7 @@ pub extern "C" fn __resolve_realloc(ptr: *mut c_void, size: usize) -> *mut c_voi
         realloc_ptr, size
     );
 
-   realloc_ptr
+    realloc_ptr
 }
 
 /**
@@ -347,7 +397,7 @@ pub extern "C" fn __resolve_realloc(ptr: *mut c_void, size: usize) -> *mut c_voi
 #[unsafe(no_mangle)]
 pub extern "C" fn __resolve_calloc(n_items: usize, item_size: usize) -> *mut c_void {
     let ptr = unsafe { mi_calloc(n_items, item_size) };
-    let size = n_items * item_size;
+    //let size = n_items * item_size;
 
     if ptr.is_null() {
         return ptr;
@@ -384,11 +434,11 @@ pub extern "C" fn __resolve_strdup(ptr: *mut c_char) -> *mut c_char {
     // +1 to include null termination byte. We should allow program to read this value.
     // Otherwise how would the program find the end of the string?
     // Although writing it to something else is probably a bad idea, this too should be allowed.
-   // let sizeofstr = unsafe { strlen(ptr) + 1 };
-   // {
-   //     let mut obj_list = ALIVE_OBJ_LIST.lock();
-   //     obj_list.add_shadow_object(AllocType::Heap, string_ptr as Vaddr, sizeofstr);
-   // }
+    // let sizeofstr = unsafe { strlen(ptr) + 1 };
+    // {
+    //     let mut obj_list = ALIVE_OBJ_LIST.lock();
+    //     obj_list.add_shadow_object(AllocType::Heap, string_ptr as Vaddr, sizeofstr);
+    // }
 
     info!(
         "[HEAP] Registered heap object (strdup): addr={:p}, size={}",
