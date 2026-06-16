@@ -429,7 +429,7 @@ pub extern "C" fn __resolve_strdup(ptr: *mut c_char) -> *mut c_char {
 //  *  - size: number of bytes to copied
 //  * @return - pointer to the copied string
 //  * NOTE: Read this link to understand the nature of strdup & strndup
-//  * https://pubs.opengroup.org/onlineptrpubs/9699919799/functions/strdup.html
+//  * https://pubs.opengroup.org/onlinepubs/9699919799/functions/strdup.html
 //  */
 #[unsafe(no_mangle)]
 pub extern "C" fn __resolve_strndup(ptr: *mut c_char, size: usize) -> *mut c_char {
