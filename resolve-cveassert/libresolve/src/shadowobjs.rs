@@ -33,6 +33,15 @@ pub struct ShadowObject {
 }
 
 impl ShadowObject {
+    pub fn new(ty: AllocType, base: Vaddr, size: usize) -> Self {
+        Self {
+            alloc_type: ty,
+            base,
+            limit: ShadowObject::limit(base, size),
+            size
+        }
+    }
+    
     /// Returns the base + limit of this shadow object as RangeInclusive
     ///
     /// Useful for querying contains
@@ -74,13 +83,7 @@ impl ShadowObjectTable {
 
     /// Adds a new shadow object to the object list, replacing any existing object at `base`
     pub fn add_shadow_object(&mut self, alloc_type: AllocType, base: Vaddr, size: usize) {
-        let sobj = ShadowObject {
-            alloc_type,
-            base,
-            limit: ShadowObject::limit(base, size),
-            size,
-        };
-        self.table.insert(base, sobj);
+        self.table.insert(base, ShadowObject::new(alloc_type, base, size));
     }
 
     /// Removes the shadow object with base address equal to `base`.
@@ -114,42 +117,11 @@ impl ShadowObjectTable {
 pub static ALIVE_OBJ_LIST: MutexWrap<ShadowObjectTable> = MutexWrap::new(ShadowObjectTable::new());
 pub static FREED_OBJ_LIST: MutexWrap<ShadowObjectTable> = MutexWrap::new(ShadowObjectTable::new());
 
-enum ShadowStackValue {
-    ShadowObject(ShadowObject),
-    InvalidatedObject(Vaddr,usize)
-}
-
-impl ShadowStackValue {
-    fn base(&self) -> Vaddr {
-        match self {
-            ShadowStackValue::ShadowObject(o) => o.base,
-            ShadowStackValue::InvalidatedObject(b, _s) => *b,
-        }
-    }
-
-    fn size(&self) -> usize {
-        match self {
-            ShadowStackValue::ShadowObject(o) => o.size,
-            ShadowStackValue::InvalidatedObject(_b, s) => *s,
-        }
-    }
-
-    fn contains(&self, addr: Vaddr) -> bool {
-        let base = self.base();
-
-        let Some(end) = base.checked_add(self.size() as Vaddr) else {
-            return false;
-        };
-
-        base <= addr && addr < end
-    }
-}
-
 // data must be ordered descending (downward growing stack on x86)
 // so push/pop are O(1) at the end.
 #[derive(Default)]
 pub struct ShadowStack {
-    data: Vec<ShadowStackValue>
+    data: Vec<ShadowObject>
 }
 
 enum LookupError {
@@ -164,52 +136,46 @@ impl ShadowStack {
     pub fn add_shadow_object(&mut self, base: Vaddr, size: usize) {
         let new_end = base.checked_add(size)
             .expect("add_shadow_object: object overflows the address space"); // exclusive
-        let make = || ShadowObject {
-            alloc_type: AllocType::Stack,
-            base,
-            limit: ShadowObject::limit(base, size),
-            size,
-        };
 
         let Ok((reused, idx)) = self.get_at(base) else {
             // most common: pushing a new obj onto the end of the stack
-            assert!(self.data.last().map_or(true, |top| new_end <= top.base()),
+            assert!(self.data.last().map_or(true, |top| new_end <= top.base),
                 "ShadowStack::add_shadow_object: new object overlaps the stack top");
-            self.data.push(ShadowStackValue::ShadowObject(make()));
+            self.data.push(ShadowObject::new(AllocType::Stack, base, size));
             return;
         };
 
-        let slot_base = reused.base();
+        let slot_base = reused.base;
         let slot_end = slot_base + reused.size();
-        let reused_live = matches!(reused, ShadowStackValue::ShadowObject(_));
+        let reused_live = reused.alloc_type != AllocType::Unallocated;
 
         // also common: new object is being pushed after program has fallen
         //              back a few stack frames. Overwrite and truncate.
         if reused_live {
             assert!(slot_base == base,
                 "ShadowStack::add_shadow_object: re-push lands inside a live object");
-            assert!(idx == 0 || new_end <= self.data[idx - 1].base(),
+            assert!(idx == 0 || new_end <= self.data[idx - 1].base,
                 "ShadowStack::add_shadow_object: object overlaps the frame above");
-            self.data[idx] = ShadowStackValue::ShadowObject(make());
+            self.data[idx] = ShadowObject::new(AllocType::Stack, base, size);
             self.data.truncate(idx + 1); // drop everything more recent
         }
         else {
             // least common: stack re-use (new alloca inside previously invalidated region)
             assert!(new_end <= slot_end,
                 "ShadowStack::add_shadow_object: object overflows its slot");
-            self.data[idx] = ShadowStackValue::ShadowObject(make());
+            self.data[idx] = ShadowObject::new(AllocType::Stack, base, size);
 
             // retain invalidated padding around object
             if slot_base < base {
-                self.data.insert(idx + 1, ShadowStackValue::InvalidatedObject(slot_base, base - slot_base));
+                self.data.insert(idx + 1, ShadowObject::new(AllocType::Unallocated, slot_base, base - slot_base));
             }
             if new_end < slot_end {
-                self.data.insert(idx, ShadowStackValue::InvalidatedObject(new_end, slot_end - new_end));
+                self.data.insert(idx, ShadowObject::new(AllocType::Unallocated, new_end, slot_end - new_end));
             }
         }
     }
 
-    fn get_at(&self, addr: Vaddr) -> Result<(&ShadowStackValue, usize), LookupError> {
+    fn get_at(&self, addr: Vaddr) -> Result<(&ShadowObject, usize), LookupError> {
         use LookupError::*;
 
         let n = self.data.len();
@@ -223,12 +189,12 @@ impl ShadowStack {
         }
 
         // easy out: below every tracked object
-        if addr < top.base() {
+        if addr < top.base {
             return Err(ObjectNotFound); // should we return a seperate ObjectOutOfBounds?
         }
 
         // binary search the shadow stack for value
-        let idx = self.data.partition_point(|o| o.base() > addr);
+        let idx = self.data.partition_point(|o| o.base > addr);
         let obj = &self.data[idx];
         if obj.contains(addr) {
             Ok((obj, idx))
@@ -252,7 +218,7 @@ impl ShadowStack {
 
         // entry holding `base` (lowest address in the range)
         let (start_idx, lo_base) = match self.get_at(base) {
-            Ok((v, idx)) => (idx, v.base()),
+            Ok((v, idx)) => (idx, v.base),
             Err(_) => { debug_assert!(false, "invalidate_at: untracked base"); return; }
         };
         assert!(lo_base == base,
@@ -260,7 +226,7 @@ impl ShadowStack {
 
         // entry holding `end - 1` (highest address in the range)
         let (end_idx, hi_end) = match self.get_at(end - 1) {
-            Ok((v, idx)) => (idx, v.base() + v.size()),
+            Ok((v, idx)) => (idx, v.base + v.size()),
             Err(_) => { debug_assert!(false, "invalidate_at: untracked limit"); return; }
         };
         assert!(hi_end == end,
@@ -273,7 +239,7 @@ impl ShadowStack {
 
         // if we didn't reach the top, leave a dead marker for the invalidated range
         if !was_top {
-            self.data.insert(end_idx, ShadowStackValue::InvalidatedObject(base, length));
+            self.data.insert(end_idx, ShadowObject::new(AllocType::Unallocated, base, length));
         }
     }
 
@@ -281,13 +247,16 @@ impl ShadowStack {
     //       when we search and get an invalidated stack object?
     pub fn search_intersection(&self, addr: Vaddr) -> Option<&ShadowObject> {
         // exact containment in a live object
-        if let Ok((ShadowStackValue::ShadowObject(sobj), _)) = self.get_at(addr) {
+        if let Ok((sobj, _)) = self.get_at(addr)
+        && sobj.alloc_type != AllocType::Unallocated
+        {
             return Some(sobj);
         }
 
         // edge case: GEP remediation one-past
         if let Some(prev) = addr.checked_sub(1)
-        && let Ok((ShadowStackValue::ShadowObject(sobj), _)) = self.get_at(prev)
+        && let Ok((sobj, _)) = self.get_at(prev)
+        && sobj.alloc_type != AllocType::Unallocated
         && sobj.past_limit() == addr
         {
             return Some(sobj);
