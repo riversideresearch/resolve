@@ -274,6 +274,7 @@ pub extern "C" fn __resolve_free(ptr: *mut c_void) -> () {
         if !mi_is_heap_owned(ptr) {
             let msg = "foreign allocation\n";
             write(STDERR_FILENO, msg.as_ptr().cast(), msg.len());
+            let _ = free(ptr);
         } else {
             let _ = mi_free(ptr);
         }
@@ -314,19 +315,6 @@ pub extern "C" fn __resolve_free(ptr: *mut c_void) -> () {
     //     let mut freed_guard = FREED_OBJ_LIST.lock();
     //     freed_guard.add_shadow_object(AllocType::Unallocated, ptr as Vaddr, ptr_size.unwrap_or(0));
     // }
-
-    unsafe {
-        if ptr.is_null() {
-            return;
-        }
-
-        let owned = mi_is_heap_owned(ptr);
-        if owned {
-            let _ = mi_free(ptr);
-        } else {
-            let _ = free(ptr);
-        }
-    }
 }
 //
 
