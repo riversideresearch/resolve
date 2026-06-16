@@ -5,8 +5,8 @@ use crate::MutexWrap;
 use log::warn;
 use std::cell::RefCell;
 use std::collections::BTreeMap;
-use std::ops::RangeInclusive;
 use std::ops::Bound::Included;
+use std::ops::RangeInclusive;
 
 /// An alias representing Virtual Address values
 pub type Vaddr = usize;
@@ -102,13 +102,13 @@ impl ShadowObjectTable {
     /// Finds a shadow object that contains 'addr' in its bounds OR a shadow object with
     /// a past_limit value matching the input
     pub fn search_intersection(&self, addr: Vaddr) -> Option<&ShadowObject> {
-        let cursor = self.table
-            .upper_bound(Included(&addr));
+        let cursor = self.table.upper_bound(Included(&addr));
 
-        cursor.peek_prev()
+        cursor
+            .peek_prev()
             .filter(|(_, o)| o.contains(addr) || o.past_limit() == addr)
-            .map(|(_, o)| o) 
-    }  
+            .map(|(_, o)| o)
+    }
 }
 
 // static object lists to store all objects
