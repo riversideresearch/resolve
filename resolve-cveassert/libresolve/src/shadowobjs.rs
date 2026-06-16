@@ -33,22 +33,29 @@ pub struct ShadowObject {
 }
 
 impl ShadowObject {
+    /// Returns the base + limit of this shadow object as RangeInclusive
+    ///
+    /// Useful for querying contains
     pub fn bounds(&self) -> RangeInclusive<Vaddr> {
         self.base..=self.limit
     }
 
+    /// Test if `addr` is within the bounds of this shadow object
     pub fn contains(&self, addr: Vaddr) -> bool {
         self.bounds().contains(&addr)
     }
 
+    /// Computes the size of the shadow object from its base and limit
     pub fn size(&self) -> usize {
         self.size
     }
 
+    /// Compute a limit from base and size
     pub fn limit(base: Vaddr, size: usize) -> Vaddr {
         if size == 0 { base } else { base.saturating_add(size - 1) }
     }
 
+    /// Compute the sentinel pointer value for this object, 1 past its limit
     pub fn past_limit(&self) -> Vaddr {
         self.limit.saturating_add(1)
     }
@@ -279,13 +286,13 @@ impl ShadowStack {
         }
 
         // edge case: GEP remediation one-past
-        if let Some(prev) = addr.checked_sub(1) {
-            if let Ok((ShadowStackValue::ShadowObject(sobj), _)) = self.get_at(prev) {
-                if sobj.past_limit() == addr {
-                    return Some(sobj);
-                }
-            }
+        if let Some(prev) = addr.checked_sub(1)
+        && let Ok((ShadowStackValue::ShadowObject(sobj), _)) = self.get_at(prev)
+        && sobj.past_limit() == addr
+        {
+            return Some(sobj);
         }
+
         None
     }
 }

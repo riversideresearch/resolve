@@ -277,9 +277,9 @@ impl From<&crate::shadowobjs::ShadowObject> for ShadowObjBounds {
 pub extern "C" fn __resolve_get_bounds_stack(ptr: *mut c_void) -> ShadowObjBounds {
     return SHADOW_STACK.with_borrow(
         |ss| {
-            match ss.search_intersection(ptr as Vaddr) {
-                Some(sobj) => { return sobj.into() }
-                None => { return ShadowObjBounds::null(); }
+            return match ss.search_intersection(ptr as Vaddr) {
+                Some(sobj) => { sobj.into() }
+                None => { ShadowObjBounds::null() }
             }
         }
     );
