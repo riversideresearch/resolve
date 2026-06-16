@@ -53,7 +53,7 @@ int __vasprintf(char **strp, const char *fmt, va_list ap)
     return -1; 
   }
 
-  char *buf = __resolve_malloc((size_t)len);
+  char *buf = __resolve_malloc((size_t)len + 1);
   if (!buf) { return -1; }
 
   va_copy(ap_copy, ap);
