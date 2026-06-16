@@ -213,7 +213,7 @@ pub extern "C" fn __resolve_posix_memalign(
 
 #[unsafe(no_mangle)]
 pub extern "C" fn __resolve_reallocarray(ptr: *mut c_void, n: usize, size: usize) -> *mut c_void {
-    return unsafe { mi_reallocarray(ptr, n, size + 1) };
+    return unsafe { mi_reallocarray(ptr, n, size) };
 }
 
 /**
@@ -223,7 +223,7 @@ pub extern "C" fn __resolve_reallocarray(ptr: *mut c_void, n: usize, size: usize
  */
 #[unsafe(no_mangle)]
 pub extern "C" fn __resolve_malloc(size: usize) -> *mut c_void {
-    let ptr = unsafe { mi_malloc(size + 1) };
+    let ptr = unsafe { mi_malloc(size) };
     //let bounds_info = unsafe { mi_resolve_ptr(ptr) };
 
     if ptr.is_null() {
@@ -248,7 +248,7 @@ pub extern "C" fn __resolve_malloc(size: usize) -> *mut c_void {
 
 #[unsafe(no_mangle)]
 pub extern "C" fn __resolve_new(size: usize) -> *mut c_void {
-    let ptr = unsafe { mi_new(size + 1) };
+    let ptr = unsafe { mi_new(size) };
 
     if ptr.is_null() {
         return ptr;
@@ -341,7 +341,7 @@ pub extern "C" fn __resolve_realloc(ptr: *mut c_void, size: usize) -> *mut c_voi
 
     // Consideration: Pointer passed in may be invalidated so we need a mechanism
     // to remove the shadow object for the orignal allocation
-    let realloc_ptr = unsafe { mi_realloc(ptr, size + 1) };
+    let realloc_ptr = unsafe { mi_realloc(ptr, size) };
 
     if realloc_ptr.is_null() {
         return realloc_ptr;
@@ -433,7 +433,7 @@ pub extern "C" fn __resolve_strdup(ptr: *mut c_char) -> *mut c_char {
 //  */
 #[unsafe(no_mangle)]
 pub extern "C" fn __resolve_strndup(ptr: *mut c_char, size: usize) -> *mut c_char {
-    let string_ptr = unsafe { mi_strndup(ptr, size + 1) };
+    let string_ptr = unsafe { mi_strndup(ptr, size) };
 
     if string_ptr.is_null() {
         return string_ptr;
