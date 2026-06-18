@@ -23,12 +23,10 @@ target_sources(mimalloc-static PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/mimalloc_shadow.c
 )
 
-set(MIMALLOC_LIB_DIR ${mimalloc_BINARY_DIR})
-message(STATUS "MIMALLOC_LIB_DIR=${MIMALLOC_LIB_DIR}")
-
 ## mimalloc proj must be PIC to ensure compatibility with libresolve
 set_target_properties(mimalloc-static PROPERTIES
     POSITION_INDEPENDENT_CODE ON
+    OUTPUT_NAME mimalloc
 )
 
 # Map CMake build type to Cargo flags
@@ -53,7 +51,7 @@ add_custom_command(
     COMMAND 
         ${CMAKE_COMMAND} -E env
         CARGO_TARGET_DIR=${RUST_OUT_DIR}
-        MIMALLOC_LIB_DIR=${MIMALLOC_LIB_DIR} # pass the static mimalloc path
+        MIMALLOC_LIB_DIR=$<TARGET_FILE_DIR:mimalloc-static>
         cargo build ${CARGO_FLAGS} 
     WORKING_DIRECTORY ${RUST_CRATE_DIR}
     COMMENT "Building libresolve.so" VERBATIM
