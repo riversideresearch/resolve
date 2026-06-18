@@ -37,10 +37,12 @@ unsafe extern "C" {
     fn mi_new(size: usize) -> *mut c_void;
     fn mi_delete(ptr: *mut c_void);
 
+    fn mi_is_in_heap_region(ptr: *mut c_void) -> bool;
     fn mi_resolve_ptr(ptr: *mut c_void) -> BoundsInfo;
     fn mi_is_heap_owned(ptr: *mut c_void) -> bool;
     fn __vasprintf(strp: *mut *mut c_char, fmt: *const c_char, args: VaList<'_>) -> c_int;
     fn resolve_return_address(level: c_uint) -> *mut c_void;
+    
 }
 
 /**
@@ -273,32 +275,41 @@ pub extern "C" fn __resolve_free(ptr: *mut c_void) -> () {
         }
 
         // Cond: Is the given pointer owned by a mimalloc allocation? 
-        if !mi_is_heap_owned(ptr) {
-            let caller = resolve_return_address(1);
-            warn!("[RESOLVE] ptr = {:p}, caller = {:p}", ptr, caller);
-            // let len = snprintf(
-            //     buf.as_mut_ptr(),
-            //     buf.len(),
-            //     c"caller=%p, ptr=%p\n".as_ptr(),
-            //     caller,
-            //     ptr,
-            // );
-
-            // if len > 0 {
-            //     let _ = write(
-            //         STDERR_FILENO,
-            //         buf.as_ptr().cast(),
-            //         usize::min(len as usize, buf.len() - 1),
-            //     );
-            // }
-
-            //let msg = "foreign allocation\n";
-            //write(STDERR_FILENO, msg.as_ptr().cast(), msg.len());
-            let _ = free(ptr); 
+        if mi_is_in_heap_region(ptr) {
+            if mi_is_heap_owned(ptr) {
+                let _ = mi_free(ptr);
+            }
         } else {
-            let _ = mi_free(ptr);
+            let _ = free(ptr);
         }
     }
+}
+    //     if !mi_is_heap_owned(ptr) {
+    //         let caller = resolve_return_address(1);
+    //         warn!("[RESOLVE] ptr = {:p}, caller = {:p}", ptr, caller);
+    //         // let len = snprintf(
+    //         //     buf.as_mut_ptr(),
+    //         //     buf.len(),
+    //         //     c"caller=%p, ptr=%p\n".as_ptr(),
+    //         //     caller,
+    //         //     ptr,
+    //         // );
+
+    //         // if len > 0 {
+    //         //     let _ = write(
+    //         //         STDERR_FILENO,
+    //         //         buf.as_ptr().cast(),
+    //         //         usize::min(len as usize, buf.len() - 1),
+    //         //     );
+    //         // }
+
+    //         //let msg = "foreign allocation\n";
+    //         //write(STDERR_FILENO, msg.as_ptr().cast(), msg.len());
+    //         let _ = free(ptr); 
+    //     } else {
+    //         let _ = mi_free(ptr);
+    //     }
+    // }
 
     // info!(
     //     "[FREE] Allocated object freed at address: 0x{:x}",
@@ -335,7 +346,6 @@ pub extern "C" fn __resolve_free(ptr: *mut c_void) -> () {
     //     let mut freed_guard = FREED_OBJ_LIST.lock();
     //     freed_guard.add_shadow_object(AllocType::Unallocated, ptr as Vaddr, ptr_size.unwrap_or(0));
     // }
-}
 //
 
 #[unsafe(no_mangle)]
