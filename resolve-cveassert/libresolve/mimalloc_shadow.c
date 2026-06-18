@@ -17,6 +17,7 @@ typedef struct {
 
 
 bounds_info_t mi_resolve_ptr(void* p) {
+  // Can return null if ptr is not owned by mimalloc
   mi_page_t *page = _mi_ptr_page(p);
   
   const size_t block_size = page->block_size;
@@ -36,7 +37,7 @@ bounds_info_t mi_resolve_ptr(void* p) {
 }
 
 bool mi_is_heap_owned(const void* p) {
-  return mi_is_in_heap_region(p);
+  return _mi_ptr_page(p) != NULL;
 }
 
 int __vasprintf(char **strp, const char *fmt, va_list ap)
@@ -53,7 +54,7 @@ int __vasprintf(char **strp, const char *fmt, va_list ap)
     return -1; 
   }
 
-  char *buf = __resolve_malloc((size_t)len + 1);
+  char *buf = __resolve_malloc((size_t)len);
   if (!buf) { return -1; }
 
   va_copy(ap_copy, ap);
