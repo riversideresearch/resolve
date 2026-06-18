@@ -36,6 +36,15 @@ build-release-with-klee:
 configure-release: 
 	cmake -B$(RESOLVE_CMAKE_BUILD_DIR) $(CMAKE_ARGS) -DCMAKE_BUILD_TYPE=Release
 
+build-debug: configure-debug
+	cmake --build $(RESOLVE_CMAKE_BUILD_DIR)
+
+configure-debug:
+	cmake -B$(RESOLVE_CMAKE_BUILD_DIR) $(CMAKE_ARGS) -DCMAKE_BUILD_TYPE=Debug
+
+build-debug-with-klee:
+	$(MAKE) build-debug RESOLVE_BUILD_KLEE=ON
+
 check: configure
 	cmake --build $(RESOLVE_CMAKE_BUILD_DIR) --target check
 
