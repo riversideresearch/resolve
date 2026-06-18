@@ -6,6 +6,8 @@ use libc::{
     strndup, strnlen,
 };
 
+use std::ffi::VaList;
+
 use crate::shadowobjs::{
     ALIVE_OBJ_LIST, AllocType, FREED_OBJ_LIST, GLOBALS, SHADOW_STACK, ShadowObject, Vaddr,
     lookup_global,
@@ -41,6 +43,7 @@ unsafe extern "C" {
     fn mi_resolve_ptr(ptr: *mut c_void) -> BoundsInfo;
     fn mi_is_heap_owned(ptr: *mut c_void) -> bool;
     fn __vasprintf(strp: *mut *mut c_char, fmt: *const c_char, args: VaList<'_>) -> c_int;
+    fn resolve_return_address(level: c_uint) -> *mut c_void;
 }
 
 /**
@@ -235,7 +238,7 @@ pub extern "C" fn __resolve_reallocarray(ptr: *mut c_void, n: usize, size: usize
  */
 #[unsafe(no_mangle)]
 pub extern "C" fn __resolve_malloc(size: usize) -> *mut c_void {
-    let ptr = unsafe { mi_malloc(size) };
+    let ptr = unsafe { mi_malloc(size + 1) };
     //let bounds_info = unsafe { mi_resolve_ptr(ptr) };
 
     if ptr.is_null() {

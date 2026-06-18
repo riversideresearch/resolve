@@ -71,3 +71,12 @@ int __vasprintf(char **strp, const char *fmt, va_list ap)
   *strp = buf;
   return written;
 }
+
+void *resolve_return_address(unsigned level) {
+  switch(level) {
+    case 0: return __builtin_return_address(0);
+    case 1: return __builtin_return_address(1);
+    case 2: return __builtin_return_address(2);
+    default: return NULL;
+  }
+}
