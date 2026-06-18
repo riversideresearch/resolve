@@ -352,23 +352,12 @@ mod tests {
 //         //table.print_shadow_obj();
 //     }
 
-<<<<<<< HEAD
-    #[test]
-    fn test_remove_shadow_objects() {
-        let mut table = ShadowObjectTable::new();
-        table.add_shadow_object(AllocType::Heap, 0x1000, 8);
-        table.add_shadow_object(AllocType::Stack, 0x2000, 16);
-        table.invalidate_at(0x1000);
-        assert_eq!(table.table.len(), 1);
-    }
-=======
 //     #[test]
 //     fn test_remove_shadow_objects() {
 //         let mut table = ShadowObjectTable::new();
 //         table.add_shadow_object(AllocType::Heap, 0x1000, 8);
 //         table.add_shadow_object(AllocType::Stack, 0x2000, 16);
 //     }
->>>>>>> ec6b0f1 (remediate.rs: Make sure all logging is commented out for poller testing.)
 
 //     #[test]
 //     fn test_search_intersection_found() {
