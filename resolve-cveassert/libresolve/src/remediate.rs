@@ -275,27 +275,26 @@ pub extern "C" fn __resolve_free(ptr: *mut c_void) -> () {
         // Cond: Is the given pointer owned by a mimalloc allocation? 
         if !mi_is_heap_owned(ptr) {
             let caller = resolve_return_address(1);
-            let mut buf = [0i8; 128];
-            let len = snprintf(
-                buf.as_mut_ptr(),
-                buf.len(),
-                c"caller=%p, ptr=%p\n".as_ptr(),
-                caller,
-                ptr,
-            );
+            warn!("[RESOLVE] ptr = {:p}, caller = {:p}", ptr, caller);
+            // let len = snprintf(
+            //     buf.as_mut_ptr(),
+            //     buf.len(),
+            //     c"caller=%p, ptr=%p\n".as_ptr(),
+            //     caller,
+            //     ptr,
+            // );
 
-            if len > 0 {
-                let _ = write(
-                    STDERR_FILENO,
-                    buf.as_ptr().cast(),
-                    usize::min(len as usize, buf.len() - 1),
-                );
-            }
+            // if len > 0 {
+            //     let _ = write(
+            //         STDERR_FILENO,
+            //         buf.as_ptr().cast(),
+            //         usize::min(len as usize, buf.len() - 1),
+            //     );
+            // }
 
             //let msg = "foreign allocation\n";
             //write(STDERR_FILENO, msg.as_ptr().cast(), msg.len());
-            let _ = free(ptr);
-            return; 
+            let _ = free(ptr); 
         } else {
             let _ = mi_free(ptr);
         }
