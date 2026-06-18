@@ -20,7 +20,7 @@ Function *getOrCreateIsHeap(Function *F) {
 
   FunctionType *cveIsHeapFnTy = FunctionType::get(i1_ty, {ptr_ty}, false);
   Function *cveIsHeapFn =
-      getOrCreateResolveHelper(M, "__cve_is_heap", cveIsHeapFnTy);
+      getOrCreateResolveHelper(M, CVE_FN("is_heap"), cveIsHeapFnTy);
 
   if (!cveIsHeapFn->empty()) {
     return cveIsHeapFn;
@@ -59,7 +59,6 @@ Function *getOrCreateIsHeap(Function *F) {
 
 Function *getOrCreateFreeOfNonHeapSanitizer(
     Function *F, Vulnerability::RemediationStrategies strategy) {
-  std::string handlerName = "__cve_nonheap_free";
   Module *M = F->getParent();
   LLVMContext &Ctx = M->getContext();
   GlobalVariable *map = SanitizerMaps[F];
@@ -74,7 +73,7 @@ Function *getOrCreateFreeOfNonHeapSanitizer(
   FunctionType *cveFreeNonHeapFnTy =
       FunctionType::get(Type::getVoidTy(Ctx), {ptr_ty}, false);
   Function *cveFreeNonHeapFn =
-      getOrCreateResolveHelper(M, handlerName, cveFreeNonHeapFnTy);
+      getOrCreateResolveHelper(M, CVE_FN("nonheap_free"), cveFreeNonHeapFnTy);
   if (!cveFreeNonHeapFn->empty()) {
     return cveFreeNonHeapFn;
   }

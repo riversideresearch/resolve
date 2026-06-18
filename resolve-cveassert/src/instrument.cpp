@@ -90,9 +90,10 @@ void instrumentAlloca(Function *F) {
   SmallVector<AllocaInst *, 16> shadowSlots;
 
   auto allocateFn = M->getOrInsertFunction(
-      "__resolve_alloca", FunctionType::get(void_ty, {ptr_ty, size_ty}, false));
+      RESOLVE_FN("alloca"),
+      FunctionType::get(void_ty, {ptr_ty, size_ty}, false));
   auto invalidateFn =
-      M->getOrInsertFunction("__resolve_invalidate_stack",
+      M->getOrInsertFunction(RESOLVE_FN("invalidate_stack"),
                              FunctionType::get(void_ty, {ptr_ty}, false));
 
   // 2 cases

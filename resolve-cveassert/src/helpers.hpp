@@ -15,6 +15,11 @@
 
 #include <string>
 
+#define RESOLVE_PREFIX "__resolve_"
+#define CVE_PREFIX "__cve_"
+#define RESOLVE_FN(name) RESOLVE_PREFIX name
+#define CVE_FN(name) CVE_PREFIX name
+
 std::string getLLVMType(llvm::Type *ty);
 llvm::Function *getOrCreateResolveReportSanitizerTriggered(llvm::Module *M);
 llvm::Function *

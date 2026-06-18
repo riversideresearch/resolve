@@ -20,7 +20,7 @@ using namespace llvm;
 static Function *
 getOrCreateNullPtrLoadSanitizer(Function *F, Type *ty,
                                 Vulnerability::RemediationStrategies strategy) {
-  std::string handlerName = "__cve_null_check_ld_" + getLLVMType(ty);
+  std::string handlerName = CVE_FN("null_check_ld_") + getLLVMType(ty);
   Module *M = F->getParent();
   LLVMContext &Ctx = M->getContext();
 
@@ -74,7 +74,7 @@ getOrCreateNullPtrLoadSanitizer(Function *F, Type *ty,
     break;
 
   default:
-    llvm_unreachable("Not a supported strategy");
+    llvm_unreachable("Not a supported strategy!");
   }
 
   builder.SetInsertPoint(NormalLoadBB);
@@ -88,7 +88,7 @@ getOrCreateNullPtrLoadSanitizer(Function *F, Type *ty,
 
 static Function *getOrCreateNullPtrStoreSanitizer(
     Function *F, Type *ty, Vulnerability::RemediationStrategies strategy) {
-  std::string handlerName = "__cve_null_check_st_" + getLLVMType(ty);
+  std::string handlerName = CVE_FN("null_check_st_") + getLLVMType(ty);
   Module *M = F->getParent();
   LLVMContext &Ctx = M->getContext();
 
@@ -147,7 +147,7 @@ static Function *getOrCreateNullPtrStoreSanitizer(
     break;
 
   default:
-    llvm_unreachable("Not a supported strategy");
+    llvm_unreachable("Not a supported strategy!");
   }
 
   // Return Block: returns pointer if non-null
