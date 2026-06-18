@@ -2,8 +2,8 @@
 // LGPL-3; See LICENSE.txt in the repo root for details.
 
 use libc::{
-    EOF, FILE, STDERR_FILENO, c_char, c_int, c_void, fgetc, free, size_t, ssize_t, strlen, strnlen,
-    write,
+    EOF, FILE, STDERR_FILENO, c_char, c_int, c_uint, c_void, fgetc, free, size_t, ssize_t, strlen, strnlen,
+    snprintf, write,
 };
 
 use std::ffi::VaList;
@@ -40,6 +40,7 @@ unsafe extern "C" {
     fn mi_resolve_ptr(ptr: *mut c_void) -> BoundsInfo;
     fn mi_is_heap_owned(ptr: *mut c_void) -> bool;
     fn __vasprintf(strp: *mut *mut c_char, fmt: *const c_char, args: VaList<'_>) -> c_int;
+    fn resolve_return_address(level: c_uint) -> *mut c_void;
 }
 
 /**
@@ -223,7 +224,7 @@ pub extern "C" fn __resolve_reallocarray(ptr: *mut c_void, n: usize, size: usize
  */
 #[unsafe(no_mangle)]
 pub extern "C" fn __resolve_malloc(size: usize) -> *mut c_void {
-    let ptr = unsafe { mi_malloc(size) };
+    let ptr = unsafe { mi_malloc(size + 1) };
     //let bounds_info = unsafe { mi_resolve_ptr(ptr) };
 
     if ptr.is_null() {
@@ -273,6 +274,24 @@ pub extern "C" fn __resolve_free(ptr: *mut c_void) -> () {
 
         // Cond: Is the given pointer owned by a mimalloc allocation? 
         if !mi_is_heap_owned(ptr) {
+            let caller = resolve_return_address(1);
+            let mut buf = [0i8; 128];
+            let len = snprintf(
+                buf.as_mut_ptr(),
+                buf.len(),
+                c"caller=%p, ptr=%p\n".as_ptr(),
+                caller,
+                ptr,
+            );
+
+            if len > 0 {
+                let _ = write(
+                    STDERR_FILENO,
+                    buf.as_ptr().cast(),
+                    usize::min(len as usize, buf.len() - 1),
+                );
+            }
+
             //let msg = "foreign allocation\n";
             //write(STDERR_FILENO, msg.as_ptr().cast(), msg.len());
             let _ = free(ptr);
