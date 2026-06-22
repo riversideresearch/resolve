@@ -2,8 +2,7 @@
 // LGPL-3; See LICENSE.txt in the repo root for details.
 
 use libc::{
-    EOF, FILE, STDERR_FILENO, c_char, c_int, c_uint, c_void, fgetc, free, size_t, ssize_t, strlen, strnlen,
-    snprintf, write,
+    EOF, FILE, STDERR_FILENO, c_char, c_int, c_uint, c_void, fgetc, free, mmap, size_t, snprintf, ssize_t, strlen, strnlen, write,
 };
 
 use std::ffi::VaList;
@@ -278,6 +277,7 @@ pub extern "C" fn __resolve_free(ptr: *mut c_void) -> () {
         if mi_is_in_heap_region(ptr) {
             if !mi_is_block_start(ptr) {
                 info!("[RESOLVE] interior pointer p = {:p}", ptr);
+                let _ = free(ptr);
             } else {
                 let _ = mi_free(ptr);
             }
