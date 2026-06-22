@@ -276,9 +276,7 @@ pub extern "C" fn __resolve_free(ptr: *mut c_void) -> () {
 
         // Cond: Is the given pointer owned by a mimalloc allocation? 
         if mi_is_in_heap_region(ptr) {
-            if mi_is_heap_owned(ptr) {
-                let _ = mi_free(ptr);
-            }
+            let _ = mi_free(ptr);
         } else {
             let _ = free(ptr);
         }
