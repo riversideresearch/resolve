@@ -78,3 +78,22 @@ int __vasprintf(char **strp, const char *fmt, va_list ap)
   *strp = buf;
   return written;
 }
+
+/* debugging function to help check if a pointer the 
+  base address or an offset into the block 
+*/
+bool mi_is_block_start(void *p) {
+  // Find the page
+  mi_page_t *page = _mi_ptr_page(p);
+
+  // Compute the block index
+  const size_t block_size = page->block_size;
+  uintptr_t page_start = (uintptr_t)page->page_start;
+  size_t block_index = ((uintptr_t)p - page_start) / block_size;
+
+  // Compute the canonical block base.
+  uintptr_t base = page_start + block_index * block_size;
+
+  // Compare to pointer
+  return base == (uintptr_t)p;
+}

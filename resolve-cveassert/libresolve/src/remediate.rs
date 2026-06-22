@@ -44,7 +44,7 @@ unsafe extern "C" {
     fn mi_resolve_ptr(ptr: *mut c_void) -> BoundsInfo;
     fn mi_is_heap_owned(ptr: *mut c_void) -> bool;
     fn __vasprintf(strp: *mut *mut c_char, fmt: *const c_char, args: VaList<'_>) -> c_int;
-    fn resolve_return_address(level: c_uint) -> *mut c_void;
+    fn mi_is_block_start(ptr: *mut c_void) -> bool;
     
 }
 
