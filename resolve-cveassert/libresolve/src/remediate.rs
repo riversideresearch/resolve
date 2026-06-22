@@ -246,6 +246,8 @@ pub extern "C" fn __resolve_strndup(ptr: *mut c_char, size: usize) -> *mut c_cha
     string_ptr
 }
 
+
+#[derive(PartialEq)]
 #[repr(C)]
 pub struct ShadowObjBounds {
     pub base: *mut c_void,
@@ -265,7 +267,7 @@ impl From<&crate::shadowobjs::ShadowObject> for ShadowObjBounds {
 }
 
 /**
- * @brief - Helper function that queries shadow obj list
+ * @brief - Helper function that queries the shadow stack
  *          to find a shadow obj where the ptr fits within
  *          its bounds of allocation 
  * @input
@@ -286,7 +288,7 @@ pub extern "C" fn __resolve_get_bounds_stack(ptr: *mut c_void) -> ShadowObjBound
 }
 
 /**
- * @brief - Helper function that queries stack shadow obj list
+ * @brief - Helper function that queries heap sobj list
  *          to find a shadow obj where the ptr fits within
  *          its bounds of allocation 
  * @input
@@ -295,13 +297,30 @@ pub extern "C" fn __resolve_get_bounds_stack(ptr: *mut c_void) -> ShadowObjBound
  *         shadow object as pointers 
  */
 #[unsafe(no_mangle)]
-pub extern "C" fn __resolve_get_bounds(ptr: *mut c_void) -> ShadowObjBounds {
+pub extern "C" fn __resolve_get_bounds_heap(ptr: *mut c_void) -> ShadowObjBounds {
     let sobj_table = ALIVE_OBJ_LIST.lock();
     let Some(sobj) = sobj_table.search_intersection(ptr as Vaddr) else {
         return ShadowObjBounds::null();
     };
 
     return sobj.into();
+}
+
+/**
+ * @brief - Generic sobj lookup where we don't know the pointers
+ *          allocation type already. Searches stack table ( O(log n) )
+ *          before searching the heap table.
+ * @input
+ *  - ptr: ptr to allocation 
+ * @return struct containing the base and limit of the
+ *         shadow object as pointers 
+ */
+#[unsafe(no_mangle)]
+pub extern "C" fn __resolve_get_bounds(ptr: *mut c_void) -> ShadowObjBounds {
+    let mut sobj = __resolve_get_bounds_stack(ptr);
+    if sobj == ShadowObjBounds::null() { sobj = __resolve_get_bounds_heap(ptr)}
+
+    sobj
 }
 
 #[unsafe(no_mangle)]
