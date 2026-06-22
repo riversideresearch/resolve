@@ -332,6 +332,76 @@ mod tests {
         assert!(table.search_intersection(0x7FFF).is_none());
     }
 
+    use super::ShadowStack;
+
+    #[test]
+    fn stack_invalidate_top_pops_clean() {
+        let mut s = ShadowStack::new();
+        s.add_shadow_object(0x1000, 0x100); // A (outer)
+        s.add_shadow_object(0x0F00, 0x100); // B (inner / top)
+
+        // B's one-past sentinel resolves to B (GEP one-past remediation).
+        assert!(s.search_intersection(0x0F00 + 0x100).is_some());
+
+        s.invalidate_at(0x0F00, 0x100); // top -> drained, no marker
+
+        assert!(s.search_intersection(0x0F00).is_none());
+        let a = s.search_intersection(0x1000).expect("A still live");
+        assert_eq!(a.base, 0x1000);
+        assert_eq!(a.alloc_type, AllocType::Stack);
+    }
+
+    #[test]
+    fn stack_implicit_multiframe_drop() {
+        let mut s = ShadowStack::new();
+        s.add_shadow_object(0x1000, 0x100); // A
+        s.add_shadow_object(0x0F00, 0x100); // B
+        s.add_shadow_object(0x0E00, 0x100); // D (top)
+
+        // smaller frame F reuses B's slot.
+        s.add_shadow_object(0x0F00, 0x80); // F
+
+        // D's region was implicitly dropped.
+        assert!(s.search_intersection(0x0E00).is_none());
+        assert!(s.search_intersection(0x0E80).is_none());
+
+        // F is live at B's base.
+        let f = s.search_intersection(0x0F00).expect("F live");
+        assert_eq!(f.base, 0x0F00);
+        assert_eq!(f.size(), 0x80);
+        assert_eq!(f.alloc_type, AllocType::Stack);
+
+        // A untouched.
+        assert!(s.search_intersection(0x1000).is_some());
+    }
+
+    /// Stack reuse into a previously-invalidated (dead) region
+    #[test]
+    fn stack_reuse_into_invalidated_region() {
+        let mut s = ShadowStack::new();
+        s.add_shadow_object(0x1000, 0x100); // A
+        s.add_shadow_object(0x0F00, 0x100); // B
+        s.add_shadow_object(0x0E00, 0x100); // C (top)
+
+        s.invalidate_at(0x0F00, 0x100);
+        assert!(s.search_intersection(0x0F80).is_none()); // interior of dead B, not live
+
+        // smaller alloca reuses the middle of B's dead slot.
+        s.add_shadow_object(0x0F40, 0x40); // 0xF40..0xF7F
+
+        let n = s.search_intersection(0x0F40).expect("reused obj live");
+        assert_eq!(n.base, 0x0F40);
+        assert_eq!(n.size(), 0x40);
+
+        // Padding on both sides of the reused object stays dead
+        assert!(s.search_intersection(0x0F20).is_none()); // low padding interior
+        assert!(s.search_intersection(0x0FC0).is_none()); // high padding interior
+
+        // Neighbors still live
+        assert!(s.search_intersection(0x1000).is_some()); // A
+        assert!(s.search_intersection(0x0E00).is_some()); // C
+    }
+
     #[test]
     #[should_panic]
     #[ignore = "not implemented"]
