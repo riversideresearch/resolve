@@ -275,10 +275,12 @@ pub extern "C" fn __resolve_free(ptr: *mut c_void) -> () {
         }
 
         // Cond: Is the given pointer owned by a mimalloc allocation? 
-        if !mi_is_block_start(ptr) {
-            info!("[RESOLVE] interior pointer p = {:p}", ptr);
-        } else {
-            let _ = mi_free(ptr);
+        if mi_is_in_heap_region(ptr) {
+            if !mi_is_block_start(ptr) {
+                info!("[RESOLVE] interior pointer p = {:p}", ptr);
+            } else {
+                let _ = mi_free(ptr);
+            }
         }
         // if mi_is_in_heap_region(ptr) {
         //     let _ = mi_free(ptr);
