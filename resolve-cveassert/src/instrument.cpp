@@ -93,9 +93,9 @@ void instrumentAlloca(Function *F) {
 
   auto allocateFn = M->getOrInsertFunction(
       "__resolve_alloca", FunctionType::get(void_ty, {ptr_ty, size_ty}, false));
-  auto invalidateFn =
-      M->getOrInsertFunction("__resolve_invalidate_stack_range",
-                             FunctionType::get(void_ty, {ptr_ty, size_ty}, false));
+  auto invalidateFn = M->getOrInsertFunction(
+      "__resolve_invalidate_stack_range",
+      FunctionType::get(void_ty, {ptr_ty, size_ty}, false));
 
   // 2 cases
   // 1. alloca [N x T]
@@ -119,7 +119,8 @@ void instrumentAlloca(Function *F) {
     Value *arrSize = oldAlloca->getArraySize();
     Type *oldAllocaTy = oldAlloca->getAllocatedType();
     uint64_t elemSize = DL.getTypeAllocSize(oldAllocaTy).getFixedValue();
-    Value *trackedBytes = builder.CreateMul(arrSize, ConstantInt::get(size_ty, elemSize));
+    Value *trackedBytes =
+        builder.CreateMul(arrSize, ConstantInt::get(size_ty, elemSize));
     Value *allocCount =
         builder.CreateAdd(arrSize, ConstantInt::get(size_ty, 1));
     AllocaInst *transformedAlloca = builder.CreateAlloca(
@@ -146,7 +147,8 @@ void instrumentAlloca(Function *F) {
         builder.CreateStore(transformedAlloca, runtimePtrField);
     storeStackAddr->setMetadata("cve.noinstrument", MDNode::get(Ctx, {}));
     Value *runtimeSizeField = builder.CreateStructGEP(shadowTy, shadowSlot, 1);
-    StoreInst *storeStackSize = builder.CreateStore(totalSize, runtimeSizeField);
+    StoreInst *storeStackSize =
+        builder.CreateStore(totalSize, runtimeSizeField);
     storeStackSize->setMetadata("cve.noinstrument", MDNode::get(Ctx, {}));
     return shadowSlot;
   };

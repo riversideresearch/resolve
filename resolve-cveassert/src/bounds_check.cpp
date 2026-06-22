@@ -290,8 +290,8 @@ static Function *getOrCreateBoundsCheckStoreSanitizer(
 static Function *getOrCreateBoundsCheckMemcpySanitizer(
     Function *F, Vulnerability::RemediationStrategies strategy,
     BoundsClass srcCls, BoundsClass dstCls) {
-  std::string handlerName = std::string("__cve_memcpy_") + classTag(srcCls) +
-                            "_" + classTag(dstCls);
+  std::string handlerName =
+      std::string("__cve_memcpy_") + classTag(srcCls) + "_" + classTag(dstCls);
   Module *M = F->getParent();
   LLVMContext &Ctx = M->getContext();
 
@@ -360,8 +360,8 @@ static Function *getOrCreateBoundsCheckMemcpySanitizer(
 static Function *getOrCreateBoundsCheckMemmoveSanitizer(
     Function *F, Vulnerability::RemediationStrategies strategy,
     BoundsClass srcCls, BoundsClass dstCls) {
-  std::string handlerName = std::string("__cve_memmove_") + classTag(srcCls) +
-                            "_" + classTag(dstCls);
+  std::string handlerName =
+      std::string("__cve_memmove_") + classTag(srcCls) + "_" + classTag(dstCls);
   Module *M = F->getParent();
   LLVMContext &Ctx = M->getContext();
 
@@ -612,8 +612,8 @@ void instrumentGep(Function *F) {
 
     builder.SetInsertPoint(derivedPtr->getNextNode());
     BoundsClass cls = classifyPointer(basePtr);
-    auto resolveGepCall =
-        builder.CreateCall(getOrCreateResolveGep(F, cls), {basePtr, derivedPtr});
+    auto resolveGepCall = builder.CreateCall(getOrCreateResolveGep(F, cls),
+                                             {basePtr, derivedPtr});
 
     // Iterate over all the users of the gep instruction and
     // replace their operands with resolve_gep result
