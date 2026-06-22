@@ -385,7 +385,7 @@ pub extern "C" fn __resolve_realloc(ptr: *mut c_void, size: usize) -> *mut c_voi
     // to remove the shadow object for the orignal allocation
     let realloc_ptr = unsafe { mi_realloc(ptr, size) };
 
-    info!("[RESOLVE] old = 0x{:x}, new = 0x:{x}, size = {}", ptr as Vaddr, realloc_ptr as Vaddr, size);
+    info!("[RESOLVE] old = 0x{:x}, new = 0x{:x}, size = {}", ptr as Vaddr, realloc_ptr as Vaddr, size);
     if realloc_ptr.is_null() {
         return realloc_ptr;
     }
