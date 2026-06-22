@@ -84,8 +84,6 @@ int __vasprintf(char **strp, const char *fmt, va_list ap)
 */
 bool mi_is_block_start(void *p) {
   if (p == NULL) { return false; }
-  if (!mi_is_in_heap_region(p)) { return false; }
-  
   // Find the page
   mi_page_t *page = _mi_ptr_page(p);
 
