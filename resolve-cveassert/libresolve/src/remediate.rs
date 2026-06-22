@@ -277,10 +277,11 @@ pub extern "C" fn __resolve_free(ptr: *mut c_void) -> () {
         if mi_is_in_heap_region(ptr) {
             if !mi_is_block_start(ptr) {
                 info!("[RESOLVE] interior pointer p = {:p}", ptr);
-                let _ = free(ptr);
             } else {
                 let _ = mi_free(ptr);
             }
+        } else {
+            let _ = free(ptr);
         }
         // if mi_is_in_heap_region(ptr) {
         //     let _ = mi_free(ptr);
