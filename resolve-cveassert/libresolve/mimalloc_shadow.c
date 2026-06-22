@@ -83,8 +83,13 @@ int __vasprintf(char **strp, const char *fmt, va_list ap)
   base address or an offset into the block 
 */
 bool mi_is_block_start(void *p) {
+  if (p == NULL) { return false; }
+  if (!mi_is_in_heap_region(p)) { return false; }
+  
   // Find the page
   mi_page_t *page = _mi_ptr_page(p);
+
+  if (page == NULL) { return false; }
 
   // Compute the block index
   const size_t block_size = page->block_size;
@@ -93,6 +98,14 @@ bool mi_is_block_start(void *p) {
 
   // Compute the canonical block base.
   uintptr_t base = page_start + block_index * block_size;
+
+  fprintf(stderr,
+    "p=%p page_start=%p block_size=%zu block_index=%zu base=%p\n",
+    p,
+    (void*)page_start,
+    block_size,
+    block_index,
+    (void*)base);
 
   // Compare to pointer
   return base == (uintptr_t)p;
