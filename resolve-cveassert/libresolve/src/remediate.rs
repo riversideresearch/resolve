@@ -41,7 +41,7 @@ unsafe extern "C" {
     fn mi_resolve_ptr(ptr: *mut c_void) -> BoundsInfo;
     fn mi_is_heap_owned(ptr: *mut c_void) -> bool;
     fn __vasprintf(strp: *mut *mut c_char, fmt: *const c_char, args: VaList<'_>) -> c_int;
-    fn resolve_return_address(level: c_uint) -> *mut c_void;
+    fn mi_is_block_start(ptr: *mut c_void) -> bool;
     
 }
 
@@ -275,11 +275,16 @@ pub extern "C" fn __resolve_free(ptr: *mut c_void) -> () {
         }
 
         // Cond: Is the given pointer owned by a mimalloc allocation? 
-        if mi_is_in_heap_region(ptr) {
-            let _ = mi_free(ptr);
+        if !mi_is_block_start(ptr) {
+            info!("[RESOLVE] interior pointer p = {:p}", ptr);
         } else {
-            let _ = free(ptr);
+            let _ = mi_free(ptr);
         }
+        // if mi_is_in_heap_region(ptr) {
+        //     let _ = mi_free(ptr);
+        // } else {
+        //     let _ = free(ptr);
+        // }
     }
 }
     //     if !mi_is_heap_owned(ptr) {
