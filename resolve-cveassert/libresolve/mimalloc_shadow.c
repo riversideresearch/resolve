@@ -96,15 +96,7 @@ bool mi_is_block_start(void *p) {
 
   // Compute the canonical block base.
   uintptr_t base = page_start + block_index * block_size;
-
-  fprintf(stderr,
-    "p=%p page_start=%p block_size=%zu block_index=%zu base=%p\n",
-    p,
-    (void*)page_start,
-    block_size,
-    block_index,
-    (void*)base);
-
+  
   // Compare to pointer
   return base == (uintptr_t)p;
 }

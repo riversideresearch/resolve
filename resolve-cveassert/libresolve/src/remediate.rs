@@ -286,7 +286,7 @@ pub extern "C" fn __resolve_free(ptr: *mut c_void) -> () {
                 let _ = mi_free(ptr);
             }
         } else {
-            info!("[RESOLVE] foreign free: 0x{:x}", ptr as Vaddr);
+            info!("[RESOLVE] foreign free: 0x{:x}, in_region={}", ptr as Vaddr, mi_is_in_heap_region(ptr));
             let _ = free(ptr);
         }
     }
