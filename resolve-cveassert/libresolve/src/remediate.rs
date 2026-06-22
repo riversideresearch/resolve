@@ -276,13 +276,17 @@ pub extern "C" fn __resolve_free(ptr: *mut c_void) -> () {
         // Cond: Is this mimalloc pointer match the base address of the allocation
         // This api call also checks if the pointer is within the mimalloc region
         if mi_is_in_heap_region(ptr) {
+            info!("[RESOLVE] In mimalloc region: 0x{:x}", ptr as Vaddr);
+
             if !mi_is_block_start(ptr) {
-                info!("[RESOLVE] invalid free: {:p}", ptr);
+                info!("[RESOLVE] invalid free: 0x{:x}", ptr as Vaddr);
             } else {
+                info!("[RESOLVE] mi_free: 0x{:x}", ptr as Vaddr);
                 let _ = mi_free(ptr);
             }
         } else {
-            return;
+            info!("[RESOLVE] foreign free: 0x{:x}", ptr as Vaddr);
+            let _ = free(ptr);
         }
     }
 }
