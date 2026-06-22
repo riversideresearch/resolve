@@ -9,8 +9,8 @@ import sys
 import tempfile
 from pathlib import Path
 
-from .agent import run_critique, run_prompt
-from .utils import prepare_output_path, require_file
+from resolve.agent_utils.agent import run_critique, run_prompt
+from resolve.agent_utils.utils import prepare_output_path, require_file
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:

@@ -23,7 +23,6 @@ getOrCreateNullPtrLoadSanitizer(Function *F, Type *ty,
   std::string handlerName = "__cve_null_check_ld_" + getLLVMType(ty);
   Module *M = F->getParent();
   LLVMContext &Ctx = M->getContext();
-  GlobalVariable *map = SanitizerMaps[F];
 
   IRBuilder<> builder(Ctx);
   // TODO: handle address spaces other than 0
@@ -36,6 +35,7 @@ getOrCreateNullPtrLoadSanitizer(Function *F, Type *ty,
   Function *resolveNullPtrLdFn =
       getOrCreateResolveHelper(M, handlerName, resolveNullPtrLdFnTy);
   if (!resolveNullPtrLdFn->empty()) {
+    recordPatchFunction(resolveNullPtrLdFn);
     return resolveNullPtrLdFn;
   }
 
@@ -49,13 +49,7 @@ getOrCreateNullPtrLoadSanitizer(Function *F, Type *ty,
 
   builder.SetInsertPoint(EntryBB);
   Argument *inputPtr = resolveNullPtrLdFn->getArg(0);
-  Value *zero = builder.getInt64(0);
-  Value *mapPtr = builder.CreateGEP(map->getValueType(), map, {zero, zero});
-
-  Value *mapEntry = builder.CreateCall(getOrCreateSanitizerMapEntry(M),
-                                       {mapPtr, ConstantInt::get(usize_ty, 1)});
-  Value *isZero = builder.CreateICmpEQ(mapEntry, ConstantInt::get(i1_ty, 0));
-  builder.CreateCondBr(isZero, NormalLoadBB, CheckIfNullBB);
+  createSanitizerGateBranch(builder, F, 1, NormalLoadBB, CheckIfNullBB);
 
   // Compare pointer with null (opaque ptrs use generic ptr type)
   // TODO: Sanitize other invalid pointers
@@ -88,6 +82,7 @@ getOrCreateNullPtrLoadSanitizer(Function *F, Type *ty,
   builder.CreateRet(ld);
 
   validateIR(resolveNullPtrLdFn);
+  recordPatchFunction(resolveNullPtrLdFn);
   return resolveNullPtrLdFn;
 }
 
@@ -96,7 +91,6 @@ static Function *getOrCreateNullPtrStoreSanitizer(
   std::string handlerName = "__cve_null_check_st_" + getLLVMType(ty);
   Module *M = F->getParent();
   LLVMContext &Ctx = M->getContext();
-  GlobalVariable *map = SanitizerMaps[F];
 
   IRBuilder<> builder(Ctx);
   // TODO: handle address spaces other than 0
@@ -110,6 +104,7 @@ static Function *getOrCreateNullPtrStoreSanitizer(
   Function *resolveNullPtrStFn =
       getOrCreateResolveHelper(M, handlerName, resolveNullPtrStFnTy);
   if (!resolveNullPtrStFn->empty()) {
+    recordPatchFunction(resolveNullPtrStFn);
     return resolveNullPtrStFn;
   }
 
@@ -125,13 +120,7 @@ static Function *getOrCreateNullPtrStoreSanitizer(
   builder.SetInsertPoint(EntryBB);
   Argument *inputPtr = resolveNullPtrStFn->getArg(0);
   Argument *inputValue = resolveNullPtrStFn->getArg(1);
-  Value *mapPtr = builder.CreateGEP(map->getValueType(), map,
-                                    {builder.getInt64(0), builder.getInt64(0)});
-
-  Value *mapEntry = builder.CreateCall(getOrCreateSanitizerMapEntry(M),
-                                       {mapPtr, ConstantInt::get(usize_ty, 1)});
-  Value *isZero = builder.CreateICmpEQ(mapEntry, ConstantInt::get(i1_ty, 0));
-  builder.CreateCondBr(isZero, NormalStoreBB, CheckIfNullBB);
+  createSanitizerGateBranch(builder, F, 1, NormalStoreBB, CheckIfNullBB);
 
   // Compare pointer with null (opaque ptrs use generic ptr type)
   // TODO: Sanitize other invalid pointers
@@ -167,6 +156,7 @@ static Function *getOrCreateNullPtrStoreSanitizer(
   builder.CreateRetVoid();
 
   validateIR(resolveNullPtrStFn);
+  recordPatchFunction(resolveNullPtrStFn);
   return resolveNullPtrStFn;
 }
 

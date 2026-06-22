@@ -97,7 +97,29 @@ FROM base AS resolve
 RUN --mount=from=cmake-builder,source=/build-cmake,target=/build-cmake,rw make -C /build-cmake install 
 COPY --from=builder /opt/resolve /opt/resolve
 COPY --from=git-version /RESOLVE_VERSION /RESOLVE_VERSION
-
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    autoconf \
+    autoconf-archive \ 
+    automake \
+    build-essential \
+    ca-certificates \
+    clang \
+    lld \
+    ninja-build \
+    git \
+    make \
+    pkg-config \
+    libssl-dev \
+    curl \
+    jq \
+    libtool \
+    libclang-rt-dev \
+    sudo \
+    time \
+    wget \
+    unzip \
+    zip \
+    && apt clean && rm -rf /var/lib/apt/lists/*
 # Install toolchains
 RUN mkdir -p /opt/toolchain /opt/vcpkg-overlays/triplets
 COPY toolchains/resolve-toolchain.cmake /opt/toolchain/resolve-toolchain.cmake

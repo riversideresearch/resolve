@@ -6,6 +6,11 @@ import os
 import subprocess
 from pathlib import Path
 
+AGENTS_FILE = {
+    "claude": "CLAUDE.md",
+    "codex": "AGENTS.md",
+    "opencode": "AGENTS.md",
+}
 
 def run_agent(
     agent: str,

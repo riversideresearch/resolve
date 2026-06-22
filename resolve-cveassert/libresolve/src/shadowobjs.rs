@@ -288,6 +288,8 @@ mod tests {
         let mut table = ShadowObjectTable::new();
         table.add_shadow_object(AllocType::Heap, 0x1000, 8);
         table.add_shadow_object(AllocType::Stack, 0x2000, 16);
+        table.invalidate_at(0x1000);
+        assert_eq!(table.table.len(), 1);
     }
 
     #[test]

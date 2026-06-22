@@ -24,6 +24,7 @@ CWE_PATCHES = {
     369: [3],
     476: [1],
     590: [2],
+    1335: [5],
     787: [0]
 }
 
@@ -66,23 +67,32 @@ def set_byte(mm: mmap.mmap, offset: int, bit: int):
 def parse_cve_description(json_path: Path) -> list[CweTarget]:
     """
     Parses CVE descriptions and stores them in list
-    If 'cwe-id' or 'affected-function' fields cannot 
+    If 'cwe-id' or 'affected-function' fields cannot
     be found then raise ValueError
     """
     cwe_targets = []
-    
+
     with json_path.open("r") as f:
         json_obj = json.load(f)
 
         if not json_obj["vulnerabilities"]:
             raise ValueError("[ERROR] No vulnerabilities found.")
-        
+
         for vuln in json_obj["vulnerabilities"]:
+            output = vuln.get("output", "inline")
+            if output in ("patch", "file"):
+                print("Skipping vulnerability with output type:", output)
+                continue
+
+            gated = vuln.get("gated", True)
+            if not gated:
+                print("Skipping ungated vulnerability")
+                continue
             cwe_id = vuln["cwe-id"]
             function_name = vuln["affected-function"]
             cve_id = vuln["cve-id"]
             cwe_targets.append(CweTarget(int(cwe_id), function_name + ".sanmap", cve_id))
-        
+
         return cwe_targets
 
 
@@ -122,7 +132,7 @@ def patch_symbol(elf_path: Path, symbol_name: str, cwe: int, bit: int):
 
             if target_offset >= mm.size():
                 raise ValueError(f"[ERROR] Target offset {target_offset:#x} out of range")
-            
+
             original, modified = set_byte(mm, target_offset, bit)
             print(
                 f"[INFO] Patched {symbol_name}[{rel_offset}] "
