@@ -227,6 +227,7 @@ pub extern "C" fn __resolve_reallocarray(ptr: *mut c_void, n: usize, size: usize
 pub extern "C" fn __resolve_malloc(size: usize) -> *mut c_void {
     let ptr = unsafe { mi_malloc(size + 1) };
     //let bounds_info = unsafe { mi_resolve_ptr(ptr) };
+    info!("[RESOLVE] mimalloc ptr: 0x{:x}", ptr as Vaddr);
 
     if ptr.is_null() {
         return ptr;
@@ -384,6 +385,7 @@ pub extern "C" fn __resolve_realloc(ptr: *mut c_void, size: usize) -> *mut c_voi
     // to remove the shadow object for the orignal allocation
     let realloc_ptr = unsafe { mi_realloc(ptr, size) };
 
+    info!("[RESOLVE] old = 0x{:x}, new = 0x:{x}, size = {}", ptr as Vaddr, realloc_ptr as Vaddr, size);
     if realloc_ptr.is_null() {
         return realloc_ptr;
     }
