@@ -18,7 +18,15 @@ typedef struct {
 
 bounds_info_t mi_resolve_ptr(void* p) {
   // Can return null if ptr is not owned by mimalloc
+  bounds_info_t bounds;
   mi_page_t *page = _mi_ptr_page(p);
+  if (page == NULL) {
+    bounds.base = (void*)0;
+    bounds.limit = (void*)0;
+    bounds.block_size = 0;
+    bounds.block_index = 0;
+    return bounds;
+  }
   
   const size_t block_size = page->block_size;
 
@@ -28,7 +36,6 @@ bounds_info_t mi_resolve_ptr(void* p) {
   size_t block_index = (ptr - page_start) / block_size; 
   uintptr_t base_addr = page_start + block_index * block_size;
 
-  bounds_info_t bounds;
   bounds.base = (void*)base_addr;
   bounds.limit = (void*)(base_addr + block_size);
   bounds.block_size = block_size;
@@ -70,13 +77,4 @@ int __vasprintf(char **strp, const char *fmt, va_list ap)
 
   *strp = buf;
   return written;
-}
-
-void *resolve_return_address(unsigned level) {
-  switch(level) {
-    case 0: return __builtin_return_address(0);
-    case 1: return __builtin_return_address(1);
-    case 2: return __builtin_return_address(2);
-    default: return NULL;
-  }
 }
