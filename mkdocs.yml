@@ -1,0 +1,48 @@
+site_name: RESOLVE Documentation
+site_url: https://riversideresearch.github.io/resolve
+repo_url: https://github.com/riversideresearch/resolve
+edit_uri: edit/main/docs/
+theme:
+  language: en
+  direction: ltr
+  name: material
+  logo: assets/resolve_logo_white.png
+  favicon: assets/resolve_square_white.png
+
+  palette:
+    # Palette toggle for light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: red
+      accent: red
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+
+    # Palette toggle for dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: red
+      accent: red
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  
+  # edit/view repo prompts
+  features:
+    - content.action.edit
+  icon:
+    edit: material/pencil 
+    view: material/eye
+copyright: RESOLVE is licensed under L-GPL v3.0
+extra:
+  generator: false
+  # social:
+  #   - icon: fontawesome/brands/github
+  #     link: https://github.com/riversideresearch
+  #     name: riversideresearch on GitHub
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
