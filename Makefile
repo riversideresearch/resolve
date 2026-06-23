@@ -14,7 +14,13 @@ endif
 RESOLVE_BUILD_KLEE ?= OFF
 CMAKE_ARGS := -GNinja -DRESOLVE_BUILD_KLEE=$(RESOLVE_BUILD_KLEE)
 
-.PHONY: build build-with-klee build-release build-release-with-klee check check-with-klee test test-with-klee install install-with-klee install-local clean
+RELEASE_BUILD_DIR ?= build-release
+RELEASE_STAGE_DIR ?= dist/resolve-release-root
+RELEASE_TARBALL ?= dist/resolve-linux-x86_64.tar.gz
+RELEASE_INSTALL_PREFIX ?= /opt/resolve
+RELEASE_PYTHON_VERSION ?= 3.12
+
+.PHONY: build build-with-klee build-release build-release-with-klee check check-with-klee test test-with-klee install install-with-klee install-local release clean
 configure: 
 	cmake -B$(RESOLVE_CMAKE_BUILD_DIR) $(CMAKE_ARGS)
 
@@ -65,6 +71,11 @@ install-with-klee:
 
 install-local: configure
 	cmake --install $(RESOLVE_CMAKE_BUILD_DIR) --prefix install
+
+release:
+	cmake -B$(RELEASE_BUILD_DIR) -GNinja -DRESOLVE_BUILD_KLEE=OFF -DRESOLVE_BUNDLE_PYTHON=ON -DRESOLVE_PYTHON_VERSION=$(RELEASE_PYTHON_VERSION) -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=$(RELEASE_INSTALL_PREFIX) -DCMAKE_INSTALL_RPATH='$$ORIGIN;$$ORIGIN/../lib'
+	cmake --build $(RELEASE_BUILD_DIR)
+	./scripts/package-release.sh $(RELEASE_BUILD_DIR) $(RELEASE_STAGE_DIR) $(RELEASE_TARBALL) $(RELEASE_INSTALL_PREFIX)
 
 clean:
 	rm -rf build/ build-with-klee/
