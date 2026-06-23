@@ -3,7 +3,7 @@ name: resolve release
 on:
   push:
     tags:
-      - "v*[0-9]*"
+      - "v[0-9]*"
 
 permissions:
   contents: write
