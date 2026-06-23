@@ -3,7 +3,7 @@ name: resolve release
 on:
   push:
     tags:
-      - "v*"
+      - "v*[0-9]*"
 
 permissions:
   contents: write
@@ -30,9 +30,10 @@ jobs:
           artifact="dist/resolve-linux-x86_64.tar.gz"
 
           test -s "$artifact"
-          tar -tzf "$artifact" | grep -q '^opt/resolve/'
-          tar -tzf "$artifact" | grep -q '^usr/local/bin/resolve$'
-          tar -tzf "$artifact" | grep -q '^usr/local/bin/resolvecc$'
+          tar -tzf "$artifact" > release-contents.txt
+          grep -q '^opt/resolve/' release-contents.txt
+          grep -q '^usr/local/bin/resolve$' release-contents.txt
+          grep -q '^usr/local/bin/resolvecc$' release-contents.txt
 
       - name: Prepare release metadata
         id: release-meta
@@ -50,8 +51,8 @@ jobs:
           ## Install
 
           ~~~bash
-          curl -fL https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}/resolve-linux-x86_64.tar.gz \
-            -o /tmp/resolve-linux-x86_64.tar.gz && \
+          curl -fL https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}/resolve-linux-x86_64.tar.gz \\
+            -o /tmp/resolve-linux-x86_64.tar.gz && \\
           sudo tar -C / -xzf /tmp/resolve-linux-x86_64.tar.gz
           ~~~
           EOF
