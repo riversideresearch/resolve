@@ -270,6 +270,9 @@ pub extern "C" fn __resolve_free(ptr: *mut c_void) -> () {
     // Insert a function to find the object and return the pointer size
     // Do I need to handle if the sobj cannot be found?
     unsafe {
+
+        // info!("[RESOLVE] free(%p), thread: 0x{:x}", /* check if mimalloc has api call to get thread id */);
+
         if ptr.is_null() {
             return;
         }
