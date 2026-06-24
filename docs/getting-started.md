@@ -28,34 +28,3 @@ Given a CVE description in structured `.json`, the `CVEAssert` pass plugin inser
 | `DlsymHook` | Instrument 'dlsym' function calls |
 | `EnhancedFacts` | Embed facts derived from program source code into custom ELF sections |
 | `ObjHook` | Instrument C memory allocators |
-
-
-### `resolve-cc`
-`resolve-cc` contains the `resolvecc` compiler wrapper and scripts for extracting facts from the ELF binary sections embedded by the `EnhancedFacts` compiler pass plugin. Those sections are then written to files to be consumed by the `reach` tool for reachability analysis. The `resolve` ELF sections in which metadata is embedded are compatible with standard linkers; a custom linker is not required for linking `resolve`-generated binaries.
-
-### `resolve-cli`
-`resolve-cli` contains scripts that create a command line interface for users to interact with the `resolve` toolchain. 
-
-
-### `libresolve`
-`libresolve` is a runtime library for tracking object allocations. The library can be configured to write runtime logs to a specified file descriptor for offline analysis.
-
-To learn more about `libresolve` and its integration with our suite of compiler passes, see the [`libresolve`](https://github.com/riversideresearch/resolve/tree/main/libresolve) documentation.  
-
-### `reach`
-`reach` performs static reachability queries on `resolve` program metadata. It consumes the fact files extracted from binaries by `linker` and determines whether a path exists from the program entry point to a specified vulnerability. When a path is found, `reach` packages the results into a `.json` object and writes them either to a user-specified path or to `stdout` by default. 
-
-A Python wrapper, `reach.py`, provides a convenient command-line interface to interact with `reach`. For more information about `reach`, see the [`reach`](https://github.com/riversideresearch/resolve/tree/main/reach) documentation.
-
-
-## BUILDING `resolve`
-```bash
-cd resolve/
-make build             # Builds compiler pass plugins, reach tool, and libresolve runtime library
-make install           # Installs executables and libraries into opt/resolve unless specified by user
-# make install-local   # Installs into <repo>/install for local development
-make test              # Runs resolve remediation and libresolve test suites 
-```
-
-## EXAMPLES
-See https://github.com/riversideresearch/resolve/tree/main/examples.

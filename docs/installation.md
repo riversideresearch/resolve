@@ -38,4 +38,4 @@ curl -fL https://github.com/riversideresearch/resolve/releases/latest/download/r
 
 ## Building from source
 
-See [building RESOLVE from source](development/building-from-source) for information on building **RESOLVE** binaries.
+See [building RESOLVE from source](../development/building-from-source) for information on building **RESOLVE** binaries.
