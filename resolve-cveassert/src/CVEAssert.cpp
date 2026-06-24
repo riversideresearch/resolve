@@ -275,7 +275,7 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
   void registerGlobals(Module &M) {
     if (M.getFunction("__resolve_register_globals_ctor"))
       return;
-    
+
     LLVMContext &Ctx = M.getContext();
     const DataLayout &DL = M.getDataLayout();
     auto ptr_ty = PointerType::get(Ctx, 0);
@@ -283,19 +283,19 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
     auto void_ty = Type::getVoidTy(Ctx);
 
     FunctionCallee registerFn = M.getOrInsertFunction(
-      "__resolve_register_global",
-      FunctionType::get(void_ty, {ptr_ty, size_ty}, false)
-    );
+        "__resolve_register_global",
+        FunctionType::get(void_ty, {ptr_ty, size_ty}, false));
 
-    SmallVector<GlobalVariable*, 16> targets;
+    SmallVector<GlobalVariable *, 16> targets;
     for (GlobalVariable &G : M.globals()) {
-      if (G.isDeclaration())                          // external: defining TU registers it
+      if (G.isDeclaration()) // external: defining TU registers it
         continue;
-      if (G.isThreadLocal())                          // TLS: ctor captures one thread's &G
+      if (G.isThreadLocal()) // TLS: ctor captures one thread's &G
         continue;
-      if (G.getType()->getPointerAddressSpace() != 0) // non-default AS: not flat-addressable
+      if (G.getType()->getPointerAddressSpace() !=
+          0) // non-default AS: not flat-addressable
         continue;
-      if (G.getName().starts_with("llvm."))           // used/global_ctors/metadata
+      if (G.getName().starts_with("llvm.")) // used/global_ctors/metadata
         continue;
       if (G.getName().starts_with("__resolve_"))
         continue;
@@ -307,12 +307,9 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
     if (targets.empty())
       return;
 
-    Function *ctor = Function::Create(
-      FunctionType::get(void_ty, {}, false),
-      GlobalValue::InternalLinkage,
-      "__resolve_register_globals_ctor",
-      &M
-    );
+    Function *ctor = Function::Create(FunctionType::get(void_ty, {}, false),
+                                      GlobalValue::InternalLinkage,
+                                      "__resolve_register_globals_ctor", &M);
 
     ctor->setMetadata("cve.noinstrument", MDNode::get(Ctx, {}));
 
@@ -407,9 +404,8 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
       }
     }
 
-    if (!writePatch &&
-        (instrument_mem_inst.instrumentAlloca ||
-        instrument_mem_inst.instrumentMemAllocator)) {
+    if (!writePatch && (instrument_mem_inst.instrumentAlloca ||
+                        instrument_mem_inst.instrumentMemAllocator)) {
       registerGlobals(M);
       result = PreservedAnalyses::none();
     }
