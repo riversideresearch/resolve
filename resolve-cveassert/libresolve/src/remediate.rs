@@ -314,10 +314,7 @@ pub extern "C" fn __resolve_get_bounds_heap(ptr: *mut c_void) -> ShadowObjBounds
 #[unsafe(no_mangle)]
 pub extern "C" fn __resolve_get_bounds_global(ptr: *mut c_void) -> ShadowObjBounds {
     match lookup_global(ptr as Vaddr) {
-        Some(obj) => ShadowObjBounds {
-            base: obj.base as *mut c_void,
-            limit: obj.past_limit() as *mut c_void
-        },
+        Some(obj) => (&obj).into(),
         None => ShadowObjBounds::null()
     }
 }

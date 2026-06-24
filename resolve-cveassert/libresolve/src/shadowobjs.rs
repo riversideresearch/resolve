@@ -345,7 +345,7 @@ thread_local! {
 pub static GLOBALS: MutexWrap<Vec<ShadowObject>> = MutexWrap::new(Vec::new());
 
 pub fn lookup_global(p: Vaddr) -> Option<ShadowObject> {
-    GLOBALS.lock().iter().find(|obj| obj.contains(p)).copied()
+    GLOBALS.lock().iter().find(|obj| obj.contains(p) || obj.past_limit() == p).copied()
 }
 
 #[cfg(test)]
@@ -387,6 +387,21 @@ mod tests {
 
         let result = table.search_intersection(0x5000);
         assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_lookup_global_in_bounds_one_past_and_miss() {
+        use crate::shadowobjs::{GLOBALS, ShadowObject, lookup_global};
+
+        GLOBALS.lock().clear();
+        GLOBALS.lock().push(ShadowObject::new(AllocType::Global, 0x7000, 4));
+
+        assert!(lookup_global(0x7000).is_some(), "base is in bounds");
+        assert!(lookup_global(0x7003).is_some(), "last valid byte is in bounds");
+        assert!(lookup_global(0x7004).is_some(), "one-past is resolvable");
+        assert!(lookup_global(0x7005).is_none(), "beyond one-past misses");
+
+        GLOBALS.lock().clear();
     }
 
     #[test]
