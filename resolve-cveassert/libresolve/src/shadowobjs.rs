@@ -3,6 +3,7 @@
 
 use crate::MutexWrap;
 use log::warn;
+use crate::remediate::ShadowObjBounds;
 use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::ops::RangeInclusive;
@@ -18,11 +19,10 @@ pub enum AllocType {
     Unknown,
     Heap,
     Stack,
-    #[allow(dead_code)]
     Global,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct ShadowObject {
     /// Allocation type (Heap, Stack, Global, etc..)
     pub alloc_type: AllocType,
@@ -340,6 +340,12 @@ impl ShadowStack {
 
 thread_local! {
     pub static SHADOW_STACK: RefCell<ShadowStack> = RefCell::new(ShadowStack::new());
+}
+
+pub static GLOBALS: MutexWrap<Vec<ShadowObject>> = MutexWrap::new(Vec::new());
+
+pub fn lookup_global(p: Vaddr) -> Option<ShadowObject> {
+    GLOBALS.lock().iter().find(|obj| obj.contains(p)).copied()
 }
 
 #[cfg(test)]
