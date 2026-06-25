@@ -138,7 +138,9 @@ void instrumentAlloca(Function *F) {
     AllocaInst *shadowSlot =
         builder.CreateAlloca(shadowTy, nullptr, "shadow.slot");
     Value *initialPtrField = builder.CreateStructGEP(shadowTy, shadowSlot, 0);
-    builder.CreateStore(ConstantPointerNull::get(ptr_ty), initialPtrField);
+    StoreInst *storeNullValue =
+        builder.CreateStore(ConstantPointerNull::get(ptr_ty), initialPtrField);
+    storeNullValue->setMetadata("cve.noinstrument", MDNode::get(Ctx, {}));
     Value *initialSizeField = builder.CreateStructGEP(shadowTy, shadowSlot, 1);
     builder.CreateStore(ConstantInt::get(size_ty, 0), initialSizeField);
     builder.SetInsertPoint(transformedAlloca->getNextNonDebugInstruction());
