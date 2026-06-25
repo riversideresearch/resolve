@@ -61,12 +61,12 @@ impl ShadowObject {
 
     /// Compute a limit from base and size
     pub fn limit(base: Vaddr, size: usize) -> Vaddr {
-        if size == 0 { base } else { base.saturating_add(size - 1) }
+        if size == 0 { base } else { base + (size - 1) }
     }
 
     /// Compute the sentinel pointer value for this object, 1 past its limit
     pub fn past_limit(&self) -> Vaddr {
-        self.limit.saturating_add(1)
+        self.limit + 1
     }
 }
 
