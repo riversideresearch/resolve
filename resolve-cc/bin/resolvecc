@@ -8,13 +8,31 @@ set -e
 # set -x # for debugging
 # RESOLVECC_DEBUG=true
 
-SCRIPT_DIR="${0%/*}"
+SCRIPT_PATH="${BASH_SOURCE[0]}"
+while [ -L "$SCRIPT_PATH" ]; do
+    SCRIPT_DIR="$(cd -P "$(dirname "$SCRIPT_PATH")" && pwd)"
+    LINK_TARGET="$(readlink "$SCRIPT_PATH")"
+    case "$LINK_TARGET" in
+        /*) SCRIPT_PATH="$LINK_TARGET" ;;
+        *)  SCRIPT_PATH="$SCRIPT_DIR/$LINK_TARGET" ;;
+    esac
+done
+SCRIPT_DIR="$(cd -P "$(dirname "$SCRIPT_PATH")" && pwd)"
 
 # Path for clang
 case "$0" in
-    *"cxx") REAL_CLANG=$(which clang++) ;;
-    *)      REAL_CLANG=$(which clang) ;;
+    *"cxx")
+        CLANG_COMMAND=clang++-18
+        CLANG_FALLBACK_COMMAND=clang++
+        CLANG_PACKAGE=clang-18
+        ;;
+    *)
+        CLANG_COMMAND=clang-18
+        CLANG_FALLBACK_COMMAND=clang
+        CLANG_PACKAGE=clang-18
+        ;;
 esac
+REAL_CLANG=$(command -v "$CLANG_COMMAND" || command -v "$CLANG_FALLBACK_COMMAND" || true)
 
 RESOLVE_LIB_DIR=${RESOLVE_LIB_DIR:-"$SCRIPT_DIR"/../lib}
 
@@ -34,7 +52,7 @@ USE_RESOLVE_FACTS=true
 RESOLVE_LABEL_CVE=${RESOLVE_LABEL_CVE:-}
 
 # Variables stores the compilers name
-CLANG_COMPILER_NAME=${CLANG_COMPILER_NAME:-"$(basename "$REAL_CLANG")"}
+CLANG_COMPILER_NAME=${CLANG_COMPILER_NAME:-"${REAL_CLANG:-$CLANG_COMMAND}"}
 RESOLVE_COMPILER_NAME=${RESOLVE_COMPILER_NAME:-"$(basename "$0")"}
 
 # Variable tells resolvecc to load CVEAssert plugin
@@ -115,6 +133,21 @@ parse_args() {
 }
 
 configure_flags() {
+    if [[ -z "$REAL_CLANG" ]]; then
+        echo "[resolvecc]: ERROR: required compiler '$CLANG_COMMAND' was not found on PATH." >&2
+        echo "[resolvecc]: Install '$CLANG_PACKAGE' or add '$CLANG_COMMAND' to PATH." >&2
+        echo "[resolvecc]: On Ubuntu, try: sudo apt install clang-18" >&2
+        echo "[resolvecc]: If you use a non-Ubuntu LLVM install, make sure clang 18 is first on PATH." >&2
+        exit 127
+    fi
+
+    CLANG_VERSION_OUTPUT=$("$REAL_CLANG" --version 2>/dev/null | sed -n '1p' || true)
+    if [[ "$CLANG_VERSION_OUTPUT" != *"version 18."* ]]; then
+        echo "[resolvecc]: ERROR: RESOLVE plugins require clang 18, but '$REAL_CLANG' reported:" >&2
+        echo "[resolvecc]: $CLANG_VERSION_OUTPUT" >&2
+        echo "[resolvecc]: On Ubuntu, install clang-18 or put clang 18 first on PATH." >&2
+        exit 127
+    fi
 
     # Check if USE_CVEASSERT var is set to true
     if $USE_CVEASSERT; then

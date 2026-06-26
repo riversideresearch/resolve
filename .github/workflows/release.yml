@@ -1,0 +1,76 @@
+name: resolve release
+
+on:
+  push:
+    tags:
+      - "v[0-9]*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build and publish release
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Install build dependencies
+        run: make install-deps
+
+      - name: Build release package
+        run: make release
+
+      - name: Validate release package
+        run: |
+          set -euo pipefail
+
+          artifact="dist/resolve-linux-x86_64.tar.gz"
+
+          test -s "$artifact"
+          tar -tzf "$artifact" > release-contents.txt
+          grep -q '^opt/resolve/' release-contents.txt
+          grep -q '^usr/local/bin/resolve$' release-contents.txt
+          grep -q '^usr/local/bin/resolvecc$' release-contents.txt
+
+      - name: Prepare release metadata
+        id: release-meta
+        run: |
+          set -euo pipefail
+
+          tag="${GITHUB_REF_NAME}"
+          if [[ "$tag" =~ (alpha|beta|rc|pre|dev|snapshot) ]]; then
+            echo "prerelease_flag=--prerelease" >> "$GITHUB_OUTPUT"
+          else
+            echo "prerelease_flag=" >> "$GITHUB_OUTPUT"
+          fi
+
+          cat > release-notes.md <<EOF
+          ## Install
+
+          ~~~bash
+          curl -fL https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}/resolve-linux-x86_64.tar.gz \\
+            -o /tmp/resolve-linux-x86_64.tar.gz && \\
+          sudo tar -C / -xzf /tmp/resolve-linux-x86_64.tar.gz
+          ~~~
+          EOF
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PRERELEASE_FLAG: ${{ steps.release-meta.outputs.prerelease_flag }}
+        run: |
+          set -euo pipefail
+
+          release_notes="$(cat release-notes.md)"
+
+          gh release create "$GITHUB_REF_NAME" \
+            dist/resolve-linux-x86_64.tar.gz \
+            --repo "$GITHUB_REPOSITORY" \
+            --verify-tag \
+            --title "$GITHUB_REF_NAME" \
+            --notes "$release_notes" \
+            --generate-notes \
+            $PRERELEASE_FLAG
