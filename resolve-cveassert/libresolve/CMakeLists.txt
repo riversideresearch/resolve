@@ -20,7 +20,7 @@ FetchContent_MakeAvailable(mimalloc)
 
 # Add the shim source to the mimalloc proj
 target_sources(mimalloc-static PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/mimalloc_shadow.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/mi_shim.c
 )
 
 ## mimalloc proj must be PIC to ensure compatibility with libresolve
