@@ -2,6 +2,7 @@
 // LGPL-3; See LICENSE.txt in the repo root for details.
 
 use crate::MutexWrap;
+use log::warn;
 use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::ops::RangeInclusive;
@@ -137,11 +138,21 @@ impl ShadowStack {
         let new_end = base.checked_add(size)
             .expect("add_shadow_object: object overflows the address space"); // exclusive
 
+        // A zero-byte alloca tracks nothing and would create a degenerate entry
+        if size == 0 { return; }
+
         let Ok((reused, idx)) = self.get_at(base) else {
-            // most common: pushing a new obj onto the end of the stack
-            assert!(self.data.last().map_or(true, |top| new_end <= top.base),
-                "ShadowStack::add_shadow_object: new object overlaps the stack top");
-            self.data.push(ShadowObject::new(AllocType::Stack, base, size));
+            // `base` is not inside any tracked entry
+            if self.data.last().map_or(true, |top| new_end <= top.base) {
+                // overwhelmingly common: clean append below the current top. O(1)
+                self.data.push(ShadowObject::new(AllocType::Stack, base, size));
+            } else {
+                // out-of-order sibling or a stale frame above us:
+                // place at the sorted position, reconciling any
+                // overlap with higher (necessarily stale) entries. newest-wins.
+                self.insert_reconcile(base, size, new_end);
+            }
+            self.assert_descending();
             return;
         };
 
@@ -152,28 +163,106 @@ impl ShadowStack {
         // also common: new object is being pushed after program has fallen
         //              back a few stack frames. Overwrite and truncate.
         if reused_live {
-            assert!(slot_base == base,
-                "ShadowStack::add_shadow_object: re-push lands inside a live object");
-            assert!(idx == 0 || new_end <= self.data[idx - 1].base,
-                "ShadowStack::add_shadow_object: object overlaps the frame above");
-            self.data[idx] = ShadowObject::new(AllocType::Stack, base, size);
-            self.data.truncate(idx + 1); // drop everything more recent
+            if slot_base < base || (idx > 0 && new_end > self.data[idx - 1].base) {
+                // `base` lands strictly inside a live entry, or a re-push at the
+                // exact base grew up into the frame above. Either way the entry we
+                // land in (and everything deeper) is a stale frame we're reusing:
+                // drop it, then reconcile against any overlap above. newest-wins.
+                self.data.truncate(idx);
+                self.insert_reconcile(base, size, new_end);
+            } else {
+                self.data[idx] = ShadowObject::new(AllocType::Stack, base, size);
+                self.data.truncate(idx + 1); // drop everything more recent
+            }
         }
         else {
-            // least common: stack re-use (new alloca inside previously invalidated region)
-            assert!(new_end <= slot_end,
-                "ShadowStack::add_shadow_object: object overflows its slot");
-            self.data[idx] = ShadowObject::new(AllocType::Stack, base, size);
+            // least common: invalidated stack re-use (new alloca inside previously invalidated region)
+            if new_end > slot_end {
+                // object overflows its dead slot into the entry above; reconcile.
+                self.insert_reconcile(base, size, new_end);
+            } else {
+                self.data[idx] = ShadowObject::new(AllocType::Stack, base, size);
 
-            // retain invalidated padding around object
-            if slot_base < base {
-                self.data.insert(idx + 1, ShadowObject::new(AllocType::Unallocated, slot_base, base - slot_base));
-            }
-            if new_end < slot_end {
-                self.data.insert(idx, ShadowObject::new(AllocType::Unallocated, new_end, slot_end - new_end));
+                // retain invalidated padding around object
+                if slot_base < base {
+                    self.data.insert(idx + 1, ShadowObject::new(AllocType::Unallocated, slot_base, base - slot_base));
+                }
+                if new_end < slot_end {
+                    self.data.insert(idx, ShadowObject::new(AllocType::Unallocated, new_end, slot_end - new_end));
+                }
             }
         }
+        self.assert_descending();
     }
+
+    /// Remove every entry overlapping [lo, hi) from the descending Vec, trimming
+    /// straddlers so the region becomes a clean hole and preserving each survivors
+    /// alloc_type. Returns (hole_idx, reached_top, removed): hole_idx is the
+    /// sorted index the now-empty [lo, hi) region occupies; reached_top is true
+    /// if the removed run reached the stack top (lowest entry) with nothing
+    /// surviving below it; removed is false if the range overlapped nothing.
+    fn clear_interval(&mut self, lo: Vaddr, hi: Vaddr) -> (usize, bool, bool) {
+        let len = self.data.len();
+
+        // first index with base < hi, then extend over the contiguous run that also
+        // reaches above `lo` (an entry overlaps [lo, hi) iff base < hi && end > lo).
+        let start = self.data.partition_point(|o| o.base >= hi);
+        let mut k = start;
+        while k < len && self.data[k].base + self.data[k].size() > lo {
+            k += 1;
+        }
+        if start == k {
+            return (start, false, false); // nothing overlaps; hole belongs at `start`
+        }
+
+        // capture straddler info by value before draining
+        let upper_base  = self.data[start].base;
+        let upper_end = upper_base + self.data[start].size(); // exclusive
+        let upper_ty = self.data[start].alloc_type;
+        let lower_base = self.data[k - 1].base;
+        let lower_ty = self.data[k - 1].alloc_type;
+
+        let upper_straddles = upper_end > hi;
+        let lower_straddles = lower_base < lo;
+        let reached_top = k == len && !lower_straddles;
+
+        if self.data[start..k].iter().any(|o| o.alloc_type != AllocType::Unallocated) {
+            warn!("ShadowStack: reconciled a live entry while resolving [0x{lo:x}, 0x{hi:x}) \
+                   (stale frame or out-of-order alloca)");
+        }
+
+        self.data.drain(start..k);
+
+        let mut ins = start;
+        if upper_straddles {
+            self.data.insert(ins, ShadowObject::new(upper_ty, hi, upper_end - hi));
+            ins += 1;
+        }
+        if lower_straddles {
+            self.data.insert(ins, ShadowObject::new(lower_ty, lower_base, lo - lower_base));
+        }
+
+        (start + upper_straddles as usize, reached_top, true)
+    }
+
+    /// Insert a live sobj spanning [base, new_end) at its sorted
+    /// position, clearing anything it overlaps.
+    fn insert_reconcile(&mut self, base: Vaddr, size: usize, new_end: Vaddr) {
+        let (hole, _, _) = self.clear_interval(base, new_end);
+        self.data.insert(hole, ShadowObject::new(AllocType::Stack, base, size));
+    }
+
+    #[cfg(debug_assertions)]
+    fn assert_descending(&self) {
+        for w in self.data.windows(2) {
+            assert!(w[0].base > w[1].limit,
+                "ShadowStack invariant violated: 0x{:x}..=0x{:x} not strictly above 0x{:x}..=0x{:x}",
+                w[1].base, w[1].limit, w[0].base, w[0].limit);
+        }
+    }
+    #[cfg(not(debug_assertions))]
+    #[inline(always)]
+    fn assert_descending(&self) {}
 
     fn get_at(&self, addr: Vaddr) -> Result<(&ShadowObject, usize), LookupError> {
         use LookupError::*;
@@ -206,41 +295,24 @@ impl ShadowStack {
     /*
         Invalidate the address range [base, base + length).
 
-        `base` and `base + length` must each land exactly on a tracked object
-        boundary. The range may span several whole objects (live or dead), but
-        it may not bisect one. The spanned entries are dropped and replaced by
-        a single dead marker.
+        Clears the range, trimming any entry that straddles a boundary.
+        If the range did not reach the stack top, a single dead marker
+        is left in its place.
      */
     pub fn invalidate_at(&mut self, base: Vaddr, length: usize) {
         if length == 0 { return; }
         let end = base.checked_add(length)
             .expect("invalidate_at: range overflows the address space"); // exclusive
 
-        // entry holding `base` (lowest address in the range)
-        let (start_idx, lo_base) = match self.get_at(base) {
-            Ok((v, idx)) => (idx, v.base),
-            Err(_) => { debug_assert!(false, "invalidate_at: untracked base"); return; }
-        };
-        assert!(lo_base == base,
-            "invalidate_at: range start 0x{base:x} is not an object boundary");
+        let (hole, reached_top, removed) = self.clear_interval(base, end);
 
-        // entry holding `end - 1` (highest address in the range)
-        let (end_idx, hi_end) = match self.get_at(end - 1) {
-            Ok((v, idx)) => (idx, v.base + v.size()),
-            Err(_) => { debug_assert!(false, "invalidate_at: untracked limit"); return; }
-        };
-        assert!(hi_end == end,
-            "invalidate_at: range end 0x{end:x} is not an object boundary");
-
-        debug_assert!(end_idx <= start_idx);
-
-        let was_top = start_idx == self.data.len() - 1;
-        self.data.drain(end_idx..=start_idx);
-
-        // if we didn't reach the top, leave a dead marker for the invalidated range
-        if !was_top {
-            self.data.insert(end_idx, ShadowObject::new(AllocType::Unallocated, base, length));
+        // leave a dead marker only if we cleared real entries below the top;
+        // an already-evicted/untracked range is a silent no-op (stale frame,
+        // double lifetime.end, etc.)
+        if removed && !reached_top {
+            self.data.insert(hole, ShadowObject::new(AllocType::Unallocated, base, length));
         }
+        self.assert_descending();
     }
 
     // TODO: Does it make more sense to return something explicit
@@ -334,6 +406,11 @@ mod tests {
 
     use super::ShadowStack;
 
+    /// (alloc_type, base, size) of each entry, top-of-Vec (highest addr) first.
+    fn layout(s: &ShadowStack) -> Vec<(AllocType, usize, usize)> {
+        s.data.iter().map(|o| (o.alloc_type, o.base, o.size())).collect()
+    }
+
     #[test]
     fn stack_invalidate_top_pops_clean() {
         let mut s = ShadowStack::new();
@@ -400,6 +477,160 @@ mod tests {
         // Neighbors still live
         assert!(s.search_intersection(0x1000).is_some()); // A
         assert!(s.search_intersection(0x0E00).is_some()); // C
+    }
+
+    /// Out-of-order siblings in one frame
+    #[test]
+    fn stack_ascending_siblings_reconcile() {
+        let mut s = ShadowStack::new();
+        s.add_shadow_object(0x1000, 0x10); // a
+        s.add_shadow_object(0x1020, 0x10); // b, above a
+        s.add_shadow_object(0x1010, 0x10); // c, between a and b
+
+        assert_eq!(layout(&s), vec![
+            (AllocType::Stack, 0x1020, 0x10),
+            (AllocType::Stack, 0x1010, 0x10),
+            (AllocType::Stack, 0x1000, 0x10),
+        ]);
+
+        assert_eq!(s.search_intersection(0x1000).unwrap().base, 0x1000);
+        assert_eq!(s.search_intersection(0x1010).unwrap().base, 0x1010);
+        assert_eq!(s.search_intersection(0x1020).unwrap().base, 0x1020);
+        // one-past `b` resolves to `b` (GEP one-past remediation)
+        assert!(s.search_intersection(0x1030).is_some());
+    }
+
+    /// Registration order must not affect the resulting layout: the reconcile
+    /// path produces the same structure as the in-order fast path.
+    #[test]
+    fn stack_order_independent_layout() {
+        let mut asc = ShadowStack::new();
+        asc.add_shadow_object(0x1000, 0x10);
+        asc.add_shadow_object(0x1020, 0x10);
+        asc.add_shadow_object(0x1010, 0x10);
+
+        let mut desc = ShadowStack::new();
+        desc.add_shadow_object(0x1020, 0x10);
+        desc.add_shadow_object(0x1010, 0x10);
+        desc.add_shadow_object(0x1000, 0x10);
+
+        assert_eq!(layout(&asc), layout(&desc));
+    }
+
+    /// A sibling landing in a gap left by a clean append
+    #[test]
+    fn stack_siblings_across_gap() {
+        let mut s = ShadowStack::new();
+        s.add_shadow_object(0x1FE0, 0x10); // B
+        s.add_shadow_object(0x2000, 0x10); // A, above B (push-above)
+        s.add_shadow_object(0x1FC0, 0x10); // D, below B via clean append -> B..D gap
+        s.add_shadow_object(0x1FD0, 0x10); // C, lands in the B..D gap
+
+        assert_eq!(layout(&s), vec![
+            (AllocType::Stack, 0x2000, 0x10),
+            (AllocType::Stack, 0x1FE0, 0x10),
+            (AllocType::Stack, 0x1FD0, 0x10),
+            (AllocType::Stack, 0x1FC0, 0x10),
+        ]);
+    }
+
+    /// A new frame whose alloca spans several stale (un-torn-down) frames: the
+    /// stale entries should be evicted (newest-wins), the outer frame untouched.
+    #[test]
+    fn stack_evict_stale_frames() {
+        let mut s = ShadowStack::new();
+        s.add_shadow_object(0x2000, 0x100); // X, outer (stays live)
+        s.add_shadow_object(0x1100, 0x80);  // S1, stale
+        s.add_shadow_object(0x1080, 0x80);  // S2, stale
+        s.add_shadow_object(0x1000, 0x180); // N spans S1+S2 exactly
+
+        assert_eq!(layout(&s), vec![
+            (AllocType::Stack, 0x2000, 0x100),
+            (AllocType::Stack, 0x1000, 0x180), // 0x1000..=0x117F
+        ]);
+        assert_eq!(s.search_intersection(0x1080).unwrap().base, 0x1000);
+        assert_eq!(s.search_intersection(0x1100).unwrap().base, 0x1000);
+        assert!(s.search_intersection(0x2000).is_some()); // X intact
+    }
+
+    /// New object partially overlaps a stale entry above: that entry's low end is
+    /// trimmed (base moves up), keeping its surviving high portion.
+    #[test]
+    fn stack_trim_straddler() {
+        let mut s = ShadowStack::new();
+        s.add_shadow_object(0x2000, 0x100); // X
+        s.add_shadow_object(0x1100, 0x100); // S1 0x1100..=0x11FF
+        s.add_shadow_object(0x1080, 0x80);  // S2 0x1080..=0x10FF
+        s.add_shadow_object(0x1000, 0x150); // N 0x1000..=0x114F, trims S1's low end
+
+        assert_eq!(layout(&s), vec![
+            (AllocType::Stack, 0x2000, 0x100),
+            (AllocType::Stack, 0x1150, 0xB0),  // S1' 0x1150..=0x11FF
+            (AllocType::Stack, 0x1000, 0x150), // N
+        ]);
+        assert_eq!(s.search_intersection(0x1140).unwrap().base, 0x1000); // N owns it now
+        assert_eq!(s.search_intersection(0x1150).unwrap().base, 0x1150); // trimmed S1'
+    }
+
+    /// Insert far above everything tracked (guards the `start == 0` underflow path).
+    #[test]
+    fn stack_insert_above_all() {
+        let mut s = ShadowStack::new();
+        s.add_shadow_object(0x1000, 0x100); // A
+        s.add_shadow_object(0x3000, 0x10);  // N far above
+
+        assert_eq!(layout(&s), vec![
+            (AllocType::Stack, 0x3000, 0x10),
+            (AllocType::Stack, 0x1000, 0x100),
+        ]);
+    }
+
+    /// New object grows up into the current top, trimming its low end (the upper
+    /// straddler reaches the stack top).
+    #[test]
+    fn stack_trim_top() {
+        let mut s = ShadowStack::new();
+        s.add_shadow_object(0x1000, 0x100); // A 0x1000..=0x10FF
+        s.add_shadow_object(0x0F00, 0x180); // N 0x0F00..=0x107F grows up into A
+
+        assert_eq!(layout(&s), vec![
+            (AllocType::Stack, 0x1080, 0x80),  // A' 0x1080..=0x10FF
+            (AllocType::Stack, 0x0F00, 0x180), // N
+        ]);
+        assert_eq!(s.search_intersection(0x1000).unwrap().base, 0x0F00); // A's low half is N
+        assert_eq!(s.search_intersection(0x1080).unwrap().base, 0x1080); // A' survives
+    }
+
+    /// A lifetime.start re-firing in a loop re-registers the same base/size;
+    /// the layout must stay stable.
+    #[test]
+    fn stack_repeated_lifetime_start_stable() {
+        let mut s = ShadowStack::new();
+        s.add_shadow_object(0x1000, 0x100); // A
+        s.add_shadow_object(0x0F00, 0x80);  // B
+        for _ in 0..3 {
+            s.add_shadow_object(0x0F00, 0x80); // re-register B
+        }
+        assert_eq!(layout(&s), vec![
+            (AllocType::Stack, 0x1000, 0x100),
+            (AllocType::Stack, 0x0F00, 0x80),
+        ]);
+    }
+
+    /// After a reconcile trims a neighbor, a later `invalidate_at` called with the
+    /// *original* (now non-boundary-aligned) bounds must not panic.
+    #[test]
+    fn stack_invalidate_after_trim() {
+        let mut s = ShadowStack::new();
+        s.add_shadow_object(0x2000, 0x100); // X
+        s.add_shadow_object(0x1100, 0x100); // S1
+        s.add_shadow_object(0x1080, 0x80);  // S2
+        s.add_shadow_object(0x1000, 0x150); // N trims S1 -> S1'@0x1150/0xB0
+
+        // S1's original bounds no longer land on a tracked boundary.
+        s.invalidate_at(0x1100, 0x100); // must not panic (boundary-tolerant)
+
+        assert!(s.search_intersection(0x2000).is_some()); // X still live
     }
 
     #[test]
