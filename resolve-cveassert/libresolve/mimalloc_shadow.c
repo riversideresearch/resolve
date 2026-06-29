@@ -1,3 +1,6 @@
+// Copyright (c) 2025 Riverside Research.
+// LGPL-3; See LICENSE.txt in the repo root for details.
+
 #include "mimalloc.h"
 #include "mimalloc/internal.h"
 #include <stdarg.h>
@@ -11,21 +14,27 @@ extern void __resolve_free(void*);
 typedef struct {
   void *base;
   void *limit;
-  size_t block_size;
-  size_t block_index;
-} bounds_info_t;
+  size_t size;
+} mi_alloc_bounds_t;
 
 
-bounds_info_t mi_resolve_ptr(void* p) {
-  // Can return null if ptr is not owned by mimalloc
-  bounds_info_t bounds;
-  mi_page_t *page = _mi_ptr_page(p);
-  if (page == NULL) {
+mi_alloc_bounds_t mi_get_alloc_bounds(void* p) {
+  mi_alloc_bounds_t bounds;
+  mi_alloc_bounds_t empty = { .base = (void*) -1, .limit = (void*)-1, .size = 0 };
+
+  // Check if ptr is owned by mimalloc
+  if (!mi_is_in_heap_region(p)) {
     bounds.base = (void*)0;
     bounds.limit = (void*)0;
-    bounds.block_size = 0;
-    bounds.block_index = 0;
+    bounds.size = 0;
     return bounds;
+  }
+
+  // Recover the page information for the pointer.
+  mi_page_t *page = _mi_ptr_page(p);
+
+  if (page == NULL) {
+    return empty;
   }
   
   const size_t block_size = page->block_size;
@@ -34,12 +43,12 @@ bounds_info_t mi_resolve_ptr(void* p) {
   uintptr_t ptr = (uintptr_t)p;
 
   size_t block_index = (ptr - page_start) / block_size; 
-  uintptr_t base_addr = page_start + block_index * block_size;
+  uintptr_t base = page_start + block_index * block_size;
 
-  bounds.base = (void*)base_addr;
-  bounds.limit = (void*)(base_addr + block_size);
-  bounds.block_size = block_size;
-  bounds.block_index = block_index;
+  void *base_ptr = (void *)base;
+  bounds.base = base_ptr;
+  bounds.size = mi_usable_size(base_ptr);
+  bounds.limit = base_ptr + bounds.size;
   return bounds;
 }
 
@@ -84,7 +93,8 @@ int __vasprintf(char **strp, const char *fmt, va_list ap)
 */
 bool mi_is_block_start(void *p) {
   if (p == NULL) { return false; }
-  // Find the page
+  
+  // Recover page information
   mi_page_t *page = _mi_ptr_page(p);
 
   if (page == NULL) { return false; }
@@ -94,7 +104,7 @@ bool mi_is_block_start(void *p) {
   uintptr_t page_start = (uintptr_t)page->page_start;
   size_t block_index = ((uintptr_t)p - page_start) / block_size;
 
-  // Compute the canonical block base.
+  // Compute the canonical base.
   uintptr_t base = page_start + block_index * block_size;
   
   // Compare to pointer
