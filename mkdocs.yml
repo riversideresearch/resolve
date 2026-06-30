@@ -1,5 +1,5 @@
 site_name: RESOLVE Documentation
-site_url: https://riversideresearch.github.io/resolve
+site_url: https://riversideresearch.github.io/resolve/
 strict: true
 repo_url: https://github.com/riversideresearch/resolve
 edit_uri: edit/main/docs/
@@ -38,6 +38,10 @@ theme:
 copyright: RESOLVE is licensed under L-GPL v3.0
 extra:
   generator: false
+  version:
+    provider: mike
+    alias: true
+    default: latest
   # social:
   #   - icon: fontawesome/brands/github
   #     link: https://github.com/riversideresearch
