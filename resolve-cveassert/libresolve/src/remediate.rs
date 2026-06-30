@@ -7,7 +7,7 @@ use libc::{
 
 use std::ffi::VaList;
 
-use crate::shadowobjs::{ALIVE_OBJ_LIST, AllocType, FREED_OBJ_LIST, Vaddr};
+use crate::shadowobjs::{SHADOW_STACK, ALIVE_OBJ_LIST, AllocType, FREED_OBJ_LIST, Vaddr};
 
 use log::{info, warn};
 
@@ -525,9 +525,49 @@ impl From<&crate::shadowobjs::ShadowObject> for ShadowObjBounds {
 }
 
 /**
- * @brief - Helper function that queries shadow obj list
+ * @brief - Helper function that queries the shadow stack
  *          to find a shadow obj where the ptr fits within
  *          its bounds of allocation 
+ * @input
+ *  - ptr: ptr to allocation 
+ * @return struct containing the base and limit of the
+ *         shadow object as pointers 
+ */
+#[unsafe(no_mangle)]
+pub extern "C" fn __resolve_get_bounds_stack(ptr: *mut c_void) -> ShadowObjBounds {
+    return SHADOW_STACK.with_borrow(
+        |ss| {
+            return match ss.search_intersection(ptr as Vaddr) {
+                Some(sobj) => { sobj.into() }
+                None => { ShadowObjBounds::null() }
+            }
+        }
+    );
+}
+
+/**
+ * @brief - Helper function that queries heap sobj list
+ *          to find a shadow obj where the ptr fits within
+ *          its bounds of allocation 
+ * @input
+ *  - ptr: ptr to allocation 
+ * @return struct containing the base and limit of the
+ *         shadow object as pointers 
+ */
+#[unsafe(no_mangle)]
+pub extern "C" fn __resolve_get_bounds_heap(ptr: *mut c_void) -> ShadowObjBounds {
+    let sobj_table = ALIVE_OBJ_LIST.lock();
+    let Some(sobj) = sobj_table.search_intersection(ptr as Vaddr) else {
+        return ShadowObjBounds::null();
+    };
+
+    return sobj.into();
+}
+
+/**
+ * @brief - Generic sobj lookup where we don't know the pointers
+ *          allocation type already. Searches stack table ( O(log n) )
+ *          before searching the heap table.
  * @input
  *  - ptr: ptr to allocation 
  * @return struct containing the base and limit of the
@@ -540,70 +580,70 @@ pub extern "C" fn __resolve_get_bounds(ptr: *mut c_void) -> ShadowObjBounds {
 
     sobj
 }
-//
-//#[unsafe(no_mangle)]
-//pub extern "C" fn resolve_obj_type(base_ptr: *mut c_void) -> AllocType {
-//    let base = base_ptr as Vaddr;
-//
-//    let find_in = |table: &crate::MutexWrap<crate::shadowobjs::ShadowObjectTable>| {
-//        let t = table.lock();
-//        t.search_intersection(base).map(|o| o.alloc_type)
-//    };
-//
-//    // Why does this search freed before alive?
-//    let alloc_type = find_in(&FREED_OBJ_LIST).or_else(|| find_in(&ALIVE_OBJ_LIST));
-//
-//    alloc_type.unwrap_or(AllocType::Unknown)
-//}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn resolve_obj_type(base_ptr: *mut c_void) -> AllocType {
+    let base = base_ptr as Vaddr;
+
+    let find_in = |table: &crate::MutexWrap<crate::shadowobjs::ShadowObjectTable>| {
+        let t = table.lock();
+        t.search_intersection(base).map(|o| o.alloc_type)
+    };
+
+    // Why does this search freed before alive?
+    let alloc_type = find_in(&FREED_OBJ_LIST).or_else(|| find_in(&ALIVE_OBJ_LIST));
+
+    alloc_type.unwrap_or(AllocType::Unknown)
+}
 
 /**
  * @brief - Logs when program enters sanitization basic block
  */
 #[unsafe(no_mangle)]
 pub extern "C" fn __resolve_report_violation() -> () {
-    // info!("[RESOLVE] sanitizer triggered");
+    info!("[RESOLVE] sanitizer triggered");
 }
 
-//#[cfg(test)]
-//mod tests {
-//   use super::*;
-//   use crate::{resolve_init, shadowobjs::AllocType};
-//
-//   #[test]
-//   fn test_malloc_free() {
-//       resolve_init();
-//       // Allocation should successfully return a memory block
-//       let ptr = __resolve_malloc(0x10);
-//       assert!(!ptr.is_null());
-//
-//       // We should track the obj correctly
-//       {
-//           let table = ALIVE_OBJ_LIST.lock();
-//           let obj = table.search_intersection(ptr as Vaddr);
-//
-//           assert!(obj.is_some());
-//           let obj = obj.unwrap();
-//           assert!(obj.size() == 0x10);
-//           assert!(obj.base == ptr as Vaddr);
-//           assert!(obj.alloc_type == AllocType::Heap);
-//       }
-//
-//       __resolve_free(ptr);
-//
-//       // After freeing a block we should track that it has been freed
-//       {
-//           let table = FREED_OBJ_LIST.lock();
-//           let obj = table.search_intersection(ptr as Vaddr);
-//
-//           assert!(obj.is_some());
-//       }
-//
-//       // And it should no longer be in the alive obj list.
-//       {
-//           let table = ALIVE_OBJ_LIST.lock();
-//           let obj = table.search_intersection(ptr as Vaddr);
-//
-//           assert!(obj.is_none());
-//       }
-//   }
-//}
+// #[cfg(test)]
+// mod tests {
+//     use super::*;
+//     use crate::{resolve_init, shadowobjs::AllocType};
+
+//     #[test]
+//     fn test_malloc_free() {
+//         resolve_init();
+//         // Allocation should successfully return a memory block
+//         let ptr = __resolve_malloc(0x10);
+//         assert!(!ptr.is_null());
+
+//         // We should track the obj correctly
+//         {
+//             let table = ALIVE_OBJ_LIST.lock();
+//             let obj = table.search_intersection(ptr as Vaddr);
+
+//             assert!(obj.is_some());
+//             let obj = obj.unwrap();
+//             assert!(obj.size() == 0x10);
+//             assert!(obj.base == ptr as Vaddr);
+//             assert!(obj.alloc_type == AllocType::Heap);
+//         }
+
+//         __resolve_free(ptr);
+
+//         // After freeing a block we should track that it has been freed
+//         {
+//             let table = FREED_OBJ_LIST.lock();
+//             let obj = table.search_intersection(ptr as Vaddr);
+
+//             assert!(obj.is_some());
+//         }
+
+//         // And it should no longer be in the alive obj list.
+//         {
+//             let table = ALIVE_OBJ_LIST.lock();
+//             let obj = table.search_intersection(ptr as Vaddr);
+
+//             assert!(obj.is_none());
+//         }
+//     }
+// }
