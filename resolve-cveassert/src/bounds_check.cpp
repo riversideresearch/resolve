@@ -134,8 +134,8 @@ static Function *getOrCreateAccessOk(Module *M, BoundsClass cls) {
   Value *basePtr = resolveAccessOkFn->getArg(0);
   Value *accessSize = resolveAccessOkFn->getArg(1);
 
-  Value *baseAndLimit =
-      builder.CreateCall(getOrCreateResolveGetBounds(M, cls), {basePtr});
+  Value *baseAndLimit = builder.CreateCall(getOrCreateResolveGetBounds(M, cls),
+                                           {basePtr}, "resolve.bounds");
   Value *limitValue = builder.CreateExtractValue(baseAndLimit, 1);
   Value *limitInt = builder.CreatePtrToInt(limitValue, size_ty);
   Value *baseInt = builder.CreatePtrToInt(basePtr, size_ty);
