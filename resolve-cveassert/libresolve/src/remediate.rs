@@ -665,21 +665,21 @@ pub extern "C" fn __resolve_get_bounds(ptr: *mut c_void) -> ShadowObjBounds {
 
     sobj
 }
-//
-//#[unsafe(no_mangle)]
-//pub extern "C" fn resolve_obj_type(base_ptr: *mut c_void) -> AllocType {
-//    let base = base_ptr as Vaddr;
-//
-//    let find_in = |table: &crate::MutexWrap<crate::shadowobjs::ShadowObjectTable>| {
-//        let t = table.lock();
-//        t.search_intersection(base).map(|o| o.alloc_type)
-//    };
-//
-//    // Why does this search freed before alive?
-//    let alloc_type = find_in(&FREED_OBJ_LIST).or_else(|| find_in(&ALIVE_OBJ_LIST));
-//
-//    alloc_type.unwrap_or(AllocType::Unknown)
-//}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn resolve_obj_type(base_ptr: *mut c_void) -> AllocType {
+    let base = base_ptr as Vaddr;
+
+    let find_in = |table: &crate::MutexWrap<crate::shadowobjs::ShadowObjectTable>| {
+        let t = table.lock();
+        t.search_intersection(base).map(|o| o.alloc_type)
+    };
+
+    // Why does this search freed before alive?
+    let alloc_type = find_in(&FREED_OBJ_LIST).or_else(|| find_in(&ALIVE_OBJ_LIST));
+
+    alloc_type.unwrap_or(AllocType::Unknown)
+}
 
 /**
  * @brief - Logs invalid memory access for a given function
