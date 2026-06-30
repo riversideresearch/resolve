@@ -134,19 +134,30 @@ void instrumentAlloca(Function *F) {
     Function *F = transformedAlloca->getFunction();
     BasicBlock &entryBB = F->getEntryBlock();
     Instruction *insertPt = &*entryBB.getFirstInsertionPt();
+    GetElementPtrInst *Gep;
     builder.SetInsertPoint(insertPt);
     AllocaInst *shadowSlot =
         builder.CreateAlloca(shadowTy, nullptr, "shadow.slot");
     Value *initialPtrField = builder.CreateStructGEP(shadowTy, shadowSlot, 0);
     builder.CreateStore(ConstantPointerNull::get(ptr_ty), initialPtrField);
     Value *initialSizeField = builder.CreateStructGEP(shadowTy, shadowSlot, 1);
+    Gep = cast<GetElementPtrInst>(initialPtrField);
+    Gep->setMetadata("cve.noinstrument", MDNode::get(Ctx, {}));
     builder.CreateStore(ConstantInt::get(size_ty, 0), initialSizeField);
     builder.SetInsertPoint(transformedAlloca->getNextNonDebugInstruction());
+
     Value *runtimePtrField = builder.CreateStructGEP(shadowTy, shadowSlot, 0);
+    Gep = cast<GetElementPtrInst>(runtimePtrField);
+    Gep->setMetadata("cve.noinstrument", MDNode::get(Ctx, {}));
+
     StoreInst *storeStackAddr =
         builder.CreateStore(transformedAlloca, runtimePtrField);
     storeStackAddr->setMetadata("cve.noinstrument", MDNode::get(Ctx, {}));
+
     Value *runtimeSizeField = builder.CreateStructGEP(shadowTy, shadowSlot, 1);
+    Gep = cast<GetElementPtrInst>(runtimeSizeField);
+    Gep->setMetadata("cve.noinstrument", MDNode::get(Ctx, {}));
+
     StoreInst *storeStackSize =
         builder.CreateStore(totalSize, runtimeSizeField);
     storeStackSize->setMetadata("cve.noinstrument", MDNode::get(Ctx, {}));
