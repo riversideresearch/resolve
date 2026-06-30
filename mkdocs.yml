@@ -46,3 +46,28 @@ markdown_extensions:
   - admonition
   - pymdownx.details
   - pymdownx.superfences
+
+nav:
+  - Home: index.md
+  - Installation: installation.md
+  - Concepts:
+    - Overview: concepts/overview.md
+    - ESBOM: concepts/esbom.md
+    - Vulnerabilities.json: concepts/vulnerabilities-json.md
+    - Facts: components/facts.md
+  - Components:
+    - Resolve CLI:
+      - Overview: components/resolve-cli/resolve-cli.md
+      - SBOM: components/resolve-cli/sbom.md
+      - Crash Analyzer: components/resolve-cli/crash-analyzer.md
+      - Input Synthesis: components/resolve-cli/input-synthesis.md
+    - Libresolve: components/libresolve.md
+    - Reach: components/reach.md
+    - CVEAssert: components/resolve-cveassert.md
+    - ResolveCC: components/resolve-cc.md
+  - Examples:
+    - Input Synthesis: examples/input-synthesis.md
+    - Reachability: examples/reachability.md
+    - Remediation: examples/remediation.md
+  - Development:
+    - Building From Source: development/building-from-source.md

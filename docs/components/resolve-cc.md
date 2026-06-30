@@ -44,3 +44,17 @@ EXAMPLES:
     resolvecc -fno-resolve test.c 
     resolvecc -c test.c
 ```
+
+## Additional Passes
+
+The `AnnotateFunctions` pass plugin inserts inline runtime monitors to collect function activation metadata during offline analysis. The inserted inline monitor links against `libresolve`, a runtime library that records activation summaries to files.
+
+`DlsymHook` instruments calls to `dlysm`. `ObjHook` instruments C memory allocators. These pass plugins must be linked against `libresolve`.   
+
+| LLVM Pass | Behavior |
+| --- | --- |
+| `AnnotateFunctions` | Insert code to record function activations |
+| `CVEAssert` | Given `.json` CVE description, insert runtime checks into affected function | 
+| `DlsymHook` | Instrument 'dlsym' function calls |
+| `EnhancedFacts` | Embed facts derived from program source code into custom ELF sections |
+| `ObjHook` | Instrument C memory allocators |

@@ -1,4 +1,5 @@
 # CVEAssert
+
 CVEAssert is an LLVM compiler pass plugin that instruments programs 
 by inserting runtime checks into functions identified by a CVE description. 
 It consumes a CVE description encoded in JSON, which is parsed into
@@ -6,12 +7,14 @@ an internal representation containing the affected source file, affected functio
 CWE identifier, and remediation strategy. Based on this
 description, CVEAssert selects and applies the appropriate sanitizer
 to each affected function. CVEAssert can optionally be linked with
-the [`libresolve`](libresolve/README.md) runtime library to enforce stack and heap bounds protections. The pass is executed early in the compilation pipeline to allow LLVM's analysis and optimization framework to optimize the injected instrumentation. 
+the [`libresolve`](/components/libresolve) runtime library to enforce stack and heap bounds protections. The pass is executed early in the compilation pipeline to allow LLVM's analysis and optimization framework to optimize the injected instrumentation. 
 
 ## Architecture Diagram
-![CVEAssert pipeline](docs/images/cveassert_pipeline.png)
+
+![CVEAssert pipeline](../assets/cveassert_pipeline.png)
 
 ## Types of Sanitizers
+
 | Type | Sanitizer |
 | --- | --- |
 | Arithmetic | Divide by Zero|
@@ -23,6 +26,7 @@ the [`libresolve`](libresolve/README.md) runtime library to enforce stack and he
 | Other | Operation Masking | 
 
 ## Directory Structure
+
 ```bash
 .
 ├── arith_san.cpp     - Source code for arithmetic sanitizers (i.e. divide by zero, integer overflow)
@@ -34,6 +38,7 @@ the [`libresolve`](libresolve/README.md) runtime library to enforce stack and he
 └── Vulnerability.hpp - Source code for internal data structure to parse CVE description
 ```
 ## Supported Sanitizers 
+
 | Sanitizer | Behavior | 
 | --- | --- |
 | Divide by Zero | Instruments division and remainder operations with runtime checks that remediate when the divisor is zero. |
@@ -43,26 +48,45 @@ the [`libresolve`](libresolve/README.md) runtime library to enforce stack and he
 | Null Pointer Dereference | Instruments pointer `load` and `store` instructions with runtime checks that check for null dereference. |
 | Operation Masking | Replaces selected 'undesirable' function calls with guarded calls that validate operands before execution. |
 | Free Nonheap | Instruments calls to `free` with runtime checks that ensure argument is a heap-allocated pointer. |
-> [!NOTE]
-> The CVE description must include an `undesirable-function` field
-> for the Operation Masking sanitizer to be applied. If this field
-> is not present, Operation Masking is not enabled. 
 
-> [!NOTE]
-> Here is a table of weakness identifiers and alternatives that can be used to
-> activate specific sanitizers.
-> | Weakness Identifiers | Sanitizer |
-> | --- | --- |
-> | `190` | Integer Overflow | 
-> | `369` | Divide by Zero |
-> | `476` | Null Pointer Dereference |
-> | `590` | Free Nonheap |
-> | `121` | Stack OOB |
-> | `122` | Heap OOB | 
+!!! note
+    The CVE description must include an `undesirable-function` field
+    for the Operation Masking sanitizer to be applied. If this field
+    is not present, Operation Masking is not enabled. 
 
-> [!NOTE]
-> Stack and heap can also activated simultaneously with 
-> these weakness identifiers `123`,`125`,`131`, `797`.  
+## Supported Values
+Here is a table of weakness identifiers and alternatives that can be used to
+activate specific sanitizers.
+
+### Common Mappings
+
+| Weakness Identifiers | Sanitizer |
+| --- | --- |
+| `190` | Integer Overflow | 
+| `369` | Divide by Zero |
+| `476` | Null Pointer Dereference |
+| `590` | Free Nonheap |
+| `121` | Stack OOB |
+| `122` | Heap OOB | 
+
+!!! note
+    Stack and heap can be activated simultaneously with 
+    these weakness identifiers `123`,`125`,`131`, `787`. See "Additional Mappings" below 
+    for other supported ids
+
+### Additional Mappings
+
+CVEAssert recognizes a handful of other `cwe-id` values for compatibility purposes, see below mapping: 
+
+| Weakness Identifiers | Sanitizer |
+| --- | --- |
+| `0` | Enables Everything | 
+| `123` | Write What Where | 
+| `119` | OOB | 
+| `787` | OOB Write | 
+| `125` | OOB Read | 
+| `131` | Incorrect Buffer Size | 
+| `1335` | Incorrect Bitwise Shift |  
 
 ## Remediation Strategies
 Remediation strategies define how sanitizers respond to detected errors encountered at runtime. 
@@ -77,30 +101,34 @@ Remediation strategies define how sanitizers respond to detected errors encounte
 | Widen | Widen potentially overflowing intermediate operations |
 | Wrap | Use 2's complement arithmetic | 
 
-> [!WARNING]
-> The default remediation stategy 
-> for arithmetic sanitizers is **`Wrap`**, both when 
-> no strategy is specified and when
-> an invalid sanitizer-strategy combination
-> is encountered.
+### Defaults
 
-> [!WARNING]
-> The default remediation strategy for
-> memory sanitizers is **`Continue`**, both when no
-> strategy is specified and when an invalid 
-> sanitizer-strategy combination is encountered.
+#### Arithmetic
 
-> [!NOTE]
-> If the divide by zero sanitizer is selected
-> with the continue strategy, undefined
-> results will return the dividend. 
+The default remediation stategy 
+for arithmetic sanitizers is **`Wrap`**, both when 
+no strategy is specified and when
+an invalid sanitizer-strategy combination
+is encountered.
 
-> [!NOTE]
-> Unlike the other strategies, **`RECOVER`** is semi-automatic.
-> This strategy requires the programmer to insert a
-> *jmp_buf* construct within the program and insert 
-> additional logic to cause the program to call setjmp
-> to transfer control to a recovery handler.
+!!! note
+    If the divide by zero sanitizer is selected
+    with the continue strategy, undefined
+    results will return the dividend. 
+
+#### Memory
+
+The default remediation strategy for
+memory sanitizers is **`Continue`**, both when no
+strategy is specified and when an invalid 
+sanitizer-strategy combination is encountered.
+
+!!! note
+    Unlike the other strategies, **`RECOVER`** is semi-automatic.
+    This strategy requires the programmer to insert a
+    *jmp_buf* construct within the program and insert 
+    additional logic to cause the program to call setjmp
+    to transfer control to a recovery handler.
 
 ## Example 
 ```C
@@ -293,6 +321,6 @@ is allowed to proceed.
 At function exit, the compiler inserts a call to `resolve_invalidate_stack` to mirror
 stack unwinding by invalidating the corresponding shadow objects.    
 
-
 ## Testing
-To verify correct IR transformations and binary behavior, we developed a testing suite with regression testing. The suite contains testcases for each sanitizer and tests that the resulting binaries perform the intended behaviors with and without the remediation instrumentation. The testing suite can be found in [`resolve-cveassert/tests`](/resolve-cveassert/tests) and the tests can be executed by calling `make test`. 
+
+To verify correct IR transformations and binary behavior, we developed a testing suite with regression testing. The suite contains testcases for each sanitizer and tests that the resulting binaries perform the intended behaviors with and without the remediation instrumentation. The testing suite can be found in [`resolve-cveassert/tests`](https://github.com/riversideresearch/resolve/tree/main/resolve-cveassert/tests) and the tests can be executed by calling `make test`.
