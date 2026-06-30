@@ -41,11 +41,11 @@ getOrCreateNullPtrLoadSanitizer(Function *F, Type *ty,
 
   BasicBlock *EntryBB = BasicBlock::Create(Ctx, "entry", resolveNullPtrLdFn);
   BasicBlock *CheckIfNullBB =
-      BasicBlock::Create(Ctx, "check_if_null", resolveNullPtrLdFn);
+      BasicBlock::Create(Ctx, "check.null", resolveNullPtrLdFn);
   BasicBlock *SanitizeNullPtrBB =
-      BasicBlock::Create(Ctx, "sanitize_null_ptr", resolveNullPtrLdFn);
+      BasicBlock::Create(Ctx, "sanitize.load", resolveNullPtrLdFn);
   BasicBlock *NormalLoadBB =
-      BasicBlock::Create(Ctx, "safe_load", resolveNullPtrLdFn);
+      BasicBlock::Create(Ctx, "safe.load", resolveNullPtrLdFn);
 
   builder.SetInsertPoint(EntryBB);
   Argument *inputPtr = resolveNullPtrLdFn->getArg(0);
@@ -110,11 +110,11 @@ static Function *getOrCreateNullPtrStoreSanitizer(
 
   BasicBlock *EntryBB = BasicBlock::Create(Ctx, "entry", resolveNullPtrStFn);
   BasicBlock *CheckIfNullBB =
-      BasicBlock::Create(Ctx, "check_if_null", resolveNullPtrStFn);
+      BasicBlock::Create(Ctx, "check.null", resolveNullPtrStFn);
   BasicBlock *SanitizeNullPtrBB =
-      BasicBlock::Create(Ctx, "sanitize_null_ptr", resolveNullPtrStFn);
+      BasicBlock::Create(Ctx, "sanitize.store", resolveNullPtrStFn);
   BasicBlock *NormalStoreBB =
-      BasicBlock::Create(Ctx, "safe_store", resolveNullPtrStFn);
+      BasicBlock::Create(Ctx, "safe.store", resolveNullPtrStFn);
 
   // Set insertion point to entry block
   builder.SetInsertPoint(EntryBB);

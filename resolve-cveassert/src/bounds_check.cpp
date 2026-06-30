@@ -190,7 +190,7 @@ static Function *getOrCreateBoundsCheckLoadSanitizer(
   BasicBlock *NormalLoadBB =
       BasicBlock::Create(Ctx, "safe.load", resolveLoadFn);
   BasicBlock *SanitizeLoadBB =
-      BasicBlock::Create(Ctx, "trap.load", resolveLoadFn);
+      BasicBlock::Create(Ctx, "sanitize.load", resolveLoadFn);
 
   builder.SetInsertPoint(EntryBB);
   Value *basePtr = resolveLoadFn->getArg(0);
@@ -254,7 +254,7 @@ static Function *getOrCreateBoundsCheckStoreSanitizer(
   BasicBlock *NormalStoreBB =
       BasicBlock::Create(Ctx, "safe.store", resolveStoreFn);
   BasicBlock *SanitizeStoreBB =
-      BasicBlock::Create(Ctx, "trap.store", resolveStoreFn);
+      BasicBlock::Create(Ctx, "sanitize.store", resolveStoreFn);
 
   builder.SetInsertPoint(EntryBB);
   Value *basePtr = resolveStoreFn->getArg(0);
@@ -317,7 +317,7 @@ static Function *getOrCreateBoundsCheckMemcpySanitizer(
   BasicBlock *NormalBB =
       BasicBlock::Create(Ctx, "safe.memcpy", resolveMemmoveFn);
   BasicBlock *SanitizeMemcpyBB =
-      BasicBlock::Create(Ctx, "trap.memcpy", resolveMemmoveFn);
+      BasicBlock::Create(Ctx, "sanitize.memcpy", resolveMemmoveFn);
 
   builder.SetInsertPoint(EntryBB);
   // Extract dst, src, size arguments from function
@@ -387,7 +387,7 @@ static Function *getOrCreateBoundsCheckMemmoveSanitizer(
   BasicBlock *NormalBB =
       BasicBlock::Create(Ctx, "safe.memmove", resolveMemmoveFn);
   BasicBlock *SanitizeMemmoveBB =
-      BasicBlock::Create(Ctx, "trap.memmove", resolveMemmoveFn);
+      BasicBlock::Create(Ctx, "sanitize.memmove", resolveMemmoveFn);
 
   builder.SetInsertPoint(EntryBB);
   // Extract dst, src, size arguments from function
@@ -458,7 +458,7 @@ static Function *getOrCreateBoundsCheckMemsetSanitizer(
   BasicBlock *NormalBB =
       BasicBlock::Create(Ctx, "safe.memset", resolveMemsetFn);
   BasicBlock *SanitizeMemsetBB =
-      BasicBlock::Create(Ctx, "trap.memset", resolveMemsetFn);
+      BasicBlock::Create(Ctx, "sanitize.memset", resolveMemsetFn);
 
   builder.SetInsertPoint(EntryBB);
   // Extract arguments for memset
