@@ -8,4 +8,4 @@
 Libresolve is a runtime library that tracks object allocations using shadow
 memory objects. It is primarily designed for the **RESOLVE toolchain**.
 
-**Full documentation:** <https://riversideresearch.github.io/resolve/components/libresolve/>
+**Full documentation:** <https://riversideresearch.github.io/resolve/latest/components/libresolve/>

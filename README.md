@@ -12,4 +12,4 @@
 
 **RESOLVE** is an LLVM-based software security tool designed to anticipate, triage and remediate CVEs. It combines binary metadata based on enhanced software bills-of-material, or eSBOMs, with runtime components and program analysis tools that together speed up the process of identifying and remediating bugs.
 
-Please see our [documentation website](https://riversideresearch.github.io/resolve) for [installation](https://riversideresearch.github.io/resolve/installation) and [usage](https://riversideresearch.github.io/resolve/getting-started).
+Please see our [documentation website](https://riversideresearch.github.io/resolve) for [installation](https://riversideresearch.github.io/resolve/latest/installation/) and [usage](https://riversideresearch.github.io/resolve/latest/components/resolve-cli/resolve-cli/).
