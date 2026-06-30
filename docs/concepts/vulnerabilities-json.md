@@ -30,4 +30,4 @@ The basic format is like this:
 }
 ```
 
-For information on choosing a `cwe-id`, see [supported ids](../../components/resolve-cveassert/#common-mappings).
+For information on choosing a `cwe-id`, see [supported ids](../components/resolve-cveassert.md#common-mappings).

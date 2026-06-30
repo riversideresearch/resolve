@@ -2,6 +2,41 @@
 
 `resolve-cli` is the primary user interface to **RESOLVE**.
 
+## Setup
+
+The overall RESOLVE build/install workflow places the RESOLVE cli tools in the install prefix.
+If a python installation does not already exist there, a pseudo python virtual environment is created, allowing use like so:
+
+```bash
+/opt/resolve/bin/resolve --help
+/opt/resolve/bin/resolve input-synthesis setup ...
+
+/opt/resolve/bin/python3 -m resolve.input_synthesis ...
+```
+
+```python
+#!/opt/resolve/bin/python3
+from resolve.reach import Orchestrator;
+o = Orchestrator(...).main()
+print(o.results)
+```
+
+Alternatively, use a virtual environment for iterative local development:
+
+```bash
+# Get uv if you need it
+# curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# create a virtual environment, install deps, install resolve cli
+uv sync
+# activate the env
+source .venv/activate
+
+python3 -m resolve ...
+```
+
+## Subcommands
+
 The RESOLVE cli is implemented as a collection of subcommands where `resolve <subcommand> [args...]` runs `resolve-<subcommand> [args...]`
 
 The current subcommands are as follows:
