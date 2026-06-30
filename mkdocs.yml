@@ -1,5 +1,6 @@
 site_name: RESOLVE Documentation
 site_url: https://riversideresearch.github.io/resolve
+strict: true
 repo_url: https://github.com/riversideresearch/resolve
 edit_uri: edit/main/docs/
 theme:
@@ -45,7 +46,11 @@ extra:
 markdown_extensions:
   - admonition
   - pymdownx.details
-  - pymdownx.superfences
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
 
 nav:
   - Home: index.md

@@ -51,9 +51,9 @@ This method uses `gemma3` as the model.
 ## Design Considerations
 
 This codebase is designed to use async networking for its API requests. Real-world projects are expected to have many dependencies,
-and the NIST and MITRE APIs are not fast. The async model allows us to dispatch requests in parallelinmprove execution speed. 
+and the NIST and MITRE APIs are not fast. The async model allows us to dispatch requests in parallel to improve execution speed. 
 
 Unfortunately, for now, the LLM interactions are synchronous and execute one-at-a-time.
 
-This project uses `pydantic` models to represent the [schemas](schema/README.md) for the [APIs](schema_defs/README.md) it interacts with.
+This project uses `pydantic` models to represent the [schemas](https://github.com/riversideresearch/resolve/blob/main/resolve-cli/src/resolve/sbom/schema/README.md) for the [APIs](https://github.com/riversideresearch/resolve/blob/main/resolve-cli/src/resolve/sbom/schema_defs/README.md) it interacts with.
 See the relevant documentation for details.
