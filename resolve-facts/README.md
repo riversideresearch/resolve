@@ -9,5 +9,5 @@ Tools for creating and querying RESOLVE binary metadata, including the `reach` t
 
 **Full documentation:**
 
-- Facts: <https://riversideresearch.github.io/resolve/components/facts/>
-- `reach` tool: <https://riversideresearch.github.io/resolve/components/reach/>
+- Facts: <https://riversideresearch.github.io/resolve/latest/components/facts/>
+- `reach` tool: <https://riversideresearch.github.io/resolve/latest/components/reach/>

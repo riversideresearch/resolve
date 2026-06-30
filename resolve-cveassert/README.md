@@ -10,4 +10,4 @@ runtime checks into functions identified by a CVE description. It can optionally
 be linked with the [`libresolve`](libresolve/README.md) runtime library to
 enforce stack and heap bounds protections.
 
-**Full documentation:** <https://riversideresearch.github.io/resolve/components/resolve-cveassert/>
+**Full documentation:** <https://riversideresearch.github.io/resolve/latest/components/resolve-cveassert/>
