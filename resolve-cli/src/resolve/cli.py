@@ -1,4 +1,4 @@
-# Copyright (c) 2025 Riverside Research.
+# Copyright (c) 2025-2026 Riverside Research.
 # LGPL-3; See LICENSE.txt in the repo root for details.
 
 import argparse
@@ -47,10 +47,15 @@ def subcommand_cli(program: str):
     parser = argparse.ArgumentParser(prog=program, add_help=False)
     parser.add_argument("subcommand", nargs="?", metavar="subcommand")
     parser.add_argument("-h", "--help", action="store_true")
+    parser.add_argument("-V", "--version", action="store_true")
     parser.add_argument("args", nargs=argparse.REMAINDER)
 
     def show_help():
         parser.print_usage()
+        print()
+        print("built-in commands:")
+        print("  help [subcommand]")
+        print("  version")
         print()
         print("available subcommands:")
         for name in sorted(subcommands):
@@ -66,6 +71,12 @@ def subcommand_cli(program: str):
 
 
     args = parser.parse_args()
+
+    if args.version or args.subcommand == "version":
+        from resolve.version import get_version
+
+        print(get_version())
+        return 0
 
     if args.help or not args.subcommand:
         show_help()

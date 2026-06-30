@@ -36,6 +36,17 @@ curl -fL https://github.com/riversideresearch/resolve/releases/latest/download/r
 !!! note
     This one-liner syntax assumes you have `curl` and `ca-certificates` already installed. 
 
+## Versioning
+
+This documentation site is versioned alongside RESOLVE GitHub releases. Use the navbar dropdown to select the correct version of the docs that corresponds with the output of:
+
+```bash
+resolve version
+```
+
+!!! note
+    If you just installed RESOLVE, the "latest" version of these docs is probably what you want (and might already be reading).
+
 ## Building from source
 
 See [building RESOLVE from source](development/building-from-source.md) for information on building **RESOLVE** binaries.
