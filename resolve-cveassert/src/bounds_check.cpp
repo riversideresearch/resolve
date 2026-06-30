@@ -6,6 +6,7 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/Analysis/CaptureTracking.h"
+#include "llvm/Analysis/ValueTracking.h"
 #include "llvm/IR/Attributes.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/IRBuilder.h"
@@ -24,7 +25,47 @@
 
 using namespace llvm;
 
-static FunctionCallee getOrCreateResolveGetBounds(Module *M) {
+/// Static classification of a pointer's underlying allocation.
+/// Used for resolving stack/heap specific sobj lookups when
+/// getUnderlyingObject (classifyPointer) provides a definitive answer.
+enum class BoundsClass { Stack, Heap, Generic };
+
+static const char *classTag(BoundsClass cls) {
+  switch (cls) {
+  case BoundsClass::Stack:
+    return "stack";
+  case BoundsClass::Heap:
+    return "heap";
+  default:
+    return "generic";
+  }
+}
+
+/// Walks the pointer's def chain (through GEPs/casts) to its underlying object
+/// and classifies it.
+static BoundsClass classifyPointer(const Value *ptr) {
+  const Value *obj = getUnderlyingObject(ptr);
+
+  if (isa<AllocaInst>(obj)) {
+    return BoundsClass::Stack;
+  }
+
+  if (auto *call = dyn_cast<CallInst>(obj)) {
+    if (Function *callee = call->getCalledFunction()) {
+      StringRef n = callee->getName();
+      if (n == "malloc" || n == "calloc" || n == "realloc" || n == "strdup" ||
+          n == "strndup" || n == "__resolve_malloc" ||
+          n == "__resolve_calloc" || n == "__resolve_realloc" ||
+          n == "__resolve_strdup" || n == "__resolve_strndup") {
+        return BoundsClass::Heap;
+      }
+    }
+  }
+
+  return BoundsClass::Generic;
+}
+
+static FunctionCallee getOrCreateResolveGetBounds(Module *M, BoundsClass cls) {
   auto &Ctx = M->getContext();
   auto ptr_ty = PointerType::get(Ctx, 0);
   auto struct_ty = StructType::get(Ctx, {ptr_ty, ptr_ty}, false);
@@ -39,13 +80,25 @@ static FunctionCallee getOrCreateResolveGetBounds(Module *M) {
   AttributeList attrs =
       AttributeList::get(Ctx, AttributeList::FunctionIndex, FnAttrs);
 
-  return M->getOrInsertFunction("__resolve_get_bounds",
-                                FunctionType::get(struct_ty, {ptr_ty}, false),
-                                attrs);
+  const char *name;
+  switch (cls) {
+  case BoundsClass::Stack:
+    name = "__resolve_get_bounds_stack";
+    break;
+  case BoundsClass::Heap:
+    name = "__resolve_get_bounds_heap";
+    break;
+  default:
+    name = "__resolve_get_bounds";
+    break;
+  }
+
+  return M->getOrInsertFunction(
+      name, FunctionType::get(struct_ty, {ptr_ty}, false), attrs);
 }
 
-static Function *getOrCreateAccessOk(Module *M) {
-  std::string handlerName = "__cve_access_ok";
+static Function *getOrCreateAccessOk(Module *M, BoundsClass cls) {
+  std::string handlerName = std::string("__cve_access_ok_") + classTag(cls);
   LLVMContext &Ctx = M->getContext();
 
   IRBuilder<> builder(Ctx);
@@ -82,7 +135,7 @@ static Function *getOrCreateAccessOk(Module *M) {
   Value *accessSize = resolveAccessOkFn->getArg(1);
 
   Value *baseAndLimit =
-      builder.CreateCall(getOrCreateResolveGetBounds(M), {basePtr});
+      builder.CreateCall(getOrCreateResolveGetBounds(M, cls), {basePtr});
   Value *limitValue = builder.CreateExtractValue(baseAndLimit, 1);
   Value *limitInt = builder.CreatePtrToInt(limitValue, size_ty);
   Value *baseInt = builder.CreatePtrToInt(basePtr, size_ty);
@@ -109,8 +162,10 @@ static Function *getOrCreateAccessOk(Module *M) {
 }
 
 static Function *getOrCreateBoundsCheckLoadSanitizer(
-    Function *F, Type *ty, Vulnerability::RemediationStrategies strategy) {
-  std::string handlerName = "__cve_bound_ld_" + getLLVMType(ty);
+    Function *F, Type *ty, Vulnerability::RemediationStrategies strategy,
+    BoundsClass cls) {
+  std::string handlerName =
+      "__cve_bound_ld_" + getLLVMType(ty) + "_" + classTag(cls);
   Module *M = F->getParent();
   LLVMContext &Ctx = M->getContext();
 
@@ -143,7 +198,7 @@ static Function *getOrCreateBoundsCheckLoadSanitizer(
 
   builder.SetInsertPoint(CheckAccessBB);
   Value *withinBounds = builder.CreateCall(
-      getOrCreateAccessOk(M), {basePtr, ConstantExpr::getSizeOf(ty)});
+      getOrCreateAccessOk(M, cls), {basePtr, ConstantExpr::getSizeOf(ty)});
 
   builder.CreateCondBr(withinBounds, NormalLoadBB, SanitizeLoadBB);
 
@@ -168,8 +223,10 @@ static Function *getOrCreateBoundsCheckLoadSanitizer(
 }
 
 static Function *getOrCreateBoundsCheckStoreSanitizer(
-    Function *F, Type *ty, Vulnerability::RemediationStrategies strategy) {
-  std::string handlerName = "__cve_bound_st_" + getLLVMType(ty);
+    Function *F, Type *ty, Vulnerability::RemediationStrategies strategy,
+    BoundsClass cls) {
+  std::string handlerName =
+      "__cve_bound_st_" + getLLVMType(ty) + "_" + classTag(cls);
   Module *M = F->getParent();
   LLVMContext &Ctx = M->getContext();
 
@@ -207,7 +264,7 @@ static Function *getOrCreateBoundsCheckStoreSanitizer(
 
   builder.SetInsertPoint(CheckAccessBB);
   Value *withinBounds = builder.CreateCall(
-      getOrCreateAccessOk(M), {basePtr, ConstantExpr::getSizeOf(ty)});
+      getOrCreateAccessOk(M, cls), {basePtr, ConstantExpr::getSizeOf(ty)});
 
   builder.CreateCondBr(withinBounds, NormalStoreBB, SanitizeStoreBB);
 
@@ -231,8 +288,10 @@ static Function *getOrCreateBoundsCheckStoreSanitizer(
 }
 
 static Function *getOrCreateBoundsCheckMemcpySanitizer(
-    Function *F, Vulnerability::RemediationStrategies strategy) {
-  std::string handlerName = "__cve_memcpy";
+    Function *F, Vulnerability::RemediationStrategies strategy,
+    BoundsClass srcCls, BoundsClass dstCls) {
+  std::string handlerName =
+      std::string("__cve_memcpy_") + classTag(srcCls) + "_" + classTag(dstCls);
   Module *M = F->getParent();
   LLVMContext &Ctx = M->getContext();
 
@@ -270,9 +329,9 @@ static Function *getOrCreateBoundsCheckMemcpySanitizer(
 
   builder.SetInsertPoint(CheckAccessBB);
   Value *check_src_access =
-      builder.CreateCall(getOrCreateAccessOk(M), {srcPtr, sizeArg});
+      builder.CreateCall(getOrCreateAccessOk(M, srcCls), {srcPtr, sizeArg});
   Value *check_dst_access =
-      builder.CreateCall(getOrCreateAccessOk(M), {dstPtr, sizeArg});
+      builder.CreateCall(getOrCreateAccessOk(M, dstCls), {dstPtr, sizeArg});
 
   Value *withinBounds = builder.CreateAnd(check_src_access, check_dst_access);
   builder.CreateCondBr(withinBounds, NormalBB, SanitizeMemcpyBB);
@@ -299,8 +358,10 @@ static Function *getOrCreateBoundsCheckMemcpySanitizer(
 }
 
 static Function *getOrCreateBoundsCheckMemmoveSanitizer(
-    Function *F, Vulnerability::RemediationStrategies strategy) {
-  std::string handlerName = "__cve_memmove";
+    Function *F, Vulnerability::RemediationStrategies strategy,
+    BoundsClass srcCls, BoundsClass dstCls) {
+  std::string handlerName =
+      std::string("__cve_memmove_") + classTag(srcCls) + "_" + classTag(dstCls);
   Module *M = F->getParent();
   LLVMContext &Ctx = M->getContext();
 
@@ -338,9 +399,9 @@ static Function *getOrCreateBoundsCheckMemmoveSanitizer(
 
   builder.SetInsertPoint(CheckAccessBB);
   Value *check_src_access =
-      builder.CreateCall(getOrCreateAccessOk(M), {srcPtr, sizeArg});
+      builder.CreateCall(getOrCreateAccessOk(M, srcCls), {srcPtr, sizeArg});
   Value *check_dst_access =
-      builder.CreateCall(getOrCreateAccessOk(M), {dstPtr, sizeArg});
+      builder.CreateCall(getOrCreateAccessOk(M, dstCls), {dstPtr, sizeArg});
 
   Value *withinBounds = builder.CreateAnd(check_src_access, check_dst_access);
   builder.CreateCondBr(withinBounds, NormalBB, SanitizeMemmoveBB);
@@ -368,8 +429,9 @@ static Function *getOrCreateBoundsCheckMemmoveSanitizer(
 }
 
 static Function *getOrCreateBoundsCheckMemsetSanitizer(
-    Function *F, Vulnerability::RemediationStrategies strategy) {
-  std::string handlerName = "__cve_memset";
+    Function *F, Vulnerability::RemediationStrategies strategy,
+    BoundsClass cls) {
+  std::string handlerName = std::string("__cve_memset_") + classTag(cls);
   Module *M = F->getParent();
   LLVMContext &Ctx = M->getContext();
 
@@ -408,7 +470,7 @@ static Function *getOrCreateBoundsCheckMemsetSanitizer(
 
   builder.SetInsertPoint(CheckAccessBB);
   Value *check_dst_access =
-      builder.CreateCall(getOrCreateAccessOk(M), {basePtr, accessSize});
+      builder.CreateCall(getOrCreateAccessOk(M, cls), {basePtr, accessSize});
   builder.CreateCondBr(check_dst_access, NormalBB, SanitizeMemsetBB);
 
   // NormalBB: call memset and return the pointer
@@ -435,8 +497,8 @@ static Function *getOrCreateBoundsCheckMemsetSanitizer(
   return resolveMemsetFn;
 }
 
-static Function *getOrCreateResolveGep(Function *F) {
-  std::string handlerName = "__cve_gep";
+static Function *getOrCreateResolveGep(Function *F, BoundsClass cls) {
+  std::string handlerName = std::string("__cve_gep_") + classTag(cls);
   Module *M = F->getParent();
   LLVMContext &Ctx = M->getContext();
 
@@ -477,7 +539,7 @@ static Function *getOrCreateResolveGep(Function *F) {
 
   builder.SetInsertPoint(GetBaseAndLimitBB);
   Value *baseAndLimit =
-      builder.CreateCall(getOrCreateResolveGetBounds(M), {basePtr});
+      builder.CreateCall(getOrCreateResolveGetBounds(M, cls), {basePtr});
   Value *baseValue = builder.CreateExtractValue(baseAndLimit, 0);
   Value *limitValue = builder.CreateExtractValue(baseAndLimit, 1);
 
@@ -549,8 +611,9 @@ void instrumentGep(Function *F) {
     }
 
     builder.SetInsertPoint(derivedPtr->getNextNode());
-    auto resolveGepCall =
-        builder.CreateCall(getOrCreateResolveGep(F), {basePtr, derivedPtr});
+    BoundsClass cls = classifyPointer(basePtr);
+    auto resolveGepCall = builder.CreateCall(getOrCreateResolveGep(F, cls),
+                                             {basePtr, derivedPtr});
 
     // Iterate over all the users of the gep instruction and
     // replace their operands with resolve_gep result
@@ -620,7 +683,10 @@ void instrumentMemcpy(Function *F,
       sizeArg = MC->getArgOperand(2);
     }
 
-    auto memcpyFn = getOrCreateBoundsCheckMemcpySanitizer(F, strategy);
+    BoundsClass srcCls = classifyPointer(srcPtr);
+    BoundsClass dstCls = classifyPointer(dstPtr);
+    auto memcpyFn =
+        getOrCreateBoundsCheckMemcpySanitizer(F, strategy, srcCls, dstCls);
     auto memcpyCall = builder.CreateCall(memcpyFn, {dstPtr, srcPtr, sizeArg});
     Inst->replaceAllUsesWith(memcpyCall);
     Inst->eraseFromParent();
@@ -687,7 +753,8 @@ void instrumentMemset(Function *F,
       sizeArg = builder.CreateIntCast(sizeArg, ExpectedLengthTy, false);
     }
 
-    auto memsetFn = getOrCreateBoundsCheckMemsetSanitizer(F, strategy);
+    BoundsClass cls = classifyPointer(basePtr);
+    auto memsetFn = getOrCreateBoundsCheckMemsetSanitizer(F, strategy, cls);
     auto memsetCall =
         builder.CreateCall(memsetFn, {basePtr, valueArg, sizeArg});
     Inst->replaceAllUsesWith(memsetCall);
@@ -743,7 +810,10 @@ void instrumentMemmove(Function *F,
       sizeArg = MC->getArgOperand(2);
     }
 
-    auto memmoveFn = getOrCreateBoundsCheckMemmoveSanitizer(F, strategy);
+    BoundsClass srcCls = classifyPointer(srcPtr);
+    BoundsClass dstCls = classifyPointer(dstPtr);
+    auto memmoveFn =
+        getOrCreateBoundsCheckMemmoveSanitizer(F, strategy, srcCls, dstCls);
     auto memmoveCall = builder.CreateCall(memmoveFn, {dstPtr, srcPtr, sizeArg});
     Inst->replaceAllUsesWith(memmoveCall);
     Inst->eraseFromParent();
@@ -801,7 +871,9 @@ void instrumentLoadStore(Function *F,
         continue;
     }
 
-    auto loadFn = getOrCreateBoundsCheckLoadSanitizer(F, valueTy, strategy);
+    BoundsClass cls = classifyPointer(ptr);
+    auto loadFn =
+        getOrCreateBoundsCheckLoadSanitizer(F, valueTy, strategy, cls);
 
     auto sanitizedLoad = builder.CreateCall(loadFn, {ptr});
     Inst->replaceAllUsesWith(sanitizedLoad);
@@ -821,7 +893,9 @@ void instrumentLoadStore(Function *F,
         continue;
     }
 
-    auto storeFn = getOrCreateBoundsCheckStoreSanitizer(F, valueTy, strategy);
+    BoundsClass cls = classifyPointer(ptr);
+    auto storeFn =
+        getOrCreateBoundsCheckStoreSanitizer(F, valueTy, strategy, cls);
 
     auto sanitizedStore =
         builder.CreateCall(storeFn, {ptr, Inst->getValueOperand()});

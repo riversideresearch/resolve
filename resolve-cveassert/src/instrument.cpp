@@ -89,11 +89,13 @@ void instrumentAlloca(Function *F) {
   SmallVector<AllocaInst *, 16> allocas;
   SmallVector<AllocaInst *, 16> shadowSlots;
 
+  StructType *shadowTy = StructType::get(Ctx, {ptr_ty, size_ty});
+
   auto allocateFn = M->getOrInsertFunction(
       "__resolve_alloca", FunctionType::get(void_ty, {ptr_ty, size_ty}, false));
-  auto invalidateFn =
-      M->getOrInsertFunction("__resolve_invalidate_stack",
-                             FunctionType::get(void_ty, {ptr_ty}, false));
+  auto invalidateFn = M->getOrInsertFunction(
+      "__resolve_invalidate_stack_range",
+      FunctionType::get(void_ty, {ptr_ty, size_ty}, false));
 
   // 2 cases
   // 1. alloca [N x T]
@@ -116,26 +118,38 @@ void instrumentAlloca(Function *F) {
     builder.SetInsertPoint(oldAlloca->getNextNonDebugInstruction());
     Value *arrSize = oldAlloca->getArraySize();
     Type *oldAllocaTy = oldAlloca->getAllocatedType();
-    Value *updatedSize =
+    uint64_t elemSize = DL.getTypeAllocSize(oldAllocaTy).getFixedValue();
+    Value *trackedBytes =
+        builder.CreateMul(arrSize, ConstantInt::get(size_ty, elemSize));
+    Value *allocCount =
         builder.CreateAdd(arrSize, ConstantInt::get(size_ty, 1));
     AllocaInst *transformedAlloca = builder.CreateAlloca(
-        oldAllocaTy, updatedSize, oldAlloca->getName() + ".inst");
+        oldAllocaTy, allocCount, oldAlloca->getName() + ".inst");
     transformedAlloca->setAlignment(oldAlloca->getAlign());
-    return {transformedAlloca, updatedSize};
+    return {transformedAlloca, trackedBytes};
   };
 
-  auto create_shadow_slot = [&](auto *transformedAlloca) -> AllocaInst * {
+  auto create_shadow_slot = [&](auto *transformedAlloca,
+                                Value *totalSize) -> AllocaInst * {
     Function *F = transformedAlloca->getFunction();
     BasicBlock &entryBB = F->getEntryBlock();
     Instruction *insertPt = &*entryBB.getFirstInsertionPt();
     builder.SetInsertPoint(insertPt);
     AllocaInst *shadowSlot =
-        builder.CreateAlloca(ptr_ty, nullptr, "shadow.slot");
-    builder.CreateStore(ConstantPointerNull::get(ptr_ty), shadowSlot);
+        builder.CreateAlloca(shadowTy, nullptr, "shadow.slot");
+    Value *initialPtrField = builder.CreateStructGEP(shadowTy, shadowSlot, 0);
+    builder.CreateStore(ConstantPointerNull::get(ptr_ty), initialPtrField);
+    Value *initialSizeField = builder.CreateStructGEP(shadowTy, shadowSlot, 1);
+    builder.CreateStore(ConstantInt::get(size_ty, 0), initialSizeField);
     builder.SetInsertPoint(transformedAlloca->getNextNonDebugInstruction());
+    Value *runtimePtrField = builder.CreateStructGEP(shadowTy, shadowSlot, 0);
     StoreInst *storeStackAddr =
-        builder.CreateStore(transformedAlloca, shadowSlot);
+        builder.CreateStore(transformedAlloca, runtimePtrField);
     storeStackAddr->setMetadata("cve.noinstrument", MDNode::get(Ctx, {}));
+    Value *runtimeSizeField = builder.CreateStructGEP(shadowTy, shadowSlot, 1);
+    StoreInst *storeStackSize =
+        builder.CreateStore(totalSize, runtimeSizeField);
+    storeStackSize->setMetadata("cve.noinstrument", MDNode::get(Ctx, {}));
     return shadowSlot;
   };
 
@@ -175,7 +189,7 @@ void instrumentAlloca(Function *F) {
       builder.SetInsertPoint(end->getNextNode());
       LoadInst *load = builder.CreateLoad(ptr_ty, shadowSlot);
       load->setMetadata("cve.noinstrument", MDNode::get(Ctx, {}));
-      builder.CreateCall(invalidateFn, {load});
+      builder.CreateCall(invalidateFn, {load, totalSize});
       StoreInst *store =
           builder.CreateStore(ConstantPointerNull::get(ptr_ty), shadowSlot);
       store->setMetadata("cve.noinstrument", MDNode::get(Ctx, {}));
@@ -211,7 +225,7 @@ void instrumentAlloca(Function *F) {
       totalSize = result.second;
     }
 
-    shadowSlot = create_shadow_slot(transformedAlloca);
+    shadowSlot = create_shadow_slot(transformedAlloca, totalSize);
     shadowSlot->setMetadata("cve.noinstrument", MDNode::get(Ctx, {}));
     transformedAlloca->setMetadata("cve.noinstrument", MDNode::get(Ctx, {}));
     handle_lifetimes(allocaInst, transformedAlloca, shadowSlot, totalSize);
@@ -244,9 +258,13 @@ void instrumentAlloca(Function *F) {
       if (auto *inst = dyn_cast<ReturnInst>(&instr)) {
         builder.SetInsertPoint(inst);
         for (auto *slot : shadowSlots) {
-          LoadInst *load = builder.CreateLoad(ptr_ty, slot);
-          load->setMetadata("cve.noinstrument", MDNode::get(Ctx, {}));
-          builder.CreateCall(invalidateFn, {load});
+          Value *ptrField = builder.CreateStructGEP(shadowTy, slot, 0);
+          LoadInst *addr = builder.CreateLoad(ptr_ty, ptrField);
+          addr->setMetadata("cve.noinstrument", MDNode::get(Ctx, {}));
+          Value *sizeField = builder.CreateStructGEP(shadowTy, slot, 1);
+          LoadInst *size = builder.CreateLoad(size_ty, sizeField);
+          size->setMetadata("cve.noinstrument", MDNode::get(Ctx, {}));
+          builder.CreateCall(invalidateFn, {addr, size});
         }
       }
     }

@@ -4,7 +4,7 @@ use libc::{
     c_char, c_void, calloc, free, malloc, realloc, strdup, strlen, strndup, strnlen,
 };
 
-use crate::shadowobjs::{ALIVE_OBJ_LIST, AllocType, FREED_OBJ_LIST, Vaddr};
+use crate::shadowobjs::{SHADOW_STACK, ALIVE_OBJ_LIST, AllocType, FREED_OBJ_LIST, Vaddr};
 
 use log::{info, warn};
 
@@ -16,24 +16,25 @@ use log::{info, warn};
 #[unsafe(no_mangle)]
 pub extern "C" fn __resolve_alloca(ptr: *mut c_void, size: usize) -> () {
     let base = ptr as Vaddr;
-    {
-        let mut obj_list = ALIVE_OBJ_LIST.lock();
-        obj_list.add_shadow_object(AllocType::Stack, base, size);
-    }
+
+    SHADOW_STACK.with_borrow_mut(
+        |ss|
+         ss.add_shadow_object(base, size)
+    );
 
     info!("[STACK] Object allocated with size: {size}, address: 0x{base:x}");
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn __resolve_invalidate_stack(base: *mut c_void) {
+pub extern "C" fn __resolve_invalidate_stack_range(base: *mut c_void, size: usize) {
     let base = base as Vaddr;
 
-    {
-        let mut obj_list = ALIVE_OBJ_LIST.lock();
-        obj_list.invalidate_at(base);
-    }
+    SHADOW_STACK.with_borrow_mut(
+        |ss|
+         ss.invalidate_at(base, size)
+    );
 
-    info!("[STACK] Free addr 0x{base:x}");
+    info!("[STACK] Free addr 0x{base:x} size {size}");
 }
 
 /**
@@ -245,14 +246,28 @@ pub extern "C" fn __resolve_strndup(ptr: *mut c_char, size: usize) -> *mut c_cha
     string_ptr
 }
 
+
+#[derive(PartialEq)]
 #[repr(C)]
 pub struct ShadowObjBounds {
     pub base: *mut c_void,
     pub limit: *mut c_void,
 }
 
+impl ShadowObjBounds {
+    pub fn null() -> Self {
+        ShadowObjBounds { base: std::ptr::null_mut(), limit: std::ptr::null_mut() }
+    }
+}
+
+impl From<&crate::shadowobjs::ShadowObject> for ShadowObjBounds {
+    fn from(sobj: &crate::shadowobjs::ShadowObject) -> Self {
+        ShadowObjBounds { base: sobj.base as *mut c_void, limit: sobj.limit as *mut c_void }
+    }
+}
+
 /**
- * @brief - Helper function that queries shadow obj list
+ * @brief - Helper function that queries the shadow stack
  *          to find a shadow obj where the ptr fits within
  *          its bounds of allocation 
  * @input
@@ -261,13 +276,51 @@ pub struct ShadowObjBounds {
  *         shadow object as pointers 
  */
 #[unsafe(no_mangle)]
-pub extern "C" fn __resolve_get_bounds(ptr: *mut c_void) -> ShadowObjBounds {
+pub extern "C" fn __resolve_get_bounds_stack(ptr: *mut c_void) -> ShadowObjBounds {
+    return SHADOW_STACK.with_borrow(
+        |ss| {
+            return match ss.search_intersection(ptr as Vaddr) {
+                Some(sobj) => { sobj.into() }
+                None => { ShadowObjBounds::null() }
+            }
+        }
+    );
+}
+
+/**
+ * @brief - Helper function that queries heap sobj list
+ *          to find a shadow obj where the ptr fits within
+ *          its bounds of allocation 
+ * @input
+ *  - ptr: ptr to allocation 
+ * @return struct containing the base and limit of the
+ *         shadow object as pointers 
+ */
+#[unsafe(no_mangle)]
+pub extern "C" fn __resolve_get_bounds_heap(ptr: *mut c_void) -> ShadowObjBounds {
     let sobj_table = ALIVE_OBJ_LIST.lock();
     let Some(sobj) = sobj_table.search_intersection(ptr as Vaddr) else {
-        return ShadowObjBounds { base: std::ptr::null_mut(), limit: std::ptr::null_mut() }
+        return ShadowObjBounds::null();
     };
 
-    return ShadowObjBounds { base: sobj.base as *mut c_void, limit: sobj.limit as *mut c_void }
+    return sobj.into();
+}
+
+/**
+ * @brief - Generic sobj lookup where we don't know the pointers
+ *          allocation type already. Searches stack table ( O(log n) )
+ *          before searching the heap table.
+ * @input
+ *  - ptr: ptr to allocation 
+ * @return struct containing the base and limit of the
+ *         shadow object as pointers 
+ */
+#[unsafe(no_mangle)]
+pub extern "C" fn __resolve_get_bounds(ptr: *mut c_void) -> ShadowObjBounds {
+    let mut sobj = __resolve_get_bounds_stack(ptr);
+    if sobj == ShadowObjBounds::null() { sobj = __resolve_get_bounds_heap(ptr)}
+
+    sobj
 }
 
 #[unsafe(no_mangle)]
