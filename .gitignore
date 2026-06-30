@@ -10,6 +10,8 @@ install/
 build-release/
 dist/
 
+resolve-cli/src/resolve/_version.py
+
 # ignore repos/outputs from tests
 llvm-plugin/tests/**/*.ll
 llvm-plugin/tests/**/*.ll.mem
