@@ -11,12 +11,18 @@ use crate::shadowobjs::{SHADOW_STACK, ALIVE_OBJ_LIST, AllocType, FREED_OBJ_LIST,
 
 use log::{info, warn};
 
+#[derive(PartialEq)]
 #[repr(C)]
-struct BoundsInfo {
+struct AllocBounds {
     base: *mut c_void,
     limit: *mut c_void,
-    block_size: usize,
-    block_index: usize,
+    size: usize,
+}
+
+impl From<AllocBounds> for ShadowObjBounds {
+    fn from(bounds: AllocBounds) -> Self {
+        ShadowObjBounds { base: bounds.base, limit: bounds.limit }
+    }
 }
 
 #[link(name = "mimalloc")]
@@ -37,10 +43,9 @@ unsafe extern "C" {
     fn mi_delete(ptr: *mut c_void);
 
     fn mi_is_in_heap_region(ptr: *mut c_void) -> bool;
-    fn mi_resolve_ptr(ptr: *mut c_void) -> BoundsInfo;
-    fn mi_is_heap_owned(ptr: *mut c_void) -> bool;
-    fn __vasprintf(strp: *mut *mut c_char, fmt: *const c_char, args: VaList<'_>) -> c_int;
+    fn mi_get_alloc_bounds(ptr: *mut c_void) -> AllocBounds;
     fn mi_is_block_start(ptr: *mut c_void) -> bool;
+    fn __vasprintf(strp: *mut *mut c_char, fmt: *const c_char, args: VaList<'_>) -> c_int;
     
 }
 
@@ -233,19 +238,9 @@ pub extern "C" fn __resolve_malloc(size: usize) -> *mut c_void {
         return ptr;
     }
 
-    //{
-    //    let mut obj_list = ALIVE_OBJ_LIST.lock();
-    //    obj_list.add_shadow_object(AllocType::Heap, ptr as Vaddr, size);
-    //}
+    let bounds = unsafe { mi_get_alloc_bounds(ptr) };
 
-    //info!(
-    //    "[HEAP] Object allocated with size: {size}, address: 0x{:x}",
-    //    ptr as Vaddr
-    //);
-
-    //info!("[RESOLVE] bounds: (0x{:x}, 0x{:x})", bounds_info.base as Vaddr, bounds_info.limit as Vaddr);
-    //info!("[RESOLVE] block index: {}", bounds_info.block_index);
-    //info!("[RESOLVE] block size: {}", bounds_info.block_size);
+    info!("[RESOLVE] bounds: [0x{:x}, 0x{:x})", bounds.base as Vaddr, bounds.limit as Vaddr);
     ptr
 }
 
@@ -393,18 +388,6 @@ pub extern "C" fn __resolve_realloc(ptr: *mut c_void, size: usize) -> *mut c_voi
         return realloc_ptr;
     }
 
-    // {
-    //     let mut obj_list = ALIVE_OBJ_LIST.lock();
-    //     // Remove shadow object for original pointer
-    //     obj_list.invalidate_at(ptr as Vaddr); // if ptr == NULL this does not do anything
-    //     obj_list.add_shadow_object(AllocType::Heap, realloc_ptr as Vaddr, size);
-    // }
-
-    // info!(
-    //     "[HEAP] Allocated object reallocated mem from src: {ptr:?}, size: {size}, dst ptr: 0x{:x}",
-    //     realloc_ptr as Vaddr
-    // );
-
     realloc_ptr
 }
 
@@ -423,16 +406,6 @@ pub extern "C" fn __resolve_calloc(n_items: usize, item_size: usize) -> *mut c_v
     if ptr.is_null() {
         return ptr;
     }
-
-    //{
-    //    let mut obj_list = ALIVE_OBJ_LIST.lock();
-    //    obj_list.add_shadow_object(AllocType::Heap, ptr as Vaddr, size);
-    //}
-
-    //info!(
-    //    "[HEAP] Logging allocation with {n_items} items, size (bytes): {size}, dst ptr: 0x{:x}",
-    //    ptr as Vaddr
-    //);
 
     ptr
 }
@@ -556,12 +529,14 @@ pub extern "C" fn __resolve_get_bounds_stack(ptr: *mut c_void) -> ShadowObjBound
  */
 #[unsafe(no_mangle)]
 pub extern "C" fn __resolve_get_bounds_heap(ptr: *mut c_void) -> ShadowObjBounds {
-    let sobj_table = ALIVE_OBJ_LIST.lock();
-    let Some(sobj) = sobj_table.search_intersection(ptr as Vaddr) else {
+    if ptr.is_null() {
         return ShadowObjBounds::null();
-    };
+    }
 
-    return sobj.into();
+    let bounds = unsafe { mi_get_alloc_bounds(ptr) };
+    info!("[RESOLVE] (ptr: 0x{:x}, lower: 0x{:x}, upper: 0x{:x})", ptr as Vaddr, bounds.base as Vaddr, bounds.limit as Vaddr);
+
+    return bounds.into();
 }
 
 /**
@@ -575,10 +550,10 @@ pub extern "C" fn __resolve_get_bounds_heap(ptr: *mut c_void) -> ShadowObjBounds
  */
 #[unsafe(no_mangle)]
 pub extern "C" fn __resolve_get_bounds(ptr: *mut c_void) -> ShadowObjBounds {
-    let mut sobj = __resolve_get_bounds_stack(ptr);
-    if sobj == ShadowObjBounds::null() { sobj = __resolve_get_bounds_heap(ptr)}
+    let mut bounds = __resolve_get_bounds_stack(ptr);
+    if bounds == ShadowObjBounds::null() { bounds = __resolve_get_bounds_heap(ptr)}
 
-    sobj
+    bounds
 }
 
 #[unsafe(no_mangle)]
