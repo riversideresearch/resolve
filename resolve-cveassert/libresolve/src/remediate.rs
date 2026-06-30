@@ -15,12 +15,18 @@ use crate::shadowobjs::{
 
 use log::{info, warn};
 
+#[derive(PartialEq)]
 #[repr(C)]
-struct BoundsInfo {
+struct AllocBounds {
     base: *mut c_void,
     limit: *mut c_void,
-    block_size: usize,
-    block_index: usize,
+    size: usize,
+}
+
+impl From<AllocBounds> for ShadowObjBounds {
+    fn from(bounds: AllocBounds) -> Self {
+        ShadowObjBounds { base: bounds.base, limit: bounds.limit }
+    }
 }
 
 #[link(name = "mimalloc")]
@@ -41,10 +47,9 @@ unsafe extern "C" {
     fn mi_delete(ptr: *mut c_void);
 
     fn mi_is_in_heap_region(ptr: *mut c_void) -> bool;
-    fn mi_resolve_ptr(ptr: *mut c_void) -> BoundsInfo;
-    fn mi_is_heap_owned(ptr: *mut c_void) -> bool;
-    fn __vasprintf(strp: *mut *mut c_char, fmt: *const c_char, args: VaList<'_>) -> c_int;
+    fn mi_get_alloc_bounds(ptr: *mut c_void) -> AllocBounds;
     fn mi_is_block_start(ptr: *mut c_void) -> bool;
+    fn __vasprintf(strp: *mut *mut c_char, fmt: *const c_char, args: VaList<'_>) -> c_int;
     
 }
 
@@ -619,33 +624,18 @@ pub extern "C" fn __resolve_get_bounds_stack(ptr: *mut c_void) -> ShadowObjBound
  */
 #[unsafe(no_mangle)]
 pub extern "C" fn __resolve_get_bounds_heap(ptr: *mut c_void) -> ShadowObjBounds {
-    let sobj_table = ALIVE_OBJ_LIST.lock();
-    let Some(sobj) = sobj_table.search_intersection(ptr as Vaddr) else {
+    if ptr.is_null() {
         return ShadowObjBounds::null();
-    };
+    }
+
+    let bounds = unsafe { mi_get_alloc_bounds(ptr) };
+    info!("[RESOLVE] (ptr: 0x{:x}, lower: 0x{:x}, upper: 0x{:x})", ptr as Vaddr, bounds.base as Vaddr, bounds.limit as Vaddr);
 
     return sobj.into();
 }
 
 /**
- * @brief - Queries recorded globals to find a shadow obj
- *          where the ptr is within bounds of allocation
- * @input
- *  - ptr: ptr to global allocation
- * @return shadow object that satisfies base <= ptr && ptr < limit
- * If shadow object cannot be found the function returns
- * a shadow object with null base and limit pointers
- */
-#[unsafe(no_mangle)]
-pub extern "C" fn __resolve_get_bounds_global(ptr: *mut c_void) -> ShadowObjBounds {
-    match lookup_global(ptr as Vaddr) {
-        Some(obj) => (&obj).into(),
-        None => ShadowObjBounds::null(),
-    }
-}
-
-/**
- * @brief - Generic shadow object lookup where we don't know the pointers
+ * @brief - Generic sobj lookup where we don't know the pointers
  *          allocation type already. Searches stack table ( O(log n) )
  *          before searching the heap table
  * @input
@@ -663,7 +653,7 @@ pub extern "C" fn __resolve_get_bounds(ptr: *mut c_void) -> ShadowObjBounds {
         sobj = __resolve_get_bounds_global(ptr)
     }
 
-    sobj
+    bounds
 }
 
 #[unsafe(no_mangle)]
