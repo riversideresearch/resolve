@@ -51,8 +51,6 @@ nav:
   - Home: index.md
   - Installation: installation.md
   - Concepts:
-    - Overview: concepts/overview.md
-    - ESBOM: concepts/esbom.md
     - Vulnerabilities.json: concepts/vulnerabilities-json.md
     - Facts: components/facts.md
   - Components:
@@ -71,3 +69,4 @@ nav:
     - Remediation: examples/remediation.md
   - Development:
     - Building From Source: development/building-from-source.md
+    - Documentation Website: development/documentation.md
