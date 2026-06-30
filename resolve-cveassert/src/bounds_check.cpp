@@ -123,19 +123,19 @@ static Function *getOrCreateAccessOk(Module *M, BoundsClass cls) {
 
   BasicBlock *EntryBB = BasicBlock::Create(Ctx, "entry", resolveAccessOkFn);
   BasicBlock *CheckAccessBB =
-      BasicBlock::Create(Ctx, "check_access", resolveAccessOkFn);
+      BasicBlock::Create(Ctx, "check.access", resolveAccessOkFn);
   BasicBlock *TrueBB =
-      BasicBlock::Create(Ctx, "return_true", resolveAccessOkFn);
+      BasicBlock::Create(Ctx, "safe.access", resolveAccessOkFn);
   BasicBlock *FalseBB =
-      BasicBlock::Create(Ctx, "return_false", resolveAccessOkFn);
+      BasicBlock::Create(Ctx, "unsafe.access", resolveAccessOkFn);
 
   builder.SetInsertPoint(EntryBB);
 
   Value *basePtr = resolveAccessOkFn->getArg(0);
   Value *accessSize = resolveAccessOkFn->getArg(1);
 
-  Value *baseAndLimit =
-      builder.CreateCall(getOrCreateResolveGetBounds(M, cls), {basePtr});
+  Value *baseAndLimit = builder.CreateCall(getOrCreateResolveGetBounds(M, cls),
+                                           {basePtr}, "resolve.bounds");
   Value *limitValue = builder.CreateExtractValue(baseAndLimit, 1);
   Value *limitInt = builder.CreatePtrToInt(limitValue, size_ty);
   Value *baseInt = builder.CreatePtrToInt(basePtr, size_ty);
@@ -186,11 +186,11 @@ static Function *getOrCreateBoundsCheckLoadSanitizer(
 
   BasicBlock *EntryBB = BasicBlock::Create(Ctx, "entry", resolveLoadFn);
   BasicBlock *CheckAccessBB =
-      BasicBlock::Create(Ctx, "check_access", resolveLoadFn);
+      BasicBlock::Create(Ctx, "check.access", resolveLoadFn);
   BasicBlock *NormalLoadBB =
-      BasicBlock::Create(Ctx, "normal_load", resolveLoadFn);
+      BasicBlock::Create(Ctx, "safe.load", resolveLoadFn);
   BasicBlock *SanitizeLoadBB =
-      BasicBlock::Create(Ctx, "sanitize_load", resolveLoadFn);
+      BasicBlock::Create(Ctx, "sanitize.load", resolveLoadFn);
 
   builder.SetInsertPoint(EntryBB);
   Value *basePtr = resolveLoadFn->getArg(0);
@@ -250,11 +250,11 @@ static Function *getOrCreateBoundsCheckStoreSanitizer(
 
   BasicBlock *EntryBB = BasicBlock::Create(Ctx, "entry", resolveStoreFn);
   BasicBlock *CheckAccessBB =
-      BasicBlock::Create(Ctx, "check_access", resolveStoreFn);
+      BasicBlock::Create(Ctx, "check.access", resolveStoreFn);
   BasicBlock *NormalStoreBB =
-      BasicBlock::Create(Ctx, "normal_store", resolveStoreFn);
+      BasicBlock::Create(Ctx, "safe.store", resolveStoreFn);
   BasicBlock *SanitizeStoreBB =
-      BasicBlock::Create(Ctx, "sanitize_store", resolveStoreFn);
+      BasicBlock::Create(Ctx, "sanitize.store", resolveStoreFn);
 
   builder.SetInsertPoint(EntryBB);
   Value *basePtr = resolveStoreFn->getArg(0);
@@ -313,11 +313,11 @@ static Function *getOrCreateBoundsCheckMemcpySanitizer(
 
   BasicBlock *EntryBB = BasicBlock::Create(Ctx, "entry", resolveMemmoveFn);
   BasicBlock *CheckAccessBB =
-      BasicBlock::Create(Ctx, "check_access", resolveMemmoveFn);
+      BasicBlock::Create(Ctx, "check.access", resolveMemmoveFn);
   BasicBlock *NormalBB =
-      BasicBlock::Create(Ctx, "safe_memcpy", resolveMemmoveFn);
+      BasicBlock::Create(Ctx, "safe.memcpy", resolveMemmoveFn);
   BasicBlock *SanitizeMemcpyBB =
-      BasicBlock::Create(Ctx, "sanitize_memcpy", resolveMemmoveFn);
+      BasicBlock::Create(Ctx, "sanitize.memcpy", resolveMemmoveFn);
 
   builder.SetInsertPoint(EntryBB);
   // Extract dst, src, size arguments from function
@@ -383,11 +383,11 @@ static Function *getOrCreateBoundsCheckMemmoveSanitizer(
 
   BasicBlock *EntryBB = BasicBlock::Create(Ctx, "entry", resolveMemmoveFn);
   BasicBlock *CheckAccessBB =
-      BasicBlock::Create(Ctx, "check_access", resolveMemmoveFn);
+      BasicBlock::Create(Ctx, "check.access", resolveMemmoveFn);
   BasicBlock *NormalBB =
-      BasicBlock::Create(Ctx, "safe_memmove", resolveMemmoveFn);
+      BasicBlock::Create(Ctx, "safe.memmove", resolveMemmoveFn);
   BasicBlock *SanitizeMemmoveBB =
-      BasicBlock::Create(Ctx, "sanitize_memmove", resolveMemmoveFn);
+      BasicBlock::Create(Ctx, "sanitize.memmove", resolveMemmoveFn);
 
   builder.SetInsertPoint(EntryBB);
   // Extract dst, src, size arguments from function
@@ -454,11 +454,11 @@ static Function *getOrCreateBoundsCheckMemsetSanitizer(
 
   BasicBlock *EntryBB = BasicBlock::Create(Ctx, "entry", resolveMemsetFn);
   BasicBlock *CheckAccessBB =
-      BasicBlock::Create(Ctx, "check_access", resolveMemsetFn);
+      BasicBlock::Create(Ctx, "check.access", resolveMemsetFn);
   BasicBlock *NormalBB =
-      BasicBlock::Create(Ctx, "safe_memset", resolveMemsetFn);
+      BasicBlock::Create(Ctx, "safe.memset", resolveMemsetFn);
   BasicBlock *SanitizeMemsetBB =
-      BasicBlock::Create(Ctx, "sanitize_memset", resolveMemsetFn);
+      BasicBlock::Create(Ctx, "sanitize.memset", resolveMemsetFn);
 
   builder.SetInsertPoint(EntryBB);
   // Extract arguments for memset
@@ -523,13 +523,11 @@ static Function *getOrCreateResolveGep(Function *F, BoundsClass cls) {
 
   BasicBlock *EntryBB = BasicBlock::Create(Ctx, "entry", resolveGepFn);
   BasicBlock *GetBaseAndLimitBB =
-      BasicBlock::Create(Ctx, "get_base_and_limit", resolveGepFn);
+      BasicBlock::Create(Ctx, "get.bounds", resolveGepFn);
   BasicBlock *CheckComputedPtrBB =
-      BasicBlock::Create(Ctx, "check_access", resolveGepFn);
-  BasicBlock *NormalBB =
-      BasicBlock::Create(Ctx, "return_normal_ptr", resolveGepFn);
-  BasicBlock *OnePastBB =
-      BasicBlock::Create(Ctx, "return_tainted_ptr", resolveGepFn);
+      BasicBlock::Create(Ctx, "check.access", resolveGepFn);
+  BasicBlock *NormalBB = BasicBlock::Create(Ctx, "safe.ptr", resolveGepFn);
+  BasicBlock *OnePastBB = BasicBlock::Create(Ctx, "tainted.ptr", resolveGepFn);
 
   builder.SetInsertPoint(EntryBB);
   // Extract the base and derived pointer
