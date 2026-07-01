@@ -75,6 +75,7 @@ nav:
     - CVEAssert: components/resolve-cveassert.md
     - ResolveCC: components/resolve-cc.md
   - Examples:
+    - Crash Analysis: examples/crash-analysis.md
     - Input Synthesis: examples/input-synthesis.md
     - Reachability: examples/reachability.md
     - Remediation: examples/remediation.md
