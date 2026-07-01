@@ -49,6 +49,8 @@ extra:
 
 markdown_extensions:
   - admonition
+  - toc:
+      permalink: true
   - pymdownx.details
   - pymdownx.superfences:
       custom_fences:
