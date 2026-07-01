@@ -47,7 +47,7 @@ First, describe the vulnerability we want to analyze in a JSON file (let's call 
 
 ## Compiling With `resolvecc`
 
-Reachability analysis runs on program *facts* (see: [RESOLVE facts](../components/facts)). **RESOLVE** generates these facts at compile time and embeds them directly into the binary. To produce them, compile with the **RESOLVE** compiler, `resolvecc`, exactly as you would with `clang`:
+Reachability analysis runs on program *facts* (see: [RESOLVE facts](../components/facts.md)). **RESOLVE** generates these facts at compile time and embeds them directly into the binary. To produce them, compile with the **RESOLVE** compiler, `resolvecc`, exactly as you would with `clang`:
 
 ```bash
 resolvecc main.c -o main
