@@ -60,7 +60,7 @@ nav:
   - Home: index.md
   - Installation: installation.md
   - Concepts:
-    - Vulnerabilities.json: concepts/vulnerabilities-json.md
+    - vulnerabilities.json: concepts/vulnerabilities-json.md
     - Facts: components/facts.md
   - Components:
     - Resolve CLI:
