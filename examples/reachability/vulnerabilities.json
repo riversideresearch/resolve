@@ -1,0 +1,14 @@
+{
+    "vulnerabilities": [
+        {
+            "cve-id": "CVE-0000-00000",
+            "cve-description": "Null pointer dereference reachable from the program entry point.",
+            "package-name": "reachability-example",
+            "package-version": "vers:generic/*",
+            "cwe-id": "476",
+            "cwe-name": "NULL Pointer Dereference",
+            "affected-function": "do_npd",
+            "affected-file": "main.c"
+        }
+    ]
+}

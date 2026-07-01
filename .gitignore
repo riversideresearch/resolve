@@ -34,3 +34,6 @@ reach_wrap_output.json
 .env
 
 **/resolve_log.out*
+
+*.facts
+*.facts.zst
