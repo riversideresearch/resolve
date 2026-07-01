@@ -30,4 +30,7 @@ The basic format is like this:
 }
 ```
 
+!!! note
+    Even some of the "required" fields are not actually consumed by certain tools, but this is the minimum set that are required for compatibility with all RESOLVE tools. For example, CVEAssert does not care if you provide a `cve-id` or `affected-file`.  
+
 For information on choosing a `cwe-id`, see [supported ids](../components/resolve-cveassert.md#common-mappings).
