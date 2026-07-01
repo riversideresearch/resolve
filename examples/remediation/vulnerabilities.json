@@ -1,8 +1,9 @@
 {
     "vulnerabilities": [
         {
-            "cwe-id": 476,
-            "affected-function": "main"
+            "cwe-id": "476",
+            "affected-function": "main",
+            "affected-file": "main.c"
         }
     ]
 }
