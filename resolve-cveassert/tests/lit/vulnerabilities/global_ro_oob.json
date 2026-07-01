@@ -1,0 +1,15 @@
+{
+    "vulnerabilities": [
+        {
+            "cve-id": "CVE-resolve-oob-global-2",
+            "cve-description": "",
+            "package-name": "resolve-test",
+            "package-version": "1.4.5",
+            "cwe-id": "125",
+            "cwe-name": "Global OOB read",
+            "affected-function": "read_global",
+            "affected-file": "global_ro_oob.c",
+            "remediation-strategy": "exit"
+        }
+    ]
+}

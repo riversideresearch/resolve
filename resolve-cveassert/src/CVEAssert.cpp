@@ -17,6 +17,7 @@
 #include "llvm/Passes/PassPlugin.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/Utils/Cloning.h"
+#include "llvm/Transforms/Utils/ModuleUtils.h"
 
 #include <cstdio>
 #include <cstdlib>
@@ -271,6 +272,57 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
     return result;
   }
 
+  void registerGlobals(Module &M) {
+    if (M.getFunction("__resolve_register_globals_ctor"))
+      return;
+
+    LLVMContext &Ctx = M.getContext();
+    const DataLayout &DL = M.getDataLayout();
+    auto ptr_ty = PointerType::get(Ctx, 0);
+    auto size_ty = Type::getInt64Ty(Ctx);
+    auto void_ty = Type::getVoidTy(Ctx);
+
+    FunctionCallee registerFn = M.getOrInsertFunction(
+        "__resolve_register_global",
+        FunctionType::get(void_ty, {ptr_ty, size_ty}, false));
+
+    SmallVector<GlobalVariable *, 16> targets;
+    for (GlobalVariable &G : M.globals()) {
+      if (G.isDeclaration()) // external: defining TU registers it
+        continue;
+      if (G.isThreadLocal()) // TLS: ctor captures one thread's &G
+        continue;
+      if (G.getType()->getPointerAddressSpace() !=
+          0) // non-default AS: not flat-addressable
+        continue;
+      if (G.getName().starts_with("llvm.")) // used/global_ctors/metadata
+        continue;
+      if (G.getName().starts_with("__resolve_"))
+        continue;
+      if (DL.getTypeAllocSize(G.getValueType()) == 0)
+        continue;
+      targets.push_back(&G);
+    }
+
+    if (targets.empty())
+      return;
+
+    Function *ctor = Function::Create(FunctionType::get(void_ty, {}, false),
+                                      GlobalValue::InternalLinkage,
+                                      "__resolve_register_globals_ctor", &M);
+
+    ctor->setMetadata("cve.noinstrument", MDNode::get(Ctx, {}));
+
+    IRBuilder<> builder(BasicBlock::Create(Ctx, "entry", ctor));
+    for (GlobalVariable *G : targets) {
+      uint64_t size = DL.getTypeAllocSize(G->getValueType());
+      builder.CreateCall(registerFn, {G, ConstantInt::get(size_ty, size)});
+    }
+    builder.CreateRetVoid();
+
+    appendToGlobalCtors(M, ctor, 0);
+  }
+
   PreservedAnalyses
   runInstrumentationPipeline(Module &M, ModuleAnalysisManager &MAM,
                              std::vector<Vulnerability> &vulns,
@@ -352,8 +404,9 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
       }
     }
 
-    if (instrument_mem_inst.instrumentAlloca ||
-        instrument_mem_inst.instrumentMemAllocator) {
+    if (!writePatch && (instrument_mem_inst.instrumentAlloca ||
+                        instrument_mem_inst.instrumentMemAllocator)) {
+      registerGlobals(M);
       result = PreservedAnalyses::none();
     }
     return result;
