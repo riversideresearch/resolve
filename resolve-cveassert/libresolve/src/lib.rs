@@ -2,7 +2,7 @@
 // LGPL-3; See LICENSE.txt in the repo root for details.
 
 #![feature(btree_cursors)]
-
+#![feature(c_variadic)]
 mod remediate;
 mod shadowobjs;
 mod trace;
@@ -11,8 +11,8 @@ use libc::{Dl_info, atexit, c_void, dladdr, dlsym};
 use std::ffi::{CStr, OsString};
 use std::fmt::Display;
 use std::fs::{self, File};
-use std::path::PathBuf;
 use std::io::{self, Seek, Write};
+use std::path::PathBuf;
 use std::sync::{LazyLock, Mutex};
 use std::{env, process};
 
@@ -34,7 +34,8 @@ impl<T> MutexWrap<T> {
 }
 
 fn idify_file_path(path: &mut PathBuf, id: impl Display) {
-    let file_name = path.file_name()
+    let file_name = path
+        .file_name()
         .expect("Path could not be found in file system.")
         .to_owned();
 
@@ -42,15 +43,14 @@ fn idify_file_path(path: &mut PathBuf, id: impl Display) {
 
     updated_file_name.push(file_name);
     updated_file_name.push("-");
-    updated_file_name.push(id.to_string()); 
+    updated_file_name.push(id.to_string());
 
     path.set_file_name(updated_file_name);
 }
 
 /// File for "resolve_dlsym.json"
 pub static DLSYM_LOG_FILE: LazyLock<MutexWrap<File>> = LazyLock::new(|| {
-    let log_dir = env::var("RESOLVE_DLSYM_LOG_DIR")
-        .unwrap_or_else(|_| ".".to_string());
+    let log_dir = env::var("RESOLVE_DLSYM_LOG_DIR").unwrap_or_else(|_| ".".to_string());
 
     let mut path = PathBuf::from(log_dir);
 
@@ -84,12 +84,12 @@ pub extern "C" fn resolve_init() {
     if cfg!(test) {
         builder.is_test(true);
     } else {
-        let file = open_resolve_log_file().unwrap_or_else(|err| { 
+        let file = open_resolve_log_file().unwrap_or_else(|err| {
             eprintln!("Libresolve log file could not be created.");
             eprintln!("Error: {err:?}");
             process::exit(12);
         });
-        
+
         builder.target(env_logger::Target::Pipe(Box::new(file)));
     }
 
@@ -97,14 +97,13 @@ pub extern "C" fn resolve_init() {
 }
 
 fn open_resolve_log_file() -> Result<File, io::Error> {
-    let log_dir = env::var("RESOLVE_RUNTIME_LOG_DIR")
-        .unwrap_or_else(|_| ".".to_string());
+    let log_dir = env::var("RESOLVE_RUNTIME_LOG_DIR").unwrap_or_else(|_| ".".to_string());
 
     let mut path = PathBuf::from(log_dir);
 
     // Ensure the parent directories exist
     fs::create_dir_all(&path)?;
-    
+
     // Append the file name
     path.push("resolve_log.out");
 

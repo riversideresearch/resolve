@@ -74,6 +74,29 @@ void instrumentLibraryAllocations(Function *F) {
   wrapLibraryFunction(F, "strdup", FunctionType::get(ptr_ty, {ptr_ty}, false));
   wrapLibraryFunction(F, "strndup",
                       FunctionType::get(ptr_ty, {ptr_ty, size_ty}, false));
+  wrapLibraryFunction(
+      F, "getline",
+      FunctionType::get(size_ty, {ptr_ty, ptr_ty, ptr_ty}, false));
+  wrapLibraryFunction(
+      F, "getdelim",
+      FunctionType::get(size_ty, {ptr_ty, ptr_ty, size_ty, ptr_ty}, false));
+  wrapLibraryFunction(F, "new", FunctionType::get(ptr_ty, {size_ty}, false));
+  wrapLibraryFunction(F, "delete", FunctionType::get(void_ty, {ptr_ty}, false));
+  wrapLibraryFunction(F, "asprintf",
+                      FunctionType::get(size_ty,
+                                        {
+                                            ptr_ty,
+                                            ptr_ty,
+                                        },
+                                        true));
+  wrapLibraryFunction(F, "aligned_alloc",
+                      FunctionType::get(ptr_ty, {size_ty, size_ty}, false));
+  wrapLibraryFunction(
+      F, "reallocarray",
+      FunctionType::get(ptr_ty, {ptr_ty, size_ty, size_ty}, false));
+  wrapLibraryFunction(
+      F, "posix_memalign",
+      FunctionType::get(size_ty, {ptr_ty, size_ty, size_ty}, false));
 }
 
 void instrumentAlloca(Function *F) {
