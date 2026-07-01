@@ -119,7 +119,7 @@ fn open_resolve_log_file() -> Result<File, io::Error> {
 pub extern "C" fn flush_dlsym_log() {
     let mut file = DLSYM_LOG_FILE.lock();
 
-    // Seek back 2 bytse to erase last ",\n"
+    // Move back 2 bytes to erase last ",\n"
     file.seek_relative(-2).unwrap();
 
     let _ = write!(&mut file, "\n  ]\n}}\n");

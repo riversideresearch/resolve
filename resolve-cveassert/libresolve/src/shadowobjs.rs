@@ -8,7 +8,7 @@ use std::collections::BTreeMap;
 use std::ops::RangeInclusive;
 use std::ops::Bound::Included;
 
-/// An alias representing Virtual Address values
+// An alias representing virtual address values
 pub type Vaddr = usize;
 
 #[repr(C)]
@@ -24,11 +24,11 @@ pub enum AllocType {
 
 #[derive(Debug, Clone)]
 pub struct ShadowObject {
-    /// Allocation type (Heap, Stack, Global, etc..)
+    // Allocation type (Heap, Stack, Global, etc..)
     pub alloc_type: AllocType,
     // Base address of the allocated object mapped to u64
     pub base: Vaddr,
-    /// Last address of the allocated object
+    // Last address of the allocated object
     pub limit: Vaddr,
     size: usize,
 }
@@ -43,29 +43,28 @@ impl ShadowObject {
         }
     }
     
-    /// Returns the base + limit of this shadow object as RangeInclusive
-    ///
-    /// Useful for querying contains
+    // Returns the base + limit of this shadow object as RangeInclusive
+    // Useful for querying contains
     pub fn bounds(&self) -> RangeInclusive<Vaddr> {
         self.base..=self.limit
     }
 
-    /// Test if `addr` is within the bounds of this shadow object
+    // Test if `addr` is within the bounds of this shadow object
     pub fn contains(&self, addr: Vaddr) -> bool {
         self.bounds().contains(&addr)
     }
 
-    /// Computes the size of the shadow object from its base and limit
+    // Computes the size of the shadow object from its base and limit
     pub fn size(&self) -> usize {
         self.size
     }
 
-    /// Compute a limit from base and size
+    // Compute a limit from base and size
     pub fn limit(base: Vaddr, size: usize) -> Vaddr {
         if size == 0 { base } else { base + (size - 1) }
     }
 
-    /// Compute the sentinel pointer value for this object, 1 past its limit
+    // Compute the sentinel pointer value for this object, 1 past its limit
     pub fn past_limit(&self) -> Vaddr {
         self.limit + 1
     }
@@ -82,19 +81,18 @@ impl ShadowObjectTable {
         }
     }
 
-    /// Adds a new shadow object to the object list, replacing any existing object at `base`
+    // Adds a new shadow object to the object list, replacing any existing object at `base`
     pub fn add_shadow_object(&mut self, alloc_type: AllocType, base: Vaddr, size: usize) {
         self.table.insert(base, ShadowObject::new(alloc_type, base, size));
     }
 
-    /// Removes the shadow object with base address equal to `base`.
-    ///
-    /// Does nothing if there is no shadow object at that address.
+    // Removes the shadow object with base address equal to `base`
+    // Performs no-op if there is no shadow object found at the addr
     pub fn invalidate_at(&mut self, base: Vaddr) {
         let _ = self.table.remove(&base);
     }
 
-    /// Removes any allocation with a base address within the supplied region
+    // Removes any allocation with a base address within the supplied region
     #[allow(dead_code)]
     pub fn invalidate_region(&mut self, base: Vaddr, limit: Vaddr) {
         self.table
@@ -102,8 +100,8 @@ impl ShadowObjectTable {
             .for_each(|_| {})
     }
 
-    /// Finds a shadow object that contains 'addr' in its bounds OR a shadow object with
-    /// a past_limit value matching the input
+    // Finds a shadow object that contains 'addr' in its bounds OR a shadow object with
+    // a past_limit value matching the input
     pub fn search_intersection(&self, addr: Vaddr) -> Option<&ShadowObject> {
         let cursor = self.table
             .upper_bound(Included(&addr));
@@ -632,12 +630,5 @@ mod tests {
 
         assert!(s.search_intersection(0x2000).is_some()); // X still live
     }
-
-    #[test]
-    #[should_panic]
-    #[ignore = "not implemented"]
-    fn test_bounds_invalid_address_panic() {
-        // let table = ShadowObjectTable::new();
-        //table.bounds(0xDEADBEEF).unwrap(); // should panic since there is no interesection
-    }
 }
+
