@@ -84,16 +84,41 @@ pub extern "C" fn resolve_init() {
     if cfg!(test) {
         builder.is_test(true);
     } else {
-        let file = open_resolve_log_file().unwrap_or_else(|err| { 
-            eprintln!("Libresolve log file could not be created.");
-            eprintln!("Error: {err:?}");
-            process::exit(12);
-        });
-        
-        builder.target(env_logger::Target::Pipe(Box::new(file)));
+        builder.target(env_logger::Target::Pipe(Box::new(LazyLogFile::new())));
     }
 
     let _ = builder.try_init();
+}
+
+/// defer creating `resolve_log.out` until the first write
+struct LazyLogFile {
+    file: Option<File>,
+}
+
+impl LazyLogFile {
+    fn new() -> Self {
+        LazyLogFile { file: None }
+    }
+
+    fn file_mut(&mut self) -> io::Result<&mut File> {
+        if self.file.is_none() {
+            self.file = Some(open_resolve_log_file()?);
+        }
+        Ok(self.file.as_mut().unwrap())
+    }
+}
+
+impl Write for LazyLogFile {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        self.file_mut()?.write(buf)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        match self.file.as_mut() {
+            Some(file) => file.flush(),
+            None => Ok(()),
+        }
+    }
 }
 
 fn open_resolve_log_file() -> Result<File, io::Error> {
@@ -104,7 +129,7 @@ fn open_resolve_log_file() -> Result<File, io::Error> {
 
     // Ensure the parent directories exist
     fs::create_dir_all(&path)?;
-    
+
     // Append the file name
     path.push("resolve_log.out");
 
