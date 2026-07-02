@@ -25,13 +25,16 @@ struct AllocBounds {
 
 impl From<AllocBounds> for ShadowObjBounds {
     fn from(bounds: AllocBounds) -> Self {
-        ShadowObjBounds { base: bounds.base, limit: bounds.limit }
+        ShadowObjBounds {
+            base: bounds.base,
+            limit: bounds.limit,
+        }
     }
 }
 
 #[link(name = "mimalloc")]
 unsafe extern "C" {
-    // Allocator API
+    // Mimalloc public API
     fn mi_malloc(size: usize) -> *mut c_void;
     fn mi_calloc(size: usize, count: usize) -> *mut c_void;
     fn mi_realloc(ptr: *mut c_void, size: usize) -> *mut c_void;
@@ -46,11 +49,12 @@ unsafe extern "C" {
     fn mi_new(size: usize) -> *mut c_void;
     fn mi_delete(ptr: *mut c_void);
 
+    // mi_shim.c API
     fn mi_is_in_heap_region(ptr: *mut c_void) -> bool;
     fn mi_get_alloc_bounds(ptr: *mut c_void) -> AllocBounds;
     fn mi_is_block_start(ptr: *mut c_void) -> bool;
     fn __vasprintf(strp: *mut *mut c_char, fmt: *const c_char, args: VaList<'_>) -> c_int;
-    
+
 }
 
 /**
@@ -245,6 +249,8 @@ pub extern "C" fn __resolve_reallocarray(ptr: *mut c_void, n: usize, size: usize
  */
 #[unsafe(no_mangle)]
 pub extern "C" fn __resolve_malloc(size: usize) -> *mut c_void {
+    // SAFETY:
+    // - 'ptr' allocated by mimalloc
     let ptr = unsafe { mi_malloc(size + 1) };
     info!("[RESOLVE] mimalloc ptr: 0x{:x}", ptr as Vaddr);
 
@@ -325,21 +331,21 @@ pub extern "C" fn __resolve_free(ptr: *mut c_void) -> () {
   //     size
   // };
 
-    // // Check if the shadow object exists
-    // match ptr_size {
-    //     Some(size) => {
-    //         info!(
-    //             "[FREE] Found shadow object for allocated object, 0x{:x}, size = {size}",
-    //             ptr as Vaddr,
-    //         );
-    //     }
-    //     None => {
-    //         warn!(
-    //             "[FREE] No shadow object found for allocated object: 0x{:x}",
-    //             ptr as Vaddr
-    //         );
-    //     }
-    // }
+// // Check if the shadow object exists
+// match ptr_size {
+//     Some(size) => {
+//         info!(
+//             "[FREE] Found shadow object for allocated object, 0x{:x}, size = {size}",
+//             ptr as Vaddr,
+//         );
+//     }
+//     None => {
+//         warn!(
+//             "[FREE] No shadow object found for allocated object: 0x{:x}",
+//             ptr as Vaddr
+//         );
+//     }
+// }
 
     {
         // Insert shadow object into freed object list
@@ -377,7 +383,10 @@ pub extern "C" fn __resolve_realloc(ptr: *mut c_void, size: usize) -> *mut c_voi
     // to remove the shadow object for the orignal allocation
     let realloc_ptr = unsafe { mi_realloc(ptr, size) };
 
-    info!("[RESOLVE] old = 0x{:x}, new = 0x{:x}, size = {}", ptr as Vaddr, realloc_ptr as Vaddr, size);
+    info!(
+        "[RESOLVE] old = 0x{:x}, new = 0x{:x}, size = {}",
+        ptr as Vaddr, realloc_ptr as Vaddr, size
+    );
     if realloc_ptr.is_null() {
         return realloc_ptr;
     }
@@ -627,8 +636,13 @@ pub extern "C" fn __resolve_get_bounds_heap(ptr: *mut c_void) -> ShadowObjBounds
         return ShadowObjBounds::null();
     }
 
+    // SAFETY:
+    // 'ptr' must point to valid allocation owned by mimalloc
     let bounds = unsafe { mi_get_alloc_bounds(ptr) };
-    info!("[RESOLVE] (ptr: 0x{:x}, lower: 0x{:x}, upper: 0x{:x})", ptr as Vaddr, bounds.base as Vaddr, bounds.limit as Vaddr);
+    info!(
+        "[RESOLVE] (ptr: 0x{:x}, lower: 0x{:x}, upper: 0x{:x})",
+        ptr as Vaddr, bounds.base as Vaddr, bounds.limit as Vaddr
+    );
 
     return sobj.into();
 }
