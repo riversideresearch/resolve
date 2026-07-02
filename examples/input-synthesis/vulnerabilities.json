@@ -1,0 +1,15 @@
+{
+    "vulnerabilities": [
+        {
+            "cve-id": "CVE-recordparser-00001",
+            "cve-description": "recordparser 1.0.0 reads a length-prefixed record from stdin, where the first byte declares the payload length. parse_record copies that many bytes into a fixed 16-byte stack buffer with memcpy and no bounds check, so a declared length greater than 16 causes a stack-based buffer overflow (CWE-121).",
+            "package-name": "recordparser",
+            "package-version": "1.0.0",
+            "cwe-id": "121",
+            "cwe-name": "Stack-based Buffer Overflow",
+            "affected-function": "parse_record",
+            "affected-file": "main.c",
+            "remediation-strategy": "exit"
+        }
+    ]
+}
