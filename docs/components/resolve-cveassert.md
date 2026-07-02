@@ -2,12 +2,15 @@
 
 CVEAssert is an LLVM compiler pass plugin that instruments programs 
 by inserting runtime checks into functions identified by a CVE description. 
-It consumes a CVE description encoded in JSON, which is parsed into
+It consumes a [CVE description encoded in JSON](../concepts/vulnerabilities-json.md), which is parsed into
 an internal representation containing the affected source file, affected function,
 CWE identifier, and remediation strategy. Based on this
 description, CVEAssert selects and applies the appropriate sanitizer
 to each affected function. CVEAssert can optionally be linked with
 the [`libresolve`](libresolve.md) runtime library to enforce stack and heap bounds protections. The pass is executed early in the compilation pipeline to allow LLVM's analysis and optimization framework to optimize the injected instrumentation. 
+
+!!! tip
+    For a step-by-step walkthrough of instrumenting a fix with CVEAssert, see the [remediation example](../examples/remediation.md).
 
 ## Architecture Diagram
 

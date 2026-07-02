@@ -2,7 +2,10 @@
 
 Scripts for driving coding agents to perform crash analysis. The pipeline takes input files regarding the crash and codifies it through structured reasoning.
 
-The agent will first examine the input folders and craft a `synthesis.md` file with objective facts about the crash. The agent will then create both a `thesis.md` and `antithesis.md` which then get reconciled into the `vulnerabilities.json` output and the `report.md`.
+The agent will first examine the input folders and craft a `synthesis.md` file with objective facts about the crash. The agent will then create both a `thesis.md` and `antithesis.md` which then get reconciled into the [`vulnerabilities.json`](../../concepts/vulnerabilities-json.md) output and the `report.md`.
+
+!!! tip
+    For a full end-to-end walkthrough, see the [crash analysis example](../../examples/crash-analysis.md).
 
 ## Example
 

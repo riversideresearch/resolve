@@ -4,7 +4,7 @@
 
 ## Setup
 
-The overall RESOLVE build/install workflow places the RESOLVE cli tools in the install prefix.
+The overall **RESOLVE** build/install workflow places the **RESOLVE** cli tools in the install prefix.
 If a python installation does not already exist there, a pseudo python virtual environment is created, allowing use like so:
 
 ```bash
@@ -37,17 +37,17 @@ python3 -m resolve ...
 
 ## Subcommands
 
-The RESOLVE cli is implemented as a collection of subcommands where `resolve <subcommand> [args...]` runs `resolve-<subcommand> [args...]`
+The **RESOLVE** cli is implemented as a collection of subcommands where `resolve <subcommand> [args...]` runs `resolve-<subcommand> [args...]`
 
 The current subcommands are as follows:
 
 ## `reach`
 
-Runs the static reachability analysis.
+Runs the static reachability analysis. See the [Reach component docs](../reach.md).
 
 Inputs:
 
-- vulnerabilities.json
+- [vulnerabilities.json](../../concepts/vulnerabilities-json.md)
 - extracted facts files
 - path to reach bin
 - source code path, to read vcpkg overlays
@@ -58,7 +58,7 @@ Outputs:
 
 ## `input-synthesis`
 
-Runs the input synthesis workflow to perform CVE analysis and improvement, (AI enhanced) reachability analysis, and finally input synthesis. 
+Runs the input synthesis workflow to perform CVE analysis and improvement, (AI enhanced) reachability analysis, and finally input synthesis. See the [Input Synthesis docs](input-synthesis.md).
 
 Inputs: 
 
@@ -78,7 +78,7 @@ Outputs (reachability):
 
 ## `crash-analyzer`
 
-Runs a crash analysis workflow, agnostic to the specifics of the input.
+Runs a crash analysis workflow, agnostic to the specifics of the input. See the [Crash Analyzer docs](crash-analyzer.md).
 
 Inputs: 
 
@@ -95,7 +95,7 @@ Outputs:
 
 ## `sbom`
 
-Searches NVD for known vulnerabilities in an SBOM and generates vulnerabilities.json with the results.
+Searches NVD for known vulnerabilities in an SBOM and generates vulnerabilities.json with the results. See the [SBOM docs](sbom.md).
 
 Inputs:
 

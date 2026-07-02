@@ -1,12 +1,15 @@
 # Software Bill Of Materials Lookup
 
-This tool cross-references a CMAKE-generated SBOM with NIST's NVD to identify known vulnerabilities, generating a `vulnerabilities.json` with the results.
+This tool cross-references a CMAKE-generated SBOM with [NIST's NVD](https://nvd.nist.gov/) to identify known vulnerabilities, generating a [`vulnerabilities.json`](../../concepts/vulnerabilities-json.md) with the results.
+
+!!! tip
+    The `vulnerabilities.json` produced here feeds directly into [reachability analysis](../reach.md); see the [reachability example](../../examples/reachability.md) for a walkthrough.
 
 ## Principle of Operation
 
-This tool parses the CMAKE-generated `spdx` SBOM file to identify the name and version number of each dependency.
+This tool parses the CMAKE-generated [`spdx`](https://spdx.dev/) SBOM file to identify the name and version number of each dependency.
 These are then looked up in NIST's NVD to find any known CVEs.
-For each identified CVE, its corresponding CWE(s) is looked up in MITRE's CWE database.
+For each identified CVE, its corresponding CWE(s) is looked up in [MITRE's CWE database](https://cwe.mitre.org/).
 Finally, an LLM is used to extract the vulnerable file and function from the natural language CVE description.
 
 ## Usage

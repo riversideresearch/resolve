@@ -1,6 +1,6 @@
 ## Dependencies
 
-Resolve has been tested on **Ubuntu 24.04.4 LTS**, but should work on other distributions that can provide the following packages:
+**RESOLVE** has been tested on **Ubuntu 24.04.4 LTS**, but should work on other distributions that can provide the following packages:
 
 - Clang 18
 - LLVM 18

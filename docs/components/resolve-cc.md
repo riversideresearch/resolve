@@ -1,6 +1,9 @@
 # resolvecc
 
-The `resolve-cc` source folder contains the `resolvecc` compiler wrapper and scripts for extracting facts from the ELF binary sections embedded by the `EnhancedFacts` compiler pass plugin. Those sections are then written to files to be consumed by the `reach` tool for reachability analysis. The `resolve` ELF sections in which metadata is embedded are compatible with standard linkers; a custom linker is not required for linking `resolve`-generated binaries.
+The `resolve-cc` source folder contains the `resolvecc` compiler wrapper and scripts for extracting [facts](facts.md) from the ELF binary sections embedded by the `EnhancedFacts` compiler pass plugin. Those sections are then written to files to be consumed by the [`reach`](reach.md) tool for reachability analysis. The `resolve` ELF sections in which metadata is embedded are compatible with standard linkers; a custom linker is not required for linking `resolve`-generated binaries.
+
+!!! tip
+    `resolvecc` is exercised end-to-end in the [reachability example](../examples/reachability.md) (fact generation) and the [remediation example](../examples/remediation.md) (compile-time fixes).
 
 If you have a valid clang-18 install, running:
 
@@ -54,7 +57,7 @@ The `AnnotateFunctions` pass plugin inserts inline runtime monitors to collect f
 | LLVM Pass | Behavior |
 | --- | --- |
 | `AnnotateFunctions` | Insert code to record function activations |
-| `CVEAssert` | Given `.json` CVE description, insert runtime checks into affected function | 
+| [`CVEAssert`](resolve-cveassert.md) | Given `.json` CVE description, insert runtime checks into affected function | 
 | `DlsymHook` | Instrument 'dlsym' function calls |
 | `EnhancedFacts` | Embed facts derived from program source code into custom ELF sections |
 | `ObjHook` | Instrument C memory allocators |

@@ -24,7 +24,7 @@ sudo apt install -y bash coreutils clang llvm binutils zstd
     sudo ln -sf /usr/bin/clang++-18 /usr/local/bin/clang++
     ```
 
-## One-Liner RESOLVE Install
+## One-Liner **RESOLVE** Install
 
 You can install the latest GitHub release of **RESOLVE** using the following command:
 
@@ -38,15 +38,15 @@ curl -fL https://github.com/riversideresearch/resolve/releases/latest/download/r
 
 ## Versioning
 
-This documentation site is versioned alongside RESOLVE GitHub releases. Use the navbar dropdown to select the correct version of the docs that corresponds with the output of:
+This documentation site is versioned alongside **RESOLVE** GitHub releases. Use the navbar dropdown to select the correct version of the docs that corresponds with the output of:
 
 ```bash
 resolve version
 ```
 
 !!! note
-    If you just installed RESOLVE, the "latest" version of these docs is probably what you want (and might already be reading).
+    If you just installed **RESOLVE**, the "latest" version of these docs is probably what you want (and might already be reading).
 
 ## Building from source
 
-See [building RESOLVE from source](development/building-from-source.md) for information on building **RESOLVE** binaries.
+See [building **RESOLVE** from source](development/building-from-source.md) for information on building **RESOLVE** binaries.

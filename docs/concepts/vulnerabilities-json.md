@@ -1,6 +1,9 @@
 # vulnerabilities.json
 
-The `vulnerabilities.json` file is an important element of the RESOLVE toolchain, as certain CLI tools can generate it (crash analyzer, input synthesis), and our downstream tools (reachability, remediation) require it.
+The `vulnerabilities.json` file is an important element of the **RESOLVE** toolchain, as certain CLI tools can generate it ([crash analyzer](../components/resolve-cli/crash-analyzer.md), [input synthesis](../components/resolve-cli/input-synthesis.md)), and our downstream tools ([reachability](../components/reach.md), [remediation](../components/resolve-cveassert.md)) require it.
+
+!!! note
+    An [SBOM lookup](../components/resolve-cli/sbom.md) can also generate a `vulnerabilities.json` from a project's software bill of materials.
 
 The basic format is like this:
 
@@ -31,6 +34,6 @@ The basic format is like this:
 ```
 
 !!! note
-    Even some of the "required" fields are not actually consumed by certain tools, but this is the minimum set that are required for compatibility with all RESOLVE tools. For example, CVEAssert does not care if you provide a `cve-id`.  
+    Even some of the "required" fields are not actually consumed by certain tools, but this is the minimum set that are required for compatibility with all **RESOLVE** tools. For example, CVEAssert does not care if you provide a `cve-id`.  
 
 For information on choosing a `cwe-id`, see [supported ids](../components/resolve-cveassert.md#common-mappings).

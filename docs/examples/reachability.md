@@ -2,7 +2,7 @@
 
 **RESOLVE** can statically determine whether a known vulnerability is *reachable* (whether a call path exists from a program's entry point to the affected function).
 
-This guide walks through checking reachability for a simple null-pointer dereference using the `resolve` CLI, and has supplemental source code in the [GitHub repository](https://github.com/riversideresearch/resolve/tree/main/examples/reachability/).
+This guide walks through checking reachability for a simple [null-pointer dereference](https://cwe.mitre.org/data/definitions/476.html) using the `resolve` CLI, and has supplemental source code in the [GitHub repository](https://github.com/riversideresearch/resolve/tree/main/examples/reachability/).
 
 ## The Program
 
@@ -23,7 +23,7 @@ We want to ask **RESOLVE**: starting from `main`, can execution actually reach `
 
 ## A Vulnerability Specification
 
-First, describe the vulnerability we want to analyze in a JSON file (let's call it `vulnerabilities.json` on disk). Each entry in the array is a *sink* (a function we would like to try to reach). All of the following fields are required, and will be fed-through into our final report:
+First, describe the vulnerability we want to analyze in a JSON file (let's call it [`vulnerabilities.json`](../concepts/vulnerabilities-json.md) on disk). Each entry in the array is a *sink* (a function we would like to try to reach). All of the following fields are required, and will be fed-through into our final report:
 
 ```json
 {
@@ -47,7 +47,7 @@ First, describe the vulnerability we want to analyze in a JSON file (let's call 
 
 ## Compiling With `resolvecc`
 
-Reachability analysis runs on program *facts* (see: [RESOLVE facts](../components/facts.md)). **RESOLVE** generates these facts at compile time and embeds them directly into the binary. To produce them, compile with the **RESOLVE** compiler, `resolvecc`, exactly as you would with `clang`:
+Reachability analysis runs on program *facts* (see: [RESOLVE facts](../components/facts.md)). **RESOLVE** generates these facts at compile time and embeds them directly into the binary. To produce them, compile with the [**RESOLVE** compiler, `resolvecc`](../components/resolve-cc.md), exactly as you would with `clang`:
 
 ```bash
 resolvecc main.c -o main
@@ -65,7 +65,7 @@ This writes `main.facts` (alongside a compressed `main.facts.zst`) into the curr
 
 ## Running the Reachability Query
 
-Now we have everything `resolve reach` needs: the vulnerability specification and the facts. Point it at both and choose an output path for the report:
+Now we have everything [`resolve reach`](../components/reach.md) needs: the vulnerability specification and the facts. Point it at both and choose an output path for the report:
 
 ```bash
 resolve reach -i vulnerabilities.json -f main.facts -o out.json
@@ -135,5 +135,8 @@ resolvecc main.c -o main
 resolve get-facts -i main
 resolve reach -i vulnerabilities.json -f main.facts -o out.json
 ```
+
+!!! tip
+    Once a path is confirmed, synthesize a concrete triggering input with input synthesis (above), or instrument a fix at compile time with [remediation](remediation.md).
 
 

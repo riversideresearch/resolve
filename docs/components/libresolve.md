@@ -40,7 +40,7 @@ Each log file automatically appends the process ID after the extension.
 
 
 ## LLVM Passes
-Libresolve is designed to used with the LLVM passes within the RESOLVE toolchain.
+Libresolve is designed to used with the [LLVM passes](resolve-cc.md#additional-passes) within the **RESOLVE** toolchain.
 
 | LLVM Passes | Behavior with Libresolve | 
 | --- | --- |
@@ -54,7 +54,7 @@ Libresolve is designed to used with the LLVM passes within the RESOLVE toolchain
 When the instrumented function is linked with libresolve, it records the function summaries of all function definitions in the C/C++ project in `resolve_log_<pid>out`. Furthermore it records basic block transitions to be used in offline analysis.
 
 ## CVEAssert
-`CVEAssert` inserts runtime checks into specified vulnerable functions in a C/C++ project based
+[`CVEAssert`](resolve-cveassert.md) inserts runtime checks into specified vulnerable functions in a C/C++ project based
 on a supplied CVE description. The CVE description is encoded as a JSON.
 
 When the instrumented program is linked with libresolve, it tracks stack and heap allocations using shadow metadata. If an invalid or security-relevant memory access occurs, libresolve records the event in `resolve_log_<pid>.out`.

@@ -1,8 +1,8 @@
 # Remediation Example
 
-**RESOLVE** can automatically remediate vulnerabilities upon program compilation using [CVEAssert](../../components/resolve-cveassert), an LLVM pass we developed to instrument programs with sanitizers.
+**RESOLVE** can automatically remediate vulnerabilities upon program compilation using [CVEAssert](../components/resolve-cveassert.md), an LLVM pass we developed to instrument programs with sanitizers.
 
-This guide explains remediating a simple null-pointer dereference example with **RESOLVE**, and has supplemental source code in the [GitHub repository](https://github.com/riversideresearch/resolve/tree/main/examples/remediation/).
+This guide explains remediating a simple [null-pointer dereference](https://cwe.mitre.org/data/definitions/476.html) example with **RESOLVE**, and has supplemental source code in the [GitHub repository](https://github.com/riversideresearch/resolve/tree/main/examples/remediation/).
 
 ## The Program
 
@@ -40,9 +40,9 @@ This is fairly obvious, but certain null pointer dereferences in real programs m
 
 ## A Vulnerability Specification
 
-To start with, we must create a json file specifying what we want resolve to fix. In this case, we need to know both the CWE ([Common Weakness Enumeration](https://cwe.mitre.org/)) number corresponding to the vulnerability type, and the affected function we want to sanitize.
+To start with, we must create a json file specifying what we want **RESOLVE** to fix. In this case, we need to know both the CWE ([Common Weakness Enumeration](https://cwe.mitre.org/)) number corresponding to the vulnerability type, and the affected function we want to sanitize.
 
-According to the **RESOLVE** vulnerabilities.json documentation, we should create a json file like so: (let's just call it `vulnerabilities.json` on disk)
+According to the **RESOLVE** [vulnerabilities.json documentation](../concepts/vulnerabilities-json.md), we should create a json file like so: (let's just call it `vulnerabilities.json` on disk)
 
 ```json
 {
@@ -59,14 +59,14 @@ According to the **RESOLVE** vulnerabilities.json documentation, we should creat
 !!! note
     In this case, some "required" fields (`cve-id`) are not actually required, since CVEAssert itself does not consume them. You can still provide them, if you'd like.
 
-To see a full list of supported CWE IDs, see the [CVEAssert documentation](../components/resolve-cveassert.md/#common-mappings).
+To see a full list of supported CWE IDs, see the [CVEAssert documentation](../components/resolve-cveassert.md#common-mappings).
 
 !!! tip
     If you wanted to remediate multiple vulnerabilities across multiple functions, you could define each one in the `vulnerabilities` array, and CVEAssert will sanitize each one.
 
 ## Compiling With Our Specification
 
-To use our newly minted specification to remediate our program, we can invoke the **RESOLVE** compiler as if it were `clang`, passing it `-fcve-assert` with a path to our specification:
+To use our newly minted specification to remediate our program, we can invoke the [**RESOLVE** compiler, `resolvecc`](../components/resolve-cc.md), as if it were `clang`, passing it `-fcve-assert` with a path to our specification:
 
 ```bash
 resolvecc main.c -o main -fcve-assert vulnerabilities.json

@@ -32,7 +32,7 @@ A declared length of 16 or less is harmless; anything larger overflows `buf`. Wh
 
 ## Describing the Vulnerability
 
-Input synthesis starts from a [RESOLVE JSON CVE description file](../concepts/vulnerabilities-json.md) (`vulnerabilities.json`). This description is what the pipeline reasons over, so it should name the affected function, the bug class, and the input condition that triggers it:
+Input synthesis starts from a [**RESOLVE** JSON CVE description file](../concepts/vulnerabilities-json.md) (`vulnerabilities.json`). This description is what the pipeline reasons over, so it should name the affected function, the bug class, and the input condition that triggers it:
 
 !!! tip
     Because this is an agentic pipeline, the more information you can provide in this context, the better. You can supply any additional json data in this file you'd like to the agent, it doesn ***not*** need to be valid **RESOLVE** metadata.
@@ -73,7 +73,7 @@ resolve input-synthesis run-all claude cve.json out/
 
 1. **Setup**: checks out the affected version, maps the project, installs dependencies, and builds it, so later phases have a real target to analyze.
 2. **Improve CVE**: sharpens the description through a debate pass, then decomposes it into necessary conditions (all must hold) and sufficient conditions (any one guarantees the trigger).
-3. **Reachability**: decides whether those conditions are simultaneously satisfiable from user input, concluding triggerable, not triggerable, or inconclusive.
+3. **Reachability**: decides whether those conditions are simultaneously satisfiable from user input, concluding triggerable, not triggerable, or inconclusive. (For the static, compiler-facts flavor of reachability, see the [reachability example](reachability.md).)
 4. **Input synthesis**: if triggerable, synthesizes a concrete input that satisfies the conditions and writes a summary to `conclusion.md`.
 
 ## Interpreting the Result
@@ -109,3 +109,6 @@ The first byte of `0x11` (declaring 17 payload bytes) is followed by 17 bytes of
 
 !!! note
     Given that input synthesis is agent-driven, the exact bytes, filenames, and any helper scripts under `input-synthesis/` vary between runs.
+
+!!! tip
+    With a proof-of-vulnerability in hand, you can instrument a compile-time fix for the same finding with [remediation](remediation.md).

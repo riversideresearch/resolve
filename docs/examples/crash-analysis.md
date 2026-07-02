@@ -4,7 +4,7 @@
 
 This is pretty neat, becaues the rest of the toolchain can use this to query and fix the crashing program. The `vulnerabilities.json` this pipeline emits is exactly what [reachability](reachability.md) and [remediation](remediation.md) consume.
 
-This guide walks through analyzing a crashing program with the `resolve` CLI, and has supplemental source code in the [GitHub repository](https://github.com/riversideresearch/resolve/tree/main/examples/crash-analysis/).
+This guide walks through analyzing a crashing program with the `resolve` CLI, and has supplemental source code in the [GitHub repository](https://github.com/riversideresearch/resolve/tree/main/examples/crash-analysis/). For the full command reference, see the [crash analyzer component docs](../components/resolve-cli/crash-analyzer.md).
 
 ## The Program
 
@@ -39,7 +39,7 @@ clang -g -O0 -fsanitize=address main.c -o greet
 ./greet AAAAAAAAAAAAAAAAAAAAAAAAAAAA > crash/asan.log 2>&1
 ```
 
-The resulting `crash/asan.log` explains the fault precisely: a `stack-buffer-overflow` write, inside `strcpy`, called from `greet` at `main.c:8`:
+The resulting `crash/asan.log` explains the fault precisely: a [`stack-buffer-overflow`](https://cwe.mitre.org/data/definitions/121.html) write, inside `strcpy`, called from `greet` at `main.c:8`:
 
 ```txt
 ==...==ERROR: AddressSanitizer: stack-buffer-overflow on address ...
