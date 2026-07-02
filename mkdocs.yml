@@ -61,6 +61,7 @@ markdown_extensions:
 nav:
   - Home: index.md
   - Installation: installation.md
+  - Architecture: architecture.md
   - Concepts:
     - vulnerabilities.json: concepts/vulnerabilities-json.md
     - Facts: components/facts.md
@@ -79,6 +80,7 @@ nav:
     - Input Synthesis: examples/input-synthesis.md
     - Reachability: examples/reachability.md
     - Remediation: examples/remediation.md
+    - SBOM: examples/sbom.md
   - Development:
     - Building From Source: development/building-from-source.md
     - Documentation Website: development/documentation.md

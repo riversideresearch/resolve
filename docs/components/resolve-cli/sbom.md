@@ -14,30 +14,34 @@ Finally, an LLM is used to extract the vulnerable file and function from the nat
 
 ## Usage
 
-### Required Options
+### Arguments
 
-  - `-i`, `--sbom`: path to SBOM file
-  - `-o`, `--out`: path for output file
+  - `sbom` (positional) -- path to one or more input SBOM file(s)
 
-### Optional Options
-  - `-s`, `--min-score` -- Minimum score for CVEs to be included in report (default 0)
-  - `-L`, `--llm-provider` -- LLM provider to use for affected file/function extraction (default Gemini)
+### Options
+  - `-o`, `--out` -- path for the output `vulnerabilities.json` (defaults to `<sbom>.vuln.json`)
+  - `-L`, `--llm-provider` `[{gemini,ollama,opencode}]` -- LLM backend used to extract the affected file and function from each CVE description. Omit it to skip extraction (those fields are reported as `UNKNOWN`); passing `-L` with no value uses `opencode`.
+  - `--id` `[ID ...]` -- only report the given vulnerability id(s)
+  - `--min-score` -- minimum CVSS v3 base score for a CVE to be included. When set, CVEs that have no v3 score are also excluded (by default they are included).
 
-### Optional Flags
-  - `-E`, `--allow-empty-score` -- Include CVEs that do NOT have 3.0 scores
-  - `-D`, `--allow-disputed` -- Include CVEs that are marked disputed
-  - `-d`, `--allow-deferred` -- Include CVEs that have been deferred by NIST
-  - `-R`, `--allow-rejected` -- Include CVEs that have been rejected by NIST
+### Filter Flags
+By default, disputed, deferred, and rejected CVEs are all included. Pass these to exclude them:
+
+  - `--filter-disputed` -- exclude CVEs marked disputed
+  - `--filter-deferred` -- exclude CVEs deferred by NIST
+  - `--filter-rejected` -- exclude CVEs rejected by NIST
 
 ### Example
 
 ```bash
-resolve sbom -i example_in.spdx.json -o example_out.json -L ollama
+resolve sbom example.spdx.json -o vulnerabilities.json -L ollama
 ```
+
+See the [SBOM example](../../examples/sbom.md) for an end-to-end walkthrough.
 
 ## LLM Providers
 
-Currently supported LLM providers are the Gemini API and Ollama.
+Affected-file/function extraction is optional; if you do not pass `-L`, those fields are left as `UNKNOWN` and no LLM is contacted. When enabled, the supported providers are Gemini, Ollama, and Opencode.
 
 ### Gemini
 
@@ -50,6 +54,10 @@ This method uses `gemini-2.5-flash` as the model.
 To use Ollama, Ollama must be installed and running on your local system.
 
 This method uses `gemma3` as the model.
+
+### Opencode
+
+To use Opencode, the `opencode` CLI must be installed and authenticated. This is the provider selected when `-L` is passed with no value.
 
 ## Design Considerations
 
