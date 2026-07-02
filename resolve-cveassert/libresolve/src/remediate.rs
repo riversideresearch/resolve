@@ -2,12 +2,13 @@
 // LGPL-3; See LICENSE.txt in the repo root for details.
 
 use libc::{
-    EOF, FILE, STDERR_FILENO, c_char, c_int, c_uint, c_void, fgetc, free, mmap, size_t, snprintf, ssize_t, strlen, strnlen, write,
+    c_char, c_int, c_uint, c_void, fgetc, free, mmap, size_t, snprintf, ssize_t, strlen, strnlen,
+    write, EOF, FILE, STDERR_FILENO,
 };
 
 use std::ffi::VaList;
 
-use crate::shadowobjs::{SHADOW_STACK, ALIVE_OBJ_LIST, AllocType, FREED_OBJ_LIST, Vaddr};
+use crate::shadowobjs::{AllocType, Vaddr, ALIVE_OBJ_LIST, FREED_OBJ_LIST, SHADOW_STACK};
 
 use log::{info, warn};
 
@@ -21,13 +22,16 @@ struct AllocBounds {
 
 impl From<AllocBounds> for ShadowObjBounds {
     fn from(bounds: AllocBounds) -> Self {
-        ShadowObjBounds { base: bounds.base, limit: bounds.limit }
+        ShadowObjBounds {
+            base: bounds.base,
+            limit: bounds.limit,
+        }
     }
 }
 
 #[link(name = "mimalloc")]
 unsafe extern "C" {
-    // Allocator API
+    // Mimalloc public API
     fn mi_malloc(size: usize) -> *mut c_void;
     fn mi_calloc(size: usize, count: usize) -> *mut c_void;
     fn mi_realloc(ptr: *mut c_void, size: usize) -> *mut c_void;
@@ -42,11 +46,12 @@ unsafe extern "C" {
     fn mi_new(size: usize) -> *mut c_void;
     fn mi_delete(ptr: *mut c_void);
 
+    // mi_shim.c API
     fn mi_is_in_heap_region(ptr: *mut c_void) -> bool;
     fn mi_get_alloc_bounds(ptr: *mut c_void) -> AllocBounds;
     fn mi_is_block_start(ptr: *mut c_void) -> bool;
     fn __vasprintf(strp: *mut *mut c_char, fmt: *const c_char, args: VaList<'_>) -> c_int;
-    
+
 }
 
 /**
@@ -58,10 +63,7 @@ unsafe extern "C" {
 pub extern "C" fn __resolve_alloca(ptr: *mut c_void, size: usize) -> () {
     let base = ptr as Vaddr;
 
-    SHADOW_STACK.with_borrow_mut(
-        |ss|
-         ss.add_shadow_object(base, size)
-    );
+    SHADOW_STACK.with_borrow_mut(|ss| ss.add_shadow_object(base, size));
 
     info!("[STACK] Object allocated with size: {size}, address: 0x{base:x}");
 }
@@ -70,10 +72,7 @@ pub extern "C" fn __resolve_alloca(ptr: *mut c_void, size: usize) -> () {
 pub extern "C" fn __resolve_invalidate_stack_range(base: *mut c_void, size: usize) {
     let base = base as Vaddr;
 
-    SHADOW_STACK.with_borrow_mut(
-        |ss|
-         ss.invalidate_at(base, size)
-    );
+    SHADOW_STACK.with_borrow_mut(|ss| ss.invalidate_at(base, size));
 
     info!("[STACK] Free addr 0x{base:x} size {size}");
 }
@@ -230,6 +229,8 @@ pub extern "C" fn __resolve_reallocarray(ptr: *mut c_void, n: usize, size: usize
  */
 #[unsafe(no_mangle)]
 pub extern "C" fn __resolve_malloc(size: usize) -> *mut c_void {
+    // SAFETY:
+    // - 'ptr' allocated by mimalloc
     let ptr = unsafe { mi_malloc(size + 1) };
     info!("[RESOLVE] mimalloc ptr: 0x{:x}", ptr as Vaddr);
 
@@ -239,7 +240,10 @@ pub extern "C" fn __resolve_malloc(size: usize) -> *mut c_void {
 
     let bounds = unsafe { mi_get_alloc_bounds(ptr) };
 
-    info!("[RESOLVE] bounds: [0x{:x}, 0x{:x})", bounds.base as Vaddr, bounds.limit as Vaddr);
+    info!(
+        "[RESOLVE] bounds: [0x{:x}, 0x{:x})",
+        bounds.base as Vaddr, bounds.limit as Vaddr
+    );
     ptr
 }
 
@@ -264,7 +268,6 @@ pub extern "C" fn __resolve_free(ptr: *mut c_void) -> () {
     // Insert a function to find the object and return the pointer size
     // Do I need to handle if the sobj cannot be found?
     unsafe {
-
         // info!("[RESOLVE] free(%p), thread: 0x{:x}", /* check if mimalloc has api call to get thread id */);
 
         if ptr.is_null() {
@@ -283,78 +286,82 @@ pub extern "C" fn __resolve_free(ptr: *mut c_void) -> () {
                 let _ = mi_free(ptr);
             }
         } else {
-            info!("[RESOLVE] foreign free: 0x{:x}, in_region={}", ptr as Vaddr, mi_is_in_heap_region(ptr));
+            info!(
+                "[RESOLVE] foreign free: 0x{:x}, in_region={}",
+                ptr as Vaddr,
+                mi_is_in_heap_region(ptr)
+            );
             // let _ = free(ptr);
         }
     }
 }
-        // if mi_is_in_heap_region(ptr) {
-        //     let _ = mi_free(ptr);
-        // } else {
-        //     let _ = free(ptr);
-        // }
-    //     if !mi_is_heap_owned(ptr) {
-    //         let caller = resolve_return_address(1);
-    //         warn!("[RESOLVE] ptr = {:p}, caller = {:p}", ptr, caller);
-    //         // let len = snprintf(
-    //         //     buf.as_mut_ptr(),
-    //         //     buf.len(),
-    //         //     c"caller=%p, ptr=%p\n".as_ptr(),
-    //         //     caller,
-    //         //     ptr,
-    //         // );
+// if mi_is_in_heap_region(ptr) {
+//     let _ = mi_free(ptr);
+// } else {
+//     let _ = free(ptr);
+// }
+//     if !mi_is_heap_owned(ptr) {
+//         let caller = resolve_return_address(1);
+//         warn!("[RESOLVE] ptr = {:p}, caller = {:p}", ptr, caller);
+//         // let len = snprintf(
+//         //     buf.as_mut_ptr(),
+//         //     buf.len(),
+//         //     c"caller=%p, ptr=%p\n".as_ptr(),
+//         //     caller,
+//         //     ptr,
+//         // );
 
-    //         // if len > 0 {
-    //         //     let _ = write(
-    //         //         STDERR_FILENO,
-    //         //         buf.as_ptr().cast(),
-    //         //         usize::min(len as usize, buf.len() - 1),
-    //         //     );
-    //         // }
+//         // if len > 0 {
+//         //     let _ = write(
+//         //         STDERR_FILENO,
+//         //         buf.as_ptr().cast(),
+//         //         usize::min(len as usize, buf.len() - 1),
+//         //     );
+//         // }
 
-    //         //let msg = "foreign allocation\n";
-    //         //write(STDERR_FILENO, msg.as_ptr().cast(), msg.len());
-    //         let _ = free(ptr); 
-    //     } else {
-    //         let _ = mi_free(ptr);
-    //     }
-    // }
+//         //let msg = "foreign allocation\n";
+//         //write(STDERR_FILENO, msg.as_ptr().cast(), msg.len());
+//         let _ = free(ptr);
+//     } else {
+//         let _ = mi_free(ptr);
+//     }
+// }
 
-    // info!(
-    //     "[FREE] Allocated object freed at address: 0x{:x}",
-    //     ptr as Vaddr
-    // );
+// info!(
+//     "[FREE] Allocated object freed at address: 0x{:x}",
+//     ptr as Vaddr
+// );
 
-    // let ptr_size = {
-    //     let mut obj_list = ALIVE_OBJ_LIST.lock();
-    //     let sobj_opt = obj_list.search_intersection(ptr as Vaddr);
-    //     let size = sobj_opt.map(|o| o.size());
-    //     // remove shadow obj from live list
-    //     obj_list.invalidate_at(ptr as Vaddr);
-    //     size
-    // };
+// let ptr_size = {
+//     let mut obj_list = ALIVE_OBJ_LIST.lock();
+//     let sobj_opt = obj_list.search_intersection(ptr as Vaddr);
+//     let size = sobj_opt.map(|o| o.size());
+//     // remove shadow obj from live list
+//     obj_list.invalidate_at(ptr as Vaddr);
+//     size
+// };
 
-    // // Check if the shadow object exists
-    // match ptr_size {
-    //     Some(size) => {
-    //         info!(
-    //             "[FREE] Found shadow object for allocated object, 0x{:x}, size = {size}",
-    //             ptr as Vaddr,
-    //         );
-    //     }
-    //     None => {
-    //         warn!(
-    //             "[FREE] No shadow object found for allocated object: 0x{:x}",
-    //             ptr as Vaddr
-    //         );
-    //     }
-    // }
+// // Check if the shadow object exists
+// match ptr_size {
+//     Some(size) => {
+//         info!(
+//             "[FREE] Found shadow object for allocated object, 0x{:x}, size = {size}",
+//             ptr as Vaddr,
+//         );
+//     }
+//     None => {
+//         warn!(
+//             "[FREE] No shadow object found for allocated object: 0x{:x}",
+//             ptr as Vaddr
+//         );
+//     }
+// }
 
-    // {
-    //     // Insert shadow object into freed object list
-    //     let mut freed_guard = FREED_OBJ_LIST.lock();
-    //     freed_guard.add_shadow_object(AllocType::Unallocated, ptr as Vaddr, ptr_size.unwrap_or(0));
-    // }
+// {
+//     // Insert shadow object into freed object list
+//     let mut freed_guard = FREED_OBJ_LIST.lock();
+//     freed_guard.add_shadow_object(AllocType::Unallocated, ptr as Vaddr, ptr_size.unwrap_or(0));
+// }
 //
 
 #[unsafe(no_mangle)]
@@ -382,7 +389,10 @@ pub extern "C" fn __resolve_realloc(ptr: *mut c_void, size: usize) -> *mut c_voi
     // to remove the shadow object for the orignal allocation
     let realloc_ptr = unsafe { mi_realloc(ptr, size) };
 
-    info!("[RESOLVE] old = 0x{:x}, new = 0x{:x}, size = {}", ptr as Vaddr, realloc_ptr as Vaddr, size);
+    info!(
+        "[RESOLVE] old = 0x{:x}, new = 0x{:x}, size = {}",
+        ptr as Vaddr, realloc_ptr as Vaddr, size
+    );
     if realloc_ptr.is_null() {
         return realloc_ptr;
     }
@@ -476,7 +486,6 @@ pub extern "C" fn __resolve_strndup(ptr: *mut c_char, size: usize) -> *mut c_cha
     string_ptr
 }
 
-
 #[derive(PartialEq)]
 #[repr(C)]
 pub struct ShadowObjBounds {
@@ -486,45 +495,49 @@ pub struct ShadowObjBounds {
 
 impl ShadowObjBounds {
     pub fn null() -> Self {
-        ShadowObjBounds { base: std::ptr::null_mut(), limit: std::ptr::null_mut() }
+        ShadowObjBounds {
+            base: std::ptr::null_mut(),
+            limit: std::ptr::null_mut(),
+        }
     }
 }
 
 impl From<&crate::shadowobjs::ShadowObject> for ShadowObjBounds {
     fn from(sobj: &crate::shadowobjs::ShadowObject) -> Self {
-        ShadowObjBounds { base: sobj.base as *mut c_void, limit: sobj.limit as *mut c_void }
+        ShadowObjBounds {
+            base: sobj.base as *mut c_void,
+            limit: sobj.limit as *mut c_void,
+        }
     }
 }
 
 /**
  * @brief - Helper function that queries the shadow stack
  *          to find a shadow obj where the ptr fits within
- *          its bounds of allocation 
+ *          its bounds of allocation
  * @input
- *  - ptr: ptr to allocation 
+ *  - ptr: ptr to allocation
  * @return struct containing the base and limit of the
- *         shadow object as pointers 
+ *         shadow object as pointers
  */
 #[unsafe(no_mangle)]
 pub extern "C" fn __resolve_get_bounds_stack(ptr: *mut c_void) -> ShadowObjBounds {
-    return SHADOW_STACK.with_borrow(
-        |ss| {
-            return match ss.search_intersection(ptr as Vaddr) {
-                Some(sobj) => { sobj.into() }
-                None => { ShadowObjBounds::null() }
-            }
-        }
-    );
+    return SHADOW_STACK.with_borrow(|ss| {
+        return match ss.search_intersection(ptr as Vaddr) {
+            Some(sobj) => sobj.into(),
+            None => ShadowObjBounds::null(),
+        };
+    });
 }
 
 /**
  * @brief - Helper function that queries heap sobj list
  *          to find a shadow obj where the ptr fits within
- *          its bounds of allocation 
+ *          its bounds of allocation
  * @input
- *  - ptr: ptr to allocation 
+ *  - ptr: ptr to allocation
  * @return struct containing the base and limit of the
- *         shadow object as pointers 
+ *         shadow object as pointers
  */
 #[unsafe(no_mangle)]
 pub extern "C" fn __resolve_get_bounds_heap(ptr: *mut c_void) -> ShadowObjBounds {
@@ -532,8 +545,13 @@ pub extern "C" fn __resolve_get_bounds_heap(ptr: *mut c_void) -> ShadowObjBounds
         return ShadowObjBounds::null();
     }
 
+    // SAFETY:
+    // 'ptr' must point to valid allocation owned by mimalloc
     let bounds = unsafe { mi_get_alloc_bounds(ptr) };
-    info!("[RESOLVE] (ptr: 0x{:x}, lower: 0x{:x}, upper: 0x{:x})", ptr as Vaddr, bounds.base as Vaddr, bounds.limit as Vaddr);
+    info!(
+        "[RESOLVE] (ptr: 0x{:x}, lower: 0x{:x}, upper: 0x{:x})",
+        ptr as Vaddr, bounds.base as Vaddr, bounds.limit as Vaddr
+    );
 
     return bounds.into();
 }
@@ -543,14 +561,16 @@ pub extern "C" fn __resolve_get_bounds_heap(ptr: *mut c_void) -> ShadowObjBounds
  *          allocation type already. Searches stack table ( O(log n) )
  *          before searching the heap table.
  * @input
- *  - ptr: ptr to allocation 
+ *  - ptr: ptr to allocation
  * @return struct containing the base and limit of the
- *         shadow object as pointers 
+ *         shadow object as pointers
  */
 #[unsafe(no_mangle)]
 pub extern "C" fn __resolve_get_bounds(ptr: *mut c_void) -> ShadowObjBounds {
     let mut bounds = __resolve_get_bounds_stack(ptr);
-    if bounds == ShadowObjBounds::null() { bounds = __resolve_get_bounds_heap(ptr)}
+    if bounds == ShadowObjBounds::null() {
+        bounds = __resolve_get_bounds_heap(ptr)
+    }
 
     bounds
 }
