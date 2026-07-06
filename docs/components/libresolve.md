@@ -57,7 +57,7 @@ When the instrumented function is linked with libresolve, it records the functio
 [`CVEAssert`](resolve-cveassert.md) inserts runtime checks into specified vulnerable functions in a C/C++ project based
 on a supplied CVE description. The CVE description is encoded as a JSON.
 
-When the instrumented program is linked with libresolve, it tracks stack and heap allocations using shadow metadata. If an invalid or security-relevant memory access occurs, libresolve records the event in `resolve_log_<pid>.out`.
+When the instrumented program is linked with libresolve, it tracks stack and heap allocations using shadow metadata. If an invalid or security-relevant memory access occurs, libresolve records the event in `resolve_log.out-<pid>`.
 
 ## DlsymHook
 The `DlsymHook` pass instruments calls to `dlsym` by wrapping them with the `resolve_` prefix. When libresolve is linked with `DlsymHook`, the runtime opens `resolve_dlsym.json` and records each dynamically resolved symbol along with its corresponding library.  
