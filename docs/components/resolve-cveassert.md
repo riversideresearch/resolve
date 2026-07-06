@@ -32,13 +32,13 @@ the [`libresolve`](libresolve.md) runtime library to enforce stack and heap boun
 
 ```bash
 .
-├── arith_san.cpp     - Source code for arithmetic sanitizers (i.e. divide by zero, integer overflow)
-├── bounds_check.cpp  - Source code for oob memory sanitizers 
-├── CVEAssert.cpp     - Driver code 
-├── helpers.cpp       - Helper functions
-├── null_ptr.cpp      - Source code for null pointer sanitizer
-├── undesirableop.cpp - Source code for operation masking sanitizer
-└── Vulnerability.hpp - Source code for internal data structure to parse CVE description
+├── ArithmeticSanitizer.cpp   - Arithmetic sanitizer
+├── BoundsCheck.cpp           - Heap/Stack bounds check
+├── CVEAssert.cpp             - Pass entry point
+├── IRUtils.cpp               - LLVM-generated helper functions
+├── NullPointerSanitizer.cpp  - Null pointer sanitizer
+├── OperationMasking.cpp      - Operation masking sanitizer
+└── Vulnerability.hpp         - Internal data structure to parse CVE description
 ```
 ## Supported Sanitizers 
 
