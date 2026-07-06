@@ -17,8 +17,8 @@
 #include "llvm/Support/raw_ostream.h"
 
 #include "CVEAssert.hpp"
+#include "IRUtils.hpp"
 #include "Vulnerability.hpp"
-#include "helpers.hpp"
 
 #include <map>
 #include <unordered_set>
