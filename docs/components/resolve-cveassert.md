@@ -245,15 +245,15 @@ Operation masking vulnerabilities occur when an affected function passes argumen
 To mitigate these vulnerabilities, CVEAssert generates a sanitized version of the vulnerable function and redirects affected call sites to the sanitized implementation. Instead of performing the original operation, the sanitized function returns its first argument unchanged. This masks the unsafe operation while allowing program execution to continue without triggering the undefined behavior associated with the original function call. Returning the first argument preserves a valid input value while preventing execution of the vulnerable operation, allowing the program to continue with a predictable result.
 
 The original program allocates a fixed buffer on the stack and uses
-the strcpy() function to copy the user input into the destination
-buffer. Because strcpy() does not verify the size of the destination
+the `strcpy()` function to copy the user input into the destination
+buffer. Because `strcpy()` does not verify the size of the destination
 buffer is large enough to hold the source string, an oversized input
 can overflow the buffer and result in undefined behavior.
 
 When CVEAssert instruments this code, it generates a sanitized
-wrapper for strcpy() that returns the first argument rather than
+wrapper for `strcpy()` that returns the first argument rather than
 performing the copy operation. The compiler then redirects calls to
-strcpy() to the sanitized wrapper, preventing the unsafe operation
+`strcpy()` to the sanitized wrapper, preventing the unsafe operation
 from being executed. 
 
 ```C
