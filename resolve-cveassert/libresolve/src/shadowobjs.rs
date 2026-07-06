@@ -3,7 +3,6 @@
 
 use crate::MutexWrap;
 use log::warn;
-use crate::remediate::ShadowObjBounds;
 use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::ops::RangeInclusive;

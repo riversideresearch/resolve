@@ -27,16 +27,15 @@
 #include <string>
 #include <vector>
 
+#include "ArithmeticSanitizer.hpp"
+#include "BoundsCheck.hpp"
 #include "CVEAssert.hpp"
+#include "FreeNonHeapMem.hpp"
+#include "IRUtils.hpp"
+#include "InstrumentAllocators.hpp"
+#include "NullPointerSanitizer.hpp"
+#include "OperationMasking.hpp"
 #include "Vulnerability.hpp"
-
-#include "arith_san.hpp"
-#include "bounds_check.hpp"
-#include "helpers.hpp"
-#include "instrument.hpp"
-#include "nonheap_free.hpp"
-#include "null_ptr.hpp"
-#include "undesirableop.hpp"
 
 using namespace llvm;
 

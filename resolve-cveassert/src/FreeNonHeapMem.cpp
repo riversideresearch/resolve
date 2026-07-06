@@ -7,8 +7,8 @@
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/InlineAsm.h"
 
+#include "IRUtils.hpp"
 #include "Vulnerability.hpp"
-#include "helpers.hpp"
 
 using namespace llvm;
 

@@ -15,14 +15,14 @@ add_subdirectory(libresolve)
 
 # Build Targets
 add_library(CVEAssert SHARED 
-  src/arith_san.cpp
-  src/bounds_check.cpp
+  src/ArithmeticSanitizer.cpp
+  src/BoundsCheck.cpp
   src/CVEAssert.cpp
-  src/helpers.cpp
-  src/instrument.cpp
-  src/nonheap_free.cpp
-  src/null_ptr.cpp
-  src/undesirableop.cpp
+  src/IRUtils.cpp
+  src/InstrumentAllocators.cpp
+  src/FreeNonHeapMem.cpp
+  src/NullPointerSanitizer.cpp
+  src/OperationMasking.cpp
 )
 
 # LLVM is normally built without RTTI. Be consistent with that.

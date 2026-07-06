@@ -10,8 +10,7 @@
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/raw_ostream.h"
 
-#include "helpers.hpp"
-#include "undesirableop.hpp"
+#include "IRUtils.hpp"
 
 #include <optional>
 #include <string>

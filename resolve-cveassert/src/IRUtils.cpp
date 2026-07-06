@@ -18,8 +18,8 @@
 #include "llvm/Transforms/Utils/Cloning.h"
 
 #include "CVEAssert.hpp"
+#include "IRUtils.hpp"
 #include "Vulnerability.hpp"
-#include "helpers.hpp"
 
 #include <algorithm>
 #include <cctype>

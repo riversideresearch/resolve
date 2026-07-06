@@ -12,8 +12,8 @@
 #include "llvm/Support/raw_ostream.h"
 
 #include "CVEAssert.hpp"
+#include "IRUtils.hpp"
 #include "Vulnerability.hpp"
-#include "helpers.hpp"
 
 using namespace llvm;
 
