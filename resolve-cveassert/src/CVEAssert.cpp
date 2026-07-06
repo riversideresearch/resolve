@@ -194,7 +194,7 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
        */
       maskOperationInFunction(&F, *vuln.UndesirableFunction, 0);
       result = PreservedAnalyses::none();
-      out << "[CVEAssert] === Post Sanitization of Undesirable Operation IR "
+      out << "[CVEAssert] === Post Sanitization of Masked Operation IR "
              "=== \n";
       out << F;
     }
