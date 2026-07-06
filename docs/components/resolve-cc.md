@@ -32,9 +32,6 @@ WRAPPER OPTIONS:
 
     -fno-resolve
         Does not load fact generation plugin.
-    
-    -lresolve 
-        Links against libresolve at link time. 
 
     -h, --help
         Show this help message.
@@ -43,7 +40,7 @@ All other options are forwarded directly to clang.
 
 EXAMPLES:
     resolvecc -fcve-assert vuln.json test.c
-    resolvecc -fcve-assert vuln.json -lresolve -O2 -g test.c
+    resolvecc -fcve-assert vuln.json -O2 -g test.c
     resolvecc -fno-resolve test.c 
     resolvecc -c test.c
 ```
