@@ -9,7 +9,6 @@
 
 #include "IRUtils.hpp"
 #include "Vulnerability.hpp"
-#include "IRUtils.hpp"
 
 using namespace llvm;
 
