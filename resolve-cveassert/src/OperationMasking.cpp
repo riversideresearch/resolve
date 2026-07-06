@@ -33,47 +33,42 @@ enum Cond { // Maybe adding an enum for all the possible conditions
 // We will continue generalizing this following eval-2
 // Change this function name to be "replaceUndesirableOperation" more
 // generalized name
-static Function *replaceUndesirableFunction(Module *M, CallInst *call,
-                                            unsigned int argNum) {
+static Function *getOrCreateMaskOperation(Module *M, CallInst *call,
+                                          unsigned int argNum) {
   LLVMContext &Ctx = M->getContext();
   IRBuilder<> builder(Ctx);
 
   std::string handlerName =
-      "resolve_sanitized_" + call->getCalledFunction()->getName().str();
+      "__cve_mask_" + call->getCalledFunction()->getName().str();
 
-  FunctionType *resolveSanitizedFnTy =
-      call->getCalledFunction()->getFunctionType();
+  FunctionType *maskFnTy = call->getCalledFunction()->getFunctionType();
 
-  Function *resolveSanitizedFn =
-      getOrCreateResolveHelper(M, handlerName, resolveSanitizedFnTy);
+  Function *maskedFn = getOrCreateResolveHelper(M, handlerName, maskFnTy);
 
-  if (!resolveSanitizedFn->empty()) {
-    recordPatchFunction(resolveSanitizedFn);
-    return resolveSanitizedFn;
+  if (!maskedFn->empty()) {
+    recordPatchFunction(maskedFn);
+    return maskedFn;
   }
 
-  BasicBlock *EntryBB = BasicBlock::Create(Ctx, "", resolveSanitizedFn);
+  BasicBlock *EntryBB = BasicBlock::Create(Ctx, "entry", maskedFn);
   // Insert a return instruction here.
   builder.SetInsertPoint(EntryBB);
-  builder.CreateRet(resolveSanitizedFn->getArg(argNum));
+  builder.CreateRet(maskedFn->getArg(argNum));
 
-  validateIR(resolveSanitizedFn);
-  recordPatchFunction(resolveSanitizedFn);
-  return resolveSanitizedFn;
+  validateIR(maskedFn);
+  recordPatchFunction(maskedFn);
+  return maskedFn;
 }
 
-void sanitizeUndesirableOperationInFunction(Function *F, std::string fnName,
-                                            unsigned int argNum) {
+void maskOperationInFunction(Function *F, std::string fnName,
+                             unsigned int argNum) {
   Module *M = F->getParent();
   LLVMContext &Ctx = M->getContext();
   IRBuilder<> builder(Ctx);
 
-  // Container to store call insts
-  std::vector<CallInst *> callsToReplace;
+  std::vector<CallInst *> callsToMask;
 
-  // loop over each basic block in the vulnerable function
   for (auto &BB : *F) {
-    // loop over each instruction
     for (auto &inst : BB) {
       if (auto *call = dyn_cast<CallInst>(&inst)) {
         Function *calledFn = call->getCalledFunction();
@@ -83,22 +78,21 @@ void sanitizeUndesirableOperationInFunction(Function *F, std::string fnName,
 
         StringRef calledFnName = calledFn->getName();
         if (calledFnName == fnName) {
-          callsToReplace.push_back(call);
+          callsToMask.push_back(call);
         }
       }
     }
   }
 
-  if (callsToReplace.size() == 0) {
+  if (callsToMask.size() == 0) {
     return;
   }
 
-  // Construct the resolve_sanitize_func function
-  Function *resolveSanitizedFn =
-      replaceUndesirableFunction(M, callsToReplace.front(), argNum);
+  // Mask the unsafe operation
+  Function *maskedFn = getOrCreateMaskOperation(M, callsToMask.front(), argNum);
 
   // Replace calls at all callsites in the module
-  for (auto call : callsToReplace) {
+  for (auto call : callsToMask) {
     builder.SetInsertPoint(call);
 
     // Get the arguments for the vulnerable function
@@ -107,10 +101,8 @@ void sanitizeUndesirableOperationInFunction(Function *F, std::string fnName,
       fnArgs.push_back(call->getOperand(i));
     }
 
-    auto sanitizedCall = builder.CreateCall(resolveSanitizedFn, fnArgs);
-
-    // replace all callsites
-    call->replaceAllUsesWith(sanitizedCall);
+    auto maskedCall = builder.CreateCall(maskedFn, fnArgs);
+    call->replaceAllUsesWith(maskedCall);
     call->eraseFromParent();
   }
 }
