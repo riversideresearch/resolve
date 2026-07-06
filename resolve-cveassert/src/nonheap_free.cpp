@@ -81,11 +81,11 @@ Function *getOrCreateFreeOfNonHeapSanitizer(
 
   BasicBlock *EntryBB = BasicBlock::Create(Ctx, "entry", cveFreeNonHeapFn);
   BasicBlock *CheckOnHeapBB =
-      BasicBlock::Create(Ctx, "check_heap", cveFreeNonHeapFn);
+      BasicBlock::Create(Ctx, "check.heap", cveFreeNonHeapFn);
   BasicBlock *SanitizeNonHeapBB =
-      BasicBlock::Create(Ctx, "sanitize_nonheap", cveFreeNonHeapFn);
+      BasicBlock::Create(Ctx, "sanitize.nonheap", cveFreeNonHeapFn);
   BasicBlock *FreeHeapBB =
-      BasicBlock::Create(Ctx, "free_heap", cveFreeNonHeapFn);
+      BasicBlock::Create(Ctx, "free.heap", cveFreeNonHeapFn);
 
   // Set insertion point to entry block
   builder.SetInsertPoint(EntryBB);

@@ -136,11 +136,11 @@ void sanitizeDivideByZero(Function *F,
 
     BasicBlock *checkMapEntryBB = binary_inst->getParent();
     BasicBlock *joinResultBB = checkMapEntryBB->splitBasicBlock(binary_inst);
-    BasicBlock *checkZeroBB = BasicBlock::Create(Ctx, "check_zero", F);
+    BasicBlock *checkZeroBB = BasicBlock::Create(Ctx, "check.zero", F);
     BasicBlock *preserveDivBB =
-        BasicBlock::Create(Ctx, "preserve_division", F, joinResultBB);
+        BasicBlock::Create(Ctx, "safe.div", F, joinResultBB);
     BasicBlock *remedDivBB =
-        BasicBlock::Create(Ctx, "remediate_division", F, joinResultBB);
+        BasicBlock::Create(Ctx, "sanitize.div", F, joinResultBB);
 
     checkMapEntryBB->getTerminator()->eraseFromParent();
     builder.SetInsertPoint(checkMapEntryBB);
@@ -397,9 +397,9 @@ void sanitizeIntOverflow(Function *F,
 
     BasicBlock *checkMapEntryBB = binary_inst->getParent();
     BasicBlock *joinResultBB = checkMapEntryBB->splitBasicBlock(binary_inst);
-    BasicBlock *checkOverflowBB = BasicBlock::Create(Ctx, "check_overflow", F);
+    BasicBlock *checkOverflowBB = BasicBlock::Create(Ctx, "check.overflow", F);
     BasicBlock *remedOverflowBB =
-        BasicBlock::Create(Ctx, "remediate_overflow", F, joinResultBB);
+        BasicBlock::Create(Ctx, "sanitize.overflow", F, joinResultBB);
 
     checkMapEntryBB->getTerminator()->eraseFromParent();
     builder.SetInsertPoint(checkMapEntryBB);
@@ -471,11 +471,11 @@ void sanitizeBitShift(Function *F,
 
     BasicBlock *checkMapEntryBB = binary_inst->getParent();
     BasicBlock *joinResultBB = checkMapEntryBB->splitBasicBlock(binary_inst);
-    BasicBlock *checkShiftBB = BasicBlock::Create(Ctx, "check_zero", F);
+    BasicBlock *checkShiftBB = BasicBlock::Create(Ctx, "check.zero", F);
     BasicBlock *preserveShiftBB =
-        BasicBlock::Create(Ctx, "preserve_shift", F, joinResultBB);
+        BasicBlock::Create(Ctx, "safe.shift", F, joinResultBB);
     BasicBlock *remedShiftBB =
-        BasicBlock::Create(Ctx, "remediate_shift", F, joinResultBB);
+        BasicBlock::Create(Ctx, "sanitize.shift", F, joinResultBB);
 
     checkMapEntryBB->getTerminator()->eraseFromParent();
     builder.SetInsertPoint(checkMapEntryBB);
