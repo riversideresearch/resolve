@@ -75,15 +75,14 @@ activate specific sanitizers.
 !!! note
     Stack and heap can be activated simultaneously with 
     these weakness identifiers `123`,`125`,`131`, `787`. See "Additional Mappings" below 
-    for other supported ids
+    for other supported ids.
 
 ### Additional Mappings
-
-CVEAssert recognizes a handful of other `cwe-id` values for compatibility purposes, see below mapping: 
+CVEAssert recognizes a handful of other `cwe-id` values for compatibility purposes, see below mapping:
 
 | Weakness Identifiers | Sanitizer |
 | --- | --- |
-| `0` | Enables Everything | 
+| `0` | Enables All Sanitizers | 
 | `123` | Write What Where | 
 | `119` | OOB | 
 | `787` | OOB Write | 
@@ -133,197 +132,150 @@ sanitizer-strategy combination is encountered.
     additional logic to cause the program to call setjmp
     to transfer control to a recovery handler.
 
-## Example 
+## Examples
+### Arithmetic
 ```C
-// div_zero.c
-
-// Divide by Zero
-int div_zero_main(int argc, const char* argv[]) {    
-    int math = (int) (42.0 / (float)argc);
-    return 42 % argc + math / argc;
+#include <limits.h>
+int add_user_input(int a, int b) {
+  int sum = a + b;
+  return sum;
 }
 
-int main(int argc, const char* argv[]) {
-    // call with 1 arg to trigger div by zero
-    return div_zero_main(argc-2, argv);
-}
-```
-
-```bash
-# Compiler invocation
-resolvecc -fcve-assert /path/to/cve div_zero.c
-```
-
-**Pre-Instrumented IR** 
-```llvm
-; Function Attrs: noinline nounwind optnone uwtable
-define dso_local i32 @div_zero_main(i32 noundef %0, ptr noundef %1) #0 {
-  %3 = alloca i32, align 4
-  %4 = alloca ptr, align 8
-  %5 = alloca i32, align 4
-  store i32 %0, ptr %3, align 4
-  store ptr %1, ptr %4, align 8
-  %6 = load i32, ptr %3, align 4
-  %7 = sitofp i32 %6 to float
-  %8 = fpext float %7 to double
-  %9 = fdiv double 4.200000e+01, %8
-  %10 = fptosi double %9 to i32
-  store i32 %10, ptr %5, align 4
-  %11 = load i32, ptr %3, align 4
-  %12 = srem i32 42, %11
-  %13 = load i32, ptr %5, align 4
-  %14 = load i32, ptr %3, align 4
-  %15 = sdiv i32 %13, %14
-  %16 = add nsw i32 %12, %15
-  ret i32 %16
+int main(int argc, char **argv) {
+  int x = INT_MAX;
+  int y = 1;
+  int result = add_user_input(x, y); 
+  return result;
 }
 ```
+The program initializes two variables x and y with the values INT_MAX and 1. When these variables are passed to the add_user_input function, the expression a+b can overflow when the mathematical result exceeds INT_MAX. In C, signed integer overflow results in undefined behavior.
 
-**Post-Instrumented IR**
-```llvm
-; Function Attrs: noinline nounwind optnone uwtable
-define dso_local i32 @div_zero_main(i32 noundef %0, ptr noundef %1) #0 {
-  %3 = alloca i32, align 4
-  %4 = alloca ptr, align 8
-  %5 = alloca i32, align 4
-  store i32 %0, ptr %3, align 4
-  store ptr %1, ptr %4, align 8
-  %6 = load i32, ptr %3, align 4
-  %7 = sitofp i32 %6 to float
-  %8 = fpext float %7 to double
-  %9 = fcmp oeq double %8, 0.000000e+00
-  br i1 %9, label %12, label %10
-
-10:                                               ; preds = %2
-  %11 = fdiv double 4.200000e+01, %8
-  br label %13
-
-12:                                               ; preds = %2
-  call void @resolve_remediation_behavior()
-  br label %13
-
-13:                                               ; preds = %10, %12
-  %14 = phi double [ 4.200000e+01, %12 ], [ %11, %10 ]
-  %15 = fptosi double %14 to i32
-  store i32 %15, ptr %5, align 4
-  %16 = load i32, ptr %3, align 4
-  %17 = icmp eq i32 %16, 0
-  br i1 %17, label %20, label %18
-
-18:                                               ; preds = %13
-  %19 = srem i32 42, %16
-  br label %21
-
-20:                                               ; preds = %13
-  call void @resolve_remediation_behavior()
-  br label %21
-
-21:                                               ; preds = %18, %20
-  %22 = phi i32 [ 0, %20 ], [ %19, %18 ]
-  %23 = load i32, ptr %5, align 4
-  %24 = load i32, ptr %3, align 4
-  %25 = icmp eq i32 %24, 0
-  br i1 %25, label %28, label %26
-
-26:                                               ; preds = %21
-  %27 = sdiv i32 %23, %24
-  br label %30
-
-28:                                               ; preds = %21
-  call void @resolve_remediation_behavior()
-  %29 = sdiv i32 %23, 1
-  br label %30
-
-30:                                               ; preds = %26, %28
-  %31 = phi i32 [ %29, %28 ], [ %27, %26 ]
-  %32 = add nsw i32 %22, %31
-  ret i32 %32
-}
-
-define internal void @resolve_remediation_behavior() {
-  call void @exit(i32 3)
-  ret void
-}
-```
-
-This example demonstrates remediation applied to a divide-by-zero in
-the function `div_zero_main`. The instrumented IR contains a call to 
-`resolve_remediation_behavior`. When a remediation strategy is selected, the compiler generates a helper function that implements the corresponding remediation strategy.
-At runtime, this helper is invoked when a violation is detected, and execution proceeds according to the selected strategy.
-In this example, the `EXIT` strategy is specified, causing the program to terminate early with a sanitizer-specific
-exit code.
+When CVEAssert instruments this code, it inserts a check that detects signed integer overflow before performing the addition. If an overflow is detected, the compiler-generated remediation logic invokes the configured remediation strategy. In this example, the saturate strategy is applied, causing the result to be clamped to INT_MAX instead of overflowing.
 
 ```C
-// heap_oob.c
+// Integer overflow
+
+#include <limits.h>
+int add_user_input(int a, int b) {
+  // -- Instrumentation inserted by CVEAssert --
+  int sum;
+  // Check for signed integer overflow before addition
+  if (__builtin_add_overflow(a, b, &sum)) {
+    // Overflow detected -> apply remediation
+    sum = __resolve_add_saturate_int(a, b);
+  }
+  // If no overflow, sum contains correct result.
+  return sum;
+}
+
+int main(int argc, char **argv) {
+  int x = INT_MAX;
+  int y = 1;
+  int result = add_user_input(x, y); // result == INT_MAX (saturated)
+  return resullt; 
+}
+```
+### Memory
+```C
 // Out-of-bounds Write 
 #include <stdlib.h>
-int main() {
-  char *p = malloc(16);
-  p[45] = 100;
+void heap_oob_example() {
+  int *buf = (int *)malloc(4 * sizeof(int));
+  buf[0] = 10;
+  buf[1] = 20;
+  buf[2] = 30;
+  buf[3] = 40;
+  buf[4] = 50; // Heap out-of-bounds write
+  free(buf);
+}
+```
+This example demonstrates an out of bounds write in `heap_oob_example`.
+The program allocates space for four integers on the heap. Valid indices range from zero to three. The write to `buffer[4]` accesses memory beyond the allocated object and results in a heap out-of-bounds write.
+
+When CVEAssert instruments this code, a bounds check is inserted before the store operation. At runtime libresolve retrieves the bounds metadata associated with `buffer`, and the instrumented code verifies that the target address falls within the valid allocation range. Since `buffer[4]` lies outside of the object bounds of the allocated object, the bounds check fails and the the configured remediation strategy is invoked before the invalid write is performed.
+
+```C
+#include <stdlib.h>
+
+// Libresolve runtime interface (simplified)
+typedef struct { void *base, void *limit} ShadowObjBounds;
+extern ShadowObjBounds __resolve_get_bounds(void *addr);
+
+void heap_oob_example() {
+  // malloc replaced with __resolve_malloc hook
+  int *buf = (int *)__resolve_malloc(4 * sizeof(int));
+  buf[0] = 10;
+  buf[1] = 20;
+  buf[2] = 30;
+  buf[3] = 40;
+
+  // -- Instrumentation inserted by CVEAssert --
+  ShadowObjBounds bounds = __resolve_get_bounds(buf);
+  char *base_addr = (char*)&buf[4];
+  size_t access_size = sizeof(int);
+  if (base_addr + access_size - 1 >= bounds.limit) {
+    // compiler-generated remediation handler
+    __cve_remediation_handler();
+  }
+  buf[4] = 50; // Write occurs if check passes
+  __resolve_free(buf);
+}
+```
+### Operation Masking
+```C
+// Operation Masking Example
+#include <string.h>
+void process_user(const char *input) {
+  char dest[8];
+  // Copy user into fixed-sized buffer
+  // Vulnerable: strcpy does not check
+  // length before writing contents to
+  // dest
+  strcpy(dest, input);
+
+  printf("Processed: %s\n", dest);
+}
+
+int main(int argc, void **argv) {
+  process_user(argv[1]);
   return 0;
 }
 ```
+Operation masking vulnerabilities occur when an affected function passes arguments to another function, causing the callee to exhibit undefined behavior. Unlike memory and arithmetic vulnerabilities, unsafe behavior may not occur at the point where the invalid value is created, but rather when that value is later consumed by another operation. 
+To mitigate these vulnerabilities, CVEAssert generates a sanitized version of the vulnerable function and redirects affected call sites to the sanitized implementation. Instead of performing the original operation, the sanitized function returns its first argument unchanged. This masks the unsafe operation while allowing program execution to continue without triggering the undefined behavior associated with the original function call. Returning the first argument preserves a valid input value while preventing execution of the vulnerable operation, allowing the program to continue with a predictable result.
 
-```bash
-# Compiler invocation
-resolvecc -fcve-assert /path/to/cve heap_oob.c 
-```
+The original program allocates a fixed buffer on the stack and uses
+the strcpy() function to copy the user input into the destination
+buffer. Because strcpy() does not verify the size of the destination
+buffer is large enough to hold the source string, an oversized input
+can overflow the buffer and result in undefined behavior.
 
-**Pre-Instrumented IR**
-```llvm
-; Function Attrs: noinline nounwind optnone uwtable
-define dso_local i32 @main() #0 {
-  %1 = alloca i32, align 4
-  %2 = alloca ptr, align 8
-  store i32 0, %1, align 4
-  %3 = call noalias ptr @malloc(i64 noundef 16) #2
-  store ptr %3, ptr %2, align 8
-  %4 = load ptr, ptr %2, align 8
-  %5 = getelementptr inbounds i8, ptr %4, i64 45
-  store i8 100, ptr %5, align 1
-  ret i32 0
+When CVEAssert instruments this code, it generates a sanitized
+wrapper for strcpy() that returns the first argument rather than
+performing the copy operation. The compiler then redirects calls to
+strcpy() to the sanitized wrapper, preventing the unsafe operation
+from being executed. 
+
+```C
+#include <string.h>
+
+// Sanitized wrapper generated by CVEAssert
+// Operation masking: return first argument instead of copying.
+char *strcpy_masked(char *dest, const char *src) {
+  return dest;
+}
+
+void process_user(const char *input) {
+  char dest[8];
+  // Original call to strcpy is replaced by wrapper
+  strcpy_masked(dest, input);
+  printf("Processed: %s\n", dest);
+}
+
+int main(int argc, char **argv) {
+  process_user(argv[0]);
+  return 0;
 }
 ```
-
-**Post-Instrumented IR**
-```llvm
-; Function Attrs: noinline nounwind optnone uwtable
-define dso_local @main() #0 {
-  %1 = alloca i32, align 4
-  call void @resolve_stack_obj(ptr %1, i64 4)
-  %2 = alloca ptr, align 8
-  call void @resolve_stack_obj(ptr %2, i64 8)
-  store i32 0, ptr %1, align 4
-  %3 = call ptr @resolve_malloc(i64 16)
-  store ptr %3, ptr %2, align 8
-  %4 = load ptr, ptr %2, align 8
-  %5 = getelementptr i8, ptr %4, i64 45
-  %6 = call ptr @resolve_gep(ptr %4, ptr %5)
-  call void @resolve_bounds_check_st_ty_i8(ptr %6, i8 100)
-  call void @resolve_invalidate_stack(ptr %1, ptr %1)
-  call void @resolve_invalidate_stack(ptr %2, ptr %2)
-  ret i32 0
-}
-```
-This example demonstrates an out of bounds write in `main`.
-The instrumented IR contains calls to `resolve_stack_obj`,
-`resolve_gep`, and `resolve_invalidate_stack`. The `resolve_stack_obj`
-function records stack allocations as shadow object in the libresolve runtime, while
-`resolve_malloc` records heap allocations in the same shadow memory.
-
-The `resolve_gep` function enforces spatial safety by performing a shadow object lookup
-on the base pointer and checking whether the derived pointer lies within the allocation 
-bounds. If a derived pointer falls outside of these bounds, `resolve_gep` returns a
-tainted pointer, a pointer whose one-past the end of a valid allocation. 
-
-In the subsequent
-`resolve_bounds_check_st_ty_i8` call the pointer is checked for taintedness. If the pointer
-is tainted, the specified resolve strategy is applied; otherwise the load or store
-is allowed to proceed.
-
-At function exit, the compiler inserts a call to `resolve_invalidate_stack` to mirror
-stack unwinding by invalidating the corresponding shadow objects.    
-
 ## Testing
-
 To verify correct IR transformations and binary behavior, we developed a testing suite with regression testing. The suite contains testcases for each sanitizer and tests that the resulting binaries perform the intended behaviors with and without the remediation instrumentation. The testing suite can be found in [`resolve-cveassert/tests`](https://github.com/riversideresearch/resolve/tree/main/resolve-cveassert/tests) and the tests can be executed by calling `make test`.
