@@ -20,6 +20,8 @@
 
 ## Building
 
+To create a loose file tree version of **RESOLVE** suitable for local development, you can do the following:
+
 ```bash
 git clone https://github.com/riversideresearch/resolve.git
 
@@ -35,3 +37,13 @@ make install-with-klee
 ```
 
 There are a handful of other targets for varying CMake build types. Investigate the `Makefile` in the repo root for more options.
+
+## Building A Release
+
+To build a release tar file locally, you can run:
+
+```bash
+make release
+```
+
+This can then be installed with `sudo tar -C / -xzf {TAR FILE}`, which extracts it into `/opt/resolve`.
