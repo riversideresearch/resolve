@@ -2,6 +2,8 @@
 
 CLI for driving coding agents to perform CVE analysis, reachability analysis, and input synthesis. The pipeline takes a [CVE description](../../concepts/vulnerabilities-json.md) as input, improves it through structured reasoning, determines whether the vulnerability is reachable in a target project, and attempts to synthesize a triggering input.
 
+For lightweight cases where the vulnerability is already well understood and the target is available to run, the [`synthesize`](#standalone-input-synthesis) subcommand skips the reasoning stages and attempts to synthesize and verify a triggering input directly from the CVE description.
+
 !!! tip
     For a full end-to-end walkthrough, see the [input synthesis example](../../examples/input-synthesis.md).
 
@@ -16,6 +18,10 @@ resolve input-synthesis run_all claude cve.json out/
 resolve input-synthesis setup claude cve.json
 resolve input-synthesis improve_CVE claude cve.json out/improve_cve
 resolve input-synthesis reachability claude cve.json out/improve_cve out/reachability
+
+# Or, for a well-understood vulnerability, synthesize a triggering input
+# directly from the CVE, bypassing the reasoning stages
+resolve input-synthesis synthesize claude cve.json out/synthesize
 ```
 
 ## Overview
@@ -38,7 +44,7 @@ The scripts work by delegating reasoning to coding agents (Claude, Codex, or Ope
 ## Failure behavior
 
 - If an agent subprocess exits non-zero, scripts print `agent failed with exit code ...` and exit non-zero.
-- `improve_CVE.py` and `reachability.py` fail if `<output_path>` exists unless `--overwrite` is provided.
+- `improve_CVE.py`, `reachability.py`, and `synthesize.py` fail if `<output_path>` exists unless `--overwrite` is provided.
 - `reachability.py` fails fast if `<improve_cve_path>` or expected condition directories are missing.
 - If required generated artifacts are missing (for example, a prompt did not produce an expected file), scripts fail with an explicit error.
 - Missing input files or missing agent executables currently raise `FileNotFoundError` tracebacks.
@@ -113,6 +119,21 @@ resolve input-synthesis run_all <agent> <cve_path> <output_path> [--overwrite]
 ```
 
 This calls `setup.run()`, `improve_CVE.run()`, and `reachability.run()` directly, placing artifacts under `<output_path>/improve_cve/` and `<output_path>/reachability/`.
+
+## Standalone input synthesis
+
+`synthesize.py` runs only the final input-synthesis step, bypassing the CVE-improvement and reachability reasoning stages. It is intended for lightweight cases where the vulnerability is already well understood and the target is available to build/run (for example, a demo where the reasoning cost of the full pipeline is not warranted).
+
+```bash
+resolve input-synthesis synthesize <agent> <cve_path> <output_path> [--overwrite]
+```
+
+Unlike `reachability.py`, it takes no `<improve_cve_path>` and reads no reachability report. Instead it drives synthesis directly from the CVE description, asking the agent to synthesize a concrete input, build/run the target (using the project's `CLAUDE.md`/`AGENTS.md` build notes and any prebuilt artifacts), and **verify the crash by running the target** rather than concluding from static reasoning. If the input cannot be verified (for example, it is rejected before reaching the vulnerable code), the result is reported as inconclusive.
+
+Output directory contains:
+
+- `conclusion.md` -- one-paragraph summary stating whether a verified triggering input was produced
+- `input-synthesis/` -- synthesized inputs and supporting scripts (if applicable)
 
 ## Supported agents
 
