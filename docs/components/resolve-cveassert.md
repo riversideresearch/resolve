@@ -132,7 +132,7 @@ sanitizer-strategy combination is encountered.
     additional logic to cause the program to call setjmp
     to transfer control to a recovery handler.
 
-## Examples
+## Instrumentation Examples
 ### Arithmetic
 ```C
 #include <limits.h>
