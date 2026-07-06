@@ -50,7 +50,7 @@ the [`libresolve`](libresolve.md) runtime library to enforce stack and heap boun
 | Stack Out-of-Bounds | Instruments stack `alloca`, `load`, `store`, and `getelementptr` instructions with runtime checks to enforce stack bounds. | 
 | Null Pointer Dereference | Instruments pointer `load` and `store` instructions with runtime checks that check for null dereference. |
 | Operation Masking | Replaces selected 'undesirable' function calls with guarded calls that validate operands before execution. |
-| Free Nonheap | Instruments calls to `free` with runtime checks that ensure argument is a heap-allocated pointer. |
+| Free Nonheap Memory | Instruments calls to `free` with runtime checks that ensure argument is a heap-allocated pointer. |
 
 !!! note
     The CVE description must include an `undesirable-function` field
