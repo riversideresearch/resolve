@@ -4,7 +4,7 @@ use libc::{
     c_char, c_void, calloc, free, malloc, realloc, strdup, strlen, strndup, strnlen,
 };
 
-use crate::shadowobjs::{SHADOW_STACK, ALIVE_OBJ_LIST, AllocType, FREED_OBJ_LIST, Vaddr};
+use crate::shadowobjs::{ALIVE_OBJ_LIST, AllocType, FREED_OBJ_LIST, GLOBALS, SHADOW_STACK, ShadowObject, Vaddr, lookup_global};
 
 use log::{info, warn};
 
@@ -23,6 +23,11 @@ pub extern "C" fn __resolve_alloca(ptr: *mut c_void, size: usize) -> () {
     );
 
     info!("[STACK] Object allocated with size: {size}, address: 0x{base:x}");
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn __resolve_register_global(ptr: *mut c_void, size: usize) {
+    GLOBALS.lock().push(ShadowObject::new(AllocType::Global, ptr as Vaddr, size));
 }
 
 #[unsafe(no_mangle)]
@@ -306,6 +311,14 @@ pub extern "C" fn __resolve_get_bounds_heap(ptr: *mut c_void) -> ShadowObjBounds
     return sobj.into();
 }
 
+#[unsafe(no_mangle)]
+pub extern "C" fn __resolve_get_bounds_global(ptr: *mut c_void) -> ShadowObjBounds {
+    match lookup_global(ptr as Vaddr) {
+        Some(obj) => (&obj).into(),
+        None => ShadowObjBounds::null()
+    }
+}
+
 /**
  * @brief - Generic sobj lookup where we don't know the pointers
  *          allocation type already. Searches stack table ( O(log n) )
@@ -319,6 +332,7 @@ pub extern "C" fn __resolve_get_bounds_heap(ptr: *mut c_void) -> ShadowObjBounds
 pub extern "C" fn __resolve_get_bounds(ptr: *mut c_void) -> ShadowObjBounds {
     let mut sobj = __resolve_get_bounds_stack(ptr);
     if sobj == ShadowObjBounds::null() { sobj = __resolve_get_bounds_heap(ptr)}
+    if sobj == ShadowObjBounds::null() { sobj = __resolve_get_bounds_global(ptr)}
 
     sobj
 }
