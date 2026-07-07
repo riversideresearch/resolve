@@ -14,7 +14,7 @@ use log::{info, warn};
 
 #[derive(PartialEq)]
 #[repr(C)]
-struct AllocBounds {
+pub struct AllocBounds {
     base: *mut c_void,
     limit: *mut c_void,
     size: usize,
@@ -28,6 +28,7 @@ impl From<AllocBounds> for ShadowObjBounds {
         }
     }
 }
+// implement the From Trait for AllocBounds
 
 #[link(name = "mimalloc")]
 unsafe extern "C" {
@@ -49,9 +50,8 @@ unsafe extern "C" {
     // mi_shim.c API
     fn mi_is_in_heap_region(ptr: *mut c_void) -> bool;
     fn mi_get_alloc_bounds(ptr: *mut c_void) -> AllocBounds;
-    fn mi_is_block_start(ptr: *mut c_void) -> bool;
     fn __vasprintf(strp: *mut *mut c_char, fmt: *const c_char, args: VaList<'_>) -> c_int;
-
+    fn mi_is_block_start(ptr: *mut c_void) -> bool;
 }
 
 /**
@@ -232,7 +232,7 @@ pub extern "C" fn __resolve_malloc(size: usize) -> *mut c_void {
     // SAFETY:
     // - 'ptr' allocated by mimalloc
     let ptr = unsafe { mi_malloc(size + 1) };
-    info!("[RESOLVE] mimalloc ptr: 0x{:x}", ptr as Vaddr);
+    info!("[RESOLVE] mi_malloc ptr: 0x{:x}", ptr as Vaddr);
 
     if ptr.is_null() {
         return ptr;
@@ -240,10 +240,8 @@ pub extern "C" fn __resolve_malloc(size: usize) -> *mut c_void {
 
     let bounds = unsafe { mi_get_alloc_bounds(ptr) };
 
-    info!(
-        "[RESOLVE] bounds: [0x{:x}, 0x{:x})",
-        bounds.base as Vaddr, bounds.limit as Vaddr
-    );
+    info!("[RESOLVE] bounds: [0x{:x}, 0x{:x})", bounds.base as Vaddr, bounds.limit as Vaddr);
+    info!("[RESOLVE] size of allocation in bytes: {}", bounds.size);
     ptr
 }
 
