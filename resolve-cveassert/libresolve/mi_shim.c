@@ -24,10 +24,7 @@ mi_alloc_bounds_t mi_get_alloc_bounds(void* p) {
 
   // Check if ptr is owned by mimalloc
   if (!mi_is_in_heap_region(p)) {
-    bounds.base = (void*)0;
-    bounds.limit = (void*)0;
-    bounds.size = 0;
-    return bounds;
+    return empty;
   }
 
   // Recover the page information for the pointer.
@@ -37,18 +34,14 @@ mi_alloc_bounds_t mi_get_alloc_bounds(void* p) {
     return empty;
   }
   
-  const size_t block_size = page->block_size;
+  // _mi_page_ptr_unalign recovers the corresponding 
+  // block for base and interior pointers 
+  mi_block_t *base = _mi_page_ptr_unalign(page, p);
+  if (!base) { return empty; }
 
-  uintptr_t page_start = (uintptr_t)page->page_start;
-  uintptr_t ptr = (uintptr_t)p;
-
-  size_t block_index = (ptr - page_start) / block_size; 
-  uintptr_t base = page_start + block_index * block_size;
-
-  void *base_ptr = (void *)base;
-  bounds.base = base_ptr;
-  bounds.size = mi_usable_size(base_ptr);
-  bounds.limit = base_ptr + bounds.size;
+  bounds.base = (void *)base;
+  bounds.size = mi_usable_size(base);
+  bounds.limit = (void *)base + bounds.size;
   return bounds;
 }
 
@@ -110,3 +103,4 @@ bool mi_is_block_start(void *p) {
   // Compare to pointer
   return base == (uintptr_t)p;
 }
+
