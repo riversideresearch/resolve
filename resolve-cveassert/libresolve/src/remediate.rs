@@ -240,7 +240,7 @@ pub extern "C" fn __resolve_malloc(size: usize) -> *mut c_void {
 
     let bounds = unsafe { mi_get_alloc_bounds(ptr) };
 
-    info!("[RESOLVE] bounds: [0x{:x}, 0x{:x})", bounds.base as Vaddr, bounds.limit as Vaddr);
+    info!("[RESOLVE] bounds: (0x{:x}, 0x{:x})", bounds.base as Vaddr, bounds.limit as Vaddr);
     info!("[RESOLVE] size of allocation in bytes: {}", bounds.size);
     ptr
 }
