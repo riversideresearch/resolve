@@ -4,7 +4,7 @@
 
 This is pretty neat, becaues the rest of the toolchain can use this to query and fix the crashing program. The `vulnerabilities.json` this pipeline emits is exactly what [reachability](reachability.md) and [remediation](remediation.md) consume.
 
-This guide walks through analyzing a crashing program with the `resolve` CLI, and has supplemental source code in the [GitHub repository](https://github.com/riversideresearch/resolve/tree/main/examples/crash-analysis/). For the full command reference, see the [crash analyzer component docs](../components/resolve-cli/crash-analyzer.md).
+This guide walks through analyzing a crashing program with the `resolve` CLI, and has supplemental source code in the [GitHub repository](https://github.com/riversideresearch/resolve/tree/main/examples/crash-analysis/). For the full command reference, see the [crash analysis component docs](../components/resolve-cli/crash-analysis.md).
 
 ## The Program
 

@@ -39,6 +39,12 @@ curl -fL https://github.com/riversideresearch/resolve/releases/latest/download/r
     -o /tmp/resolve-linux-x86_64.tar.gz && sudo tar -C / -xzf /tmp/resolve-linux-x86_64.tar.gz
 ```
 
+Add it to `PATH` with:
+
+```bash
+export PATH="/opt/resolve/bin:$PATH"
+```
+
 !!! note
     This one-liner syntax assumes you have `curl` and `ca-certificates` already installed. 
 

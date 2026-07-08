@@ -30,7 +30,7 @@ graph TD
 There are two ways to produce a finding, and both emit the same [`vulnerabilities.json`](concepts/vulnerabilities-json.md):
 
 - **[SBOM lookup](examples/sbom.md)** works *before* you have a crash. It takes your project's [SPDX](https://spdx.dev/) software bill of materials, cross-references each dependency against [NVD](https://nvd.nist.gov/) and [MITRE CWE](https://cwe.mitre.org/), and reports the known CVEs. See the [SBOM component docs](components/resolve-cli/sbom.md).
-- **[Crash analysis](examples/crash-analysis.md)** works *after* something breaks. It drives a coding agent through raw crash evidence (core dumps, sanitizer logs, reproducers) and distills it into a structured finding. See the [crash analyzer component docs](components/resolve-cli/crash-analyzer.md).
+- **[Crash analysis](examples/crash-analysis.md)** works *after* something breaks. It drives a coding agent through raw crash evidence (core dumps, sanitizer logs, reproducers) and distills it into a structured finding. See the [crash analysis component docs](components/resolve-cli/crash-analysis.md).
 
 Regardless of origin, even if a human writes it themselves, this output is the toolchain's common currency: a [`vulnerabilities.json`](concepts/vulnerabilities-json.md) naming the affected function, file, and weakness class.
 

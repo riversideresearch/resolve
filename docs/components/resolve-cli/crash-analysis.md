@@ -1,4 +1,4 @@
-# Crash Analyzer
+# Crash Analysis
 
 Scripts for driving coding agents to perform crash analysis. The pipeline takes input files regarding the crash and codifies it through structured reasoning.
 

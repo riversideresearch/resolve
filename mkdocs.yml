@@ -69,7 +69,7 @@ nav:
     - Resolve CLI:
       - Overview: components/resolve-cli/resolve-cli.md
       - SBOM: components/resolve-cli/sbom.md
-      - Crash Analysis: components/resolve-cli/crash-analyzer.md
+      - Crash Analysis: components/resolve-cli/crash-analysis.md
       - Input Synthesis: components/resolve-cli/input-synthesis.md
     - Libresolve: components/libresolve.md
     - Reach: components/reach.md

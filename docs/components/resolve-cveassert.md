@@ -172,7 +172,7 @@ int main(int argc, char **argv) {
   int x = INT_MAX;
   int y = 1;
   int result = add_user_input(x, y); // result == INT_MAX (saturated)
-  return resullt; 
+  return result; 
 }
 ```
 ### Memory
@@ -192,7 +192,7 @@ void heap_oob_example() {
 This example demonstrates an out of bounds write in `heap_oob_example`.
 The program allocates space for four integers on the heap. Valid indices range from zero to three. The write to `buffer[4]` accesses memory beyond the allocated object and results in a heap out-of-bounds write.
 
-When CVEAssert instruments this code, a bounds check is inserted before the store operation. At runtime libresolve retrieves the bounds metadata associated with `buffer`, and the instrumented code verifies that the target address falls within the valid allocation range. Since `buffer[4]` lies outside of the object bounds of the allocated object, the bounds check fails and the the configured remediation strategy is invoked before the invalid write is performed.
+When CVEAssert instruments this code, a bounds check is inserted before the store operation. At runtime libresolve retrieves the bounds metadata associated with `buffer`, and the instrumented code verifies that the target address falls within the valid allocation range. Since `buffer[4]` lies outside of the object bounds of the allocated object, the bounds check fails and the configured remediation strategy is invoked before the invalid write is performed.
 
 ```C
 #include <stdlib.h>
