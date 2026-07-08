@@ -9,6 +9,12 @@ To use pre-built **RESOLVE**, you need the following:
 - binutils
 - zstd
 
+For some of the **RESOLVE** tooling, an agentic harness is required, like one of:
+
+- [opencode](https://opencode.ai/)
+- [claude code](https://code.claude.com/docs/en/quickstart#step-1-install-claude-code)
+- [codex cli](https://developers.openai.com/codex/cli)
+
 On **Ubuntu**, try:
 
 ```bash

@@ -11,8 +11,8 @@ The agent will first examine the input folders and craft a `synthesis.md` file w
 
 Using the resolve-cli:
 ```bash
-resolve crash-analyzer codex -i folder_with_crash_files # or:
-resolve crash-analyzer codex -i folder_with_crash_files -s folder_with_source_code
+resolve crash-analysis codex -i folder_with_crash_files # or:
+resolve crash-analysis codex -i folder_with_crash_files -s folder_with_source_code
 ```
 
 !!! tip

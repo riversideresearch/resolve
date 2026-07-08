@@ -78,9 +78,9 @@ Outputs (reachability):
 
 The `synthesize` subcommand runs only the final input-synthesis step, driving it directly from the CVE description without the improve-CVE/reachability stages, for lightweight cases where the vulnerability is already understood. See the [Input Synthesis docs](input-synthesis.md#standalone-input-synthesis).
 
-## `crash-analyzer`
+## `crash-analysis`
 
-Runs a crash analysis workflow, agnostic to the specifics of the input. See the [Crash Analyzer docs](crash-analyzer.md).
+Runs a crash analysis workflow, agnostic to the specifics of the input. See the [Crash Analysis docs](crash-analyzer.md).
 
 Inputs: 
 

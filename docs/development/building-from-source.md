@@ -2,13 +2,10 @@
 
 **RESOLVE** has been tested on **Ubuntu 24.04.4 LTS**, but should work on other distributions that can provide the following packages:
 
-- Clang 18
-- LLVM 18
 - Nightly Rust
 - uv
 - CMake
 - build-essential
-- make
 - ninja-build
 - clang-18
 - clang-18-dev
