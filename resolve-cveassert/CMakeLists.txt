@@ -25,6 +25,8 @@ add_library(CVEAssert SHARED
   src/OperationMasking.cpp
 )
 
+target_compile_definitions(CVEAssert PRIVATE LLVM_FORCE_ENABLE_STATS=1)
+
 # LLVM is normally built without RTTI. Be consistent with that.
 if(NOT LLVM_ENABLE_RTTI)
   target_compile_options(CVEAssert PRIVATE -fno-rtti)
