@@ -295,7 +295,6 @@ static Function *getOrCreateBoundsCheckMemcpySanitizer(
 
   auto ptr_ty = PointerType::get(Ctx, 0);
   auto size_ty = Type::getInt64Ty(Ctx);
-  auto i1_ty = Type::getInt1Ty(Ctx);
 
   FunctionType *resolveMemmoveFnTy =
       FunctionType::get(ptr_ty, {ptr_ty, ptr_ty, size_ty}, false);
