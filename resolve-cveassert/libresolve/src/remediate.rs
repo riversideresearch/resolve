@@ -363,7 +363,8 @@ pub extern "C" fn __resolve_report_violation() -> () {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{resolve_init, shadowobjs::AllocType};
+    use crate::file::resolve_init;
+    use crate::shadowobjs::AllocType;
 
     #[test]
     fn test_malloc_free() {
