@@ -172,8 +172,6 @@ static Function *getOrCreateBoundsCheckLoadSanitizer(
   IRBuilder<> builder(Ctx);
 
   auto ptr_ty = PointerType::get(Ctx, 0);
-  auto i1_ty = Type::getInt1Ty(Ctx);
-  auto usize_ty = Type::getInt64Ty(Ctx);
 
   FunctionType *resolveLoadFnTy = FunctionType::get(ty, {ptr_ty}, false);
   Function *resolveLoadFn =
@@ -235,8 +233,6 @@ static Function *getOrCreateBoundsCheckStoreSanitizer(
   // TODO: handle address spaces other than 0
   auto ptr_ty = PointerType::get(Ctx, 0);
   auto void_ty = Type::getVoidTy(Ctx);
-  auto i1_ty = Type::getInt1Ty(Ctx);
-  auto usize_ty = Type::getInt64Ty(Ctx);
 
   FunctionType *resolveStoreFnTy =
       FunctionType::get(void_ty, {ptr_ty, ty}, false);
@@ -369,7 +365,6 @@ static Function *getOrCreateBoundsCheckMemmoveSanitizer(
 
   auto ptr_ty = PointerType::get(Ctx, 0);
   auto size_ty = Type::getInt64Ty(Ctx);
-  auto i1_ty = Type::getInt1Ty(Ctx);
 
   FunctionType *resolveMemmoveFnTy =
       FunctionType::get(ptr_ty, {ptr_ty, ptr_ty, size_ty}, false);
@@ -439,7 +434,6 @@ static Function *getOrCreateBoundsCheckMemsetSanitizer(
 
   auto ptr_ty = PointerType::get(Ctx, 0);
   auto i32_ty = Type::getInt32Ty(Ctx);
-  auto i1_ty = Type::getInt1Ty(Ctx);
   auto size_ty = Type::getInt64Ty(Ctx);
 
   FunctionType *resolveMemsetFnTy =
@@ -506,7 +500,6 @@ static Function *getOrCreateResolveGep(Function *F, BoundsClass cls) {
 
   auto ptr_ty = PointerType::get(Ctx, 0);
   auto size_ty = Type::getInt64Ty(Ctx);
-  auto i1_ty = Type::getInt1Ty(Ctx);
 
   FunctionType *resolveGepFnTy =
       FunctionType::get(ptr_ty, {ptr_ty, ptr_ty}, false);
