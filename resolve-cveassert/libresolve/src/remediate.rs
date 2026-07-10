@@ -341,7 +341,7 @@ pub extern "C" fn __resolve_get_bounds(ptr: *mut c_void) -> ShadowObjBounds {
 pub extern "C" fn resolve_obj_type(base_ptr: *mut c_void) -> AllocType {
     let base = base_ptr as Vaddr;
 
-    let find_in = |table: &crate::MutexWrap<crate::shadowobjs::ShadowObjectTable>| {
+    let find_in = |table: &crate::file::MutexWrap<crate::shadowobjs::ShadowObjectTable>| {
         let t = table.lock();
         t.search_intersection(base).map(|o| o.alloc_type)
     };
