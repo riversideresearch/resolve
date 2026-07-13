@@ -189,10 +189,10 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
     out << F;
     out << "[CVEAssert] === Inserted Sanitizer Helpers === \n";
 
-    if (vuln.UndesirableFunction.has_value()) {
+    if (vuln.Operation.has_value()) {
       /* NOTE: We are using '0' as a temporary this will be updated future PRs
        */
-      sanitizeContract(&F, *vuln.UndesirableFunction, 0);
+      sanitizeContract(&F, *vuln.Operation, 0);
       result = PreservedAnalyses::none();
       out << "[CVEAssert] === Post Sanitization of Masked Operation IR "
              "=== \n";
