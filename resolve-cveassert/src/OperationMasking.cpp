@@ -11,6 +11,7 @@
 #include "llvm/Support/raw_ostream.h"
 
 #include "IRUtils.hpp"
+#include "Vulnerability.hpp"
 
 #include <optional>
 #include <string>
@@ -18,12 +19,24 @@
 
 using namespace llvm;
 
-enum Cond { // Maybe adding an enum for all the possible conditions
-  EQ = 1,
-  GT = 2,
-  GT_EQ = 3,
-  LT = 4,
-  LT_EQ = 5
+enum class PredicateKind {
+  InBounds,
+  NotEqual,
+  NotNull,
+  NonZero,
+};
+
+// Predicates tell the compiler what
+// must be true before executing the operation
+struct Predicate {
+  PredicateKind kind;
+  unsigned arg0;
+  unsigned arg1;
+};
+
+struct Contract {
+  std::vector<Predicate> predicates;
+  Vulnerability::RemediationStrategies strategy;
 };
 
 // Parameters
