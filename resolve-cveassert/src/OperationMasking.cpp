@@ -53,7 +53,7 @@ static Function *getOrCreateContractWrapper(Module *M, CallInst *call,
 
   Function *originalFn = call->getCalledFunction();
 
-  std::string handlerName = "__cve_masked_" + originalFn->getName().str();
+  std::string handlerName = "__cve_contract_" + originalFn->getName().str();
 
   FunctionType *wrapperTy = originalFn->getFunctionType();
 
