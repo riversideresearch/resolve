@@ -5,7 +5,6 @@
 
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/SmallVector.h"
-#include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/Analysis/CaptureTracking.h"
 #include "llvm/IR/DerivedTypes.h"
@@ -20,10 +19,6 @@
 #include <utility>
 
 using namespace llvm;
-
-#define DEBUG_TYPE "instrument-allocators"
-
-STATISTIC(TransformAlloca, "Alloca instructions transformed");
 
 /// Replaces all calls to `name` in `F` with calls to `__resolve_name`
 static void wrapLibraryFunction(Function *F, StringRef name, FunctionType *ty) {
@@ -267,7 +262,6 @@ void instrumentAlloca(Function *F) {
 
     // TODO: Add fast filter to prune non-escaping allocas
     handle_alloca(alloca);
-    ++TransformAlloca;
   }
 
   for (auto &BB : *F) {
@@ -292,7 +286,4 @@ void instrumentAlloca(Function *F) {
       alloca->eraseFromParent();
     }
   }
-
-  raw_ostream &out = errs();
-  PrintStatistics(out);
 }
