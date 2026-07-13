@@ -192,7 +192,7 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
     if (vuln.UndesirableFunction.has_value()) {
       /* NOTE: We are using '0' as a temporary this will be updated future PRs
        */
-      sanitizeUndesirableOperationInFunction(&F, *vuln.UndesirableFunction, 0);
+      sanitizeContract(&F, *vuln.UndesirableFunction, 0);
       result = PreservedAnalyses::none();
       out << "[CVEAssert] === Post Sanitization of Undesirable Operation IR "
              "=== \n";

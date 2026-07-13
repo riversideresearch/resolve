@@ -46,37 +46,52 @@ struct Contract {
 // We will continue generalizing this following eval-2
 // Change this function name to be "replaceUndesirableOperation" more
 // generalized name
-static Function *replaceUndesirableFunction(Module *M, CallInst *call,
+static Function *getOrCreateContractWrapper(Module *M, CallInst *call,
                                             unsigned int argNum) {
   LLVMContext &Ctx = M->getContext();
   IRBuilder<> builder(Ctx);
 
-  std::string handlerName =
-      "resolve_sanitized_" + call->getCalledFunction()->getName().str();
+  Function *originalFn = call->getCalledFunction();
 
-  FunctionType *resolveSanitizedFnTy =
-      call->getCalledFunction()->getFunctionType();
+  std::string handlerName = "__cve_masked_" + originalFn->getName().str();
 
-  Function *resolveSanitizedFn =
-      getOrCreateResolveHelper(M, handlerName, resolveSanitizedFnTy);
+  FunctionType *wrapperTy = originalFn->getFunctionType();
 
-  if (!resolveSanitizedFn->empty()) {
-    recordPatchFunction(resolveSanitizedFn);
-    return resolveSanitizedFn;
+  Function *resolveWrapperFn =
+      getOrCreateResolveHelper(M, handlerName, wrapperTy);
+
+  SmallVector<Value *> Args;
+  for (Argument &arg : resolveWrapperFn->args()) {
+    Args.push_back(&arg);
   }
 
-  BasicBlock *EntryBB = BasicBlock::Create(Ctx, "", resolveSanitizedFn);
+  if (!resolveWrapperFn->empty()) {
+    recordPatchFunction(resolveWrapperFn);
+    return resolveWrapperFn;
+  }
+
+  // TODO: Create 3 basic blocks
+  // 1. Preconditions
+  // 2. Valid path
+  // 3. Recovery path
+  BasicBlock *EntryBB = BasicBlock::Create(Ctx, "entry", resolveWrapperFn);
   // Insert a return instruction here.
   builder.SetInsertPoint(EntryBB);
-  builder.CreateRet(resolveSanitizedFn->getArg(argNum));
 
-  validateIR(resolveSanitizedFn);
-  recordPatchFunction(resolveSanitizedFn);
-  return resolveSanitizedFn;
+  // TODO: Create helper to generate the llvm-ir for preconditions
+  // TODO: Create helper to generate valid path (call original operation
+  // contract)
+  // TODO: Create helper to generate recovery path
+
+  builder.CreateCall(originalFn, Args);
+  builder.CreateRet(resolveWrapperFn->getArg(argNum));
+
+  validateIR(resolveWrapperFn);
+  recordPatchFunction(resolveWrapperFn);
+  return resolveWrapperFn;
 }
 
-void sanitizeUndesirableOperationInFunction(Function *F, std::string fnName,
-                                            unsigned int argNum) {
+void sanitizeContract(Function *F, std::string fnName, unsigned int argNum) {
   Module *M = F->getParent();
   LLVMContext &Ctx = M->getContext();
   IRBuilder<> builder(Ctx);
@@ -106,24 +121,19 @@ void sanitizeUndesirableOperationInFunction(Function *F, std::string fnName,
     return;
   }
 
-  // Construct the resolve_sanitize_func function
-  Function *resolveSanitizedFn =
-      replaceUndesirableFunction(M, callsToReplace.front(), argNum);
+  Function *resolveWrapperFn =
+      getOrCreateContractWrapper(M, callsToReplace.front(), argNum);
 
-  // Replace calls at all callsites in the module
   for (auto call : callsToReplace) {
     builder.SetInsertPoint(call);
 
-    // Get the arguments for the vulnerable function
     SmallVector<Value *, 2> fnArgs;
     for (unsigned int i = 0; i < call->arg_size(); ++i) {
       fnArgs.push_back(call->getOperand(i));
     }
 
-    auto sanitizedCall = builder.CreateCall(resolveSanitizedFn, fnArgs);
-
-    // replace all callsites
-    call->replaceAllUsesWith(sanitizedCall);
+    auto resolveWrapperCall = builder.CreateCall(resolveWrapperFn, fnArgs);
+    call->replaceAllUsesWith(resolveWrapperCall);
     call->eraseFromParent();
   }
 }
