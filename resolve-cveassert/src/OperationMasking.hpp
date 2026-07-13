@@ -7,5 +7,5 @@
 
 #include "llvm/IR/Function.h"
 #include <string>
-void maskOperationInFunction(llvm::Function *F, std::string fnName,
-                             unsigned int argNum);
+void sanitizeContract(llvm::Function *F, std::string fnName,
+                      unsigned int argNum);

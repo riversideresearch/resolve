@@ -11,6 +11,7 @@
 #include "llvm/Support/raw_ostream.h"
 
 #include "IRUtils.hpp"
+#include "Vulnerability.hpp"
 
 #include <optional>
 #include <string>
@@ -18,12 +19,24 @@
 
 using namespace llvm;
 
-enum Cond { // Maybe adding an enum for all the possible conditions
-  EQ = 1,
-  GT = 2,
-  GT_EQ = 3,
-  LT = 4,
-  LT_EQ = 5
+enum class PredicateKind {
+  InBounds,
+  NotEqual,
+  NotNull,
+  NonZero,
+};
+
+// Predicates tell the compiler what
+// must be true before executing the operation
+struct Predicate {
+  PredicateKind kind;
+  unsigned arg0;
+  unsigned arg1;
+};
+
+struct Contract {
+  std::vector<Predicate> predicates;
+  Vulnerability::RemediationStrategies strategy;
 };
 
 // Parameters
@@ -33,40 +46,56 @@ enum Cond { // Maybe adding an enum for all the possible conditions
 // We will continue generalizing this following eval-2
 // Change this function name to be "replaceUndesirableOperation" more
 // generalized name
-static Function *getOrCreateMaskOperation(Module *M, CallInst *call,
-                                          unsigned int argNum) {
+static Function *getOrCreateContractWrapper(Module *M, CallInst *call,
+                                            unsigned int argNum) {
   LLVMContext &Ctx = M->getContext();
   IRBuilder<> builder(Ctx);
 
-  std::string handlerName =
-      "__cve_mask_" + call->getCalledFunction()->getName().str();
+  Function *originalFn = call->getCalledFunction();
 
-  FunctionType *maskFnTy = call->getCalledFunction()->getFunctionType();
+  std::string handlerName = "__cve_contract_" + originalFn->getName().str();
 
-  Function *maskedFn = getOrCreateResolveHelper(M, handlerName, maskFnTy);
+  FunctionType *wrapperTy = originalFn->getFunctionType();
 
-  if (!maskedFn->empty()) {
-    recordPatchFunction(maskedFn);
-    return maskedFn;
+  Function *resolveWrapperFn =
+      getOrCreateResolveHelper(M, handlerName, wrapperTy);
+
+  SmallVector<Value *> Args;
+  for (Argument &arg : resolveWrapperFn->args()) {
+    Args.push_back(&arg);
   }
 
-  BasicBlock *EntryBB = BasicBlock::Create(Ctx, "entry", maskedFn);
+  if (!resolveWrapperFn->empty()) {
+    recordPatchFunction(resolveWrapperFn);
+    return resolveWrapperFn;
+  }
+
+  // TODO: Create 3 basic blocks
+  // 1. Preconditions
+  // 2. Valid path
+  // 3. Recovery path
+  BasicBlock *EntryBB = BasicBlock::Create(Ctx, "entry", resolveWrapperFn);
   // Insert a return instruction here.
   builder.SetInsertPoint(EntryBB);
-  builder.CreateRet(maskedFn->getArg(argNum));
 
-  validateIR(maskedFn);
-  recordPatchFunction(maskedFn);
-  return maskedFn;
+  // TODO: Create helper to generate the llvm-ir for preconditions
+  // TODO: Create helper to generate valid path (call original operation
+  // contract)
+  // TODO: Create helper to generate recovery path
+  builder.CreateCall(originalFn, Args);
+  builder.CreateRet(resolveWrapperFn->getArg(argNum));
+
+  validateIR(resolveWrapperFn);
+  recordPatchFunction(resolveWrapperFn);
+  return resolveWrapperFn;
 }
 
-void maskOperationInFunction(Function *F, std::string fnName,
-                             unsigned int argNum) {
+void sanitizeContract(Function *F, std::string fnName, unsigned int argNum) {
   Module *M = F->getParent();
   LLVMContext &Ctx = M->getContext();
   IRBuilder<> builder(Ctx);
 
-  std::vector<CallInst *> callsToMask;
+  std::vector<CallInst *> callsToReplace;
 
   for (auto &BB : *F) {
     for (auto &inst : BB) {
@@ -78,31 +107,28 @@ void maskOperationInFunction(Function *F, std::string fnName,
 
         StringRef calledFnName = calledFn->getName();
         if (calledFnName == fnName) {
-          callsToMask.push_back(call);
+          callsToReplace.push_back(call);
         }
       }
     }
   }
 
-  if (callsToMask.size() == 0) {
+  if (callsToReplace.size() == 0) {
     return;
   }
 
-  // Mask the unsafe operation
-  Function *maskedFn = getOrCreateMaskOperation(M, callsToMask.front(), argNum);
+  Function *resolveWrapperFn =
+      getOrCreateContractWrapper(M, callsToReplace.front(), argNum);
 
-  // Replace calls at all callsites in the module
-  for (auto call : callsToMask) {
+  for (auto call : callsToReplace) {
     builder.SetInsertPoint(call);
-
-    // Get the arguments for the vulnerable function
     SmallVector<Value *, 2> fnArgs;
     for (unsigned int i = 0; i < call->arg_size(); ++i) {
       fnArgs.push_back(call->getOperand(i));
     }
 
-    auto maskedCall = builder.CreateCall(maskedFn, fnArgs);
-    call->replaceAllUsesWith(maskedCall);
+    auto resolveWrapperCall = builder.CreateCall(resolveWrapperFn, fnArgs);
+    call->replaceAllUsesWith(resolveWrapperCall);
     call->eraseFromParent();
   }
 }
