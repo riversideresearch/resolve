@@ -8,5 +8,5 @@ The primary user interface to RESOLVE; a collection of subcommands where
 The documentation site is the canonical source for setup and usage, including
 the per-subcommand pages for
 [SBOM](https://riversideresearch.github.io/resolve/latest/components/resolve-cli/sbom/),
-[crash analyzer](https://riversideresearch.github.io/resolve/latest/components/resolve-cli/crash-analyzer/),
+[crash analyzer](https://riversideresearch.github.io/resolve/latest/components/resolve-cli/crash-analysis/),
 and [input synthesis](https://riversideresearch.github.io/resolve/latest/components/resolve-cli/input-synthesis/).

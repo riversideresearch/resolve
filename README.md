@@ -14,7 +14,6 @@
 
 Please see our [documentation website](https://riversideresearch.github.io/resolve) for [installation](https://riversideresearch.github.io/resolve/latest/installation/) and [usage](https://riversideresearch.github.io/resolve/latest/components/resolve-cli/resolve-cli/).
 
----
 
 #### Quick Install
 

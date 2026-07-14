@@ -2,14 +2,11 @@ name: Deploy docs
 
 # Version policy
 #   - push to main          -> "dev"  version
-#   - stable tag  vX.Y.Z     -> "X.Y" version, aliased "latest", set as default
-#   - prerelease tag         -> full tag version, NOT aliased "latest"
+#   - successful release tag -> published by the release workflow
 
 on:
   push:
     branches: [main]
-    tags:
-      - "v[0-9]*"
   workflow_dispatch:
 
 # Write perms for gh-pages branch
@@ -50,25 +47,10 @@ jobs:
         id: vars
         run: |
           set -euo pipefail
-          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
-            tag="${GITHUB_REF_NAME#v}"          # strip leading v: v1.2.3 -> 1.2.3
-            if [[ "${GITHUB_REF_NAME}" =~ (alpha|beta|rc|pre|dev|snapshot) ]]; then
-              echo "version=${tag}"            >> "$GITHUB_OUTPUT"  # e.g. 1.2.0-rc1
-              echo "alias="                    >> "$GITHUB_OUTPUT"
-              echo "title=${GITHUB_REF_NAME}"  >> "$GITHUB_OUTPUT"
-              echo "set_default=false"         >> "$GITHUB_OUTPUT"
-            else
-              echo "version=$(echo "$tag" | cut -d. -f1,2)" >> "$GITHUB_OUTPUT"  # 1.2
-              echo "alias=latest"              >> "$GITHUB_OUTPUT"
-              echo "title=${GITHUB_REF_NAME}"  >> "$GITHUB_OUTPUT"  # e.g. v1.2.3
-              echo "set_default=true"          >> "$GITHUB_OUTPUT"
-            fi
-          else
-            echo "version=dev"                 >> "$GITHUB_OUTPUT"
-            echo "alias="                      >> "$GITHUB_OUTPUT"
-            echo "title=dev"                   >> "$GITHUB_OUTPUT"
-            echo "set_default=false"           >> "$GITHUB_OUTPUT"
-          fi
+          echo "version=dev"                 >> "$GITHUB_OUTPUT"
+          echo "alias="                      >> "$GITHUB_OUTPUT"
+          echo "title=dev"                   >> "$GITHUB_OUTPUT"
+          echo "set_default=false"           >> "$GITHUB_OUTPUT"
 
       - name: Deploy with mike
         run: |
