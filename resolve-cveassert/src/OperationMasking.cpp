@@ -19,26 +19,6 @@
 
 using namespace llvm;
 
-enum class PredicateKind {
-  InBounds,
-  NotEqual,
-  NotNull,
-  NonZero,
-};
-
-// Predicates tell the compiler what
-// must be true before executing the operation
-struct Predicate {
-  PredicateKind kind;
-  unsigned arg0;
-  unsigned arg1;
-};
-
-struct Contract {
-  std::vector<Predicate> predicates;
-  Vulnerability::RemediationStrategies strategy;
-};
-
 // Parameters
 // 1. Which arguments to return (or zero)
 // 2. Which arguments to test (if any)
