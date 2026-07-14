@@ -21,6 +21,7 @@ if [[ "$INSTALL_PREFIX" != /* ]]; then
 fi
 
 BUILD_DIR=$(cd "$BUILD_DIR_INPUT" && pwd)
+REPO_ROOT=$(cd "$(dirname "$0")/.." && pwd)
 TARBALL_DIR=$(dirname "$TARBALL_INPUT")
 TARBALL_NAME=$(basename "$TARBALL_INPUT")
 
@@ -114,7 +115,9 @@ for cmd in "$STAGED_PREFIX"/bin/resolve* "$STAGED_PREFIX"/bin/reach "$STAGED_PRE
     ln -sfn "$INSTALL_PREFIX/bin/$cmd_name" "$STAGE_DIR/usr/local/bin/$cmd_name"
 done
 
-tar -C "$STAGE_DIR" -czf "$TARBALL" opt usr
+cp "$REPO_ROOT/LICENSE.txt" "$STAGE_DIR/LICENSE.txt"
+cp "$REPO_ROOT/LICENSE-GPL-3.0.txt" "$STAGE_DIR/LICENSE-GPL-3.0.txt"
+tar -C "$STAGE_DIR" -czf "$TARBALL" opt usr LICENSE.txt LICENSE-GPL-3.0.txt
 
 echo "Created $TARBALL"
 echo "Install with: sudo tar -C / -xzf $TARBALL"

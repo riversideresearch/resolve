@@ -1,0 +1,80 @@
+name: Deploy docs
+
+# Version policy
+#   - push to main          -> "dev"  version
+#   - successful release tag -> published by the release workflow
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Write perms for gh-pages branch
+permissions:
+  contents: write
+
+# overlapping runs might race on the gh-pages branch,
+# cancelled runs might corrupt
+concurrency:
+  group: docs-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Install docs dependencies
+        run: pip install -r docs/requirements.txt mike
+
+      - name: Configure git identity
+        # need identity to commit to github pages branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Fetch gh-pages branch
+        run: git fetch origin gh-pages --depth=1 || true
+
+      - name: Compute version, alias, and default policy
+        id: vars
+        run: |
+          set -euo pipefail
+          echo "version=dev"                 >> "$GITHUB_OUTPUT"
+          echo "alias="                      >> "$GITHUB_OUTPUT"
+          echo "title=dev"                   >> "$GITHUB_OUTPUT"
+          echo "set_default=false"           >> "$GITHUB_OUTPUT"
+
+      - name: Deploy with mike
+        run: |
+          set -euo pipefail
+          version="${{ steps.vars.outputs.version }}"
+          alias="${{ steps.vars.outputs.alias }}"
+          title="${{ steps.vars.outputs.title }}"
+          if [[ -n "$alias" ]]; then
+            # --update-aliases moves "latest" from the previous version to this one
+            mike deploy --push --update-aliases --alias-type=copy --title "$title" "$version" "$alias"
+          else
+            mike deploy --push --title "$title" "$version"
+          fi
+
+      - name: Update default version
+        run: |
+          set -euo pipefail
+          if [[ "${{ steps.vars.outputs.set_default }}" == "true" ]]; then
+            # Stable release: root of the site redirects to whatever "latest" points to
+            mike set-default --push latest
+          elif [[ "${{ steps.vars.outputs.version }}" == "dev" ]]; then
+            # TODO: this can be removed once the site has been deployed once. It's needed
+            #       for first time bootstrapping.
+            if ! mike list --json 2>/dev/null | grep -q '"latest"'; then
+              mike set-default --push dev
+            fi
+          fi

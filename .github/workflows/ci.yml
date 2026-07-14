@@ -23,7 +23,7 @@ jobs:
       - name: Check
         run: make check-with-klee
       - name: Build Examples
-        run: ./examples/openssl.sh
+        run: ./examples/misc/openssl.sh
 
   trigger-gitlab:
     runs-on: ubuntu-latest

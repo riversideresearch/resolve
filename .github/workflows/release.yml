@@ -3,7 +3,7 @@ name: resolve release
 on:
   push:
     tags:
-      - "v[0-9]*"
+      - "v*"
 
 permissions:
   contents: write
@@ -17,8 +17,20 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
 
+      - name: Validate release tag
+        run: |
+          set -euo pipefail
+          tag="$GITHUB_REF_NAME"
+          if [[ ! "$tag" =~ ^v[0-9]+[.][0-9]+[.][0-9]+(-[0-9A-Za-z]+([.][0-9A-Za-z]+)*)?([+][0-9A-Za-z]+([.][0-9A-Za-z]+)*)?$ ]]; then
+            echo "Release tags must use SemVer: vMAJOR.MINOR.PATCH[-PRERELEASE][+BUILD]" >&2
+            exit 1
+          fi
+
       - name: Install build dependencies
         run: make install-deps
+
+      - name: Set Python package version
+        run: uv version --project resolve-cli "${GITHUB_REF_NAME#v}"
 
       - name: Build release package
         run: make release
@@ -34,6 +46,8 @@ jobs:
           grep -q '^opt/resolve/' release-contents.txt
           grep -q '^usr/local/bin/resolve$' release-contents.txt
           grep -q '^usr/local/bin/resolvecc$' release-contents.txt
+          grep -q '^LICENSE.txt$' release-contents.txt
+          grep -q '^LICENSE-GPL-3.0.txt$' release-contents.txt
 
       - name: Prepare release metadata
         id: release-meta
@@ -41,7 +55,7 @@ jobs:
           set -euo pipefail
 
           tag="${GITHUB_REF_NAME}"
-          if [[ "$tag" =~ (alpha|beta|rc|pre|dev|snapshot) ]]; then
+          if [[ "$tag" == *-* ]]; then
             echo "prerelease_flag=--prerelease" >> "$GITHUB_OUTPUT"
           else
             echo "prerelease_flag=" >> "$GITHUB_OUTPUT"
@@ -74,3 +88,63 @@ jobs:
             --notes "$release_notes" \
             --generate-notes \
             $PRERELEASE_FLAG
+
+  deploy-docs:
+    name: Deploy versioned docs
+    needs: release
+    runs-on: ubuntu-latest
+    concurrency:
+      group: docs-deploy
+      cancel-in-progress: false
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Install docs dependencies
+        run: pip install -r docs/requirements.txt mike
+
+      - name: Configure git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Fetch gh-pages branch
+        run: git fetch origin gh-pages --depth=1 || true
+
+      - name: Compute documentation version
+        id: vars
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME#v}"
+          if [[ "$tag" == *-* ]]; then
+            echo "version=${tag}" >> "$GITHUB_OUTPUT"
+            echo "alias=" >> "$GITHUB_OUTPUT"
+            echo "title=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+            echo "set_default=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "version=$(echo "$tag" | cut -d. -f1,2)" >> "$GITHUB_OUTPUT"
+            echo "alias=latest" >> "$GITHUB_OUTPUT"
+            echo "title=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+            echo "set_default=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Deploy with mike
+        run: |
+          set -euo pipefail
+          version="${{ steps.vars.outputs.version }}"
+          alias="${{ steps.vars.outputs.alias }}"
+          title="${{ steps.vars.outputs.title }}"
+          if [[ -n "$alias" ]]; then
+            mike deploy --push --update-aliases --alias-type=copy --title "$title" "$version" "$alias"
+          else
+            mike deploy --push --title "$title" "$version"
+          fi
+
+      - name: Update default version
+        if: steps.vars.outputs.set_default == 'true'
+        run: mike set-default --push latest
