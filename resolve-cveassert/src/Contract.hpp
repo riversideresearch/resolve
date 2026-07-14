@@ -17,13 +17,13 @@ enum class PredicateKind {
 
 // Predicates tell the compiler what
 // must be true before executing the operation
-struct Predicate {
+struct Precondition {
   PredicateKind kind;
   unsigned arg0;
   unsigned arg1;
 };
 
 struct Contract {
-  std::vector<Predicate> predicates;
+  std::vector<Precondition> preconditions;
   Vulnerability::RemediationStrategies strategy;
 };
