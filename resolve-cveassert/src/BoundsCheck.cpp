@@ -18,7 +18,7 @@
 
 #include "CVEAssert.hpp"
 #include "IRUtils.hpp"
-#include "Vulnerability.hpp"
+#include "Remediation.hpp"
 
 #include <map>
 #include <unordered_set>
@@ -162,8 +162,7 @@ static Function *getOrCreateAccessOk(Module *M, BoundsClass cls) {
 }
 
 static Function *getOrCreateBoundsCheckLoadSanitizer(
-    Function *F, Type *ty, Vulnerability::RemediationStrategies strategy,
-    BoundsClass cls) {
+    Function *F, Type *ty, RemediationStrategies strategy, BoundsClass cls) {
   std::string handlerName =
       "__cve_bound_ld_" + getLLVMType(ty) + "_" + classTag(cls);
   Module *M = F->getParent();
@@ -223,8 +222,7 @@ static Function *getOrCreateBoundsCheckLoadSanitizer(
 }
 
 static Function *getOrCreateBoundsCheckStoreSanitizer(
-    Function *F, Type *ty, Vulnerability::RemediationStrategies strategy,
-    BoundsClass cls) {
+    Function *F, Type *ty, RemediationStrategies strategy, BoundsClass cls) {
   std::string handlerName =
       "__cve_bound_st_" + getLLVMType(ty) + "_" + classTag(cls);
   Module *M = F->getParent();
@@ -287,9 +285,10 @@ static Function *getOrCreateBoundsCheckStoreSanitizer(
   return resolveStoreFn;
 }
 
-static Function *getOrCreateBoundsCheckMemcpySanitizer(
-    Function *F, Vulnerability::RemediationStrategies strategy,
-    BoundsClass srcCls, BoundsClass dstCls) {
+static Function *
+getOrCreateBoundsCheckMemcpySanitizer(Function *F,
+                                      RemediationStrategies strategy,
+                                      BoundsClass srcCls, BoundsClass dstCls) {
   std::string handlerName =
       std::string("__cve_memcpy_") + classTag(srcCls) + "_" + classTag(dstCls);
   Module *M = F->getParent();
@@ -357,9 +356,10 @@ static Function *getOrCreateBoundsCheckMemcpySanitizer(
   return resolveMemmoveFn;
 }
 
-static Function *getOrCreateBoundsCheckMemmoveSanitizer(
-    Function *F, Vulnerability::RemediationStrategies strategy,
-    BoundsClass srcCls, BoundsClass dstCls) {
+static Function *
+getOrCreateBoundsCheckMemmoveSanitizer(Function *F,
+                                       RemediationStrategies strategy,
+                                       BoundsClass srcCls, BoundsClass dstCls) {
   std::string handlerName =
       std::string("__cve_memmove_") + classTag(srcCls) + "_" + classTag(dstCls);
   Module *M = F->getParent();
@@ -429,8 +429,7 @@ static Function *getOrCreateBoundsCheckMemmoveSanitizer(
 }
 
 static Function *getOrCreateBoundsCheckMemsetSanitizer(
-    Function *F, Vulnerability::RemediationStrategies strategy,
-    BoundsClass cls) {
+    Function *F, RemediationStrategies strategy, BoundsClass cls) {
   std::string handlerName = std::string("__cve_memset_") + classTag(cls);
   Module *M = F->getParent();
   LLVMContext &Ctx = M->getContext();
@@ -633,8 +632,7 @@ void instrumentGep(Function *F) {
   }
 }
 
-void instrumentMemcpy(Function *F,
-                      Vulnerability::RemediationStrategies strategy) {
+void instrumentMemcpy(Function *F, RemediationStrategies strategy) {
   LLVMContext &Ctx = F->getContext();
   IRBuilder<> builder(Ctx);
   std::vector<Instruction *> memcpyList;
@@ -691,8 +689,7 @@ void instrumentMemcpy(Function *F,
   }
 }
 
-void instrumentMemset(Function *F,
-                      Vulnerability::RemediationStrategies strategy) {
+void instrumentMemset(Function *F, RemediationStrategies strategy) {
   LLVMContext &Ctx = F->getContext();
   IRBuilder<> builder(Ctx);
   std::vector<Instruction *> memsetList;
@@ -760,8 +757,7 @@ void instrumentMemset(Function *F,
   }
 }
 
-void instrumentMemmove(Function *F,
-                       Vulnerability::RemediationStrategies strategy) {
+void instrumentMemmove(Function *F, RemediationStrategies strategy) {
   LLVMContext &Ctx = F->getContext();
   IRBuilder<> builder(Ctx);
   std::vector<Instruction *> memmoveList;
@@ -818,8 +814,7 @@ void instrumentMemmove(Function *F,
   }
 }
 
-void instrumentLoadStore(Function *F,
-                         Vulnerability::RemediationStrategies strategy) {
+void instrumentLoadStore(Function *F, RemediationStrategies strategy) {
   LLVMContext &Ctx = F->getContext();
   IRBuilder<> builder(Ctx);
 
@@ -827,16 +822,16 @@ void instrumentLoadStore(Function *F,
   std::vector<StoreInst *> storeList;
 
   switch (strategy) {
-  case Vulnerability::RemediationStrategies::CONTINUE:
-  case Vulnerability::RemediationStrategies::EXIT:
-  case Vulnerability::RemediationStrategies::RECOVER:
+  case RemediationStrategies::CONTINUE:
+  case RemediationStrategies::EXIT:
+  case RemediationStrategies::RECOVER:
     break;
 
   default:
     llvm::errs() << "[CVEAssert] Error: instrumentLoadStore does not support "
                     "remediation strategy "
                  << "defaulting to continue strategy!\n";
-    strategy = Vulnerability::RemediationStrategies::CONTINUE;
+    strategy = RemediationStrategies::CONTINUE;
     break;
   }
 
@@ -903,8 +898,7 @@ void instrumentLoadStore(Function *F,
   }
 }
 
-void sanitizeMemInstBounds(Function *F,
-                           Vulnerability::RemediationStrategies strategy) {
+void sanitizeMemInstBounds(Function *F, RemediationStrategies strategy) {
   instrumentGep(F);
   instrumentMemcpy(F, strategy);
   instrumentMemmove(F, strategy);

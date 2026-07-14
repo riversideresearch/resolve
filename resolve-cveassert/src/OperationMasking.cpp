@@ -11,7 +11,7 @@
 #include "llvm/Support/raw_ostream.h"
 
 #include "IRUtils.hpp"
-#include "Vulnerability.hpp"
+#include "Remediation.hpp"
 
 #include <optional>
 #include <string>

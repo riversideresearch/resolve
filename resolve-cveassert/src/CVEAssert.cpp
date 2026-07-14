@@ -35,6 +35,7 @@
 #include "InstrumentAllocators.hpp"
 #include "NullPointerSanitizer.hpp"
 #include "OperationMasking.hpp"
+#include "Remediation.hpp"
 #include "Vulnerability.hpp"
 
 using namespace llvm;
@@ -114,8 +115,7 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
     vulnerabilities = Vulnerability::parseVulnerabilityFile();
   }
 
-  void applyAutomaticSanitizers(Function &F,
-                                Vulnerability::RemediationStrategies strategy) {
+  void applyAutomaticSanitizers(Function &F, RemediationStrategies strategy) {
     /// applies all automatic sanitizers (operation masking excluded)
     sanitizeFreeOfNonHeap(&F, strategy);
     sanitizeMemInstBounds(&F, strategy);
@@ -199,7 +199,7 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
       out << F;
     }
 
-    if (vuln.Strategy == Vulnerability::RemediationStrategies::NONE) {
+    if (vuln.Strategy == RemediationStrategies::NONE) {
       out << "[CVEAssert] NONE strategy selected for " << vuln.TargetFileName
           << ":" << vuln.TargetFunctionName << "...\n";
       out << "[CVEAssert] Skipping remediation\n";
@@ -345,7 +345,7 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
 
     for (auto &vuln : vulns) {
       // Also skip instrumentation for skipped vulnerabilities
-      if (vuln.Strategy == Vulnerability::RemediationStrategies::NONE) {
+      if (vuln.Strategy == RemediationStrategies::NONE) {
         continue;
       }
 
@@ -416,7 +416,7 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
     std::vector<Vulnerability> moduleVulns;
 
     for (auto &vuln : vulnerabilities) {
-      if (vuln.Output == Vulnerability::RemediationOutput::PATCH) {
+      if (vuln.Output == RemediationOutput::PATCH) {
         patchVulns.push_back(vuln);
       } else {
         moduleVulns.push_back(vuln);

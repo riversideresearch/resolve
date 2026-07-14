@@ -5,7 +5,7 @@
 
 #pragma once
 
-#include "Vulnerability.hpp"
+#include "Remediation.hpp"
 #include <vector>
 
 enum class PredicateKind {
@@ -25,5 +25,5 @@ struct Precondition {
 
 struct Contract {
   std::vector<Precondition> preconditions;
-  Vulnerability::RemediationStrategies strategy;
+  RemediationStrategies strategy;
 };
