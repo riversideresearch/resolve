@@ -4,25 +4,9 @@ use std::fmt::Display;
 use std::fs::{self, File};
 use std::path::PathBuf;
 use std::io::{self, Seek, Write};
-use std::sync::{LazyLock, Mutex};
+use std::sync::LazyLock;
 use std::{env, process};
-
-pub struct MutexWrap<T> {
-    mutex: Mutex<T>,
-}
-
-impl<T> MutexWrap<T> {
-    pub const fn new(x: T) -> Self {
-        MutexWrap {
-            mutex: Mutex::new(x),
-        }
-    }
-
-    // Abort if the mutex is poisoned
-    pub fn lock(&self) -> std::sync::MutexGuard<'_, T> {
-        self.mutex.lock().expect("Not poisoned")
-    }
-}
+use crate::MutexWrap;
 
 fn idify_file_path(path: &mut PathBuf, id: impl Display) {
     let file_name = path.file_name()
