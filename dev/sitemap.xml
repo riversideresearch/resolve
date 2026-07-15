@@ -2,82 +2,82 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     <url>
          <loc>https://riversideresearch.github.io/resolve/dev/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-15</lastmod>
     </url>
     <url>
          <loc>https://riversideresearch.github.io/resolve/dev/architecture/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-15</lastmod>
     </url>
     <url>
          <loc>https://riversideresearch.github.io/resolve/dev/installation/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-15</lastmod>
     </url>
     <url>
          <loc>https://riversideresearch.github.io/resolve/dev/components/facts/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-15</lastmod>
     </url>
     <url>
          <loc>https://riversideresearch.github.io/resolve/dev/components/libresolve/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-15</lastmod>
     </url>
     <url>
          <loc>https://riversideresearch.github.io/resolve/dev/components/reach/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-15</lastmod>
     </url>
     <url>
          <loc>https://riversideresearch.github.io/resolve/dev/components/resolve-cc/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-15</lastmod>
     </url>
     <url>
          <loc>https://riversideresearch.github.io/resolve/dev/components/resolve-cveassert/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-15</lastmod>
     </url>
     <url>
          <loc>https://riversideresearch.github.io/resolve/dev/components/resolve-cli/crash-analysis/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-15</lastmod>
     </url>
     <url>
          <loc>https://riversideresearch.github.io/resolve/dev/components/resolve-cli/input-synthesis/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-15</lastmod>
     </url>
     <url>
          <loc>https://riversideresearch.github.io/resolve/dev/components/resolve-cli/resolve-cli/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-15</lastmod>
     </url>
     <url>
          <loc>https://riversideresearch.github.io/resolve/dev/components/resolve-cli/sbom/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-15</lastmod>
     </url>
     <url>
          <loc>https://riversideresearch.github.io/resolve/dev/concepts/vulnerabilities-json/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-15</lastmod>
     </url>
     <url>
          <loc>https://riversideresearch.github.io/resolve/dev/development/building-from-source/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-15</lastmod>
     </url>
     <url>
          <loc>https://riversideresearch.github.io/resolve/dev/development/documentation/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-15</lastmod>
     </url>
     <url>
          <loc>https://riversideresearch.github.io/resolve/dev/examples/crash-analysis/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-15</lastmod>
     </url>
     <url>
          <loc>https://riversideresearch.github.io/resolve/dev/examples/input-synthesis/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-15</lastmod>
     </url>
     <url>
          <loc>https://riversideresearch.github.io/resolve/dev/examples/reachability/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-15</lastmod>
     </url>
     <url>
          <loc>https://riversideresearch.github.io/resolve/dev/examples/remediation/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-15</lastmod>
     </url>
     <url>
          <loc>https://riversideresearch.github.io/resolve/dev/examples/sbom/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-15</lastmod>
     </url>
 </urlset>
