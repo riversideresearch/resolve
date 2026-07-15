@@ -13,7 +13,8 @@ use std::fmt::Display;
 use std::fs::{self, File};
 use std::path::PathBuf;
 use std::io::{self, Seek, Write};
-use std::sync::{LazyLock, Mutex};
+use parking_lot::{Mutex, MutexGuard};
+use std::sync::LazyLock;
 use std::{env, process};
 
 pub struct MutexWrap<T> {
@@ -28,8 +29,8 @@ impl<T> MutexWrap<T> {
     }
 
     // Abort if the mutex is poisoned
-    pub fn lock(&self) -> std::sync::MutexGuard<'_, T> {
-        self.mutex.lock().expect("Not poisoned")
+    pub fn lock(&self) -> MutexGuard<'_, T> {
+        self.mutex.lock()
     }
 }
 
