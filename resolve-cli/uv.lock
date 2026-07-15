@@ -893,7 +893,6 @@ requires-dist = [
     
     { name = "pyelftools", specifier = ">=0.32" },
     { name = "univers", specifier = ">=31.1.0" },
-,
 ]
 
 [[package]]
