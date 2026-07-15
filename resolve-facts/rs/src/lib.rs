@@ -1,5 +1,6 @@
 mod builder;
 mod model;
+mod utils;
 
 use model::*;
 use builder::*;
