@@ -37,3 +37,6 @@ reach_wrap_output.json
 
 *.facts
 *.facts.zst
+
+# rust
+*target*
