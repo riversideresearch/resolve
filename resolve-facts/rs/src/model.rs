@@ -1,15 +1,11 @@
 use std::collections::HashMap;
 
-static VERSION: u8 = 0;
-
-enum FactsMode {
+pub enum FactsMode {
     Full,
     Slim,
 }
 
-static MODE: FactsMode = FactsMode::Slim;
-
-enum NodeType {
+pub enum NodeType {
     Module,
     Function,
     Argument,
@@ -18,19 +14,20 @@ enum NodeType {
     GlobalVariable,
 }
 
-enum Linkage {
+pub enum Linkage {
     Other,
     ExternalLinkage,
 }
 
-enum CallType {
+pub enum CallType {
     Direct,
     Indirect,
 }
 
-type NodeID = u32;
+pub type NodeID = u32;
+pub type ModuleID = u32;
 
-struct Node {
+pub struct Node {
     ty:             NodeType,
     idx:            Option<u32>,
     name:           Option<String>,
@@ -43,7 +40,7 @@ struct Node {
     address_taken:  Option<bool>,
 }
 
-enum EdgeKind {
+pub enum EdgeKind {
     Calls,
     Contains,
     DataFlowTo,
@@ -52,24 +49,22 @@ enum EdgeKind {
     ControlFlowTo,
 }
 
-struct Edge {
+pub struct Edge {
     kinds: Vec<EdgeKind>,
 }
 
-struct EdgeID {
+pub struct EdgeID {
     first:  NodeID,
     second: NodeID,
 }
 
-struct ModuleFacts {
-    nodes: HashMap<NodeID, ModuleFacts>,
+#[derive(Default)]
+pub struct ModuleFacts {
+    nodes: HashMap<NodeID, Node>,
     edges: HashMap<EdgeID, Edge>,
 }
 
-struct ProgramFacts {
-    modules: HashMap<NodeID, ModuleFacts>,
-}
-
-fn main() {
-    println!("Hello, world!");
+#[derive(Default)]
+pub struct ProgramFacts {
+    pub modules: HashMap<ModuleID, ModuleFacts>,
 }
