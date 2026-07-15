@@ -49,6 +49,30 @@ install(CODE "
     )
 ")
 
+# Stamp the resolve version into the package before installing it
+install(CODE "
+    set(_resolve_version \"\")
+    if(\"\$ENV{GITHUB_REF_TYPE}\" STREQUAL \"tag\" AND NOT \"\$ENV{GITHUB_REF_NAME}\" STREQUAL \"\")
+        set(_resolve_version \"\$ENV{GITHUB_REF_NAME}\")
+    else()
+        execute_process(
+            COMMAND git -C \"${CMAKE_CURRENT_SOURCE_DIR}\" describe --tags --always --dirty --abbrev=8
+            RESULT_VARIABLE _git_result
+            OUTPUT_VARIABLE _git_version
+            OUTPUT_STRIP_TRAILING_WHITESPACE
+            ERROR_QUIET
+        )
+        if(_git_result EQUAL 0)
+            set(_resolve_version \"\${_git_version}\")
+        endif()
+    endif()
+    message(STATUS \"Stamping resolve version: '\${_resolve_version}'\")
+    file(WRITE \"${CMAKE_CURRENT_SOURCE_DIR}/src/resolve/_version.py\"
+\"# Generated at build/install time by resolve-cli/CMakeLists.txt. Do not edit or commit.
+__version__ = \\\"\${_resolve_version}\\\"
+\")
+")
+
 # Install as python package with uv
 install(CODE "
     set(_install_prefix \"\${CMAKE_INSTALL_PREFIX}\")

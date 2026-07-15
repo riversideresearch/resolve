@@ -1,0 +1,70 @@
+{
+  "@context" : "https://spdx.org/rdf/3.0.1/spdx-context.jsonld",
+  "@graph" :
+  [
+    {
+      "@id" : "_:Build#CreationInfo",
+      "comment" : "This SBOM was generated from the CMakeLists.txt File",
+      "created" : "2026-06-30T12:00:00Z",
+      "createdBy" :
+      [
+        "https://gitlab.kitware.com/cmake/cmake"
+      ],
+      "specVersion" : "3.0.1",
+      "type" : "CreationInfo"
+    },
+    {
+      "creationInfo" : "_:Build#CreationInfo",
+      "element" :
+      [
+        {
+          "builtTime" : "2026-06-30T12:00:00Z",
+          "creationInfo" : "_:Build#CreationInfo",
+          "name" : "fontconfig:fontconfig_project::fontconfig",
+          "software_packageVersion" : "2.2.1",
+          "spdxId" : "urn:fontconfig::fontconfig#Package",
+          "type" : "software_Package"
+        },
+        {
+          "builtTime" : "2026-06-30T12:00:00Z",
+          "creationInfo" : "_:Build#CreationInfo",
+          "name" : "ZLIB:ZLIB::ZLIB",
+          "software_packageVersion" : "1.3.1",
+          "spdxId" : "urn:ZLIB::ZLIB#Package",
+          "type" : "software_Package"
+        }
+      ],
+      "name" : "textkitTargets",
+      "profileConformance" :
+      [
+        "core",
+        "software"
+      ],
+      "rootElement" :
+      [
+        {
+          "creationInfo" : "_:Build#CreationInfo",
+          "name" : "textkit",
+          "software_primaryPurpose" : "application",
+          "spdxId" : "urn:textkit#Package",
+          "type" : "software_Package"
+        }
+      ],
+      "spdxId" : "urn:textkitTargets#SPDXDocument",
+      "type" : "SpdxDocument"
+    },
+    {
+      "creationInfo" : "_:Build#CreationInfo",
+      "description" : "Linked Libraries",
+      "from" : "urn:textkit#Package",
+      "relationshipType" : "dependsOn",
+      "spdxId" : "urn:Static#Relationship",
+      "to" :
+      [
+        "urn:fontconfig::fontconfig#Package",
+        "urn:ZLIB::ZLIB#Package"
+      ],
+      "type" : "Relationship"
+    }
+  ]
+}

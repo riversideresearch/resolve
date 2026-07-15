@@ -1,0 +1,86 @@
+site_name: RESOLVE Documentation
+site_url: https://riversideresearch.github.io/resolve/
+strict: true
+repo_url: https://github.com/riversideresearch/resolve
+edit_uri: edit/main/docs/
+theme:
+  language: en
+  direction: ltr
+  name: material
+  logo: assets/resolve_logo_white.png
+  favicon: assets/resolve_square_white.png
+
+  palette:
+    # Palette toggle for light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: red
+      accent: red
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+
+    # Palette toggle for dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: red
+      accent: red
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  
+  # edit/view repo prompts
+  features:
+    - content.action.edit
+  icon:
+    edit: material/pencil 
+    view: material/eye
+copyright: RESOLVE is licensed under L-GPL v3.0
+extra:
+  generator: false
+  version:
+    provider: mike
+    alias: true
+    default: latest
+  # social:
+  #   - icon: fontawesome/brands/github
+  #     link: https://github.com/riversideresearch
+  #     name: riversideresearch on GitHub
+
+markdown_extensions:
+  - admonition
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+
+nav:
+  - Home: index.md
+  - Installation: installation.md
+  - Architecture: architecture.md
+  - Concepts:
+    - vulnerabilities.json: concepts/vulnerabilities-json.md
+    - Facts: components/facts.md
+  - Components:
+    - Resolve CLI:
+      - Overview: components/resolve-cli/resolve-cli.md
+      - SBOM: components/resolve-cli/sbom.md
+      - Crash Analysis: components/resolve-cli/crash-analysis.md
+      - Input Synthesis: components/resolve-cli/input-synthesis.md
+    - Libresolve: components/libresolve.md
+    - Reach: components/reach.md
+    - CVEAssert: components/resolve-cveassert.md
+    - ResolveCC: components/resolve-cc.md
+  - Examples:
+    - Crash Analysis: examples/crash-analysis.md
+    - Input Synthesis: examples/input-synthesis.md
+    - Reachability: examples/reachability.md
+    - Remediation: examples/remediation.md
+    - SBOM: examples/sbom.md
+  - Development:
+    - Building From Source: development/building-from-source.md
+    - Documentation Website: development/documentation.md

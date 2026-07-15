@@ -1,0 +1,2 @@
+# Python dependencies for building the RESOLVE documentation site
+mkdocs-material>=9.5

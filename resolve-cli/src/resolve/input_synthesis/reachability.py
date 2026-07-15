@@ -11,6 +11,7 @@ from pathlib import Path
 
 from resolve.agent_utils.agent import run_critique, run_prompt
 from resolve.agent_utils.utils import prepare_output_path, require_file
+from resolve.input_synthesis import synthesize
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -141,17 +142,10 @@ If the only satisfiable sufficient condition(s) are machine-dependent (e.g., x86
     # INPUT SYNTHESIS AND CONCLUSION
     ############################################################################
 
-    final_prompt = f"""
-`{reachability_path}` contains a reachability analysis of a CVE possibly affecting this project. Your tasks:
-1) If `{reachability_path}` concludes that the CVE is reachable or triggerable, synthesize an input that triggers it and verify that it works. If triggerability is inconclusive, try to synthesize an input and see if it works (and if it fails still report the result as inconclusive). If `{reachability_path}` concludes that the CVE is not triggerable, skip this step. Don't second-guess the conclusion.
-2) Write a one-paragraph summary of the conclusion to `{output_path}/conclusion.md`.
-
-If you synthesize an input, ensure that it will work on any realistic system if possible. E.g., if the exploit depends on resource exhaustion then make it work on a system that has a large amount of that resource.
-
-Put any files you create in `{output_path}/input-synthesis/`. If a triggering input is synthesized, include an explanation of how it was synthesized and how to test that it works. Don't delete any scripts/programs that were used to generate the input.
-"""
-    run_prompt(agent, final_prompt, model=model)
-    require_file(output_path / "conclusion.md", "final conclusion")
+    final_prompt = synthesize.synthesis_prompt_from_reachability(
+        reachability_path, output_path
+    )
+    synthesize.run_synthesis(agent, final_prompt, output_path, model)
 
     return 0
 

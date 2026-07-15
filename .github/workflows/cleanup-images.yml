@@ -1,0 +1,30 @@
+name: Cleanup Old GHCR Images
+
+on:
+  schedule:
+    - cron: '0 0 * * 0' # weekly, Sunday at 00:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  delete-old-versions:
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        package:
+          - resolve
+          - resolve/analyze-image/server-remediated
+
+    steps:
+      - name: Delete excess versions of ${{ matrix.package }}
+        uses: actions/delete-package-versions@v5
+        with:
+          owner: riversideresearch
+          package-name: ${{ matrix.package }}
+          package-type: container
+          min-versions-to-keep: 5
