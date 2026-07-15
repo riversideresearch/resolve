@@ -27,17 +27,21 @@ pub enum CallType {
 pub type NodeID = u32;
 pub type ModuleID = u32;
 
+pub struct NodeProps {
+    pub idx:            Option<u32>,
+    pub name:           Option<String>,
+    pub opcode:         Option<String>,
+    pub linkage:        Option<Linkage>,
+    pub call_type:      Option<CallType>,
+    pub source_loc:     Option<String>,
+    pub source_file:    Option<String>,
+    pub function_type:  Option<String>,
+    pub address_taken:  Option<bool>,
+}
+
 pub struct Node {
-    ty:             NodeType,
-    idx:            Option<u32>,
-    name:           Option<String>,
-    opcode:         Option<String>,
-    linkage:        Option<Linkage>,
-    call_type:      Option<CallType>,
-    source_loc:     Option<String>,
-    source_file:    Option<String>,
-    function_type:  Option<String>,
-    address_taken:  Option<bool>,
+    pub ty:     NodeType,
+    pub props:  NodeProps,
 }
 
 pub enum EdgeKind {
@@ -54,14 +58,14 @@ pub struct Edge {
 }
 
 pub struct EdgeID {
-    first:  NodeID,
-    second: NodeID,
+    pub first:  NodeID,
+    pub second: NodeID,
 }
 
 #[derive(Default)]
 pub struct ModuleFacts {
-    nodes: HashMap<NodeID, Node>,
-    edges: HashMap<EdgeID, Edge>,
+    pub nodes: HashMap<NodeID, Node>,
+    pub edges: HashMap<EdgeID, Edge>,
 }
 
 #[derive(Default)]

@@ -1,12 +1,12 @@
 use crate::model::*;
 
 #[unsafe(no_mangle)]
-pub extern "C" fn new_facts() -> *mut ProgramFacts {
+pub extern "C" fn new_program_facts() -> *mut ProgramFacts {
     Box::into_raw(Box::new(ProgramFacts::default()))
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn free_facts(b: *mut ProgramFacts) {
+pub extern "C" fn free_program_facts(b: *mut ProgramFacts) {
     if !b.is_null() { unsafe {drop(Box::from_raw(b)); } }
 }
 
@@ -22,7 +22,14 @@ pub extern "C" fn record_new_module(b: *mut ProgramFacts, id: ModuleID, hint: us
 pub extern "C" fn record_node(b: *mut ProgramFacts, module: ModuleID, node_id: NodeID, ty: NodeType) {
     let Some(b) = (unsafe { b.as_mut() }) else { return };
 
-    
+    if let Some(m) = b.modules.get(&module) {
+        m.nodes.insert(
+            node_id,
+            Node {
+                
+            }
+        );
+    }
 }
 
 #[unsafe(no_mangle)] // TODO: UPDATE FUNC??
