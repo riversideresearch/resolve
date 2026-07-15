@@ -1,12 +1,12 @@
 // Copyright (c) 2025 Riverside Research.
 // LGPL-3; See LICENSE.txt in the repo root for details.
 
-use crate::MutexWrap;
 use log::warn;
 use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::ops::RangeInclusive;
 use std::ops::Bound::Included;
+use crate::MutexWrap;
 
 /// An alias representing Virtual Address values
 pub type Vaddr = usize;

@@ -94,8 +94,6 @@ void sanitizeDivideByZero(Function *F,
                           Vulnerability::RemediationStrategies strategy) {
   Module *M = F->getParent();
   auto &Ctx = M->getContext();
-  auto usize_ty = Type::getInt64Ty(Ctx);
-  auto i1_ty = Type::getInt1Ty(Ctx);
   IRBuilder<> builder(Ctx);
   std::vector<Instruction *> worklist;
 
@@ -260,8 +258,6 @@ void sanitizeIntOverflow(Function *F,
   std::vector<Instruction *> worklist;
   Module *M = F->getParent();
   auto &Ctx = M->getContext();
-  auto usize_ty = Type::getInt64Ty(Ctx);
-  auto i1_ty = Type::getInt1Ty(Ctx);
   IRBuilder<> builder(Ctx);
 
   switch (strategy) {
@@ -429,8 +425,6 @@ void sanitizeBitShift(Function *F,
                       Vulnerability::RemediationStrategies strategy) {
   Module *M = F->getParent();
   auto &Ctx = M->getContext();
-  auto usize_ty = Type::getInt64Ty(Ctx);
-  auto i1_ty = Type::getInt1Ty(Ctx);
   IRBuilder<> builder(Ctx);
   std::vector<Instruction *> worklist;
 

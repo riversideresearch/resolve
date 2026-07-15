@@ -28,7 +28,6 @@ getOrCreateNullPtrLoadSanitizer(Function *F, Type *ty,
   // TODO: handle address spaces other than 0
   auto ptr_ty = PointerType::get(Ctx, 0);
   auto usize_ty = Type::getInt64Ty(Ctx);
-  auto i1_ty = Type::getInt1Ty(Ctx);
 
   // TODO: write this in asm as some kind of sanitzer_rt?
   FunctionType *resolveNullPtrLdFnTy = FunctionType::get(ty, {ptr_ty}, false);
@@ -96,7 +95,6 @@ static Function *getOrCreateNullPtrStoreSanitizer(
   // TODO: handle address spaces other than 0
   auto ptr_ty = PointerType::get(Ctx, 0);
   auto usize_ty = Type::getInt64Ty(Ctx);
-  auto i1_ty = Type::getInt1Ty(Ctx);
 
   // TODO: write this in asm as some kind of sanitzer_rt?
   FunctionType *resolveNullPtrStFnTy =
