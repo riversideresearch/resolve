@@ -23,12 +23,11 @@ pub extern "C" fn record_new_module(b: *mut ProgramFacts, id: ModuleID, hint: us
 pub extern "C" fn record_node(b: *mut ProgramFacts, module: ModuleID, node_id: NodeID, ty: NodeType) {
     let Some(b) = (unsafe { b.as_mut() }) else { return };
 
-    if let Some(m) = b.modules.get_mut(&module) {
-        m.nodes.insert(
-            node_id,
-            Node { ty, props: NodeProps::default() }
-        );
-    }
+    b.modules
+        .entry(module)
+        .or_default()
+        .nodes
+        .insert(node_id, Node { ty, props: NodeProps::default() });
 }
 
 #[unsafe(no_mangle)]
@@ -81,3 +80,12 @@ node_prop_setter!(record_node_name,          name,          str);
 node_prop_setter!(record_node_opcode,        opcode,        str);
 node_prop_setter!(record_node_source_file,   source_file,   str);
 node_prop_setter!(record_node_function_type, function_type, str);
+
+#[unsafe(no_mangle)]
+pub extern "C" fn record_node_source_loc(
+    b: *mut ProgramFacts, module: ModuleID, node_id: NodeID, line: u32, col: u32,
+) {
+    let Some(b) = (unsafe { b.as_mut() }) else { return };
+    let Some(node) = b.node_mut(module, node_id) else { return };
+    node.props.source_loc = Some((line, col));
+}

@@ -5,6 +5,7 @@ pub enum FactsMode {
     Slim,
 }
 
+#[allow(unused)] // cbindgen ABI
 #[repr(u8)]
 pub enum NodeType {
     Module,
@@ -15,12 +16,14 @@ pub enum NodeType {
     GlobalVariable,
 }
 
+#[allow(unused)] // cbindgen ABI
 #[repr(u8)]
 pub enum Linkage {
     Other,
     ExternalLinkage,
 }
 
+#[allow(unused)] // cbindgen ABI
 #[repr(u8)]
 pub enum CallType {
     Direct,
@@ -48,6 +51,8 @@ pub struct Node {
     pub props:  NodeProps,
 }
 
+#[allow(unused)] // cbindgen ABI
+#[repr(u8)]
 pub enum EdgeKind {
     Calls,
     Contains,
