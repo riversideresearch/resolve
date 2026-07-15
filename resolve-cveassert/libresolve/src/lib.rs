@@ -9,8 +9,7 @@ mod trace;
 mod file;
 
 
-use parking_lot::{MutexGuard};
-pub type Mutex<T> = parking_lot::Mutex<T>;
+use parking_lot::{Mutex, MutexGuard};
 
 pub struct MutexWrap<T> {
     mutex: Mutex<T>,
@@ -23,7 +22,6 @@ impl<T> MutexWrap<T> {
         }
     }
 
-    // Abort if the mutex is poisoned
     pub fn lock(&self) -> MutexGuard<'_, T> {
         self.mutex.lock()
     }
