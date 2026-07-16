@@ -1,10 +1,5 @@
 use std::collections::HashMap;
 
-pub enum FactsMode {
-    Full,
-    Slim,
-}
-
 #[allow(unused)] // cbindgen ABI
 #[repr(u8)]
 pub enum NodeType {
