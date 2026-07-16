@@ -33,20 +33,20 @@ pub type ModuleID = u32;
 
 #[derive(Default)]
 pub struct NodeProps {
-    pub idx:            Option<u32>,
-    pub name:           Option<String>,
-    pub opcode:         Option<String>,
-    pub linkage:        Option<Linkage>,
-    pub call_type:      Option<CallType>,
-    pub source_loc:     Option<(u32, u32)>,
-    pub source_file:    Option<String>,
-    pub function_type:  Option<String>,
-    pub address_taken:  Option<bool>,
+    pub idx: Option<u32>,
+    pub name: Option<String>,
+    pub opcode: Option<String>,
+    pub linkage: Option<Linkage>,
+    pub call_type: Option<CallType>,
+    pub source_loc: Option<(u32, u32)>,
+    pub source_file: Option<String>,
+    pub function_type: Option<String>,
+    pub address_taken: Option<bool>,
 }
 
 pub struct Node {
-    pub ty:     NodeType,
-    pub props:  NodeProps,
+    pub ty: NodeType,
+    pub props: NodeProps,
 }
 
 #[allow(unused)] // cbindgen ABI
@@ -67,7 +67,7 @@ pub struct Edge {
 
 #[derive(PartialEq, Eq, Hash, Clone, Copy)]
 pub struct EdgeID {
-    pub first:  NodeID,
+    pub first: NodeID,
     pub second: NodeID,
 }
 
