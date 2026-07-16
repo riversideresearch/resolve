@@ -16,3 +16,4 @@ enum class RemediationStrategies {
 };
 
 enum class RemediationOutput { INLINE, PATCH };
+

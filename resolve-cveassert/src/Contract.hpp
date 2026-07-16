@@ -6,6 +6,8 @@
 #pragma once
 
 #include "Remediation.hpp"
+#include "llvm/Support/JSON.h"
+
 #include <vector>
 
 enum class PredicateKind {
@@ -17,13 +19,13 @@ enum class PredicateKind {
 
 // Predicates tell the compiler what
 // must be true before executing the operation
-struct Precondition {
+struct Predicate {
   PredicateKind kind;
   unsigned arg0;
   unsigned arg1;
 };
 
 struct Contract {
-  std::vector<Precondition> preconditions;
+  std::vector<Predicate> preconditions;
   RemediationStrategies strategy;
 };
