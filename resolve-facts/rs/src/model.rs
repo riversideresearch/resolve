@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 #[allow(unused)] // cbindgen ABI
 #[repr(u8)]
+#[derive(Clone, Copy)]
 pub enum NodeType {
     Module,
     Function,
@@ -13,6 +14,7 @@ pub enum NodeType {
 
 #[allow(unused)] // cbindgen ABI
 #[repr(u8)]
+#[derive(Copy, Clone)]
 pub enum Linkage {
     Other,
     ExternalLinkage,
@@ -20,6 +22,7 @@ pub enum Linkage {
 
 #[allow(unused)] // cbindgen ABI
 #[repr(u8)]
+#[derive(Copy, Clone)]
 pub enum CallType {
     Direct,
     Indirect,
