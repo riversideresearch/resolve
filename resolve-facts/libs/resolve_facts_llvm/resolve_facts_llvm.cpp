@@ -13,20 +13,9 @@
 #include <unordered_map>
 #include <vector>
 
+#include "llvm/Support/Compression.h"
+
 using namespace llvm;
-
-using Linkage = resolve_facts::Linkage;
-using CallType = resolve_facts::CallType;
-using EdgeKind = resolve_facts::EdgeKind;
-
-ProgramFacts resolve::all_facts;
-LLVMFacts resolve::facts(resolve::all_facts);
-
-std::string resolve::debugLocToString(DebugLoc dbgLoc) {
-  auto line = std::to_string(dbgLoc.getLine());
-  auto col = std::to_string(dbgLoc.getCol());
-  return line + ":" + col;
-}
 
 std::string resolve::typeToString(const Type &type) {
   std::string str;
@@ -35,12 +24,11 @@ std::string resolve::typeToString(const Type &type) {
   return str;
 }
 
-void resolve::getGlobalFacts(GlobalVariable &G) {
+void resolve::getGlobalFacts(LLVMFacts &facts, GlobalVariable &G) {
   facts.addNode(G);
-  facts.addNodeProp(G, [&](auto& node) {
-    node.name = G.getName().str();
-    node.linkage = (G.hasExternalLinkage() ? Linkage::ExternalLinkage : Linkage::Other);
-  });
+  facts.setName(G, G.getName());
+  facts.setLinkage(G, G.hasExternalLinkage() ? Linkage::ExternalLinkage
+                                             : Linkage::Other);
 }
 
 static std::string getFunctionNameFromDebugInfo(Function &F) {
@@ -53,64 +41,59 @@ static std::string getFunctionNameFromDebugInfo(Function &F) {
   return "";
 }
 
-void resolve::getFunctionFacts(Function &F) {
+void resolve::getFunctionFacts(LLVMFacts &facts, Function &F) {
   facts.addNode(F);
-  facts.addNodeProp(F, [&](auto& node) {
-    node.name = F.getName().str();
-    node.linkage = (F.hasExternalLinkage() ? Linkage::ExternalLinkage : Linkage::Other);
-    node.function_type = typeToString(*F.getFunctionType());
-    auto name = getFunctionNameFromDebugInfo(F);
-    if (name != "") {
-      node.source_file = name;
-    }
-    if (F.hasAddressTaken()) {
-      node.address_taken = true;
-    }
-  });
+  facts.setName(F, F.getName());
+  facts.setLinkage(F, F.hasExternalLinkage() ? Linkage::ExternalLinkage
+                                             : Linkage::Other);
+  facts.setFunctionType(F, typeToString(*F.getFunctionType()));
+  auto name = getFunctionNameFromDebugInfo(F);
+  if (!name.empty()) {
+    facts.setSourceFile(F, name);
+  }
+  if (F.hasAddressTaken()) {
+    facts.setAddressTaken(F);
+  }
 
   if (F.isDeclaration())
     return;
 
-  facts.addEdge(F, F.getEntryBlock(), [](auto& edge) { edge.kinds.push_back(EdgeKind::EntryPoint); });
+  facts.addEdge(F, F.getEntryBlock(), EdgeKind::EntryPoint);
 
   for (Argument &A : F.args()) {
-    facts.addEdge(F, A, [&](auto& edge) { edge.kinds.push_back(EdgeKind::Contains); });
-    facts.addNodeProp(A, [&](auto& node) { node.idx = A.getArgNo(); });
+    facts.addEdge(F, A, EdgeKind::Contains);
+    facts.setIdx(A, A.getArgNo());
   }
 
   for (BasicBlock &BB : F) {
-    facts.addEdge(F, BB, [&](auto& edge) { edge.kinds.push_back(EdgeKind::Contains); });
-    facts.addNodeProp(BB, [&](auto& node) { 
-      node.idx = LLVMFacts::getIndexInParent(BB);
-      if (BB.hasName()) {
-        node.name = BB.getName().str();
-      }
-    });
+    facts.addEdge(F, BB, EdgeKind::Contains);
+    facts.setIdx(BB, LLVMFacts::getIndexInParent(BB));
+    if (BB.hasName()) {
+      facts.setName(BB, BB.getName());
+    }
 
     // Control flow Edges
     for (BasicBlock *Succ : successors(&BB)) {
-      facts.addEdge(BB, *Succ, [&](auto& edge) { edge.kinds.push_back(EdgeKind::ControlFlowTo); });
+      facts.addEdge(BB, *Succ, EdgeKind::ControlFlowTo);
     }
 
     for (Instruction &I : BB) {
-      facts.addEdge(BB, I, [&](auto& edge) { edge.kinds.push_back(EdgeKind::Contains); });
-      facts.addNodeProp(I, [&](auto& node) {
-        node.opcode = I.getOpcodeName();
-        if (auto dbgLoc = I.getDebugLoc()) {
-           node.source_loc = debugLocToString(dbgLoc);
-        }
-      });
+      facts.addEdge(BB, I, EdgeKind::Contains);
+      facts.setOpcode(I, I.getOpcodeName());
+      if (auto dbgLoc = I.getDebugLoc()) {
+        facts.setSourceLoc(I, dbgLoc.getLine(), dbgLoc.getCol());
+      }
 
       // Data–flow edges: from each operand (if an instruction) to I.
       for (Value *op : I.operands()) {
         if (Instruction *opI = dyn_cast<Instruction>(op)) {
-          facts.addEdge(*opI, I, [&](auto& edge) { edge.kinds.push_back(EdgeKind::DataFlowTo); });
+          facts.addEdge(*opI, I, EdgeKind::DataFlowTo);
         } else if (Argument *opA = dyn_cast<Argument>(op)) {
-          facts.addEdge(*opA, I, [&](auto& edge) { edge.kinds.push_back(EdgeKind::DataFlowTo); });
+          facts.addEdge(*opA, I, EdgeKind::DataFlowTo);
         } else if (GlobalVariable *opG = dyn_cast<GlobalVariable>(op)) {
-          facts.addEdge(I, *opG, [&](auto& edge) { edge.kinds.push_back(EdgeKind::References); });
+          facts.addEdge(I, *opG, EdgeKind::References);
         } else if (Function *opF = dyn_cast<Function>(op)) {
-          facts.addEdge(I, *opF, [&](auto& edge) { edge.kinds.push_back(EdgeKind::References); });
+          facts.addEdge(I, *opF, EdgeKind::References);
         }
       }
 
@@ -118,45 +101,41 @@ void resolve::getFunctionFacts(Function &F) {
       if (auto *CB = dyn_cast<CallBase>(&I)) {
         CallType ct;
         if (Function *Callee = CB->getCalledFunction()) {
-          facts.addEdge(I, *Callee, [&](auto& edge) { edge.kinds.push_back(EdgeKind::Calls); });
+          facts.addEdge(I, *Callee, EdgeKind::Calls);
           ct = CallType::Direct;
         } else {
           // Indirect call
           ct = CallType::Indirect;
         }
 
-        facts.addNodeProp(I, [&](auto& node) {
-            node.call_type = ct;
-            node.function_type = typeToString(*CB->getFunctionType());
-        });
+        facts.setCallType(I, ct);
+        facts.setFunctionType(I, typeToString(*CB->getFunctionType()));
       }
     }
   }
 }
 
-void resolve::getModuleFacts(Module &M) {
-  facts.addNodeProp(M, [&](auto& node) { node.source_file = M.getSourceFileName(); });
+void resolve::getModuleFacts(LLVMFacts &facts, Module &M) {
+  facts.setSourceFile(M, M.getSourceFileName());
 
   for (GlobalVariable &G : M.globals()) {
-    facts.addEdge(M, G, [&](auto& edge) { edge.kinds.push_back(EdgeKind::Contains); });
+    facts.addEdge(M, G, EdgeKind::Contains);
 
-    getGlobalFacts(G);
+    getGlobalFacts(facts, G);
   }
 
   for (Function &F : M) {
-    facts.addEdge(M, F, [&](auto& edge) { edge.kinds.push_back(EdgeKind::Contains); });
+    facts.addEdge(M, F, EdgeKind::Contains);
 
-    getFunctionFacts(F);
+    getFunctionFacts(facts, F);
   }
 }
 
 // Embed the accumulated facts into custom ELF sections.
-void resolve::embedFacts(Module &M) {
+void resolve::embedFacts(Module &M, ArrayRef<uint8_t> facts) {
   LLVMContext &C = M.getContext();
   auto embedFactsSection = [&](StringRef sectionName,
-                               const std::string &facts) {
-    ArrayRef<uint8_t> inputData(reinterpret_cast<const uint8_t *>(facts.data()),
-                                facts.size());
+                               ArrayRef<uint8_t> inputData) {
     SmallVector<uint8_t> compressedFacts;
 
     if (std::getenv("RESOLVE_IGNORE_COMPRESSION")) {
@@ -166,7 +145,9 @@ void resolve::embedFacts(Module &M) {
       compression::compress(params, inputData, compressedFacts);
     }
 
-    //errs() << "Embedding facts for " << sectionName << " with original size " << facts.size() << " and compressed size " << compressedFacts.size() << "\n";
+    // errs() << "Embedding facts for " << sectionName << " with original size "
+    // << facts.size() << " and compressed size " << compressedFacts.size() <<
+    // "\n";
 
     Constant *dataArr = ConstantDataArray::get(C, compressedFacts);
     GlobalVariable *gv =
@@ -178,6 +159,5 @@ void resolve::embedFacts(Module &M) {
     appendToCompilerUsed(M, {gv});
   };
 
-  // add a newline afterwards to help-distinguish between combined modules
-  embedFactsSection(".facts", facts.serialize() + "\n");
+  embedFactsSection(".facts", facts);
 }

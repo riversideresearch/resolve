@@ -2,28 +2,41 @@ use std::collections::HashMap;
 
 use crate::model::*;
 
-static VERSION: u8 = 0;
+const VERSION: u8 = 0;
+
+// A frame is self-delimiting so multiple `.facts` contributions can be
+// concatenated by the linker and decoded one after another.
+const FRAME_LEN_OFFSET: usize = 1;
+const INTERN_POOL_OFFSET: usize = 5;
+const MODULE_COUNT_OFFSET: usize = 9;
+const HEADER_LEN: usize = 13;
 
 pub struct FactsBuf(Vec<u8>);
 
 #[unsafe(no_mangle)]
-pub extern "C" fn facts_buf_len(b: *mut FactsBuf) -> usize {
-    unsafe { b.as_ref().unwrap().0.len() } // TODO: unwrap OK?
+pub extern "C" fn facts_buf_len(b: *const FactsBuf) -> usize {
+    unsafe { b.as_ref() }.map_or(0, |buf| buf.0.len())
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn facts_buf_data(b: *mut FactsBuf) -> *const u8 {
-    unsafe { b.as_ref().unwrap().0.as_ptr() } // TODO: unwrap OK?
+pub extern "C" fn facts_buf_data(b: *const FactsBuf) -> *const u8 {
+    unsafe { b.as_ref() }.map_or(std::ptr::null(), |buf| buf.0.as_ptr())
 }
 
 #[unsafe(no_mangle)]
 pub extern "C" fn facts_buf_free(b: *mut FactsBuf) {
-    if !b.is_null() { unsafe {drop(Box::from_raw(b)); } }
+    if !b.is_null() {
+        unsafe {
+            drop(Box::from_raw(b));
+        }
+    }
 }
 
 #[unsafe(no_mangle)]
 pub extern "C" fn facts_serialize(b: *const ProgramFacts) -> *mut FactsBuf {
-    let Some(b) = (unsafe { b.as_ref() }) else { panic!("TODO") };
+    let Some(b) = (unsafe { b.as_ref() }) else {
+        return std::ptr::null_mut();
+    };
 
     Box::into_raw(Box::new(FactsBuf(b.serialize())))
 }
@@ -50,12 +63,20 @@ impl Interner {
         let mut buf: Vec<u8> = Vec::new();
 
         // u32: number of strings
-        buf.extend_from_slice(&u32::try_from(self.strings.len()).expect("TOO MANY STRINGS").to_le_bytes());
+        buf.extend_from_slice(
+            &u32::try_from(self.strings.len())
+                .expect("TOO MANY STRINGS")
+                .to_le_bytes(),
+        );
 
         for text in &self.strings {
             let bytes = text.as_bytes();
-            buf.extend_from_slice(&u32::try_from(bytes.len()).expect("STRING IS WAY TOO BIG").to_le_bytes());
-            buf.extend_from_slice(&text.as_bytes().to_vec());
+            buf.extend_from_slice(
+                &u32::try_from(bytes.len())
+                    .expect("STRING IS WAY TOO BIG")
+                    .to_le_bytes(),
+            );
+            buf.extend_from_slice(bytes);
         }
 
         buf
@@ -71,14 +92,15 @@ impl ProgramFacts {
         // 0 - version
         buf.push(VERSION);
 
-        // 1 - 4 intern pool offset
-        buf.push(0);
-        buf.push(0);
-        buf.push(0);
-        buf.push(0);
-
-        // 5 - 8 module count
-        buf.extend_from_slice(&(self.modules.len() as u32).to_le_bytes());
+        // 1..5 - total frame length (patched after the intern pool is added)
+        // 5..9 - intern pool offset (patched before the intern pool is added)
+        // 9..13 - module count
+        buf.resize(HEADER_LEN, 0);
+        buf[MODULE_COUNT_OFFSET..HEADER_LEN].copy_from_slice(
+            &u32::try_from(self.modules.len())
+                .expect("too many modules")
+                .to_le_bytes(),
+        );
 
         // sort modules (stability)
         let mut modules: Vec<_> = self.modules.iter().collect();
@@ -92,10 +114,13 @@ impl ProgramFacts {
             buf.extend_from_slice(&v.serialize(&mut i));
         }
 
-        let pool_start: u32 = buf.len() as u32;
-        buf[1..5].copy_from_slice(&pool_start.to_le_bytes());
+        let pool_start = u32::try_from(buf.len()).expect("facts frame exceeds 4 GiB");
+        buf[INTERN_POOL_OFFSET..MODULE_COUNT_OFFSET].copy_from_slice(&pool_start.to_le_bytes());
 
         buf.extend_from_slice(&i.as_bytes());
+
+        let frame_len = u32::try_from(buf.len()).expect("facts frame exceeds 4 GiB");
+        buf[FRAME_LEN_OFFSET..INTERN_POOL_OFFSET].copy_from_slice(&frame_len.to_le_bytes());
 
         buf
     }
@@ -106,15 +131,19 @@ impl ModuleFacts {
         let mut buf: Vec<u8> = Vec::new();
 
         // u32: num nodes
-        buf.extend_from_slice(&(self.nodes.len() as u32).to_le_bytes());
-        
+        buf.extend_from_slice(
+            &u32::try_from(self.nodes.len())
+                .expect("too many nodes")
+                .to_le_bytes(),
+        );
+
         // NODES:
 
         // sort nodes (stability)
         let mut nodes: Vec<_> = self.nodes.iter().collect();
         nodes.sort_unstable_by_key(|(node_id, _)| *node_id);
 
-        for (k,v) in nodes {
+        for (k, v) in nodes {
             // nodeID: u32
             buf.extend_from_slice(&k.to_le_bytes());
 
@@ -123,7 +152,11 @@ impl ModuleFacts {
         }
 
         // u32: num edges
-        buf.extend_from_slice(&(self.edges.len() as u32).to_le_bytes());
+        buf.extend_from_slice(
+            &u32::try_from(self.edges.len())
+                .expect("too many edges")
+                .to_le_bytes(),
+        );
 
         // EDGES:
 
@@ -131,7 +164,7 @@ impl ModuleFacts {
         let mut edges: Vec<_> = self.edges.iter().collect();
         edges.sort_unstable_by_key(|(id, _)| (id.first, id.second));
 
-        for (k,v) in edges {
+        for (k, v) in edges {
             // edgeID: u32, u32
             buf.extend_from_slice(&k.first.to_le_bytes());
             buf.extend_from_slice(&k.second.to_le_bytes());
@@ -144,27 +177,27 @@ impl ModuleFacts {
     }
 }
 
-const P_IDX:           u16 = 0;
-const P_NAME:          u16 = 1;
-const P_OPCODE:        u16 = 2;
-const P_LINKAGE:       u16 = 3;
-const P_CALL_TYPE:     u16 = 4;
-const P_SOURCE_LOC:    u16 = 5;
-const P_SOURCE_FILE:   u16 = 6;
+const P_IDX: u16 = 0;
+const P_NAME: u16 = 1;
+const P_OPCODE: u16 = 2;
+const P_LINKAGE: u16 = 3;
+const P_CALL_TYPE: u16 = 4;
+const P_SOURCE_LOC: u16 = 5;
+const P_SOURCE_FILE: u16 = 6;
 const P_FUNCTION_TYPE: u16 = 7;
 const P_ADDRESS_TAKEN: u16 = 8;
 
 impl NodeProps {
     fn mask(&self) -> u16 {
         let mut mask: u16 = 0;
-        mask |= (self.idx.is_some()                 as u16) << P_IDX;
-        mask |= (self.name.is_some()                as u16) << P_NAME;
-        mask |= (self.opcode.is_some()              as u16) << P_OPCODE;
-        mask |= (self.linkage.is_some()             as u16) << P_LINKAGE;
-        mask |= (self.call_type.is_some()           as u16) << P_CALL_TYPE;
-        mask |= (self.source_loc.is_some()          as u16) << P_SOURCE_LOC;
-        mask |= (self.source_file.is_some()         as u16) << P_SOURCE_FILE;
-        mask |= (self.function_type.is_some()       as u16) << P_FUNCTION_TYPE;
+        mask |= (self.idx.is_some() as u16) << P_IDX;
+        mask |= (self.name.is_some() as u16) << P_NAME;
+        mask |= (self.opcode.is_some() as u16) << P_OPCODE;
+        mask |= (self.linkage.is_some() as u16) << P_LINKAGE;
+        mask |= (self.call_type.is_some() as u16) << P_CALL_TYPE;
+        mask |= (self.source_loc.is_some() as u16) << P_SOURCE_LOC;
+        mask |= (self.source_file.is_some() as u16) << P_SOURCE_FILE;
+        mask |= (self.function_type.is_some() as u16) << P_FUNCTION_TYPE;
         mask |= ((self.address_taken == Some(true)) as u16) << P_ADDRESS_TAKEN;
         mask
     }
