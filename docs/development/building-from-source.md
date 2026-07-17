@@ -3,6 +3,7 @@
 **RESOLVE** has been tested on **Ubuntu 24.04.4 LTS**, but should work on other distributions that can provide the following packages:
 
 - Nightly Rust
+- cbindgen (`cargo install cbindgen --version 0.29.0 --locked`)
 - uv
 - CMake
 - build-essential

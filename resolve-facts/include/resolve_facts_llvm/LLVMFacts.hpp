@@ -6,8 +6,11 @@
 #ifndef RESOLVE_LLVM_LLVMFACTS_HPP
 #define RESOLVE_LLVM_LLVMFACTS_HPP
 
-#include "resolve_facts/resolve_facts.hpp"
+#include "facts_rs.hpp"
 
+#include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/SmallString.h"
+#include "llvm/ADT/StringRef.h"
 #include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Function.h"
@@ -16,17 +19,33 @@
 #include "llvm/IR/Module.h"
 #include "llvm/Support/FileSystem.h"
 
+#include <cassert>
+#include <cstdint>
+#include <stdexcept>
 #include <unordered_map>
 
-using ProgramFacts = resolve_facts::ProgramFacts;
-using ModuleFacts = resolve_facts::ModuleFacts;
-using Node = resolve_facts::Node;
-using NodeId = resolve_facts::NodeId;
-using NodeType = resolve_facts::NodeType;
-using EdgeId = resolve_facts::EdgeId;
+using NodeId = uint32_t;
 
+// Owns a Rust FactsBuf for the duration of the C++ embedding call.
+class SerializedFacts {
+  FactsBuf *buf = nullptr;
+
+public:
+  explicit SerializedFacts(FactsBuf *buf) : buf(buf) {}
+  ~SerializedFacts() { facts_buf_free(buf); }
+
+  SerializedFacts(const SerializedFacts &) = delete;
+  SerializedFacts &operator=(const SerializedFacts &) = delete;
+
+  llvm::ArrayRef<uint8_t> bytes() const {
+    return {facts_buf_data(buf), facts_buf_len(buf)};
+  }
+};
+
+// LLVM-specific ID mapping and a thin recording facade over the opaque Rust
+// ProgramFacts context. This owns no C++ facts model.
 class LLVMFacts {
-  ProgramFacts &facts;
+  ProgramFacts *facts = new_program_facts();
   NodeId next_node_id = 1;
 
   std::unordered_map<const llvm::Module *, NodeId> moduleIDs;
@@ -36,67 +55,47 @@ class LLVMFacts {
   std::unordered_map<const llvm::Instruction *, NodeId> instructionIDs;
   std::unordered_map<const llvm::GlobalVariable *, NodeId> globalVarIDs;
 
-  void recordNewModule(const NodeId &id, const size_t size_hint) {
-    ModuleFacts mf{};
-    // Try to avoid reallocations
-    mf.nodes.reserve(size_hint);
-    mf.edges.reserve(2 * size_hint);
-
-    facts.modules[id] = mf;
+  void recordNewModule(const NodeId id, const size_t size_hint) {
+    ::record_new_module(facts, id, size_hint);
   }
 
-  /// Record a node fact.
-  void recordNode(const NodeId &module, const NodeId &id,
-                  const NodeType &type) {
-    Node node{.type = type};
-    facts.modules.at(module).nodes.emplace(id, node);
+  void recordNode(const NodeId module, const NodeId id, const NodeType type) {
+    ::record_node(facts, module, id, type);
   }
 
-  /// Record a node property.
-  template <typename F>
-  void recordNodeProp(const NodeId &module, const NodeId &nodeID,
-                      F &&update_func) {
-    auto &mf = facts.modules.at(module);
-    update_func(mf.nodes.at(nodeID));
-  }
+  template <typename N> NodeId nodeId(const N &node) { return addNode(node); }
 
-  /// Record an edge fact.
-  template <typename F>
-  void recordEdge(const NodeId &module, const NodeId &srcID,
-                  const NodeId &tgtID, F &&update_func) {
-    auto pair = EdgeId(srcID, tgtID);
-    auto &mf = facts.modules.at(module);
-    auto [it, exists] = mf.edges.try_emplace(pair);
-    update_func(it->second);
+  template <typename N> NodeId moduleId(const N &node) {
+    return getModuleId(node);
   }
 
 public:
-  LLVMFacts(ProgramFacts &facts) : facts(facts) {}
+  LLVMFacts() {
+    if (!facts) {
+      throw std::runtime_error("failed to allocate Rust ProgramFacts context");
+    }
+  }
+  ~LLVMFacts() { free_program_facts(facts); }
+
+  LLVMFacts(const LLVMFacts &) = delete;
+  LLVMFacts &operator=(const LLVMFacts &) = delete;
 
   NodeId addNode(const llvm::Module &M) {
     if (moduleIDs.find(&M) == moduleIDs.end()) {
-
       llvm::SmallString<128> src_path = llvm::StringRef(M.getSourceFileName());
       llvm::sys::fs::make_absolute(src_path);
-
-      std::string src = (std::string)src_path;
-      size_t hash = std::hash<std::string>{}(src);
-      auto id = (NodeId)hash;
-
-      // llvm::errs() << "Creating new module: " << id << "\n";
+      auto id =
+          static_cast<NodeId>(std::hash<std::string>{}(std::string(src_path)));
 
       moduleIDs[&M] = id;
-
-      // Estimate how many total nodes we will be creating to prevent rehashes
-      auto instrs = M.getInstructionCount();
-      recordNewModule(id, 2 * instrs);
+      recordNewModule(id, 2 * M.getInstructionCount());
       recordNode(id, id, NodeType::Module);
       return id;
     }
     return moduleIDs[&M];
   }
 
-  NodeId getModuleId(const llvm::Module &m) { return addNode(m); }
+  NodeId getModuleId(const llvm::Module &M) { return addNode(M); }
 
   template <typename T> NodeId getModuleId(const T &i) {
     const llvm::Module *module;
@@ -123,12 +122,9 @@ public:
 
   NodeId addNode(const llvm::GlobalVariable &GV) {
     if (globalVarIDs.find(&GV) == globalVarIDs.end()) {
-      auto id = next_node_id;
-      next_node_id += 1;
-      auto module_id = getModuleId(GV);
-
+      const auto id = next_node_id++;
       globalVarIDs[&GV] = id;
-      recordNode(module_id, id, NodeType::GlobalVariable);
+      recordNode(getModuleId(GV), id, NodeType::GlobalVariable);
       return id;
     }
     return globalVarIDs[&GV];
@@ -136,12 +132,9 @@ public:
 
   NodeId addNode(const llvm::Function &F) {
     if (functionIDs.find(&F) == functionIDs.end()) {
-      auto id = next_node_id;
-      next_node_id += 1;
-      auto module_id = getModuleId(F);
-
+      const auto id = next_node_id++;
       functionIDs[&F] = id;
-      recordNode(module_id, id, NodeType::Function);
+      recordNode(getModuleId(F), id, NodeType::Function);
       return id;
     }
     return functionIDs[&F];
@@ -149,12 +142,9 @@ public:
 
   NodeId addNode(const llvm::Argument &A) {
     if (argumentIDs.find(&A) == argumentIDs.end()) {
-      auto id = next_node_id;
-      next_node_id += 1;
-      auto module_id = getModuleId(A);
-
+      const auto id = next_node_id++;
       argumentIDs[&A] = id;
-      recordNode(module_id, id, NodeType::Argument);
+      recordNode(getModuleId(A), id, NodeType::Argument);
       return id;
     }
     return argumentIDs[&A];
@@ -162,12 +152,9 @@ public:
 
   NodeId addNode(const llvm::BasicBlock &BB) {
     if (basicBlockIDs.find(&BB) == basicBlockIDs.end()) {
-      auto id = next_node_id;
-      next_node_id += 1;
-      auto module_id = getModuleId(BB);
-
+      const auto id = next_node_id++;
       basicBlockIDs[&BB] = id;
-      recordNode(module_id, id, NodeType::BasicBlock);
+      recordNode(getModuleId(BB), id, NodeType::BasicBlock);
       return id;
     }
     return basicBlockIDs[&BB];
@@ -175,38 +162,78 @@ public:
 
   NodeId addNode(const llvm::Instruction &I) {
     if (instructionIDs.find(&I) == instructionIDs.end()) {
-      auto id = next_node_id;
-      next_node_id += 1;
-      auto module_id = getModuleId(I);
-
+      const auto id = next_node_id++;
       instructionIDs[&I] = id;
-      recordNode(module_id, id, NodeType::Instruction);
+      recordNode(getModuleId(I), id, NodeType::Instruction);
       return id;
     }
     return instructionIDs[&I];
   }
 
-  template <typename S, typename D, typename F>
-  void addEdge(S &src, D &dst, F &&update_func) {
-    auto m1 = getModuleId(src);
-    auto m2 = getModuleId(dst);
+  template <typename S, typename D>
+  void addEdge(const S &src, const D &dst, const EdgeKind kind) {
+    const auto m1 = getModuleId(src);
+    const auto m2 = getModuleId(dst);
     assert(m1 == m2);
-
-    addEdge(m1, addNode(src), addNode(dst), update_func);
+    ::record_edge(facts, m1, addNode(src), addNode(dst), kind);
   }
 
-  template <typename F>
-  void addEdge(NodeId module, NodeId src, NodeId dst, F &&update_func) {
-    recordEdge(module, src, dst, update_func);
+  template <typename N> void setIdx(const N &node, const uint32_t value) {
+    ::record_node_idx(facts, moduleId(node), nodeId(node), value);
   }
 
-  template <typename N, typename F>
-  void addNodeProp(const N &node, F &&update_func) {
-    auto module_id = getModuleId(node);
-    recordNodeProp(module_id, addNode(node), update_func);
+  template <typename N>
+  void setName(const N &node, const llvm::StringRef value) {
+    ::record_node_name(facts, moduleId(node), nodeId(node),
+                       reinterpret_cast<const uint8_t *>(value.data()),
+                       value.size());
   }
 
-  const std::string serialize() const { return facts.serialize(); }
+  template <typename N>
+  void setOpcode(const N &node, const llvm::StringRef value) {
+    ::record_node_opcode(facts, moduleId(node), nodeId(node),
+                         reinterpret_cast<const uint8_t *>(value.data()),
+                         value.size());
+  }
+
+  template <typename N> void setLinkage(const N &node, const Linkage value) {
+    ::record_node_linkage(facts, moduleId(node), nodeId(node), value);
+  }
+
+  template <typename N> void setCallType(const N &node, const CallType value) {
+    ::record_node_call_type(facts, moduleId(node), nodeId(node), value);
+  }
+
+  template <typename N>
+  void setSourceLoc(const N &node, const uint32_t line, const uint32_t col) {
+    ::record_node_source_loc(facts, moduleId(node), nodeId(node), line, col);
+  }
+
+  template <typename N>
+  void setSourceFile(const N &node, const llvm::StringRef value) {
+    ::record_node_source_file(facts, moduleId(node), nodeId(node),
+                              reinterpret_cast<const uint8_t *>(value.data()),
+                              value.size());
+  }
+
+  template <typename N>
+  void setFunctionType(const N &node, const llvm::StringRef value) {
+    ::record_node_function_type(facts, moduleId(node), nodeId(node),
+                                reinterpret_cast<const uint8_t *>(value.data()),
+                                value.size());
+  }
+
+  template <typename N> void setAddressTaken(const N &node) {
+    ::record_node_address_taken(facts, moduleId(node), nodeId(node), true);
+  }
+
+  SerializedFacts serialize() const {
+    auto *buf = facts_serialize(facts);
+    if (!buf) {
+      throw std::runtime_error("failed to serialize Rust ProgramFacts context");
+    }
+    return SerializedFacts(buf);
+  }
 };
 
 #endif // RESOLVE_LLVM_LLVMFACTS_HPP

@@ -62,4 +62,6 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
     | sh -s -- -y --default-toolchain nightly
 
 source "$HOME/.cargo/env"
+echo "[*] Installing cbindgen"
+cargo install cbindgen --version 0.29.0 --locked
 echo " All dependencies installed successfully."

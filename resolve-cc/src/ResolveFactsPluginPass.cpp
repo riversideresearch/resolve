@@ -12,8 +12,10 @@
 
 struct ResolveFactsPluginPass : public PassInfoMixin<ResolveFactsPluginPass> {
   PreservedAnalyses run(Module &M, ModuleAnalysisManager &) {
-    resolve::getModuleFacts(M);
-    resolve::embedFacts(M);
+    LLVMFacts facts;
+    resolve::getModuleFacts(facts, M);
+    auto bytes = facts.serialize();
+    resolve::embedFacts(M, bytes.bytes());
     return PreservedAnalyses::all();
   }
 };

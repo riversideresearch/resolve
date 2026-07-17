@@ -3,7 +3,6 @@
  *   LGPL-3; See LICENSE.txt in the repo root for details.
  */
 
-#include "resolve_facts/resolve_facts.hpp"
 #include "resolve_facts_llvm/LLVMFacts.hpp"
 
 #include "llvm/ADT/SmallString.h"
@@ -21,28 +20,19 @@
 #include "llvm/IR/PassManager.h"
 #include "llvm/Passes/PassBuilder.h"
 #include "llvm/Passes/PassPlugin.h"
-#include "llvm/Support/Compression.h"
-#include "llvm/Support/FileSystem.h"
-#include "llvm/Support/Path.h"
-#include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/Utils/ModuleUtils.h"
 
 using namespace llvm;
 
 namespace resolve {
-extern ProgramFacts all_facts;
-extern LLVMFacts facts;
-
-std::string debugLocToString(DebugLoc dbgLoc);
-
 std::string typeToString(const Type &type);
 
-void getGlobalFacts(GlobalVariable &G);
+void getGlobalFacts(LLVMFacts &facts, GlobalVariable &G);
 
-void getFunctionFacts(Function &F);
+void getFunctionFacts(LLVMFacts &facts, Function &F);
 
-void getModuleFacts(Module &M);
+void getModuleFacts(LLVMFacts &facts, Module &M);
 
 // Embed the accumulated facts into custom ELF sections.
-void embedFacts(Module &M);
+void embedFacts(Module &M, ArrayRef<uint8_t> facts);
 } // namespace resolve
