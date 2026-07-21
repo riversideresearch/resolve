@@ -17,4 +17,3 @@ enum class RemediationStrategies {
 
 // TODO: Write comments for these options
 enum class RemediationOutput { INLINE, PATCH };
-
