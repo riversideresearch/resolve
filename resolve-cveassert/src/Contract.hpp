@@ -4,9 +4,6 @@
  */
 
 #pragma once
-
-#include "llvm/Support/JSON.h"
-
 #include <vector>
 
 enum class PredicateKind {
