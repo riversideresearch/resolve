@@ -8,7 +8,6 @@
 
 enum class PredicateKind {
   InBounds,
-  NotEqual,
   NotNull,
   NonZero,
 };
