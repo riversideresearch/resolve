@@ -5,7 +5,6 @@
 
 #pragma once
 
-#include "Remediation.hpp"
 #include "llvm/Support/JSON.h"
 
 #include <vector>
@@ -27,5 +26,4 @@ struct Predicate {
 
 struct Contract {
   std::vector<Predicate> preconditions;
-  RemediationStrategies strategy;
 };

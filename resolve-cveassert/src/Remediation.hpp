@@ -15,5 +15,6 @@ enum class RemediationStrategies {
   WIDEN     /* Widen potentially overflowing intermediate operations */
 };
 
+// TODO: Write comments for these options
 enum class RemediationOutput { INLINE, PATCH };
 
