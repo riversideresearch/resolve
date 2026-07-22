@@ -21,5 +21,6 @@ struct Predicate {
 };
 
 struct Contract {
+  std::string operation;
   std::vector<Predicate> preconditions;
 };
