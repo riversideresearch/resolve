@@ -5,7 +5,8 @@
 
 #pragma once
 
+#include "Contract.hpp"
 #include "llvm/IR/Function.h"
 #include <string>
-void sanitizeContract(llvm::Function *F, std::string fnName,
+void sanitizeContract(llvm::Function *F, Contract contract,
                       unsigned int argNum);

@@ -10,6 +10,7 @@
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/raw_ostream.h"
 
+#include "Contract.hpp"
 #include "IRUtils.hpp"
 #include "Remediation.hpp"
 
@@ -70,12 +71,13 @@ static Function *getOrCreateContractWrapper(Module *M, CallInst *call,
   return resolveWrapperFn;
 }
 
-void sanitizeContract(Function *F, std::string fnName, unsigned int argNum) {
+void sanitizeContract(Function *F, Contract contract, unsigned int argNum) {
   Module *M = F->getParent();
   LLVMContext &Ctx = M->getContext();
   IRBuilder<> builder(Ctx);
 
   std::vector<CallInst *> callsToReplace;
+  std::string opName = contract.operation;
 
   for (auto &BB : *F) {
     for (auto &inst : BB) {
@@ -86,7 +88,7 @@ void sanitizeContract(Function *F, std::string fnName, unsigned int argNum) {
         }
 
         StringRef calledFnName = calledFn->getName();
-        if (calledFnName == fnName) {
+        if (calledFnName == opName) {
           callsToReplace.push_back(call);
         }
       }
