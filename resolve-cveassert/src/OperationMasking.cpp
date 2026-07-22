@@ -20,14 +20,62 @@
 
 using namespace llvm;
 
-// Parameters
-// 1. Which arguments to return (or zero)
-// 2. Which arguments to test (if any)
-// 3. Condition to test (equality, <, etc..) NOTE: not needed right now delay
-// We will continue generalizing this following eval-2
-// Change this function name to be "replaceUndesirableOperation" more
-// generalized name
+static void emitPreconditions(Function *wrapperFn, BasicBlock *entryBB,
+                              BasicBlock *validBB, BasicBlock *recoverBB,
+                              Contract contract) {
+  LLVMContext &Ctx = wrapperFn->getContext();
+  IRBuilder<> builder(Ctx);
+  // Extract preconditions from contract (hard coding for testing)
+  Precondition precond = contract.preconditions[0];
+
+  builder.SetInsertPoint(entryBB);
+
+  // Check the predicate
+  Value *Cond = nullptr;
+  // Fetch wrapper argument
+  Argument *arg = wrapperFn->getArg(precond.arg0);
+  if (precond.kind == PredicateKind::NonZero) {
+    Value *zero = ConstantInt::get(arg->getType(), 0);
+    Cond = builder.CreateICmpEQ(arg, zero);
+  }
+
+  builder.CreateCondBr(Cond, recoverBB, validBB);
+}
+
+static void emitValidPath(BasicBlock *block, Function *wrapperFn,
+                          Function *origFn) {
+  LLVMContext &Ctx = wrapperFn->getContext();
+  IRBuilder<> builder(Ctx);
+
+  SmallVector<Value *> Args;
+  for (Argument &arg : wrapperFn->args()) {
+    Args.push_back(&arg);
+  }
+
+  builder.SetInsertPoint(block);
+
+  Value *opVal = builder.CreateCall(origFn, Args);
+
+  if (wrapperFn->getReturnType()->isVoidTy()) {
+    builder.CreateRetVoid();
+  } else {
+    builder.CreateRet(opVal);
+  }
+}
+
+static void emitRecoveryPath(BasicBlock *block, Function *wrapperFn,
+                             RemediationStrategies policy) {
+  Module *M = wrapperFn->getParent();
+  LLVMContext &Ctx = wrapperFn->getContext();
+  IRBuilder<> builder(Ctx);
+
+  builder.SetInsertPoint(block);
+  builder.CreateCall(getOrCreateRemediationBehavior(M, policy));
+  builder.CreateUnreachable();
+}
+
 static Function *getOrCreateContractWrapper(Module *M, CallInst *call,
+                                            Contract contract,
                                             RemediationStrategies policy) {
   LLVMContext &Ctx = M->getContext();
   IRBuilder<> builder(Ctx);
@@ -41,11 +89,6 @@ static Function *getOrCreateContractWrapper(Module *M, CallInst *call,
   Function *resolveWrapperFn =
       getOrCreateResolveHelper(M, handlerName, wrapperTy);
 
-  SmallVector<Value *> Args;
-  for (Argument &arg : resolveWrapperFn->args()) {
-    Args.push_back(&arg);
-  }
-
   if (!resolveWrapperFn->empty()) {
     recordPatchFunction(resolveWrapperFn);
     return resolveWrapperFn;
@@ -56,16 +99,19 @@ static Function *getOrCreateContractWrapper(Module *M, CallInst *call,
   // 2. Valid path
   // 3. Recovery path
   BasicBlock *EntryBB = BasicBlock::Create(Ctx, "entry", resolveWrapperFn);
-  // Insert a return instruction here.
-  builder.SetInsertPoint(EntryBB);
+  BasicBlock *ValidBB = BasicBlock::Create(Ctx, "valid.path", resolveWrapperFn);
+  BasicBlock *RecoverBB =
+      BasicBlock::Create(Ctx, "recover.path", resolveWrapperFn);
 
   // TODO: Create helper to generate the llvm-ir for preconditions
+  emitPreconditions(resolveWrapperFn, EntryBB, ValidBB, RecoverBB, contract);
+
   // TODO: Create helper to generate valid path (call original operation
   // contract)
+  emitValidPath(ValidBB, resolveWrapperFn, originalFn);
+
   // TODO: Create helper to generate recovery path
-  Value *opValue = builder.CreateCall(originalFn, Args);
-  builder.CreateRet(opValue);
-  // builder.getOrCreateRemediationBehavior(M, policy);
+  emitRecoveryPath(RecoverBB, resolveWrapperFn, policy);
 
   validateIR(resolveWrapperFn);
   recordPatchFunction(resolveWrapperFn);
@@ -102,7 +148,7 @@ void sanitizeContract(Function *F, Contract contract,
   }
 
   Function *resolveWrapperFn =
-      getOrCreateContractWrapper(M, callsToReplace.front(), policy);
+      getOrCreateContractWrapper(M, callsToReplace.front(), contract, policy);
 
   for (auto call : callsToReplace) {
     builder.SetInsertPoint(call);
