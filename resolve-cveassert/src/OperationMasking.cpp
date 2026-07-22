@@ -28,7 +28,7 @@ using namespace llvm;
 // Change this function name to be "replaceUndesirableOperation" more
 // generalized name
 static Function *getOrCreateContractWrapper(Module *M, CallInst *call,
-                                            unsigned int argNum) {
+                                            RemediationStrategies policy) {
   LLVMContext &Ctx = M->getContext();
   IRBuilder<> builder(Ctx);
 
@@ -63,15 +63,17 @@ static Function *getOrCreateContractWrapper(Module *M, CallInst *call,
   // TODO: Create helper to generate valid path (call original operation
   // contract)
   // TODO: Create helper to generate recovery path
-  builder.CreateCall(originalFn, Args);
-  builder.CreateRet(resolveWrapperFn->getArg(argNum));
+  Value *opValue = builder.CreateCall(originalFn, Args);
+  builder.CreateRet(opValue);
+  // builder.getOrCreateRemediationBehavior(M, policy);
 
   validateIR(resolveWrapperFn);
   recordPatchFunction(resolveWrapperFn);
   return resolveWrapperFn;
 }
 
-void sanitizeContract(Function *F, Contract contract, unsigned int argNum) {
+void sanitizeContract(Function *F, Contract contract,
+                      RemediationStrategies policy) {
   Module *M = F->getParent();
   LLVMContext &Ctx = M->getContext();
   IRBuilder<> builder(Ctx);
@@ -100,7 +102,7 @@ void sanitizeContract(Function *F, Contract contract, unsigned int argNum) {
   }
 
   Function *resolveWrapperFn =
-      getOrCreateContractWrapper(M, callsToReplace.front(), argNum);
+      getOrCreateContractWrapper(M, callsToReplace.front(), policy);
 
   for (auto call : callsToReplace) {
     builder.SetInsertPoint(call);

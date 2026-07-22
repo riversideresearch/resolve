@@ -6,7 +6,8 @@
 #pragma once
 
 #include "Contract.hpp"
+#include "Remediation.hpp"
 #include "llvm/IR/Function.h"
 #include <string>
 void sanitizeContract(llvm::Function *F, Contract contract,
-                      unsigned int argNum);
+                      RemediationStrategies policy);

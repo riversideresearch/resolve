@@ -196,7 +196,7 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
       /* NOTE: We are using '0' as a temporary this will be updated future PRs
        */
       Contract contract = *vuln.ContractInfo;
-      sanitizeContract(&F, contract, 0);
+      sanitizeContract(&F, contract, vuln.Strategy);
       result = PreservedAnalyses::none();
       out << "[CVEAssert] === Post Sanitization of Masked Operation IR "
              "=== \n";
