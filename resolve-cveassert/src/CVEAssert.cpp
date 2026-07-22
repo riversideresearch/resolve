@@ -37,6 +37,7 @@
 #include "OperationMasking.hpp"
 #include "Remediation.hpp"
 #include "Vulnerability.hpp"
+#include "VulnerabilityParser.hpp"
 
 using namespace llvm;
 
@@ -112,7 +113,9 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
     // Initialize env var
     CVE_ASSERT_DEBUG = strlen(std::getenv("CVE_ASSERT_DEBUG") ?: "") > 0;
 
-    vulnerabilities = Vulnerability::parseVulnerabilityFile();
+    // Initialize a parser obj to parse JSON config
+    VulnerabilityParser parser;
+    vulnerabilities = parser.parseVulnerabilityFile();
   }
 
   void applyAutomaticSanitizers(Function &F, RemediationStrategies strategy) {
@@ -189,10 +192,11 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
     out << F;
     out << "[CVEAssert] === Inserted Sanitizer Helpers === \n";
 
-    if (vuln.Operation.has_value()) {
+    if (vuln.ContractInfo.has_value()) {
       /* NOTE: We are using '0' as a temporary this will be updated future PRs
        */
-      sanitizeContract(&F, *vuln.Operation, 0);
+      Contract contract = *vuln.ContractInfo;
+      sanitizeContract(&F, contract, 0);
       result = PreservedAnalyses::none();
       out << "[CVEAssert] === Post Sanitization of Masked Operation IR "
              "=== \n";
