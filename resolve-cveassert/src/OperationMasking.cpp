@@ -30,10 +30,12 @@ static void emitPreconditions(Function *wrapperFn, BasicBlock *entryBB,
 
   builder.SetInsertPoint(entryBB);
 
-  // Check the predicate
   Value *Cond = nullptr;
-  // Fetch wrapper argument
+
+  // Fetch wrapper argument idx
   Argument *arg = wrapperFn->getArg(precond.arg0);
+
+  // Check the predicate
   if (precond.kind == PredicateKind::NonZero) {
     Value *zero = ConstantInt::get(arg->getType(), 0);
     Cond = builder.CreateICmpEQ(arg, zero);
@@ -74,10 +76,10 @@ static void emitRecoveryPath(BasicBlock *block, Function *wrapperFn,
   builder.CreateUnreachable();
 }
 
-static Function *getOrCreateContractWrapper(Module *M, CallInst *call,
+static Function *getOrCreateContractWrapper(Function *F, CallInst *call,
                                             Contract contract,
                                             RemediationStrategies policy) {
-  LLVMContext &Ctx = M->getContext();
+  LLVMContext &Ctx = F->getContext();
   IRBuilder<> builder(Ctx);
 
   Function *originalFn = call->getCalledFunction();
@@ -86,12 +88,12 @@ static Function *getOrCreateContractWrapper(Module *M, CallInst *call,
 
   FunctionType *wrapperTy = originalFn->getFunctionType();
 
-  Function *resolveWrapperFn =
-      getOrCreateResolveHelper(M, handlerName, wrapperTy);
+  Function *wrapperFn =
+      getOrCreateResolveHelper(F->getParent(), handlerName, wrapperTy);
 
-  if (!resolveWrapperFn->empty()) {
-    recordPatchFunction(resolveWrapperFn);
-    return resolveWrapperFn;
+  if (!wrapperFn->empty()) {
+    recordPatchFunction(wrapperFn);
+    return wrapperFn;
   }
 
   // TODO: Create 3 basic blocks
@@ -120,45 +122,45 @@ static Function *getOrCreateContractWrapper(Module *M, CallInst *call,
 
 void sanitizeContract(Function *F, Contract contract,
                       RemediationStrategies policy) {
-  Module *M = F->getParent();
-  LLVMContext &Ctx = M->getContext();
+
+  LLVMContext &Ctx = F->getContext();
   IRBuilder<> builder(Ctx);
 
-  std::vector<CallInst *> callsToReplace;
-  std::string opName = contract.operation;
+  smallVectory<CallInst *> matchingCalls;
+  std::string operationName = contract.operation;
 
   for (auto &BB : *F) {
     for (auto &inst : BB) {
       if (auto *call = dyn_cast<CallInst>(&inst)) {
-        Function *calledFn = call->getCalledFunction();
-        if (!calledFn) {
+        Function *callee = call->getCalledFunction();
+        if (!callee) {
           continue;
         }
 
-        StringRef calledFnName = calledFn->getName();
-        if (calledFnName == opName) {
-          callsToReplace.push_back(call);
+        StringRef calleeName = callee->getName();
+        if (calleeName == operationName) {
+          matchingCalls.push_back(call);
         }
       }
     }
   }
 
-  if (callsToReplace.size() == 0) {
+  if (matchingCalls.size() == 0) {
     return;
   }
 
-  Function *resolveWrapperFn =
-      getOrCreateContractWrapper(M, callsToReplace.front(), contract, policy);
+  Function *contractWrapperFn =
+      getOrCreateContractWrapper(F, matchingCalls.front(), contract, policy);
 
-  for (auto call : callsToReplace) {
+  for (auto call : matchingCalls) {
     builder.SetInsertPoint(call);
-    SmallVector<Value *, 2> fnArgs;
+    SmallVector<Value *, 2> callArgs;
     for (unsigned int i = 0; i < call->arg_size(); ++i) {
-      fnArgs.push_back(call->getOperand(i));
+      callArgs.push_back(call->getOperand(i));
     }
 
-    auto resolveWrapperCall = builder.CreateCall(resolveWrapperFn, fnArgs);
-    call->replaceAllUsesWith(resolveWrapperCall);
+    auto wrapperCall = builder.CreateCall(contractWrapperFn, callArgs);
+    call->replaceAllUsesWith(wrapperCall);
     call->eraseFromParent();
   }
 }
