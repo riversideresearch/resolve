@@ -35,7 +35,9 @@
 #include "InstrumentAllocators.hpp"
 #include "NullPointerSanitizer.hpp"
 #include "OperationMasking.hpp"
+#include "Remediation.hpp"
 #include "Vulnerability.hpp"
+#include "VulnerabilityParser.hpp"
 
 using namespace llvm;
 
@@ -111,11 +113,12 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
     // Initialize env var
     CVE_ASSERT_DEBUG = strlen(std::getenv("CVE_ASSERT_DEBUG") ?: "") > 0;
 
-    vulnerabilities = Vulnerability::parseVulnerabilityFile();
+    // Initialize a parser obj to parse JSON config
+    VulnerabilityParser parser;
+    vulnerabilities = parser.parseVulnerabilityFile();
   }
 
-  void applyAutomaticSanitizers(Function &F,
-                                Vulnerability::RemediationStrategies strategy) {
+  void applyAutomaticSanitizers(Function &F, RemediationStrategies strategy) {
     /// applies all automatic sanitizers (operation masking excluded)
     sanitizeFreeOfNonHeap(&F, strategy);
     sanitizeMemInstBounds(&F, strategy);
@@ -189,17 +192,18 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
     out << F;
     out << "[CVEAssert] === Inserted Sanitizer Helpers === \n";
 
-    if (vuln.UndesirableFunction.has_value()) {
+    if (vuln.ContractInfo.has_value()) {
       /* NOTE: We are using '0' as a temporary this will be updated future PRs
        */
-      sanitizeUndesirableOperationInFunction(&F, *vuln.UndesirableFunction, 0);
+      Contract contract = *vuln.ContractInfo;
+      sanitizeContract(&F, contract, vuln.Strategy);
       result = PreservedAnalyses::none();
-      out << "[CVEAssert] === Post Sanitization of Undesirable Operation IR "
+      out << "[CVEAssert] === Post Sanitization of Masked Operation IR "
              "=== \n";
       out << F;
     }
 
-    if (vuln.Strategy == Vulnerability::RemediationStrategies::NONE) {
+    if (vuln.Strategy == RemediationStrategies::NONE) {
       out << "[CVEAssert] NONE strategy selected for " << vuln.TargetFileName
           << ":" << vuln.TargetFunctionName << "...\n";
       out << "[CVEAssert] Skipping remediation\n";
@@ -345,7 +349,7 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
 
     for (auto &vuln : vulns) {
       // Also skip instrumentation for skipped vulnerabilities
-      if (vuln.Strategy == Vulnerability::RemediationStrategies::NONE) {
+      if (vuln.Strategy == RemediationStrategies::NONE) {
         continue;
       }
 
@@ -416,7 +420,7 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
     std::vector<Vulnerability> moduleVulns;
 
     for (auto &vuln : vulnerabilities) {
-      if (vuln.Output == Vulnerability::RemediationOutput::PATCH) {
+      if (vuln.Output == RemediationOutput::PATCH) {
         patchVulns.push_back(vuln);
       } else {
         moduleVulns.push_back(vuln);

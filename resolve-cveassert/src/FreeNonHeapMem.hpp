@@ -5,11 +5,11 @@
 
 #pragma once
 
-#include "Vulnerability.hpp"
+#include "Remediation.hpp"
 #include "llvm/IR/Function.h"
 
 llvm::Function *getOrCreateIsHeap(llvm::Function *F);
-llvm::Function *getOrCreateFreeOfNonHeapSanitizer(
-    llvm::Function *F, Vulnerability::RemediationStrategies strategy);
-void sanitizeFreeOfNonHeap(llvm::Function *F,
-                           Vulnerability::RemediationStrategies strategy);
+llvm::Function *
+getOrCreateFreeOfNonHeapSanitizer(llvm::Function *F,
+                                  RemediationStrategies strategy);
+void sanitizeFreeOfNonHeap(llvm::Function *F, RemediationStrategies strategy);

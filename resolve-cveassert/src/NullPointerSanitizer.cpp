@@ -13,13 +13,13 @@
 
 #include "CVEAssert.hpp"
 #include "IRUtils.hpp"
-#include "Vulnerability.hpp"
+#include "Remediation.hpp"
 
 using namespace llvm;
 
 static Function *
 getOrCreateNullPtrLoadSanitizer(Function *F, Type *ty,
-                                Vulnerability::RemediationStrategies strategy) {
+                                RemediationStrategies strategy) {
   std::string handlerName = "__cve_null_check_ld_" + getLLVMType(ty);
   Module *M = F->getParent();
   LLVMContext &Ctx = M->getContext();
@@ -61,12 +61,12 @@ getOrCreateNullPtrLoadSanitizer(Function *F, Type *ty,
 
   builder.SetInsertPoint(SanitizeNullPtrBB);
   switch (strategy) {
-  case Vulnerability::RemediationStrategies::CONTINUE:
+  case RemediationStrategies::CONTINUE:
     builder.CreateRet(Constant::getNullValue(ty));
     break;
 
-  case Vulnerability::RemediationStrategies::EXIT:
-  case Vulnerability::RemediationStrategies::RECOVER:
+  case RemediationStrategies::EXIT:
+  case RemediationStrategies::RECOVER:
     builder.CreateCall(getOrCreateResolveReportSanitizerTriggered(M));
     builder.CreateCall(getOrCreateRemediationBehavior(M, strategy));
     builder.CreateUnreachable();
@@ -85,8 +85,9 @@ getOrCreateNullPtrLoadSanitizer(Function *F, Type *ty,
   return resolveNullPtrLdFn;
 }
 
-static Function *getOrCreateNullPtrStoreSanitizer(
-    Function *F, Type *ty, Vulnerability::RemediationStrategies strategy) {
+static Function *
+getOrCreateNullPtrStoreSanitizer(Function *F, Type *ty,
+                                 RemediationStrategies strategy) {
   std::string handlerName = "__cve_null_check_st_" + getLLVMType(ty);
   Module *M = F->getParent();
   LLVMContext &Ctx = M->getContext();
@@ -133,12 +134,12 @@ static Function *getOrCreateNullPtrStoreSanitizer(
 
   builder.SetInsertPoint(SanitizeNullPtrBB);
   switch (strategy) {
-  case Vulnerability::RemediationStrategies::CONTINUE:
+  case RemediationStrategies::CONTINUE:
     builder.CreateRetVoid();
     break;
 
-  case Vulnerability::RemediationStrategies::EXIT:
-  case Vulnerability::RemediationStrategies::RECOVER:
+  case RemediationStrategies::EXIT:
+  case RemediationStrategies::RECOVER:
     builder.CreateCall(getOrCreateResolveReportSanitizerTriggered(M));
     builder.CreateCall(getOrCreateRemediationBehavior(M, strategy));
     builder.CreateUnreachable();
@@ -158,8 +159,7 @@ static Function *getOrCreateNullPtrStoreSanitizer(
   return resolveNullPtrStFn;
 }
 
-void sanitizeNullPointers(Function *F,
-                          Vulnerability::RemediationStrategies strategy) {
+void sanitizeNullPointers(Function *F, RemediationStrategies strategy) {
   LLVMContext &Ctx = F->getContext();
   IRBuilder<> builder(Ctx);
 
@@ -167,16 +167,16 @@ void sanitizeNullPointers(Function *F,
   std::vector<StoreInst *> storeList;
 
   switch (strategy) {
-  case Vulnerability::RemediationStrategies::EXIT:
-  case Vulnerability::RemediationStrategies::RECOVER:
-  case Vulnerability::RemediationStrategies::CONTINUE:
+  case RemediationStrategies::EXIT:
+  case RemediationStrategies::RECOVER:
+  case RemediationStrategies::CONTINUE:
     break;
 
   default:
     llvm::errs() << "[CVEAssert] Error: sanitizeNullPointers does not support "
                     "remediation strategy "
                  << "defaulting to continue strategy!\n";
-    strategy = Vulnerability::RemediationStrategies::CONTINUE;
+    strategy = RemediationStrategies::CONTINUE;
     break;
   }
 

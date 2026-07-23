@@ -19,7 +19,7 @@
 
 #include "CVEAssert.hpp"
 #include "IRUtils.hpp"
-#include "Vulnerability.hpp"
+#include "Remediation.hpp"
 
 #include <algorithm>
 #include <cctype>
@@ -524,9 +524,8 @@ Function *getOrCreateRecoverBufferFunction(Module *M) {
   return resolveRecoverFn;
 }
 
-Function *
-getOrCreateRemediationBehavior(Module *M,
-                               Vulnerability::RemediationStrategies strategy) {
+Function *getOrCreateRemediationBehavior(Module *M,
+                                         RemediationStrategies strategy) {
   auto &Ctx = M->getContext();
   auto ptr_ty = PointerType::get(Ctx, 0);
   auto void_ty = Type::getVoidTy(Ctx);
@@ -536,10 +535,10 @@ getOrCreateRemediationBehavior(Module *M,
 
   std::string fnName;
   switch (strategy) {
-  case Vulnerability::RemediationStrategies::EXIT:
+  case RemediationStrategies::EXIT:
     fnName = "__cve_exit";
     break;
-  case Vulnerability::RemediationStrategies::RECOVER:
+  case RemediationStrategies::RECOVER:
     fnName = "__cve_recover";
     break;
   default:
@@ -556,7 +555,7 @@ getOrCreateRemediationBehavior(Module *M,
   IRBuilder<> builder(BB);
 
   switch (strategy) {
-  case Vulnerability::RemediationStrategies::EXIT: {
+  case RemediationStrategies::EXIT: {
     FunctionType *exitTy = FunctionType::get(void_ty, {i32_ty}, false);
     FunctionCallee exitFn = M->getOrInsertFunction("_exit", exitTy);
     builder.CreateCall(exitFn, {builder.getInt32(3)});
@@ -564,7 +563,7 @@ getOrCreateRemediationBehavior(Module *M,
     break;
   }
 
-  case Vulnerability::RemediationStrategies::RECOVER: {
+  case RemediationStrategies::RECOVER: {
     FunctionCallee longjmpFn = M->getOrInsertFunction(
         "longjmp", FunctionType::get(void_ty, {ptr_ty, i32_ty}, false));
 
