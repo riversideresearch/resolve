@@ -349,7 +349,7 @@ Function *getOrCreateSanitizerMapEntry(Module *M) {
       FunctionType::get(i1_ty, {ptr_ty, usize_ty}, false);
 
   Function *sanitizerMapIdxFn =
-      getOrCreateResolveHelper(M, "__resolve_get_flag", sanitizerMapIdxFnTy);
+      getOrCreateResolveHelper(M, "__cve_get_flag", sanitizerMapIdxFnTy);
   if (!sanitizerMapIdxFn->empty()) {
     recordPatchFunction(sanitizerMapIdxFn);
     return sanitizerMapIdxFn;
@@ -434,7 +434,7 @@ Function *getOrCreateIsHeap(Module *M, LLVMContext &Ctx) {
   FunctionType *resolveIsHeapFnTy = FunctionType::get(i1_ty, {ptr_ty}, false);
 
   Function *resolveIsHeapFn =
-      getOrCreateResolveHelper(M, "__resolve_is_heap", resolveIsHeapFnTy);
+      getOrCreateResolveHelper(M, "__cve_is_heap", resolveIsHeapFnTy);
 
   if (!resolveIsHeapFn->empty()) {
     recordPatchFunction(resolveIsHeapFn);
@@ -480,7 +480,7 @@ Function *getOrCreateResolveReportSanitizerTriggered(Module *M) {
   FunctionType *resolveReportFnTy = FunctionType::get(void_ty, {}, false);
 
   Function *resolveReportFn =
-      getOrCreateResolveHelper(M, "__resolve_report_violation",
+      getOrCreateResolveHelper(M, "__cve_report_violation",
                                resolveReportFnTy, GlobalValue::WeakAnyLinkage);
   if (!resolveReportFn->empty()) {
     recordPatchFunction(resolveReportFn);
@@ -536,10 +536,10 @@ Function *getOrCreateRemediationBehavior(Module *M,
   std::string fnName;
   switch (strategy) {
   case RemediationStrategies::EXIT:
-    fnName = "__resolve_exit";
+    fnName = "__cve_exit";
     break;
   case RemediationStrategies::RECOVER:
-    fnName = "__resolve_recover";
+    fnName = "__cve_recover";
     break;
   default:
     return nullptr;
