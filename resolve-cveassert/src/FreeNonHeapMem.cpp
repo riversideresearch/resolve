@@ -20,7 +20,7 @@ Function *getOrCreateIsHeap(Function *F) {
 
   FunctionType *cveIsHeapFnTy = FunctionType::get(i1_ty, {ptr_ty}, false);
   Function *cveIsHeapFn =
-      getOrCreateResolveHelper(M, "__cve_is_heap", cveIsHeapFnTy);
+      getOrCreateResolveHelper(M, "__resolve_is_heap", cveIsHeapFnTy);
 
   if (!cveIsHeapFn->empty()) {
     return cveIsHeapFn;

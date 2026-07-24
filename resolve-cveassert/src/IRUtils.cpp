@@ -349,7 +349,7 @@ Function *getOrCreateSanitizerMapEntry(Module *M) {
       FunctionType::get(i1_ty, {ptr_ty, usize_ty}, false);
 
   Function *sanitizerMapIdxFn =
-      getOrCreateResolveHelper(M, "__cve_get_flag", sanitizerMapIdxFnTy);
+      getOrCreateResolveHelper(M, "__resolve_get_flag", sanitizerMapIdxFnTy);
   if (!sanitizerMapIdxFn->empty()) {
     recordPatchFunction(sanitizerMapIdxFn);
     return sanitizerMapIdxFn;
@@ -434,7 +434,7 @@ Function *getOrCreateIsHeap(Module *M, LLVMContext &Ctx) {
   FunctionType *resolveIsHeapFnTy = FunctionType::get(i1_ty, {ptr_ty}, false);
 
   Function *resolveIsHeapFn =
-      getOrCreateResolveHelper(M, "__cve_is_heap", resolveIsHeapFnTy);
+      getOrCreateResolveHelper(M, "__resolve_is_heap", resolveIsHeapFnTy);
 
   if (!resolveIsHeapFn->empty()) {
     recordPatchFunction(resolveIsHeapFn);
@@ -537,10 +537,10 @@ getOrCreateRemediationBehavior(Module *M,
   std::string fnName;
   switch (strategy) {
   case Vulnerability::RemediationStrategies::EXIT:
-    fnName = "__cve_exit";
+    fnName = "__resolve_exit";
     break;
   case Vulnerability::RemediationStrategies::RECOVER:
-    fnName = "__cve_recover";
+    fnName = "__resolve_recover";
     break;
   default:
     return nullptr;
