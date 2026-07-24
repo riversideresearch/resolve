@@ -480,7 +480,7 @@ Function *getOrCreateResolveReportSanitizerTriggered(Module *M) {
   FunctionType *resolveReportFnTy = FunctionType::get(void_ty, {}, false);
 
   Function *resolveReportFn =
-      getOrCreateResolveHelper(M, "__cve_report_violation",
+      getOrCreateResolveHelper(M, "__resolve_report_violation",
                                resolveReportFnTy, GlobalValue::WeakAnyLinkage);
   if (!resolveReportFn->empty()) {
     recordPatchFunction(resolveReportFn);
