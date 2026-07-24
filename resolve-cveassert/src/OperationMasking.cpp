@@ -100,24 +100,24 @@ static Function *getOrCreateContractWrapper(Function *F, CallInst *call,
   // 1. Preconditions
   // 2. Valid path
   // 3. Recovery path
-  BasicBlock *EntryBB = BasicBlock::Create(Ctx, "entry", resolveWrapperFn);
-  BasicBlock *ValidBB = BasicBlock::Create(Ctx, "valid.path", resolveWrapperFn);
+  BasicBlock *EntryBB = BasicBlock::Create(Ctx, "entry", wrapperFn);
+  BasicBlock *ValidBB = BasicBlock::Create(Ctx, "valid.path", wrapperFn);
   BasicBlock *RecoverBB =
-      BasicBlock::Create(Ctx, "recover.path", resolveWrapperFn);
+      BasicBlock::Create(Ctx, "recover.path", wrapperFn);
 
   // TODO: Create helper to generate the llvm-ir for preconditions
-  emitPreconditions(resolveWrapperFn, EntryBB, ValidBB, RecoverBB, contract);
+  emitPreconditions(wrapperFn, EntryBB, ValidBB, RecoverBB, contract);
 
   // TODO: Create helper to generate valid path (call original operation
   // contract)
-  emitValidPath(ValidBB, resolveWrapperFn, originalFn);
+  emitValidPath(ValidBB, wrapperFn, originalFn);
 
   // TODO: Create helper to generate recovery path
-  emitRecoveryPath(RecoverBB, resolveWrapperFn, policy);
+  emitRecoveryPath(RecoverBB, wrapperFn, policy);
 
-  validateIR(resolveWrapperFn);
-  recordPatchFunction(resolveWrapperFn);
-  return resolveWrapperFn;
+  validateIR(wrapperFn);
+  recordPatchFunction(wrapperFn);
+  return wrapperFn;
 }
 
 void sanitizeContract(Function *F, Contract contract,
