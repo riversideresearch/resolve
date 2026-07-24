@@ -289,8 +289,8 @@ static Function *
 getOrCreateBoundsCheckMemcpySanitizer(Function *F,
                                       RemediationStrategies strategy,
                                       BoundsClass srcCls, BoundsClass dstCls) {
-  std::string handlerName = std::string("__cve_memcpy_") +
-                            classTag(srcCls) + "_" + classTag(dstCls);
+  std::string handlerName =
+      std::string("__cve_memcpy_") + classTag(srcCls) + "_" + classTag(dstCls);
   Module *M = F->getParent();
   LLVMContext &Ctx = M->getContext();
 
@@ -360,8 +360,8 @@ static Function *
 getOrCreateBoundsCheckMemmoveSanitizer(Function *F,
                                        RemediationStrategies strategy,
                                        BoundsClass srcCls, BoundsClass dstCls) {
-  std::string handlerName = std::string("__cve_memmove_") +
-                            classTag(srcCls) + "_" + classTag(dstCls);
+  std::string handlerName =
+      std::string("__cve_memmove_") + classTag(srcCls) + "_" + classTag(dstCls);
   Module *M = F->getParent();
   LLVMContext &Ctx = M->getContext();
 
