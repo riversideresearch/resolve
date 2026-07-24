@@ -20,7 +20,7 @@ using namespace llvm;
 static Function *
 getOrCreateNullPtrLoadSanitizer(Function *F, Type *ty,
                                 RemediationStrategies strategy) {
-  std::string handlerName = "__cve_null_check_ld_" + getLLVMType(ty);
+  std::string handlerName = "__resolve_null_check_ld_" + getLLVMType(ty);
   Module *M = F->getParent();
   LLVMContext &Ctx = M->getContext();
 
@@ -89,7 +89,7 @@ getOrCreateNullPtrLoadSanitizer(Function *F, Type *ty,
 static Function *
 getOrCreateNullPtrStoreSanitizer(Function *F, Type *ty,
                                  RemediationStrategies strategy) {
-  std::string handlerName = "__cve_null_check_st_" + getLLVMType(ty);
+  std::string handlerName = "__resolve_null_check_st_" + getLLVMType(ty);
   Module *M = F->getParent();
   LLVMContext &Ctx = M->getContext();
 
