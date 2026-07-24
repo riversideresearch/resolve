@@ -84,7 +84,7 @@ static Function *getOrCreateContractWrapper(Function *F, CallInst *call,
 
   Function *originalFn = call->getCalledFunction();
 
-  std::string handlerName = "__cve_contract_" + originalFn->getName().str();
+  std::string handlerName = "__resolve_contract_" + originalFn->getName().str();
 
   FunctionType *wrapperTy = originalFn->getFunctionType();
 
@@ -126,7 +126,7 @@ void sanitizeContract(Function *F, Contract contract,
   LLVMContext &Ctx = F->getContext();
   IRBuilder<> builder(Ctx);
 
-  smallVectory<CallInst *> matchingCalls;
+  SmallVector<CallInst *> matchingCalls;
   std::string operationName = contract.operation;
 
   for (auto &BB : *F) {
