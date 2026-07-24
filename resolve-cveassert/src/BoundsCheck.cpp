@@ -98,7 +98,7 @@ static FunctionCallee getOrCreateResolveGetBounds(Module *M, BoundsClass cls) {
 }
 
 static Function *getOrCreateAccessOk(Module *M, BoundsClass cls) {
-  std::string handlerName = std::string("__cve_access_ok_") + classTag(cls);
+  std::string handlerName = std::string("__resolve_access_ok_") + classTag(cls);
   LLVMContext &Ctx = M->getContext();
 
   IRBuilder<> builder(Ctx);
@@ -165,7 +165,7 @@ static Function *getOrCreateBoundsCheckLoadSanitizer(
     Function *F, Type *ty, Vulnerability::RemediationStrategies strategy,
     BoundsClass cls) {
   std::string handlerName =
-      "__cve_bound_ld_" + getLLVMType(ty) + "_" + classTag(cls);
+      "__resolve_bound_ld_" + getLLVMType(ty) + "_" + classTag(cls);
   Module *M = F->getParent();
   LLVMContext &Ctx = M->getContext();
 
@@ -224,7 +224,7 @@ static Function *getOrCreateBoundsCheckStoreSanitizer(
     Function *F, Type *ty, Vulnerability::RemediationStrategies strategy,
     BoundsClass cls) {
   std::string handlerName =
-      "__cve_bound_st_" + getLLVMType(ty) + "_" + classTag(cls);
+      "__resolve_bound_st_" + getLLVMType(ty) + "_" + classTag(cls);
   Module *M = F->getParent();
   LLVMContext &Ctx = M->getContext();
 
@@ -286,8 +286,8 @@ static Function *getOrCreateBoundsCheckStoreSanitizer(
 static Function *getOrCreateBoundsCheckMemcpySanitizer(
     Function *F, Vulnerability::RemediationStrategies strategy,
     BoundsClass srcCls, BoundsClass dstCls) {
-  std::string handlerName =
-      std::string("__cve_memcpy_") + classTag(srcCls) + "_" + classTag(dstCls);
+  std::string handlerName = std::string("__resolve_memcpy_") +
+                            classTag(srcCls) + "_" + classTag(dstCls);
   Module *M = F->getParent();
   LLVMContext &Ctx = M->getContext();
 
@@ -355,8 +355,8 @@ static Function *getOrCreateBoundsCheckMemcpySanitizer(
 static Function *getOrCreateBoundsCheckMemmoveSanitizer(
     Function *F, Vulnerability::RemediationStrategies strategy,
     BoundsClass srcCls, BoundsClass dstCls) {
-  std::string handlerName =
-      std::string("__cve_memmove_") + classTag(srcCls) + "_" + classTag(dstCls);
+  std::string handlerName = std::string("__resolve_memmove_") +
+                            classTag(srcCls) + "_" + classTag(dstCls);
   Module *M = F->getParent();
   LLVMContext &Ctx = M->getContext();
 
@@ -425,7 +425,7 @@ static Function *getOrCreateBoundsCheckMemmoveSanitizer(
 static Function *getOrCreateBoundsCheckMemsetSanitizer(
     Function *F, Vulnerability::RemediationStrategies strategy,
     BoundsClass cls) {
-  std::string handlerName = std::string("__cve_memset_") + classTag(cls);
+  std::string handlerName = std::string("__resolve_memset_") + classTag(cls);
   Module *M = F->getParent();
   LLVMContext &Ctx = M->getContext();
 
@@ -491,7 +491,7 @@ static Function *getOrCreateBoundsCheckMemsetSanitizer(
 }
 
 static Function *getOrCreateResolveGep(Function *F, BoundsClass cls) {
-  std::string handlerName = std::string("__cve_gep_") + classTag(cls);
+  std::string handlerName = std::string("__resolve_gep_") + classTag(cls);
   Module *M = F->getParent();
   LLVMContext &Ctx = M->getContext();
 
