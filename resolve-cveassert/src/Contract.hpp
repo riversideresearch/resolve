@@ -22,6 +22,6 @@ struct Precondition {
 };
 
 struct Contract {
-  std::string operation;
+  llvm::StringRef operation;
   std::vector<Precondition> preconditions;
 };

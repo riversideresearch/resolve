@@ -102,8 +102,7 @@ static Function *getOrCreateContractWrapper(Function *F, CallInst *call,
   // 3. Recovery path
   BasicBlock *EntryBB = BasicBlock::Create(Ctx, "entry", wrapperFn);
   BasicBlock *ValidBB = BasicBlock::Create(Ctx, "valid.path", wrapperFn);
-  BasicBlock *RecoverBB =
-      BasicBlock::Create(Ctx, "recover.path", wrapperFn);
+  BasicBlock *RecoverBB = BasicBlock::Create(Ctx, "recover.path", wrapperFn);
 
   // TODO: Create helper to generate the llvm-ir for preconditions
   emitPreconditions(wrapperFn, EntryBB, ValidBB, RecoverBB, contract);
@@ -127,7 +126,7 @@ void sanitizeContract(Function *F, Contract contract,
   IRBuilder<> builder(Ctx);
 
   SmallVector<CallInst *> matchingCalls;
-  std::string operationName = contract.operation;
+  StringRef operationName = contract.operation;
 
   for (auto &BB : *F) {
     for (auto &inst : BB) {
