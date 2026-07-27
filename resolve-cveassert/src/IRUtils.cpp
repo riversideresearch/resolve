@@ -420,9 +420,9 @@ Function *getOrCreateResolveHelper(Module *M, std::string fn_name,
   if (auto handler = M->getFunction(fn_name))
     return handler;
 
-  Function *resolveHelperFn = Function::Create(fn_type, link_type, fn_name, M);
-  resolveHelperFn->setMetadata("cve.noinstrument", MDNode::get(Ctx, {}));
-  return resolveHelperFn;
+  Function *helperFn = Function::Create(fn_type, link_type, fn_name, M);
+  helperFn->setMetadata("cve.noinstrument", MDNode::get(Ctx, {}));
+  return helperFn;
 }
 
 Function *getOrCreateIsHeap(Module *M, LLVMContext &Ctx) {
@@ -431,22 +431,22 @@ Function *getOrCreateIsHeap(Module *M, LLVMContext &Ctx) {
   auto i1_ty = Type::getInt1Ty(Ctx);
 
   // TODO: write this in asm as some kind of sanitzer_rt?
-  FunctionType *resolveIsHeapFnTy = FunctionType::get(i1_ty, {ptr_ty}, false);
+  FunctionType *isHeapFnTy = FunctionType::get(i1_ty, {ptr_ty}, false);
 
-  Function *resolveIsHeapFn =
-      getOrCreateResolveHelper(M, "__resolve_is_heap", resolveIsHeapFnTy);
+  Function *isHeapFn =
+      getOrCreateResolveHelper(M, "__resolve_is_heap", isHeapFnTy);
 
-  if (!resolveIsHeapFn->empty()) {
-    recordPatchFunction(resolveIsHeapFn);
-    return resolveIsHeapFn;
+  if (!isHeapFn->empty()) {
+    recordPatchFunction(isHeapFn);
+    return isHeapFn;
   }
 
   IRBuilder<> Builder(Ctx);
-  BasicBlock *Entry = BasicBlock::Create(Ctx, "entry", resolveIsHeapFn);
+  BasicBlock *Entry = BasicBlock::Create(Ctx, "entry", isHeapFn);
   Builder.SetInsertPoint(Entry);
 
   // Get function argument
-  Argument *InputPtr = resolveIsHeapFn->getArg(0);
+  Argument *InputPtr = isHeapFn->getArg(0);
 
   FunctionType *AsmType = FunctionType::get(ptr_ty, {});
   auto read_sp_asm = InlineAsm::get(AsmType, "mov %rsp, $0",
@@ -468,60 +468,60 @@ Function *getOrCreateIsHeap(Module *M, LLVMContext &Ctx) {
   auto result = Builder.CreateNot(Builder.CreateOr({is_stack, is_static}));
   Builder.CreateRet(result);
 
-  validateIR(resolveIsHeapFn);
-  recordPatchFunction(resolveIsHeapFn);
-  return resolveIsHeapFn;
+  validateIR(isHeapFn);
+  recordPatchFunction(isHeapFn);
+  return isHeapFn;
 }
 
-Function *getOrCreateResolveReportSanitizerTriggered(Module *M) {
+Function *getOrCreateReportSanitizerTriggered(Module *M) {
   auto &Ctx = M->getContext();
   auto void_ty = Type::getVoidTy(Ctx);
 
-  FunctionType *resolveReportFnTy = FunctionType::get(void_ty, {}, false);
+  FunctionType *reportFnTy = FunctionType::get(void_ty, {}, false);
 
-  Function *resolveReportFn =
+  Function *reportFn =
       getOrCreateResolveHelper(M, "__resolve_report_violation",
-                               resolveReportFnTy, GlobalValue::WeakAnyLinkage);
-  if (!resolveReportFn->empty()) {
-    recordPatchFunction(resolveReportFn);
-    return resolveReportFn;
+                               reportFnTy, GlobalValue::WeakAnyLinkage);
+  if (!reportFn->empty()) {
+    recordPatchFunction(reportFn);
+    return reportFn;
   }
 
-  BasicBlock *EntryBB = BasicBlock::Create(Ctx, "", resolveReportFn);
+  BasicBlock *EntryBB = BasicBlock::Create(Ctx, "", reportFn);
   IRBuilder<> builder(EntryBB);
   builder.CreateRetVoid();
 
-  validateIR(resolveReportFn);
-  recordPatchFunction(resolveReportFn);
-  return resolveReportFn;
+  validateIR(reportFn);
+  recordPatchFunction(reportFn);
+  return reportFn;
 }
 
 Function *getOrCreateRecoverBufferFunction(Module *M) {
   LLVMContext &Ctx = M->getContext();
 
   auto ptr_ty = PointerType::get(M->getContext(), 0);
-  FunctionType *resolve_recover_buf_fn_ty =
+  FunctionType *fnTy =
       FunctionType::get(ptr_ty, {}, false);
 
-  auto resolveRecoverFn = getOrCreateResolveHelper(
-      M, "resolve_get_recover_longjmp_buf", resolve_recover_buf_fn_ty,
+  auto recoverFn = getOrCreateResolveHelper(
+      M, "resolve_get_recover_longjmp_buf", fnTy,
       GlobalValue::WeakAnyLinkage);
-  if (!resolveRecoverFn->empty()) {
-    recordPatchFunction(resolveRecoverFn);
-    return resolveRecoverFn;
+  if (!recoverFn->empty()) {
+    recordPatchFunction(recoverFn);
+    return recoverFn;
   }
 
   BasicBlock *EntryBB =
-      BasicBlock::Create(M->getContext(), "", resolveRecoverFn);
+      BasicBlock::Create(M->getContext(), "", recoverFn);
   IRBuilder<> builder(EntryBB);
   builder.SetInsertPoint(EntryBB);
   builder.CreateRet(Constant::getNullValue(ptr_ty));
 
-  resolveRecoverFn->setMetadata("cve.noinstrument", MDNode::get(Ctx, {}));
-  validateIR(resolveRecoverFn);
-  recordPatchFunction(resolveRecoverFn);
+  recoverFn->setMetadata("cve.noinstrument", MDNode::get(Ctx, {}));
+  validateIR(recoverFn);
+  recordPatchFunction(recoverFn);
 
-  return resolveRecoverFn;
+  return recoverFn;
 }
 
 Function *
