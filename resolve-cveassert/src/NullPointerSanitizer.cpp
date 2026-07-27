@@ -67,7 +67,7 @@ getOrCreateNullPtrLoadSanitizer(Function *F, Type *ty,
 
   case Vulnerability::RemediationStrategies::EXIT:
   case Vulnerability::RemediationStrategies::RECOVER:
-    builder.CreateCall(getOrCreateResolveReportSanitizerTriggered(M));
+    builder.CreateCall(getOrCreateReportSanitizerTriggered(M));
     builder.CreateCall(getOrCreateRemediationBehavior(M, strategy));
     builder.CreateUnreachable();
     break;
@@ -139,7 +139,7 @@ static Function *getOrCreateNullPtrStoreSanitizer(
 
   case Vulnerability::RemediationStrategies::EXIT:
   case Vulnerability::RemediationStrategies::RECOVER:
-    builder.CreateCall(getOrCreateResolveReportSanitizerTriggered(M));
+    builder.CreateCall(getOrCreateReportSanitizerTriggered(M));
     builder.CreateCall(getOrCreateRemediationBehavior(M, strategy));
     builder.CreateUnreachable();
     break;

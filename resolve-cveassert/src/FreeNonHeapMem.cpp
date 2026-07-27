@@ -18,19 +18,19 @@ Function *getOrCreateIsHeap(Function *F) {
   auto ptr_ty = PointerType::get(Ctx, 0);
   auto i1_ty = Type::getInt1Ty(Ctx);
 
-  FunctionType *cveIsHeapFnTy = FunctionType::get(i1_ty, {ptr_ty}, false);
-  Function *cveIsHeapFn =
-      getOrCreateResolveHelper(M, "__resolve_is_heap", cveIsHeapFnTy);
+  FunctionType *isHeapFnTy = FunctionType::get(i1_ty, {ptr_ty}, false);
+  Function *isHeapFn =
+      getOrCreateResolveHelper(M, "__resolve_is_heap", isHeapFnTy);
 
-  if (!cveIsHeapFn->empty()) {
-    return cveIsHeapFn;
+  if (!isHeapFn->empty()) {
+    return isHeapFn;
   }
 
   IRBuilder<> builder(Ctx);
-  BasicBlock *entryBB = BasicBlock::Create(Ctx, "entry", cveIsHeapFn);
+  BasicBlock *entryBB = BasicBlock::Create(Ctx, "entry", isHeapFn);
   builder.SetInsertPoint(entryBB);
 
-  Argument *inputPtr = cveIsHeapFn->getArg(0);
+  Argument *inputPtr = isHeapFn->getArg(0);
 
   FunctionType *asmTy = FunctionType::get(ptr_ty, {});
   auto read_sp_asm = InlineAsm::get(asmTy, "mov %rsp, $0",
@@ -53,13 +53,13 @@ Function *getOrCreateIsHeap(Function *F) {
   auto result = builder.CreateNot(builder.CreateOr(is_stack, is_static));
   builder.CreateRet(result);
 
-  validateIR(cveIsHeapFn);
-  return cveIsHeapFn;
+  validateIR(isHeapFn);
+  return isHeapFn;
 }
 
 Function *getOrCreateFreeOfNonHeapSanitizer(
     Function *F, Vulnerability::RemediationStrategies strategy) {
-  std::string handlerName = "__cve_nonheap_free";
+  std::string handlerName = "__resolve_nonheap_free";
   Module *M = F->getParent();
   LLVMContext &Ctx = M->getContext();
   GlobalVariable *map = SanitizerMaps[F];
