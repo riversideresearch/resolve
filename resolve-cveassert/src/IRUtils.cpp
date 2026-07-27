@@ -479,9 +479,8 @@ Function *getOrCreateReportSanitizerTriggered(Module *M) {
 
   FunctionType *reportFnTy = FunctionType::get(void_ty, {}, false);
 
-  Function *reportFn =
-      getOrCreateResolveHelper(M, "__resolve_report_violation",
-                               reportFnTy, GlobalValue::WeakAnyLinkage);
+  Function *reportFn = getOrCreateResolveHelper(
+      M, "__resolve_report_violation", reportFnTy, GlobalValue::WeakAnyLinkage);
   if (!reportFn->empty()) {
     recordPatchFunction(reportFn);
     return reportFn;
@@ -500,19 +499,16 @@ Function *getOrCreateRecoverBufferFunction(Module *M) {
   LLVMContext &Ctx = M->getContext();
 
   auto ptr_ty = PointerType::get(M->getContext(), 0);
-  FunctionType *fnTy =
-      FunctionType::get(ptr_ty, {}, false);
+  FunctionType *fnTy = FunctionType::get(ptr_ty, {}, false);
 
   auto recoverFn = getOrCreateResolveHelper(
-      M, "resolve_get_recover_longjmp_buf", fnTy,
-      GlobalValue::WeakAnyLinkage);
+      M, "resolve_get_recover_longjmp_buf", fnTy, GlobalValue::WeakAnyLinkage);
   if (!recoverFn->empty()) {
     recordPatchFunction(recoverFn);
     return recoverFn;
   }
 
-  BasicBlock *EntryBB =
-      BasicBlock::Create(M->getContext(), "", recoverFn);
+  BasicBlock *EntryBB = BasicBlock::Create(M->getContext(), "", recoverFn);
   IRBuilder<> builder(EntryBB);
   builder.SetInsertPoint(EntryBB);
   builder.CreateRet(Constant::getNullValue(ptr_ty));
