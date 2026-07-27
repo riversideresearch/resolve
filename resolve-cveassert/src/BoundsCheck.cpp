@@ -207,7 +207,7 @@ static Function *getOrCreateBoundsCheckLoadSanitizer(
 
   // SanitizeLoadBB: Apply remediation strategy
   builder.SetInsertPoint(SanitizeLoadBB);
-  builder.CreateCall(getOrCreateResolveReportSanitizerTriggered(M));
+  builder.CreateCall(getOrCreateReportSanitizerTriggered(M));
   if (Function *fn = getOrCreateRemediationBehavior(M, strategy)) {
     builder.CreateCall(fn);
     builder.CreateUnreachable();
@@ -270,7 +270,7 @@ static Function *getOrCreateBoundsCheckStoreSanitizer(
 
   // SanitizeStoreBB: Apply remediation strategy
   builder.SetInsertPoint(SanitizeStoreBB);
-  builder.CreateCall(getOrCreateResolveReportSanitizerTriggered(M));
+  builder.CreateCall(getOrCreateReportSanitizerTriggered(M));
   if (Function *fn = getOrCreateRemediationBehavior(M, strategy)) {
     builder.CreateCall(fn);
     builder.CreateUnreachable();
@@ -340,7 +340,7 @@ static Function *getOrCreateBoundsCheckMemcpySanitizer(
 
   // SanitizeMemcpyBB: Remediate memcpy returns null pointer.
   builder.SetInsertPoint(SanitizeMemcpyBB);
-  builder.CreateCall(getOrCreateResolveReportSanitizerTriggered(M));
+  builder.CreateCall(getOrCreateReportSanitizerTriggered(M));
   if (Function *fn = getOrCreateRemediationBehavior(M, strategy)) {
     builder.CreateCall(fn);
     builder.CreateUnreachable();
@@ -409,7 +409,7 @@ static Function *getOrCreateBoundsCheckMemmoveSanitizer(
 
   // SanitizeMemcpyBB: Remediate memcpy returns null pointer.
   builder.SetInsertPoint(SanitizeMemmoveBB);
-  builder.CreateCall(getOrCreateResolveReportSanitizerTriggered(M));
+  builder.CreateCall(getOrCreateReportSanitizerTriggered(M));
   if (Function *fn = getOrCreateRemediationBehavior(M, strategy)) {
     builder.CreateCall(fn);
     builder.CreateUnreachable();
@@ -477,7 +477,7 @@ static Function *getOrCreateBoundsCheckMemsetSanitizer(
   builder.CreateRet(memsetPtr);
 
   builder.SetInsertPoint(SanitizeMemsetBB);
-  builder.CreateCall(getOrCreateResolveReportSanitizerTriggered(M));
+  builder.CreateCall(getOrCreateReportSanitizerTriggered(M));
   if (Function *fn = getOrCreateRemediationBehavior(M, strategy)) {
     builder.CreateCall(fn);
     builder.CreateUnreachable();

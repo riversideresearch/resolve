@@ -167,7 +167,7 @@ void sanitizeDivideByZero(Function *F,
     builder.CreateCondBr(isZero, remedDivBB, preserveDivBB);
 
     builder.SetInsertPoint(remedDivBB);
-    builder.CreateCall(getOrCreateResolveReportSanitizerTriggered(M));
+    builder.CreateCall(getOrCreateReportSanitizerTriggered(M));
     if (Function *fn = getOrCreateRemediationBehavior(M, strategy)) {
       builder.CreateCall(fn);
     }
@@ -404,7 +404,7 @@ void sanitizeIntOverflow(Function *F,
     builder.CreateCondBr(isOverflow, remedOverflowBB, joinResultBB);
 
     builder.SetInsertPoint(remedOverflowBB);
-    builder.CreateCall(getOrCreateResolveReportSanitizerTriggered(M));
+    builder.CreateCall(getOrCreateReportSanitizerTriggered(M));
     if (Function *fn = getOrCreateRemediationBehavior(M, strategy)) {
       builder.CreateCall(fn);
     }
