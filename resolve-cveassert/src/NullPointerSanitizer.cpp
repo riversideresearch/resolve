@@ -96,7 +96,7 @@ static Function *getOrCreateNullPtrStoreSanitizer(
   // TODO: write this in asm as some kind of sanitzer_rt?
   FunctionType *wrapperType =
       FunctionType::get(Type::getVoidTy(Ctx), {ptr_ty, ty}, false);
-  Function *wrapperFn = getOrCreateResolveHelper(M, handlerName, wrapperFnTy);
+  Function *wrapperFn = getOrCreateResolveHelper(M, handlerName, wrapperType);
   if (!wrapperFn->empty()) {
     recordPatchFunction(wrapperFn);
     return wrapperFn;
