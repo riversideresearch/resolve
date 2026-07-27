@@ -30,34 +30,31 @@ getOrCreateNullPtrLoadSanitizer(Function *F, Type *ty,
   auto usize_ty = Type::getInt64Ty(Ctx);
 
   // TODO: write this in asm as some kind of sanitzer_rt?
-  FunctionType *resolveNullPtrLdFnTy = FunctionType::get(ty, {ptr_ty}, false);
-  Function *resolveNullPtrLdFn =
-      getOrCreateResolveHelper(M, handlerName, resolveNullPtrLdFnTy);
-  if (!resolveNullPtrLdFn->empty()) {
-    recordPatchFunction(resolveNullPtrLdFn);
-    return resolveNullPtrLdFn;
+  FunctionType *wrapperType = FunctionType::get(ty, {ptr_ty}, false);
+  Function *wrapperFn = getOrCreateResolveHelper(M, handlerName, wrapperType);
+  if (!wrapperFn->empty()) {
+    recordPatchFunction(wrapperFn);
+    return wrapperFn;
   }
 
-  BasicBlock *EntryBB = BasicBlock::Create(Ctx, "entry", resolveNullPtrLdFn);
-  BasicBlock *CheckIfNullBB =
-      BasicBlock::Create(Ctx, "check.null", resolveNullPtrLdFn);
+  BasicBlock *EntryBB = BasicBlock::Create(Ctx, "entry", wrapperFn);
+  BasicBlock *CheckIfNullBB = BasicBlock::Create(Ctx, "check.null", wrapperFn);
   BasicBlock *SanitizeNullPtrBB =
-      BasicBlock::Create(Ctx, "sanitize.load", resolveNullPtrLdFn);
-  BasicBlock *NormalLoadBB =
-      BasicBlock::Create(Ctx, "safe.load", resolveNullPtrLdFn);
+      BasicBlock::Create(Ctx, "sanitize.load", wrapperFn);
+  BasicBlock *NormalLoadBB = BasicBlock::Create(Ctx, "safe.load", wrapperFn);
 
   builder.SetInsertPoint(EntryBB);
-  Argument *inputPtr = resolveNullPtrLdFn->getArg(0);
+  Argument *inputPtr = wrapperFn->getArg(0);
   createSanitizerGateBranch(builder, F, 1, NormalLoadBB, CheckIfNullBB);
 
   // Compare pointer with null (opaque ptrs use generic ptr type)
   // TODO: Sanitize other invalid pointers
   builder.SetInsertPoint(CheckIfNullBB);
-  Value *PtrValue = builder.CreatePtrToInt(inputPtr, usize_ty);
-  Value *IsNull =
-      builder.CreateICmpULT(PtrValue, ConstantInt::get(usize_ty, 0x1000));
+  Value *ptrAsInt = builder.CreatePtrToInt(inputPtr, usize_ty);
+  Value *isBelowMinAddress =
+      builder.CreateICmpULT(ptrAsInt, ConstantInt::get(usize_ty, 0x1000));
 
-  builder.CreateCondBr(IsNull, SanitizeNullPtrBB, NormalLoadBB);
+  builder.CreateCondBr(isBelowMinAddress, SanitizeNullPtrBB, NormalLoadBB);
 
   builder.SetInsertPoint(SanitizeNullPtrBB);
   switch (strategy) {
@@ -77,12 +74,12 @@ getOrCreateNullPtrLoadSanitizer(Function *F, Type *ty,
   }
 
   builder.SetInsertPoint(NormalLoadBB);
-  Value *ld = builder.CreateLoad(ty, inputPtr);
-  builder.CreateRet(ld);
+  Value *loadedValue = builder.CreateLoad(ty, inputPtr);
+  builder.CreateRet(loadedValue);
 
-  validateIR(resolveNullPtrLdFn);
-  recordPatchFunction(resolveNullPtrLdFn);
-  return resolveNullPtrLdFn;
+  validateIR(wrapperFn);
+  recordPatchFunction(wrapperFn);
+  return wrapperFn;
 }
 
 static Function *getOrCreateNullPtrStoreSanitizer(
@@ -97,27 +94,24 @@ static Function *getOrCreateNullPtrStoreSanitizer(
   auto usize_ty = Type::getInt64Ty(Ctx);
 
   // TODO: write this in asm as some kind of sanitzer_rt?
-  FunctionType *resolveNullPtrStFnTy =
+  FunctionType *wrapperType =
       FunctionType::get(Type::getVoidTy(Ctx), {ptr_ty, ty}, false);
-  Function *resolveNullPtrStFn =
-      getOrCreateResolveHelper(M, handlerName, resolveNullPtrStFnTy);
-  if (!resolveNullPtrStFn->empty()) {
-    recordPatchFunction(resolveNullPtrStFn);
-    return resolveNullPtrStFn;
+  Function *wrapperFn = getOrCreateResolveHelper(M, handlerName, wrapperFnTy);
+  if (!wrapperFn->empty()) {
+    recordPatchFunction(wrapperFn);
+    return wrapperFn;
   }
 
-  BasicBlock *EntryBB = BasicBlock::Create(Ctx, "entry", resolveNullPtrStFn);
-  BasicBlock *CheckIfNullBB =
-      BasicBlock::Create(Ctx, "check.null", resolveNullPtrStFn);
+  BasicBlock *EntryBB = BasicBlock::Create(Ctx, "entry", wrapperFn);
+  BasicBlock *CheckIfNullBB = BasicBlock::Create(Ctx, "check.null", wrapperFn);
   BasicBlock *SanitizeNullPtrBB =
-      BasicBlock::Create(Ctx, "sanitize.store", resolveNullPtrStFn);
-  BasicBlock *NormalStoreBB =
-      BasicBlock::Create(Ctx, "safe.store", resolveNullPtrStFn);
+      BasicBlock::Create(Ctx, "sanitize.store", wrapperFn);
+  BasicBlock *NormalStoreBB = BasicBlock::Create(Ctx, "safe.store", wrapperFn);
 
   // Set insertion point to entry block
   builder.SetInsertPoint(EntryBB);
-  Argument *inputPtr = resolveNullPtrStFn->getArg(0);
-  Argument *inputValue = resolveNullPtrStFn->getArg(1);
+  Argument *inputPtr = wrapperFn->getArg(0);
+  Argument *inputValue = wrapperFn->getArg(1);
   createSanitizerGateBranch(builder, F, 1, NormalStoreBB, CheckIfNullBB);
 
   // Compare pointer with null (opaque ptrs use generic ptr type)
@@ -126,10 +120,10 @@ static Function *getOrCreateNullPtrStoreSanitizer(
   // Unix systems do not map first page of memory,
   // we need to detect remdiate pointers within this range.
   builder.SetInsertPoint(CheckIfNullBB);
-  Value *PtrValue = builder.CreatePtrToInt(inputPtr, usize_ty);
-  Value *IsNull =
-      builder.CreateICmpULT(PtrValue, ConstantInt::get(usize_ty, 0x1000));
-  builder.CreateCondBr(IsNull, SanitizeNullPtrBB, NormalStoreBB);
+  Value *ptrAsInt = builder.CreatePtrToInt(inputPtr, usize_ty);
+  Value *isBelowMinAddress =
+      builder.CreateICmpULT(ptrAsInt, ConstantInt::get(usize_ty, 0x1000));
+  builder.CreateCondBr(isBelowMinAddress, SanitizeNullPtrBB, NormalStoreBB);
 
   builder.SetInsertPoint(SanitizeNullPtrBB);
   switch (strategy) {
@@ -153,9 +147,9 @@ static Function *getOrCreateNullPtrStoreSanitizer(
   builder.CreateStore(inputValue, inputPtr);
   builder.CreateRetVoid();
 
-  validateIR(resolveNullPtrStFn);
-  recordPatchFunction(resolveNullPtrStFn);
-  return resolveNullPtrStFn;
+  validateIR(wrapperFn);
+  recordPatchFunction(wrapperFn);
+  return wrapperFn;
 }
 
 void sanitizeNullPointers(Function *F,
