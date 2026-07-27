@@ -16,7 +16,7 @@
 #include <string>
 
 std::string getLLVMType(llvm::Type *ty);
-llvm::Function *getOrCreateResolveReportSanitizerTriggered(llvm::Module *M);
+llvm::Function *getOrCreateReportSanitizerTriggered(llvm::Module *M);
 llvm::Function *
 getOrCreateRemediationBehavior(llvm::Module *M,
                                Vulnerability::RemediationStrategies strategy);
