@@ -18,19 +18,19 @@
 using namespace llvm;
 
 static Function *
-getOrCreateNullPtrLoadSanitizer(Function *F, Type *ty,
+getOrCreateNullPtrLoadSanitizer(Function *F, Type *valueType,
                                 Vulnerability::RemediationStrategies strategy) {
-  std::string handlerName = "__resolve_null_check_ld_" + getLLVMType(ty);
+  std::string handlerName = "__resolve_null_check_ld_" + getLLVMType(valueType);
   Module *M = F->getParent();
   LLVMContext &Ctx = M->getContext();
 
   IRBuilder<> builder(Ctx);
   // TODO: handle address spaces other than 0
-  auto ptr_ty = PointerType::get(Ctx, 0);
-  auto usize_ty = Type::getInt64Ty(Ctx);
+  auto ptrType = PointerType::get(Ctx, 0);
+  auto pointerIntType = Type::getInt64Ty(Ctx);
 
   // TODO: write this in asm as some kind of sanitzer_rt?
-  FunctionType *wrapperType = FunctionType::get(ty, {ptr_ty}, false);
+  FunctionType *wrapperType = FunctionType::get(valueType, {ptrType}, false);
   Function *wrapperFn = getOrCreateResolveHelper(M, handlerName, wrapperType);
   if (!wrapperFn->empty()) {
     recordPatchFunction(wrapperFn);
@@ -50,16 +50,16 @@ getOrCreateNullPtrLoadSanitizer(Function *F, Type *ty,
   // Compare pointer with null (opaque ptrs use generic ptr type)
   // TODO: Sanitize other invalid pointers
   builder.SetInsertPoint(CheckIfNullBB);
-  Value *ptrAsInt = builder.CreatePtrToInt(inputPtr, usize_ty);
+  Value *ptrAsInt = builder.CreatePtrToInt(inputPtr, pointerIntType);
   Value *isBelowMinAddress =
-      builder.CreateICmpULT(ptrAsInt, ConstantInt::get(usize_ty, 0x1000));
+      builder.CreateICmpULT(ptrAsInt, ConstantInt::get(pointerIntType, 0x1000));
 
   builder.CreateCondBr(isBelowMinAddress, SanitizeNullPtrBB, NormalLoadBB);
 
   builder.SetInsertPoint(SanitizeNullPtrBB);
   switch (strategy) {
   case Vulnerability::RemediationStrategies::CONTINUE:
-    builder.CreateRet(Constant::getNullValue(ty));
+    builder.CreateRet(Constant::getNullValue(valueType));
     break;
 
   case Vulnerability::RemediationStrategies::EXIT:
@@ -74,7 +74,7 @@ getOrCreateNullPtrLoadSanitizer(Function *F, Type *ty,
   }
 
   builder.SetInsertPoint(NormalLoadBB);
-  Value *loadedValue = builder.CreateLoad(ty, inputPtr);
+  Value *loadedValue = builder.CreateLoad(valueType, inputPtr);
   builder.CreateRet(loadedValue);
 
   validateIR(wrapperFn);
@@ -83,19 +83,20 @@ getOrCreateNullPtrLoadSanitizer(Function *F, Type *ty,
 }
 
 static Function *getOrCreateNullPtrStoreSanitizer(
-    Function *F, Type *ty, Vulnerability::RemediationStrategies strategy) {
-  std::string handlerName = "__resolve_null_check_st_" + getLLVMType(ty);
+    Function *F, Type *valueType,
+    Vulnerability::RemediationStrategies strategy) {
+  std::string handlerName = "__resolve_null_check_st_" + getLLVMType(valueType);
   Module *M = F->getParent();
   LLVMContext &Ctx = M->getContext();
 
   IRBuilder<> builder(Ctx);
   // TODO: handle address spaces other than 0
-  auto ptr_ty = PointerType::get(Ctx, 0);
-  auto usize_ty = Type::getInt64Ty(Ctx);
+  auto ptrType = PointerType::get(Ctx, 0);
+  auto pointerIntType = Type::getInt64Ty(Ctx);
 
   // TODO: write this in asm as some kind of sanitzer_rt?
   FunctionType *wrapperType =
-      FunctionType::get(Type::getVoidTy(Ctx), {ptr_ty, ty}, false);
+      FunctionType::get(Type::getVoidTy(Ctx), {ptrType, valueType}, false);
   Function *wrapperFn = getOrCreateResolveHelper(M, handlerName, wrapperType);
   if (!wrapperFn->empty()) {
     recordPatchFunction(wrapperFn);
@@ -120,9 +121,9 @@ static Function *getOrCreateNullPtrStoreSanitizer(
   // Unix systems do not map first page of memory,
   // we need to detect remdiate pointers within this range.
   builder.SetInsertPoint(CheckIfNullBB);
-  Value *ptrAsInt = builder.CreatePtrToInt(inputPtr, usize_ty);
+  Value *ptrAsInt = builder.CreatePtrToInt(inputPtr, pointerIntType);
   Value *isBelowMinAddress =
-      builder.CreateICmpULT(ptrAsInt, ConstantInt::get(usize_ty, 0x1000));
+      builder.CreateICmpULT(ptrAsInt, ConstantInt::get(pointerIntType, 0x1000));
   builder.CreateCondBr(isBelowMinAddress, SanitizeNullPtrBB, NormalStoreBB);
 
   builder.SetInsertPoint(SanitizeNullPtrBB);
@@ -186,9 +187,9 @@ void sanitizeNullPointers(Function *F,
 
   for (auto Inst : loadList) {
     builder.SetInsertPoint(Inst);
-    auto valueTy = Inst->getType();
+    auto valueType = Inst->getType();
 
-    auto loadFn = getOrCreateNullPtrLoadSanitizer(F, valueTy, strategy);
+    auto loadFn = getOrCreateNullPtrLoadSanitizer(F, valueType, strategy);
 
     auto sanitizedLoad =
         builder.CreateCall(loadFn, {Inst->getPointerOperand()});
@@ -199,8 +200,8 @@ void sanitizeNullPointers(Function *F,
 
   for (auto Inst : storeList) {
     builder.SetInsertPoint(Inst);
-    auto valueTy = Inst->getValueOperand()->getType();
-    auto storeFn = getOrCreateNullPtrStoreSanitizer(F, valueTy, strategy);
+    auto valueType = Inst->getValueOperand()->getType();
+    auto storeFn = getOrCreateNullPtrStoreSanitizer(F, valueType, strategy);
 
     auto sanitizedStore = builder.CreateCall(
         storeFn, {Inst->getPointerOperand(), Inst->getValueOperand()});
