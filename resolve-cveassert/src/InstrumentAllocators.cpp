@@ -61,19 +61,21 @@ static void wrapLibraryFunction(Function *F, StringRef name, FunctionType *ty) {
 void instrumentLibraryAllocations(Function *F) {
   LLVMContext &Ctx = F->getContext();
 
-  auto ptr_ty = PointerType::get(Ctx, 0);
-  auto size_ty = Type::getInt64Ty(Ctx);
-  auto void_ty = Type::getVoidTy(Ctx);
+  auto ptrType = PointerType::get(Ctx, 0);
+  auto sizeType = Type::getInt64Ty(Ctx);
+  auto voidType = Type::getVoidTy(Ctx);
 
-  wrapLibraryFunction(F, "malloc", FunctionType::get(ptr_ty, {size_ty}, false));
+  wrapLibraryFunction(F, "malloc",
+                      FunctionType::get(ptrType, {sizeType}, false));
   wrapLibraryFunction(F, "realloc",
-                      FunctionType::get(ptr_ty, {ptr_ty, size_ty}, false));
+                      FunctionType::get(ptrType, {ptrType, sizeType}, false));
   wrapLibraryFunction(F, "calloc",
-                      FunctionType::get(ptr_ty, {size_ty, size_ty}, false));
-  wrapLibraryFunction(F, "free", FunctionType::get(void_ty, {ptr_ty}, false));
-  wrapLibraryFunction(F, "strdup", FunctionType::get(ptr_ty, {ptr_ty}, false));
+                      FunctionType::get(ptrType, {sizeType, sizeType}, false));
+  wrapLibraryFunction(F, "free", FunctionType::get(voidType, {ptrType}, false));
+  wrapLibraryFunction(F, "strdup",
+                      FunctionType::get(ptrType, {ptrType}, false));
   wrapLibraryFunction(F, "strndup",
-                      FunctionType::get(ptr_ty, {ptr_ty, size_ty}, false));
+                      FunctionType::get(ptrType, {ptrType, sizeType}, false));
 }
 
 void instrumentAlloca(Function *F) {
@@ -82,20 +84,21 @@ void instrumentAlloca(Function *F) {
   IRBuilder<> builder(Ctx);
   const DataLayout &DL = M->getDataLayout();
 
-  auto ptr_ty = PointerType::get(Ctx, 0);
-  auto size_ty = Type::getInt64Ty(Ctx);
-  auto void_ty = Type::getVoidTy(Ctx);
+  auto ptrType = PointerType::get(Ctx, 0);
+  auto sizeType = Type::getInt64Ty(Ctx);
+  auto voidType = Type::getVoidTy(Ctx);
 
   SmallVector<AllocaInst *, 16> allocas;
   SmallVector<AllocaInst *, 16> shadowSlots;
 
-  StructType *shadowTy = StructType::get(Ctx, {ptr_ty, size_ty});
+  StructType *shadowTy = StructType::get(Ctx, {ptrType, sizeType});
 
   auto allocateFn = M->getOrInsertFunction(
-      "__resolve_alloca", FunctionType::get(void_ty, {ptr_ty, size_ty}, false));
+      "__resolve_alloca",
+      FunctionType::get(voidType, {ptrType, sizeType}, false));
   auto invalidateFn = M->getOrInsertFunction(
       "__resolve_invalidate_stack_range",
-      FunctionType::get(void_ty, {ptr_ty, size_ty}, false));
+      FunctionType::get(voidType, {ptrType, sizeType}, false));
 
   // 2 cases
   // 1. alloca [N x T]
@@ -120,9 +123,9 @@ void instrumentAlloca(Function *F) {
     Type *oldAllocaTy = oldAlloca->getAllocatedType();
     uint64_t elemSize = DL.getTypeAllocSize(oldAllocaTy).getFixedValue();
     Value *trackedBytes =
-        builder.CreateMul(arrSize, ConstantInt::get(size_ty, elemSize));
+        builder.CreateMul(arrSize, ConstantInt::get(sizeType, elemSize));
     Value *allocCount =
-        builder.CreateAdd(arrSize, ConstantInt::get(size_ty, 1));
+        builder.CreateAdd(arrSize, ConstantInt::get(sizeType, 1));
     AllocaInst *transformedAlloca = builder.CreateAlloca(
         oldAllocaTy, allocCount, oldAlloca->getName() + ".inst");
     transformedAlloca->setAlignment(oldAlloca->getAlign());
@@ -139,11 +142,11 @@ void instrumentAlloca(Function *F) {
     AllocaInst *shadowSlot =
         builder.CreateAlloca(shadowTy, nullptr, "shadow.slot");
     Value *initialPtrField = builder.CreateStructGEP(shadowTy, shadowSlot, 0);
-    builder.CreateStore(ConstantPointerNull::get(ptr_ty), initialPtrField);
+    builder.CreateStore(ConstantPointerNull::get(ptrType), initialPtrField);
     Value *initialSizeField = builder.CreateStructGEP(shadowTy, shadowSlot, 1);
     Gep = cast<GetElementPtrInst>(initialPtrField);
     Gep->setMetadata("cve.noinstrument", MDNode::get(Ctx, {}));
-    builder.CreateStore(ConstantInt::get(size_ty, 0), initialSizeField);
+    builder.CreateStore(ConstantInt::get(sizeType, 0), initialSizeField);
     builder.SetInsertPoint(transformedAlloca->getNextNonDebugInstruction());
 
     Value *runtimePtrField = builder.CreateStructGEP(shadowTy, shadowSlot, 0);
@@ -198,11 +201,11 @@ void instrumentAlloca(Function *F) {
     for (auto *end : lifetimeEnd) {
       end->setArgOperand(0, totalSize);
       builder.SetInsertPoint(end->getNextNode());
-      LoadInst *load = builder.CreateLoad(ptr_ty, shadowSlot);
+      LoadInst *load = builder.CreateLoad(ptrType, shadowSlot);
       load->setMetadata("cve.noinstrument", MDNode::get(Ctx, {}));
       builder.CreateCall(invalidateFn, {load, totalSize});
       StoreInst *store =
-          builder.CreateStore(ConstantPointerNull::get(ptr_ty), shadowSlot);
+          builder.CreateStore(ConstantPointerNull::get(ptrType), shadowSlot);
       store->setMetadata("cve.noinstrument", MDNode::get(Ctx, {}));
     }
 
@@ -229,7 +232,7 @@ void instrumentAlloca(Function *F) {
       auto maybeSize = allocaInst->getAllocationSize(DL);
       TypeSize ts = *maybeSize;
       uint64_t size = ts.getFixedValue();
-      totalSize = ConstantInt::get(size_ty, size);
+      totalSize = ConstantInt::get(sizeType, size);
     } else {
       auto result = create_transformed_alloca(allocaInst);
       transformedAlloca = result.first;
@@ -270,10 +273,10 @@ void instrumentAlloca(Function *F) {
         builder.SetInsertPoint(inst);
         for (auto *slot : shadowSlots) {
           Value *ptrField = builder.CreateStructGEP(shadowTy, slot, 0);
-          LoadInst *addr = builder.CreateLoad(ptr_ty, ptrField);
+          LoadInst *addr = builder.CreateLoad(ptrType, ptrField);
           addr->setMetadata("cve.noinstrument", MDNode::get(Ctx, {}));
           Value *sizeField = builder.CreateStructGEP(shadowTy, slot, 1);
-          LoadInst *size = builder.CreateLoad(size_ty, sizeField);
+          LoadInst *size = builder.CreateLoad(sizeType, sizeField);
           size->setMetadata("cve.noinstrument", MDNode::get(Ctx, {}));
           builder.CreateCall(invalidateFn, {addr, size});
         }
