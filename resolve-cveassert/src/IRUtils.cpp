@@ -366,7 +366,7 @@ Function *getOrCreateSanitizerMapEntry(Module *M) {
 
   Value *zero = builder.getInt64(0);
 
-  Value *flagPtr = builder.CreateGEP(sanitizerMapType, mapPtr, {zero, idx});
+  Value *flagPtr = builder.CreateGEP(sanitizerMapType, mapPtr, {zero, index});
   Value *flag = builder.CreateLoad(boolType, flagPtr);
   builder.CreateRet(flag);
 
@@ -421,54 +421,6 @@ Function *getOrCreateResolveHelper(Module *M, std::string fn_name,
   Function *helperFn = Function::Create(fn_type, link_type, fn_name, M);
   helperFn->setMetadata("cve.noinstrument", MDNode::get(Ctx, {}));
   return helperFn;
-}
-
-Function *getOrCreateIsHeap(Module *M, LLVMContext &Ctx) {
-  // TODO: handle address spaces other than 0
-  auto ptrType = PointerType::get(Ctx, 0);
-  auto boolType = Type::getInt1Ty(Ctx);
-
-  // TODO: write this in asm as some kind of sanitzer_rt?
-  FunctionType *isHeapFnTy = FunctionType::get(boolType, {ptrType}, false);
-
-  Function *isHeapFn =
-      getOrCreateResolveHelper(M, "__resolve_is_heap", isHeapFnTy);
-
-  if (!isHeapFn->empty()) {
-    recordPatchFunction(isHeapFn);
-    return isHeapFn;
-  }
-
-  IRBuilder<> Builder(Ctx);
-  BasicBlock *Entry = BasicBlock::Create(Ctx, "entry", isHeapFn);
-  Builder.SetInsertPoint(Entry);
-
-  // Get function argument
-  Argument *InputPtr = isHeapFn->getArg(0);
-
-  FunctionType *AsmType = FunctionType::get(ptrType, {});
-  auto read_sp_asm = InlineAsm::get(AsmType, "mov %rsp, $0",
-                                    "=r,~{dirflag},~{fpsr},~{flags}", true);
-  auto read_sp = Builder.CreateCall(read_sp_asm, {});
-  // ($rsp <= InputPtr)
-  auto is_stack = Builder.CreateICmpULE(read_sp, InputPtr);
-
-  auto start = M->getOrInsertGlobal("_start", Type::getInt8Ty(Ctx));
-  auto end = M->getOrInsertGlobal("_end", Type::getInt8Ty(Ctx));
-
-  // ((InputPtr >= _start) && (InputPtr <= _end))
-  auto is_static = Builder.CreateAnd({
-      Builder.CreateICmpUGE(InputPtr, start),
-      Builder.CreateICmpULE(InputPtr, end),
-  });
-
-  // return !(is_stack || is_static);
-  auto result = Builder.CreateNot(Builder.CreateOr({is_stack, is_static}));
-  Builder.CreateRet(result);
-
-  validateIR(isHeapFn);
-  recordPatchFunction(isHeapFn);
-  return isHeapFn;
 }
 
 Function *getOrCreateReportSanitizerTriggered(Module *M) {
