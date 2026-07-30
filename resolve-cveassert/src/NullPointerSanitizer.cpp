@@ -41,11 +41,11 @@ getOrCreateNullPtrLoadSanitizer(Function *F, Type *valueType,
   BasicBlock *checkNullPtrBB = BasicBlock::Create(Ctx, "check.null", wrapperFn);
   BasicBlock *handleNullPtrBB =
       BasicBlock::Create(Ctx, "sanitize.load", wrapperFn);
-  BasicBlock *NormalLoadBB = BasicBlock::Create(Ctx, "safe.load", wrapperFn);
+  BasicBlock *performLoadBB = BasicBlock::Create(Ctx, "safe.load", wrapperFn);
 
   builder.SetInsertPoint(entryBB);
   Argument *ptr = wrapperFn->getArg(0);
-  createSanitizerGateBranch(builder, F, 1, NormalLoadBB, checkNullPtrBB);
+  createSanitizerGateBranch(builder, F, 1, performLoadBB, checkNullPtrBB);
 
   // Compare pointer with null (opaque ptrs use generic ptr type)
   // TODO: Sanitize other invalid pointers
@@ -54,7 +54,7 @@ getOrCreateNullPtrLoadSanitizer(Function *F, Type *valueType,
   Value *isBelowMinAddress =
       builder.CreateICmpULT(ptrAsInt, ConstantInt::get(pointerIntType, 0x1000));
 
-  builder.CreateCondBr(isBelowMinAddress, handleNullPtrBB, NormalLoadBB);
+  builder.CreateCondBr(isBelowMinAddress, handleNullPtrBB, performLoadBB);
 
   builder.SetInsertPoint(handleNullPtrBB);
   switch (strategy) {
@@ -73,7 +73,7 @@ getOrCreateNullPtrLoadSanitizer(Function *F, Type *valueType,
     llvm_unreachable("Not a supported strategy");
   }
 
-  builder.SetInsertPoint(NormalLoadBB);
+  builder.SetInsertPoint(performLoadBB);
   Value *loadedValue = builder.CreateLoad(valueType, ptr);
   builder.CreateRet(loadedValue);
 
