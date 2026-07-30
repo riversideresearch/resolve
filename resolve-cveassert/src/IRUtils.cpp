@@ -496,7 +496,7 @@ Function *getOrCreateReportSanitizerTriggered(Module *M) {
   return reportFn;
 }
 
-Function *getOrCreate(Module *M) {
+Function *getOrCreateRecoverBufferFn(Module *M) {
   LLVMContext &Ctx = M->getContext();
 
   auto ptrType = PointerType::get(Ctx, 0);
@@ -566,7 +566,7 @@ getOrCreateRemediationBehavior(Module *M,
     FunctionCallee longjmpFn = M->getOrInsertFunction(
         "longjmp", FunctionType::get(voidType, {ptrType, intType}, false));
 
-    Function *recoverBufferFn = getOrCreateRecoverBufferFunction(M);
+    Function *recoverBufferFn = getOrCreateRecoverBufferFn(M);
     Value *buf = builder.CreateCall(recoverBufferFn);
     builder.CreateCall(longjmpFn, {buf, builder.getInt32(42)});
     builder.CreateUnreachable();
