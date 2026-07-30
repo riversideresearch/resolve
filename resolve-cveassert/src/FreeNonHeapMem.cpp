@@ -3,6 +3,7 @@
  *   LGPL-3; See LICENSE.txt in the repo root for details.
  */
 
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/InlineAsm.h"
@@ -124,7 +125,7 @@ void sanitizeFreeOfNonHeap(Function *F,
                            Vulnerability::RemediationStrategies strategy) {
   LLVMContext &Ctx = F->getContext();
   IRBuilder<> builder(Ctx);
-  std::vector<CallInst *> workList;
+  SmallVector<CallInst *> workList;
 
   for (auto &BB : *F) {
     for (auto &Inst : BB) {
