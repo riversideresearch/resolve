@@ -357,8 +357,8 @@ Function *getOrCreateSanitizerMapEntry(Module *M) {
 
   IRBuilder<> builder(Ctx);
 
-  BasicBlock *EntryBB = BasicBlock::Create(Ctx, "entry", sanitizerMapIdxFn);
-  builder.SetInsertPoint(EntryBB);
+  BasicBlock *entryBB = BasicBlock::Create(Ctx, "entry", sanitizerMapIdxFn);
+  builder.SetInsertPoint(entryBB);
 
   // When indexing an array use two indices
   // 1. First index step from the global ptr
@@ -487,8 +487,8 @@ Function *getOrCreateReportSanitizerTriggered(Module *M) {
     return reportFn;
   }
 
-  BasicBlock *EntryBB = BasicBlock::Create(Ctx, "entry", reportFn);
-  IRBuilder<> builder(EntryBB);
+  BasicBlock *entryBB = BasicBlock::Create(Ctx, "entry", reportFn);
+  IRBuilder<> builder(entryBB);
   builder.CreateRetVoid();
 
   validateIR(reportFn);
@@ -511,8 +511,8 @@ Function *getOrCreateRecoverBufferFn(Module *M) {
     return recoverBufferFn;
   }
 
-  BasicBlock *EntryBB = BasicBlock::Create(Ctx, "entry", recoverBufferFn);
-  IRBuilder<> builder(EntryBB);
+  BasicBlock *entryBB = BasicBlock::Create(Ctx, "entry", recoverBufferFn);
+  IRBuilder<> builder(entryBB);
   builder.CreateRet(Constant::getNullValue(ptrType));
 
   recoverBufferFn->setMetadata("cve.noinstrument", MDNode::get(Ctx, {}));
@@ -550,13 +550,13 @@ getOrCreateRemediationBehavior(Module *M,
     return fn;
   }
 
-  BasicBlock *BB = BasicBlock::Create(Ctx, "entry", fn);
-  IRBuilder<> builder(BB);
+  BasicBlock *entryBB = BasicBlock::Create(Ctx, "entry", fn);
+  IRBuilder<> builder(entryBB);
 
   switch (strategy) {
   case Vulnerability::RemediationStrategies::EXIT: {
-    FunctionType *exitTy = FunctionType::get(voidType, {intType}, false);
-    FunctionCallee exitFn = M->getOrInsertFunction("_exit", exitTy);
+    FunctionType *exitType = FunctionType::get(voidType, {intType}, false);
+    FunctionCallee exitFn = M->getOrInsertFunction("_exit", exitType);
     builder.CreateCall(exitFn, {builder.getInt32(3)});
     builder.CreateUnreachable();
     break;
