@@ -417,10 +417,10 @@ Function *getOrCreateResolveHelper(Module *M, std::string fnName,
                                    FunctionType *fnType,
                                    GlobalValue::LinkageTypes linkType) {
   LLVMContext &Ctx = M->getContext();
-  if (auto handler = M->getFunction(fn_name))
+  if (auto handler = M->getFunction(fnName))
     return handler;
 
-  Function *helperFn = Function::Create(fn_type, link_type, fn_name, M);
+  Function *helperFn = Function::Create(fnType, linkType, fnName, M);
   helperFn->setMetadata("cve.noinstrument", MDNode::get(Ctx, {}));
   return helperFn;
 }
