@@ -41,8 +41,8 @@ void validateIR(Function *F) {
 }
 
 static bool patchRecording = false;
-static std::vector<llvm::Function *> patchHelpers;
-static std::vector<llvm::GlobalVariable *> patchGlobals;
+static SmallVector<llvm::Function *> patchHelpers;
+static SmallVector<llvm::GlobalVariable *> patchGlobals;
 
 static void collectReferencedGlobals(Value *V, std::set<std::string> &Names,
                                      SmallPtrSetImpl<Value *> &Visited) {
@@ -182,7 +182,7 @@ static std::string renderPatchModule(Module &SourceModule, Function *Target) {
     }
   }
 
-  std::vector<GlobalAlias *> AliasesToErase;
+  SmallVector<GlobalAlias *> AliasesToErase;
   for (GlobalAlias &A : PatchModule->aliases()) {
     if (!A.hasName() || !ReferencedGlobals.contains(A.getName().str())) {
       AliasesToErase.push_back(&A);
@@ -192,7 +192,7 @@ static std::string renderPatchModule(Module &SourceModule, Function *Target) {
     A->eraseFromParent();
   }
 
-  std::vector<GlobalIFunc *> IFuncsToErase;
+  SmallVector<GlobalIFunc *> IFuncsToErase;
   for (GlobalIFunc &I : PatchModule->ifuncs()) {
     if (!I.hasName() || !ReferencedGlobals.contains(I.getName().str())) {
       IFuncsToErase.push_back(&I);
@@ -202,7 +202,7 @@ static std::string renderPatchModule(Module &SourceModule, Function *Target) {
     I->eraseFromParent();
   }
 
-  std::vector<GlobalVariable *> GlobalsToErase;
+  SmallVector<GlobalVariable *> GlobalsToErase;
   for (GlobalVariable &G : PatchModule->globals()) {
     if (isRecordedGlobal(&G, GlobalDefs)) {
       continue;
@@ -220,7 +220,7 @@ static std::string renderPatchModule(Module &SourceModule, Function *Target) {
     G->eraseFromParent();
   }
 
-  std::vector<Function *> FunctionsToErase;
+  SmallVector<Function *> FunctionsToErase;
   for (Function &F : *PatchModule) {
     if (isRecordedFunction(&F, FunctionDefs)) {
       continue;
@@ -340,41 +340,39 @@ void createSanitizerGateBranch(IRBuilder<> &Builder, Function *F,
 
 Function *getOrCreateSanitizerMapEntry(Module *M) {
   LLVMContext &Ctx = M->getContext();
-  auto i1_ty = Type::getInt1Ty(Ctx);
+  auto boolType = Type::getInt1Ty(Ctx);
   auto ptrType = PointerType::get(Ctx, 0);
-  auto usize_ty = Type::getInt64Ty(Ctx);
-  auto arr_ty = ArrayType::get(i1_ty, 6);
+  auto indexType = Type::getInt64Ty(Ctx);
+  auto sanitizerMapType = ArrayType::get(boolType, 6);
 
-  FunctionType *sanitizerMapIdxFnTy =
-      FunctionType::get(i1_ty, {ptrType, usize_ty}, false);
+  FunctionType *mapLookupType =
+      FunctionType::get(boolType, {ptrType, indexType}, false);
 
-  Function *sanitizerMapIdxFn =
-      getOrCreateResolveHelper(M, "__resolve_get_flag", sanitizerMapIdxFnTy);
-  if (!sanitizerMapIdxFn->empty()) {
-    recordPatchFunction(sanitizerMapIdxFn);
-    return sanitizerMapIdxFn;
+  Function *lookupFn =
+      getOrCreateResolveHelper(M, "__resolve_get_flag", mapLookupType);
+  if (!lookupFn->empty()) {
+    recordPatchFunction(lookupFn);
+    return lookupFn;
   }
 
-  IRBuilder<> builder(Ctx);
-
-  BasicBlock *entryBB = BasicBlock::Create(Ctx, "entry", sanitizerMapIdxFn);
-  builder.SetInsertPoint(entryBB);
+  BasicBlock *entryBB = BasicBlock::Create(Ctx, "entry", lookupFn);
+  IRBuilder<> builder(entryBB);
 
   // When indexing an array use two indices
   // 1. First index step from the global ptr
   // 2. Second index: the actual element index
-  Argument *mapPtr = sanitizerMapIdxFn->getArg(0);
-  Argument *idx = sanitizerMapIdxFn->getArg(1);
+  Argument *mapPtr = lookupFn->getArg(0);
+  Argument *index = lookupFn->getArg(1);
 
   Value *zero = builder.getInt64(0);
 
-  Value *sanitizerMapPtr = builder.CreateGEP(arr_ty, mapPtr, {zero, idx});
-  Value *flag = builder.CreateLoad(i1_ty, sanitizerMapPtr);
+  Value *flagPtr = builder.CreateGEP(sanitizerMapType, mapPtr, {zero, idx});
+  Value *flag = builder.CreateLoad(boolType, flagPtr);
   builder.CreateRet(flag);
 
-  validateIR(sanitizerMapIdxFn);
-  recordPatchFunction(sanitizerMapIdxFn);
-  return sanitizerMapIdxFn;
+  validateIR(lookupFn);
+  recordPatchFunction(lookupFn);
+  return lookupFn;
 }
 
 std::string getLLVMType(Type *ty) {
@@ -428,10 +426,10 @@ Function *getOrCreateResolveHelper(Module *M, std::string fn_name,
 Function *getOrCreateIsHeap(Module *M, LLVMContext &Ctx) {
   // TODO: handle address spaces other than 0
   auto ptrType = PointerType::get(Ctx, 0);
-  auto i1_ty = Type::getInt1Ty(Ctx);
+  auto boolType = Type::getInt1Ty(Ctx);
 
   // TODO: write this in asm as some kind of sanitzer_rt?
-  FunctionType *isHeapFnTy = FunctionType::get(i1_ty, {ptrType}, false);
+  FunctionType *isHeapFnTy = FunctionType::get(boolType, {ptrType}, false);
 
   Function *isHeapFn =
       getOrCreateResolveHelper(M, "__resolve_is_heap", isHeapFnTy);
