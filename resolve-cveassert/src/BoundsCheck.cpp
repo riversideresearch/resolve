@@ -638,12 +638,12 @@ void instrumentMemcpy(Function *F,
         continue;
       }
 
-      Function *calledFn = call->getCalledFunction();
-      if (!calledFn) {
+      Function *callee = call->getCalledFunction();
+      if (!callee) {
         continue;
       }
 
-      StringRef fnName = calledFn->getName();
+      StringRef fnName = callee->getName();
 
       if (fnName == "memcpy") {
         memcpyList.push_back(call);
@@ -696,12 +696,12 @@ void instrumentMemset(Function *F,
         continue;
       }
 
-      Function *calledFn = call->getCalledFunction();
-      if (!calledFn) {
+      Function *callee = call->getCalledFunction();
+      if (!callee) {
         continue;
       }
 
-      StringRef fnName = calledFn->getName();
+      StringRef fnName = callee->getName();
 
       if (fnName == "memset") {
         memsetList.push_back(call);
@@ -764,12 +764,12 @@ void instrumentMemmove(Function *F,
         continue;
       }
 
-      Function *calledFn = call->getCalledFunction();
-      if (!calledFn) {
+      Function *callee = call->getCalledFunction();
+      if (!callee) {
         continue;
       }
 
-      StringRef fnName = calledFn->getName();
+      StringRef fnName = callee->getName();
 
       if (fnName == "memmove") {
         memmoveList.push_back(call);
