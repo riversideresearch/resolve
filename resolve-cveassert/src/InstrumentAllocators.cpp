@@ -21,40 +21,41 @@
 using namespace llvm;
 
 /// Replaces all calls to `name` in `F` with calls to `__resolve_name`
-static void wrapLibraryFunction(Function *F, StringRef name, FunctionType *ty) {
+static void wrapLibraryFunction(Function *F, StringRef libraryFunctionName,
+                                FunctionType *Type) {
   Module *M = F->getParent();
   LLVMContext &Ctx = M->getContext();
   IRBuilder<> builder(Ctx);
 
-  SmallVector<CallInst *, 8> callList;
+  SmallVector<call *, 8> matchingCalls;
 
-  SmallString<16> resolveCalleeName = {"__resolve_", name};
-  FunctionCallee resolveCallee = M->getOrInsertFunction(resolveCalleeName, ty);
+  SmallString<16> resolveName = {"__resolve_", libraryFunctionName};
+  FunctionCallee wrapperCallee = M->getOrInsertFunction(resolveName, Type);
 
-  auto swap_call = [&](CallInst *callInst) {
-    builder.SetInsertPoint(callInst);
-    SmallVector<Value *, 8> args(callInst->arg_begin(), callInst->arg_end());
-    CallInst *resolveCall =
-        builder.CreateCall(resolveCallee, args, callInst->getName() + ".inst");
+  auto replaceCall = [&](call *call) {
+    builder.SetInsertPoint(call);
+    SmallVector<Value *, 8> args(call->arg_begin(), call->arg_end());
+    CallInst *wrapperCall =
+        builder.CreateCall(wrapperCallee, args, call->getName() + ".inst");
 
-    callInst->replaceAllUsesWith(resolveCall);
-    callInst->eraseFromParent();
+    call->replaceAllUsesWith(wrapperCall);
+    call->eraseFromParent();
   };
 
   for (auto &BB : *F) {
     for (auto &inst : BB) {
-      if (auto *call = dyn_cast<CallInst>(&inst)) {
-        Function *calledFn = call->getCalledFunction();
+      if (auto *call = dyn_cast<call>(&inst)) {
+        Function *callee = call->getCalledFunction();
 
-        if (calledFn && calledFn->getName() == name) {
-          callList.push_back(call);
+        if (calleee && callee->getName() == name) {
+          matchingCalls.push_back(call);
         }
       }
     }
   }
 
-  for (auto call : callList) {
-    swap_call(call);
+  for (auto call : matchingCalls) {
+    replaceCall(call);
   }
 }
 
@@ -91,7 +92,7 @@ void instrumentAlloca(Function *F) {
   SmallVector<AllocaInst *, 16> allocas;
   SmallVector<AllocaInst *, 16> shadowSlots;
 
-  StructType *shadowTy = StructType::get(Ctx, {ptrType, sizeType});
+  StructType *shadowType = StructType::get(Ctx, {ptrType, sizeType});
 
   auto allocateFn = M->getOrInsertFunction(
       "__resolve_alloca",
@@ -140,16 +141,17 @@ void instrumentAlloca(Function *F) {
     GetElementPtrInst *Gep;
     builder.SetInsertPoint(insertPt);
     AllocaInst *shadowSlot =
-        builder.CreateAlloca(shadowTy, nullptr, "shadow.slot");
-    Value *initialPtrField = builder.CreateStructGEP(shadowTy, shadowSlot, 0);
+        builder.CreateAlloca(shadowType, nullptr, "shadow.slot");
+    Value *initialPtrField = builder.CreateStructGEP(shadowType, shadowSlot, 0);
     builder.CreateStore(ConstantPointerNull::get(ptrType), initialPtrField);
-    Value *initialSizeField = builder.CreateStructGEP(shadowTy, shadowSlot, 1);
+    Value *initialSizeField =
+        builder.CreateStructGEP(shadowType, shadowSlot, 1);
     Gep = cast<GetElementPtrInst>(initialPtrField);
     Gep->setMetadata("cve.noinstrument", MDNode::get(Ctx, {}));
     builder.CreateStore(ConstantInt::get(sizeType, 0), initialSizeField);
     builder.SetInsertPoint(transformedAlloca->getNextNonDebugInstruction());
 
-    Value *runtimePtrField = builder.CreateStructGEP(shadowTy, shadowSlot, 0);
+    Value *runtimePtrField = builder.CreateStructGEP(shadowType, shadowSlot, 0);
     Gep = cast<GetElementPtrInst>(runtimePtrField);
     Gep->setMetadata("cve.noinstrument", MDNode::get(Ctx, {}));
 
@@ -157,7 +159,8 @@ void instrumentAlloca(Function *F) {
         builder.CreateStore(transformedAlloca, runtimePtrField);
     storeStackAddr->setMetadata("cve.noinstrument", MDNode::get(Ctx, {}));
 
-    Value *runtimeSizeField = builder.CreateStructGEP(shadowTy, shadowSlot, 1);
+    Value *runtimeSizeField =
+        builder.CreateStructGEP(shadowType, shadowSlot, 1);
     Gep = cast<GetElementPtrInst>(runtimeSizeField);
     Gep->setMetadata("cve.noinstrument", MDNode::get(Ctx, {}));
 
@@ -272,10 +275,10 @@ void instrumentAlloca(Function *F) {
       if (auto *inst = dyn_cast<ReturnInst>(&instr)) {
         builder.SetInsertPoint(inst);
         for (auto *slot : shadowSlots) {
-          Value *ptrField = builder.CreateStructGEP(shadowTy, slot, 0);
+          Value *ptrField = builder.CreateStructGEP(shadowType, slot, 0);
           LoadInst *addr = builder.CreateLoad(ptrType, ptrField);
           addr->setMetadata("cve.noinstrument", MDNode::get(Ctx, {}));
-          Value *sizeField = builder.CreateStructGEP(shadowTy, slot, 1);
+          Value *sizeField = builder.CreateStructGEP(shadowType, slot, 1);
           LoadInst *size = builder.CreateLoad(sizeType, sizeField);
           size->setMetadata("cve.noinstrument", MDNode::get(Ctx, {}));
           builder.CreateCall(invalidateFn, {addr, size});
