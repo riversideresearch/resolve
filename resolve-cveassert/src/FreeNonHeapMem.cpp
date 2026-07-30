@@ -14,47 +14,47 @@ using namespace llvm;
 
 Function *getOrCreateIsHeap(Function *F) {
   auto *M = F->getParent();
-  LLVMContext &Ctx = M->getContext();
-  auto ptr_ty = PointerType::get(Ctx, 0);
-  auto i1_ty = Type::getInt1Ty(Ctx);
+  LLVMContext &Ctx = F->getContext();
+  auto ptrType = PointerType::get(Ctx, 0);
+  auto boolType = Type::getInt1Ty(Ctx);
 
-  FunctionType *isHeapFnTy = FunctionType::get(i1_ty, {ptr_ty}, false);
-  Function *isHeapFn =
-      getOrCreateResolveHelper(M, "__resolve_is_heap", isHeapFnTy);
+  FunctionType *isHeapPtrFnType = FunctionType::get(boolType, {ptrType}, false);
+  Function *isHeapPtrFn =
+      getOrCreateResolveHelper(M, "__resolve_is_heap", isHeapPtrFnType);
 
-  if (!isHeapFn->empty()) {
-    return isHeapFn;
+  if (!isHeapPtrFn->empty()) {
+    return isHeapPtrFn;
   }
 
   IRBuilder<> builder(Ctx);
-  BasicBlock *entryBB = BasicBlock::Create(Ctx, "entry", isHeapFn);
+  BasicBlock *entryBB = BasicBlock::Create(Ctx, "entry", isHeapPtrFn);
   builder.SetInsertPoint(entryBB);
 
-  Argument *inputPtr = isHeapFn->getArg(0);
+  Argument *ptr = isHeapPtrFn->getArg(0);
 
-  FunctionType *asmTy = FunctionType::get(ptr_ty, {});
-  auto read_sp_asm = InlineAsm::get(asmTy, "mov %rsp, $0",
+  FunctionType *asmType = FunctionType::get(ptrType, {});
+  auto read_sp_asm = InlineAsm::get(asmType, "mov %rsp, $0",
                                     "=r,~{dirflag},~{fpsr},~{flags}", true);
   auto read_sp = builder.CreateCall(read_sp_asm, {});
 
-  // $rsp <= inputPtr
-  auto is_stack = builder.CreateICmpULE(read_sp, inputPtr);
+  // $rsp <= ptr
+  auto is_stack = builder.CreateICmpULE(read_sp, ptr);
 
   auto start = M->getOrInsertGlobal("_start", Type::getInt8Ty(Ctx));
   auto end = M->getOrInsertGlobal("_end", Type::getInt8Ty(Ctx));
 
-  // inputPtr >= _start && inputPtr <= _end
+  // ptr >= _start && ptr <= _end
   auto is_static = builder.CreateAnd({
-      builder.CreateICmpUGE(inputPtr, start),
-      builder.CreateICmpULE(inputPtr, end),
+      builder.CreateICmpUGE(ptr, start),
+      builder.CreateICmpULE(ptr, end),
   });
 
   // return !(is_stack || is_static)
   auto result = builder.CreateNot(builder.CreateOr(is_stack, is_static));
   builder.CreateRet(result);
 
-  validateIR(isHeapFn);
-  return isHeapFn;
+  validateIR(isHeapPtrFn);
+  return isHeapPtrFn;
 }
 
 Function *getOrCreateFreeOfNonHeapSanitizer(
@@ -62,61 +62,62 @@ Function *getOrCreateFreeOfNonHeapSanitizer(
   std::string handlerName = "__resolve_nonheap_free";
   Module *M = F->getParent();
   LLVMContext &Ctx = M->getContext();
-  GlobalVariable *map = SanitizerMaps[F];
+  GlobalVariable *sanitizerMap = SanitizerMaps[F];
 
   IRBuilder<> builder(Ctx);
   // TODO: handle address spaces other than 0
-  auto ptr_ty = PointerType::get(Ctx, 0);
-  auto usize_ty = Type::getInt64Ty(Ctx);
-  auto i1_ty = Type::getInt1Ty(Ctx);
+  auto ptrType = PointerType::get(Ctx, 0);
+  auto pointerIntegerType = Type::getInt64Ty(Ctx);
+  auto boolType = Type::getInt1Ty(Ctx);
 
   // TODO: write this in asm as some kind of sanitzer_rt?
-  FunctionType *cveFreeNonHeapFnTy =
-      FunctionType::get(Type::getVoidTy(Ctx), {ptr_ty}, false);
-  Function *cveFreeNonHeapFn =
-      getOrCreateResolveHelper(M, handlerName, cveFreeNonHeapFnTy);
-  if (!cveFreeNonHeapFn->empty()) {
-    return cveFreeNonHeapFn;
+  FunctionType *sanitizerType =
+      FunctionType::get(Type::getVoidTy(Ctx), {ptrType}, false);
+  Function *sanitizerFn =
+      getOrCreateResolveHelper(M, handlerName, sanitizerType);
+  if (!sanitizerFn->empty()) {
+    return sanitizerFn;
   }
 
-  BasicBlock *EntryBB = BasicBlock::Create(Ctx, "entry", cveFreeNonHeapFn);
-  BasicBlock *CheckOnHeapBB =
-      BasicBlock::Create(Ctx, "check.heap", cveFreeNonHeapFn);
-  BasicBlock *SanitizeNonHeapBB =
-      BasicBlock::Create(Ctx, "sanitize.nonheap", cveFreeNonHeapFn);
-  BasicBlock *FreeHeapBB =
-      BasicBlock::Create(Ctx, "free.heap", cveFreeNonHeapFn);
+  BasicBlock *entryBB = BasicBlock::Create(Ctx, "entry", sanitizerFn);
+  BasicBlock *checkHeapBB = BasicBlock::Create(Ctx, "check.heap", sanitizerFn);
+  BasicBlock *handleInvalidFreeBB =
+      BasicBlock::Create(Ctx, "sanitize.nonheap", sanitizerFn);
+  BasicBlock *freeHeapBB = BasicBlock::Create(Ctx, "free.heap", sanitizerFn);
 
   // Set insertion point to entry block
-  builder.SetInsertPoint(EntryBB);
-  Argument *inputPtr = cveFreeNonHeapFn->getArg(0);
+  builder.SetInsertPoint(entryBB);
+  Argument *ptr = sanitizerFn->getArg(0);
 
-  Value *mapPtr = builder.CreateGEP(map->getValueType(), map,
-                                    {builder.getInt64(0), builder.getInt64(0)});
-  Value *mapEntry = builder.CreateCall(getOrCreateSanitizerMapEntry(M),
-                                       {mapPtr, ConstantInt::get(usize_ty, 2)});
-  Value *isZero = builder.CreateICmpEQ(mapEntry, ConstantInt::get(i1_ty, 0));
-  builder.CreateCondBr(isZero, FreeHeapBB, CheckOnHeapBB);
+  Value *sanitizerMapPtr =
+      builder.CreateGEP(sanitizerMap->getValueType(), sanitizerMap,
+                        {builder.getInt64(0), builder.getInt64(0)});
+  Value *sanitizerEnabled = builder.CreateCall(
+      getOrCreateSanitizerMapEntry(M),
+      {sanitizerMapPtr, ConstantInt::get(pointerIntegerType, 2)});
+  Value *sanitizerDisabled =
+      builder.CreateICmpEQ(sanitizerEnabled, ConstantInt::get(boolType, 0));
+  builder.CreateCondBr(sanitizerDisabled, freeHeapBB, checkHeapBB);
 
   // Call Is Heap Func
   // Branch if True
-  builder.SetInsertPoint(CheckOnHeapBB);
-  Value *IsHeap = builder.CreateCall(getOrCreateIsHeap(F), {inputPtr});
-  builder.CreateCondBr(IsHeap, FreeHeapBB, SanitizeNonHeapBB);
+  builder.SetInsertPoint(checkHeapBB);
+  Value *isHeapPtr = builder.CreateCall(getOrCreateIsHeap(F), {ptr});
+  builder.CreateCondBr(isHeapPtr, freeHeapBB, handleInvalidFreeBB);
 
-  builder.SetInsertPoint(SanitizeNonHeapBB);
+  builder.SetInsertPoint(handleInvalidFreeBB);
   if (Function *fn = getOrCreateRemediationBehavior(M, strategy)) {
     builder.CreateCall(fn);
   }
   builder.CreateRetVoid();
 
   // Free Block: call Free
-  builder.SetInsertPoint(FreeHeapBB);
-  builder.CreateCall(M->getFunction("free"), {inputPtr});
+  builder.SetInsertPoint(freeHeapBB);
+  builder.CreateCall(M->getFunction("free"), {ptr});
   builder.CreateRetVoid();
 
-  validateIR(cveFreeNonHeapFn);
-  return cveFreeNonHeapFn;
+  validateIR(sanitizerFn);
+  return sanitizerFn;
 }
 
 void sanitizeFreeOfNonHeap(Function *F,
