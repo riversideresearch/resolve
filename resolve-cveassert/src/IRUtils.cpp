@@ -341,12 +341,12 @@ void createSanitizerGateBranch(IRBuilder<> &Builder, Function *F,
 Function *getOrCreateSanitizerMapEntry(Module *M) {
   LLVMContext &Ctx = M->getContext();
   auto i1_ty = Type::getInt1Ty(Ctx);
-  auto ptr_ty = PointerType::get(Ctx, 0);
+  auto ptrType = PointerType::get(Ctx, 0);
   auto usize_ty = Type::getInt64Ty(Ctx);
   auto arr_ty = ArrayType::get(i1_ty, 6);
 
   FunctionType *sanitizerMapIdxFnTy =
-      FunctionType::get(i1_ty, {ptr_ty, usize_ty}, false);
+      FunctionType::get(i1_ty, {ptrType, usize_ty}, false);
 
   Function *sanitizerMapIdxFn =
       getOrCreateResolveHelper(M, "__resolve_get_flag", sanitizerMapIdxFnTy);
@@ -427,11 +427,11 @@ Function *getOrCreateResolveHelper(Module *M, std::string fn_name,
 
 Function *getOrCreateIsHeap(Module *M, LLVMContext &Ctx) {
   // TODO: handle address spaces other than 0
-  auto ptr_ty = PointerType::get(Ctx, 0);
+  auto ptrType = PointerType::get(Ctx, 0);
   auto i1_ty = Type::getInt1Ty(Ctx);
 
   // TODO: write this in asm as some kind of sanitzer_rt?
-  FunctionType *isHeapFnTy = FunctionType::get(i1_ty, {ptr_ty}, false);
+  FunctionType *isHeapFnTy = FunctionType::get(i1_ty, {ptrType}, false);
 
   Function *isHeapFn =
       getOrCreateResolveHelper(M, "__resolve_is_heap", isHeapFnTy);
@@ -448,7 +448,7 @@ Function *getOrCreateIsHeap(Module *M, LLVMContext &Ctx) {
   // Get function argument
   Argument *InputPtr = isHeapFn->getArg(0);
 
-  FunctionType *AsmType = FunctionType::get(ptr_ty, {});
+  FunctionType *AsmType = FunctionType::get(ptrType, {});
   auto read_sp_asm = InlineAsm::get(AsmType, "mov %rsp, $0",
                                     "=r,~{dirflag},~{fpsr},~{flags}", true);
   auto read_sp = Builder.CreateCall(read_sp_asm, {});
@@ -475,18 +475,19 @@ Function *getOrCreateIsHeap(Module *M, LLVMContext &Ctx) {
 
 Function *getOrCreateReportSanitizerTriggered(Module *M) {
   auto &Ctx = M->getContext();
-  auto void_ty = Type::getVoidTy(Ctx);
+  auto voidType = Type::getVoidTy(Ctx);
 
-  FunctionType *reportFnTy = FunctionType::get(void_ty, {}, false);
+  FunctionType *reportFnType = FunctionType::get(voidType, {}, false);
 
-  Function *reportFn = getOrCreateResolveHelper(
-      M, "__resolve_report_violation", reportFnTy, GlobalValue::WeakAnyLinkage);
+  Function *reportFn =
+      getOrCreateResolveHelper(M, "__resolve_report_violation", reportFnType,
+                               GlobalValue::WeakAnyLinkage);
   if (!reportFn->empty()) {
     recordPatchFunction(reportFn);
     return reportFn;
   }
 
-  BasicBlock *EntryBB = BasicBlock::Create(Ctx, "", reportFn);
+  BasicBlock *EntryBB = BasicBlock::Create(Ctx, "entry", reportFn);
   IRBuilder<> builder(EntryBB);
   builder.CreateRetVoid();
 
@@ -495,40 +496,41 @@ Function *getOrCreateReportSanitizerTriggered(Module *M) {
   return reportFn;
 }
 
-Function *getOrCreateRecoverBufferFunction(Module *M) {
+Function *getOrCreate(Module *M) {
   LLVMContext &Ctx = M->getContext();
 
-  auto ptr_ty = PointerType::get(M->getContext(), 0);
-  FunctionType *fnTy = FunctionType::get(ptr_ty, {}, false);
+  auto ptrType = PointerType::get(Ctx, 0);
+  FunctionType *fnTy = FunctionType::get(ptrType, {}, false);
 
-  auto recoverFn = getOrCreateResolveHelper(
+  // TODO: Before merging update the name of this function and update testcase
+  // names.
+  auto recoverBufferFn = getOrCreateResolveHelper(
       M, "resolve_get_recover_longjmp_buf", fnTy, GlobalValue::WeakAnyLinkage);
-  if (!recoverFn->empty()) {
-    recordPatchFunction(recoverFn);
-    return recoverFn;
+  if (!recoverBufferFn->empty()) {
+    recordPatchFunction(recoverBufferFn);
+    return recoverBufferFn;
   }
 
-  BasicBlock *EntryBB = BasicBlock::Create(M->getContext(), "", recoverFn);
+  BasicBlock *EntryBB = BasicBlock::Create(Ctx, "entry", recoverBufferFn);
   IRBuilder<> builder(EntryBB);
-  builder.SetInsertPoint(EntryBB);
-  builder.CreateRet(Constant::getNullValue(ptr_ty));
+  builder.CreateRet(Constant::getNullValue(ptrType));
 
-  recoverFn->setMetadata("cve.noinstrument", MDNode::get(Ctx, {}));
-  validateIR(recoverFn);
-  recordPatchFunction(recoverFn);
+  recoverBufferFn->setMetadata("cve.noinstrument", MDNode::get(Ctx, {}));
+  validateIR(recoverBufferFn);
+  recordPatchFunction(recoverBufferFn);
 
-  return recoverFn;
+  return recoverBufferFn;
 }
 
 Function *
 getOrCreateRemediationBehavior(Module *M,
                                Vulnerability::RemediationStrategies strategy) {
   auto &Ctx = M->getContext();
-  auto ptr_ty = PointerType::get(Ctx, 0);
-  auto void_ty = Type::getVoidTy(Ctx);
-  auto i32_ty = Type::getInt32Ty(Ctx);
+  auto ptrType = PointerType::get(Ctx, 0);
+  auto voidType = Type::getVoidTy(Ctx);
+  auto intType = Type::getInt32Ty(Ctx);
 
-  FunctionType *fnTy = FunctionType::get(void_ty, {}, false);
+  FunctionType *fnTy = FunctionType::get(voidType, {}, false);
 
   std::string fnName;
   switch (strategy) {
@@ -553,7 +555,7 @@ getOrCreateRemediationBehavior(Module *M,
 
   switch (strategy) {
   case Vulnerability::RemediationStrategies::EXIT: {
-    FunctionType *exitTy = FunctionType::get(void_ty, {i32_ty}, false);
+    FunctionType *exitTy = FunctionType::get(voidType, {intType}, false);
     FunctionCallee exitFn = M->getOrInsertFunction("_exit", exitTy);
     builder.CreateCall(exitFn, {builder.getInt32(3)});
     builder.CreateUnreachable();
@@ -562,10 +564,10 @@ getOrCreateRemediationBehavior(Module *M,
 
   case Vulnerability::RemediationStrategies::RECOVER: {
     FunctionCallee longjmpFn = M->getOrInsertFunction(
-        "longjmp", FunctionType::get(void_ty, {ptr_ty, i32_ty}, false));
+        "longjmp", FunctionType::get(voidType, {ptrType, intType}, false));
 
-    Function *resolveRecoverFn = getOrCreateRecoverBufferFunction(M);
-    Value *buf = builder.CreateCall(resolveRecoverFn);
+    Function *recoverBufferFn = getOrCreateRecoverBufferFunction(M);
+    Value *buf = builder.CreateCall(recoverBufferFn);
     builder.CreateCall(longjmpFn, {buf, builder.getInt32(42)});
     builder.CreateUnreachable();
     break;
