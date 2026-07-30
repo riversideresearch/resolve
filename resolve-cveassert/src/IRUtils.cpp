@@ -413,9 +413,9 @@ std::string getLLVMType(Type *ty) {
   return escapeTypeToIdent(canon);
 }
 
-Function *getOrCreateResolveHelper(Module *M, std::string fn_name,
-                                   FunctionType *fn_type,
-                                   GlobalValue::LinkageTypes link_type) {
+Function *getOrCreateResolveHelper(Module *M, std::string fnName,
+                                   FunctionType *fnType,
+                                   GlobalValue::LinkageTypes linkType) {
   LLVMContext &Ctx = M->getContext();
   if (auto handler = M->getFunction(fn_name))
     return handler;
