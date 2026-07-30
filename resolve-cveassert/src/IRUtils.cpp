@@ -343,7 +343,9 @@ Function *getOrCreateSanitizerMapEntry(Module *M) {
   auto boolType = Type::getInt1Ty(Ctx);
   auto ptrType = PointerType::get(Ctx, 0);
   auto indexType = Type::getInt64Ty(Ctx);
-  auto sanitizerMapType = ArrayType::get(boolType, 6);
+
+  constexpr unsigned NumSanitizerFlags = 6;
+  auto sanitizerMapType = ArrayType::get(boolType, NumSanitizerFlags);
 
   FunctionType *mapLookupType =
       FunctionType::get(boolType, {ptrType, indexType}, false);
