@@ -29,8 +29,8 @@ static void wrapLibraryFunction(Function *F, StringRef libraryFunctionName,
 
   SmallVector<call *, 8> matchingCalls;
 
-  SmallString<16> resolveName = {"__resolve_", libraryFunctionName};
-  FunctionCallee wrapperCallee = M->getOrInsertFunction(resolveName, Type);
+  SmallString<16> wrapperName = {"__resolve_", libraryFunctionName};
+  FunctionCallee wrapperCallee = M->getOrInsertFunction(wrapperName, Type);
 
   auto replaceCall = [&](call *call) {
     builder.SetInsertPoint(call);
