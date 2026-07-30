@@ -37,26 +37,26 @@ getOrCreateNullPtrLoadSanitizer(Function *F, Type *valueType,
     return wrapperFn;
   }
 
-  BasicBlock *EntryBB = BasicBlock::Create(Ctx, "entry", wrapperFn);
-  BasicBlock *CheckIfNullBB = BasicBlock::Create(Ctx, "check.null", wrapperFn);
-  BasicBlock *SanitizeNullPtrBB =
+  BasicBlock *entryBB = BasicBlock::Create(Ctx, "entry", wrapperFn);
+  BasicBlock *checkNullPtrBB = BasicBlock::Create(Ctx, "check.null", wrapperFn);
+  BasicBlock *handleNullPtrBB =
       BasicBlock::Create(Ctx, "sanitize.load", wrapperFn);
   BasicBlock *NormalLoadBB = BasicBlock::Create(Ctx, "safe.load", wrapperFn);
 
-  builder.SetInsertPoint(EntryBB);
-  Argument *inputPtr = wrapperFn->getArg(0);
-  createSanitizerGateBranch(builder, F, 1, NormalLoadBB, CheckIfNullBB);
+  builder.SetInsertPoint(entryBB);
+  Argument *ptr = wrapperFn->getArg(0);
+  createSanitizerGateBranch(builder, F, 1, NormalLoadBB, checkNullPtrBB);
 
   // Compare pointer with null (opaque ptrs use generic ptr type)
   // TODO: Sanitize other invalid pointers
-  builder.SetInsertPoint(CheckIfNullBB);
-  Value *ptrAsInt = builder.CreatePtrToInt(inputPtr, pointerIntType);
+  builder.SetInsertPoint(checkNullPtrBB);
+  Value *ptrAsInt = builder.CreatePtrToInt(ptr, pointerIntType);
   Value *isBelowMinAddress =
       builder.CreateICmpULT(ptrAsInt, ConstantInt::get(pointerIntType, 0x1000));
 
-  builder.CreateCondBr(isBelowMinAddress, SanitizeNullPtrBB, NormalLoadBB);
+  builder.CreateCondBr(isBelowMinAddress, handleNullPtrBB, NormalLoadBB);
 
-  builder.SetInsertPoint(SanitizeNullPtrBB);
+  builder.SetInsertPoint(handleNullPtrBB);
   switch (strategy) {
   case Vulnerability::RemediationStrategies::CONTINUE:
     builder.CreateRet(Constant::getNullValue(valueType));
@@ -74,7 +74,7 @@ getOrCreateNullPtrLoadSanitizer(Function *F, Type *valueType,
   }
 
   builder.SetInsertPoint(NormalLoadBB);
-  Value *loadedValue = builder.CreateLoad(valueType, inputPtr);
+  Value *loadedValue = builder.CreateLoad(valueType, ptr);
   builder.CreateRet(loadedValue);
 
   validateIR(wrapperFn);
@@ -103,30 +103,30 @@ static Function *getOrCreateNullPtrStoreSanitizer(
     return wrapperFn;
   }
 
-  BasicBlock *EntryBB = BasicBlock::Create(Ctx, "entry", wrapperFn);
-  BasicBlock *CheckIfNullBB = BasicBlock::Create(Ctx, "check.null", wrapperFn);
-  BasicBlock *SanitizeNullPtrBB =
+  BasicBlock *entryBB = BasicBlock::Create(Ctx, "entry", wrapperFn);
+  BasicBlock *checkNullPtrBB = BasicBlock::Create(Ctx, "check.null", wrapperFn);
+  BasicBlock *handleNullPtrBB =
       BasicBlock::Create(Ctx, "sanitize.store", wrapperFn);
-  BasicBlock *NormalStoreBB = BasicBlock::Create(Ctx, "safe.store", wrapperFn);
+  BasicBlock *performStoreBB = BasicBlock::Create(Ctx, "safe.store", wrapperFn);
 
   // Set insertion point to entry block
-  builder.SetInsertPoint(EntryBB);
-  Argument *inputPtr = wrapperFn->getArg(0);
-  Argument *inputValue = wrapperFn->getArg(1);
-  createSanitizerGateBranch(builder, F, 1, NormalStoreBB, CheckIfNullBB);
+  builder.SetInsertPoint(entryBB);
+  Argument *ptr = wrapperFn->getArg(0);
+  Argument *storedValue = wrapperFn->getArg(1);
+  createSanitizerGateBranch(builder, F, 1, performStoreBB, checkNullPtrBB);
 
   // Compare pointer with null (opaque ptrs use generic ptr type)
   // TODO: Sanitize other invalid pointers
   // Updating conditional check for ptr value less than 0x1000
   // Unix systems do not map first page of memory,
   // we need to detect remdiate pointers within this range.
-  builder.SetInsertPoint(CheckIfNullBB);
-  Value *ptrAsInt = builder.CreatePtrToInt(inputPtr, pointerIntType);
+  builder.SetInsertPoint(checkNullPtrBB);
+  Value *ptrAsInt = builder.CreatePtrToInt(ptr, pointerIntType);
   Value *isBelowMinAddress =
       builder.CreateICmpULT(ptrAsInt, ConstantInt::get(pointerIntType, 0x1000));
-  builder.CreateCondBr(isBelowMinAddress, SanitizeNullPtrBB, NormalStoreBB);
+  builder.CreateCondBr(isBelowMinAddress, handleNullPtrBB, performStoreBB);
 
-  builder.SetInsertPoint(SanitizeNullPtrBB);
+  builder.SetInsertPoint(handleNullPtrBB);
   switch (strategy) {
   case Vulnerability::RemediationStrategies::CONTINUE:
     builder.CreateRetVoid();
@@ -144,8 +144,8 @@ static Function *getOrCreateNullPtrStoreSanitizer(
   }
 
   // Return Block: returns pointer if non-null
-  builder.SetInsertPoint(NormalStoreBB);
-  builder.CreateStore(inputValue, inputPtr);
+  builder.SetInsertPoint(performStoreBB);
+  builder.CreateStore(storedValue, ptr);
   builder.CreateRetVoid();
 
   validateIR(wrapperFn);
@@ -158,8 +158,8 @@ void sanitizeNullPointers(Function *F,
   LLVMContext &Ctx = F->getContext();
   IRBuilder<> builder(Ctx);
 
-  std::vector<LoadInst *> loadList;
-  std::vector<StoreInst *> storeList;
+  SmallVector<LoadInst *> loadList;
+  SmallVector<StoreInst *> storeList;
 
   switch (strategy) {
   case Vulnerability::RemediationStrategies::EXIT:
@@ -176,37 +176,37 @@ void sanitizeNullPointers(Function *F,
   }
 
   for (auto &BB : *F) {
-    for (auto &I : BB) {
-      if (auto Inst = dyn_cast<LoadInst>(&I)) {
-        loadList.push_back(Inst);
-      } else if (auto Inst = dyn_cast<StoreInst>(&I)) {
-        storeList.push_back(Inst);
+    for (auto &inst : BB) {
+      if (auto *load = dyn_cast<LoadInst>(&inst)) {
+        loadList.push_back(load);
+      } else if (auto *store = dyn_cast<StoreInst>(&inst)) {
+        storeList.push_back(store);
       }
     }
   }
 
-  for (auto Inst : loadList) {
-    builder.SetInsertPoint(Inst);
-    auto valueType = Inst->getType();
+  for (auto *load : loadList) {
+    builder.SetInsertPoint(load);
+    auto valueType = load->getType();
 
     auto loadFn = getOrCreateNullPtrLoadSanitizer(F, valueType, strategy);
 
     auto sanitizedLoad =
-        builder.CreateCall(loadFn, {Inst->getPointerOperand()});
-    Inst->replaceAllUsesWith(sanitizedLoad);
-    Inst->removeFromParent();
-    Inst->deleteValue();
+        builder.CreateCall(loadFn, {load->getPointerOperand()});
+    load->replaceAllUsesWith(sanitizedLoad);
+    load->removeFromParent();
+    load->deleteValue();
   }
 
-  for (auto Inst : storeList) {
-    builder.SetInsertPoint(Inst);
-    auto valueType = Inst->getValueOperand()->getType();
+  for (auto *store : storeList) {
+    builder.SetInsertPoint(store);
+    auto valueType = store->getValueOperand()->getType();
     auto storeFn = getOrCreateNullPtrStoreSanitizer(F, valueType, strategy);
 
     auto sanitizedStore = builder.CreateCall(
-        storeFn, {Inst->getPointerOperand(), Inst->getValueOperand()});
-    Inst->replaceAllUsesWith(sanitizedStore);
-    Inst->removeFromParent();
-    Inst->deleteValue();
+        storeFn, {store->getPointerOperand(), store->getValueOperand()});
+    store->replaceAllUsesWith(sanitizedStore);
+    store->removeFromParent();
+    store->deleteValue();
   }
 }
