@@ -67,8 +67,8 @@ static BoundsClass classifyPointer(const Value *ptr) {
 
 static FunctionCallee getOrCreateResolveGetBounds(Module *M, BoundsClass cls) {
   auto &Ctx = M->getContext();
-  auto ptr_ty = PointerType::get(Ctx, 0);
-  auto struct_ty = StructType::get(Ctx, {ptr_ty, ptr_ty}, false);
+  auto ptrType = PointerType::get(Ctx, 0);
+  auto struct_ty = StructType::get(Ctx, {ptrType, ptrType}, false);
 
   MemoryEffects ME = MemoryEffects::none();
 
@@ -94,182 +94,177 @@ static FunctionCallee getOrCreateResolveGetBounds(Module *M, BoundsClass cls) {
   }
 
   return M->getOrInsertFunction(
-      name, FunctionType::get(struct_ty, {ptr_ty}, false), attrs);
+      name, FunctionType::get(struct_ty, {ptrType}, false), attrs);
 }
 
 static Function *getOrCreateAccessOk(Module *M, BoundsClass cls) {
   std::string handlerName = std::string("__resolve_access_ok_") + classTag(cls);
   LLVMContext &Ctx = M->getContext();
-
   IRBuilder<> builder(Ctx);
 
-  auto ptr_ty = PointerType::get(Ctx, 0);
-  auto size_ty = Type::getInt64Ty(Ctx);
-  auto bool_ty = Type::getIntNTy(Ctx, 1);
+  auto ptrType = PointerType::get(Ctx, 0);
+  auto sizeType = Type::getInt64Ty(Ctx);
+  auto boolType = Type::getIntNTy(Ctx, 1);
 
-  FunctionType *resolveAccessOkFnTy =
-      FunctionType::get(bool_ty, {ptr_ty, size_ty}, false);
+  FunctionType *accessCheckType =
+      FunctionType::get(boolType, {ptrType, sizeType}, false);
 
-  Function *resolveAccessOkFn =
-      getOrCreateResolveHelper(M, handlerName, resolveAccessOkFnTy);
+  Function *accessOkFn =
+      getOrCreateResolveHelper(M, handlerName, accessCheckType);
 
-  if (!resolveAccessOkFn->empty()) {
-    recordPatchFunction(resolveAccessOkFn);
-    return resolveAccessOkFn;
+  if (!accessOkFn->empty()) {
+    recordPatchFunction(accessOkFn);
+    return accessOkFn;
   }
 
   // Adding an attribute to always inline this function
-  resolveAccessOkFn->addFnAttr(Attribute::AlwaysInline);
+  accessOkFn->addFnAttr(Attribute::AlwaysInline);
 
-  BasicBlock *EntryBB = BasicBlock::Create(Ctx, "entry", resolveAccessOkFn);
-  BasicBlock *CheckAccessBB =
-      BasicBlock::Create(Ctx, "check.access", resolveAccessOkFn);
-  BasicBlock *TrueBB =
-      BasicBlock::Create(Ctx, "safe.access", resolveAccessOkFn);
-  BasicBlock *FalseBB =
-      BasicBlock::Create(Ctx, "unsafe.access", resolveAccessOkFn);
+  BasicBlock *entryBB = BasicBlock::Create(Ctx, "entry", accessOkFn);
+  BasicBlock *checkBoundsBB =
+      BasicBlock::Create(Ctx, "check.access", accessOkFn);
+  BasicBlock *accessAllowedBB =
+      BasicBlock::Create(Ctx, "safe.access", accessOkFn);
+  BasicBlock *accessDeniedBB =
+      BasicBlock::Create(Ctx, "unsafe.access", accessOkFn);
 
-  builder.SetInsertPoint(EntryBB);
+  builder.SetInsertPoint(entryBB);
 
-  Value *basePtr = resolveAccessOkFn->getArg(0);
-  Value *accessSize = resolveAccessOkFn->getArg(1);
+  Value *ptr = accessOkFn->getArg(0);
+  Value *accessSize = accessOkFn->getArg(1);
 
-  Value *baseAndLimit = builder.CreateCall(getOrCreateResolveGetBounds(M, cls),
-                                           {basePtr}, "resolve.bounds");
-  Value *limitValue = builder.CreateExtractValue(baseAndLimit, 1);
-  Value *limitInt = builder.CreatePtrToInt(limitValue, size_ty);
-  Value *baseInt = builder.CreatePtrToInt(basePtr, size_ty);
-  Value *isZero = builder.CreateICmpEQ(limitInt, ConstantInt::get(size_ty, 0));
-  builder.CreateCondBr(isZero, TrueBB, CheckAccessBB);
+  Value *bounds = builder.CreateCall(getOrCreateResolveGetBounds(M, cls), {ptr},
+                                     "resolve.bounds");
+  Value *upperBound = builder.CreateExtractValue(bounds, 1);
+  Value *upperBoundInt = builder.CreatePtrToInt(upperBound, sizeType);
+  Value *lowerBoundInt = builder.CreatePtrToInt(ptr, sizeType);
+  Value *untrackedObject =
+      builder.CreateICmpEQ(upperBoundInt, ConstantInt::get(sizeType, 0));
+  builder.CreateCondBr(untrackedObject, accessAllowedBB, checkBoundsBB);
 
-  builder.SetInsertPoint(CheckAccessBB);
+  builder.SetInsertPoint(checkBoundsBB);
   Value *accessLimit = builder.CreateAdd(
-      baseInt, builder.CreateSub(accessSize, ConstantInt::get(size_ty, 1)));
+      lowerBoundInt,
+      builder.CreateSub(accessSize, ConstantInt::get(sizeType, 1)));
 
-  Value *withinBounds = builder.CreateICmpULE(accessLimit, limitInt);
+  Value *accessInBounds = builder.CreateICmpULE(accessLimit, upperBoundInt);
 
-  builder.CreateCondBr(withinBounds, TrueBB, FalseBB);
+  builder.CreateCondBr(accessInBounds, accessAllowedBB, accessDeniedBB);
 
-  builder.SetInsertPoint(TrueBB);
+  builder.SetInsertPoint(accessAllowedBB);
   builder.CreateRet(ConstantInt::getTrue(Ctx));
 
-  builder.SetInsertPoint(FalseBB);
+  builder.SetInsertPoint(accessDeniedBB);
   builder.CreateRet(ConstantInt::getFalse(Ctx));
 
-  validateIR(resolveAccessOkFn);
-  recordPatchFunction(resolveAccessOkFn);
-  return resolveAccessOkFn;
+  validateIR(accessOkFn);
+  recordPatchFunction(accessOkFn);
+  return accessOkFn;
 }
 
 static Function *getOrCreateBoundsCheckLoadSanitizer(
-    Function *F, Type *ty, Vulnerability::RemediationStrategies strategy,
+    Function *F, Type *Type, Vulnerability::RemediationStrategies strategy,
     BoundsClass cls) {
   std::string handlerName =
-      "__resolve_bound_ld_" + getLLVMType(ty) + "_" + classTag(cls);
+      "__resolve_bound_ld_" + getLLVMType(Type) + "_" + classTag(cls);
   Module *M = F->getParent();
   LLVMContext &Ctx = M->getContext();
-
   IRBuilder<> builder(Ctx);
 
-  auto ptr_ty = PointerType::get(Ctx, 0);
+  auto ptrType = PointerType::get(Ctx, 0);
 
-  FunctionType *resolveLoadFnTy = FunctionType::get(ty, {ptr_ty}, false);
-  Function *resolveLoadFn =
-      getOrCreateResolveHelper(M, handlerName, resolveLoadFnTy);
+  FunctionType *wrapperType = FunctionType::get(Type, {ptrType}, false);
+  Function *wrapperFn = getOrCreateResolveHelper(M, handlerName, wrapperType);
 
-  if (!resolveLoadFn->empty()) {
-    recordPatchFunction(resolveLoadFn);
-    return resolveLoadFn;
+  if (!wrapperFn->empty()) {
+    recordPatchFunction(wrapperFn);
+    return wrapperFn;
   }
 
-  BasicBlock *EntryBB = BasicBlock::Create(Ctx, "entry", resolveLoadFn);
-  BasicBlock *CheckAccessBB =
-      BasicBlock::Create(Ctx, "check.access", resolveLoadFn);
-  BasicBlock *NormalLoadBB =
-      BasicBlock::Create(Ctx, "safe.load", resolveLoadFn);
-  BasicBlock *SanitizeLoadBB =
-      BasicBlock::Create(Ctx, "sanitize.load", resolveLoadFn);
+  BasicBlock *entryBB = BasicBlock::Create(Ctx, "entry", wrapperFn);
+  BasicBlock *checkBoundsBB =
+      BasicBlock::Create(Ctx, "check.access", wrapperFn);
+  BasicBlock *performLoadBB = BasicBlock::Create(Ctx, "safe.load", wrapperFn);
+  BasicBlock *handleInvalidLoadBB =
+      BasicBlock::Create(Ctx, "sanitize.load", wrapperFn);
 
-  builder.SetInsertPoint(EntryBB);
-  Value *basePtr = resolveLoadFn->getArg(0);
-  createSanitizerGateBranch(builder, F, 0, NormalLoadBB, CheckAccessBB);
+  builder.SetInsertPoint(entryBB);
+  Value *ptr = wrapperFn->getArg(0);
+  createSanitizerGateBranch(builder, F, 0, performLoadBB, checkBoundsBB);
 
-  builder.SetInsertPoint(CheckAccessBB);
-  Value *withinBounds = builder.CreateCall(
-      getOrCreateAccessOk(M, cls), {basePtr, ConstantExpr::getSizeOf(ty)});
+  builder.SetInsertPoint(checkBoundsBB);
+  Value *accessInBounds = builder.CreateCall(
+      getOrCreateAccessOk(M, cls), {ptr, ConstantExpr::getSizeOf(Type)});
 
-  builder.CreateCondBr(withinBounds, NormalLoadBB, SanitizeLoadBB);
+  builder.CreateCondBr(accessInBounds, performLoadBB, handleInvalidLoadBB);
 
-  // NormalLoadBB: Return the loaded value.
-  builder.SetInsertPoint(NormalLoadBB);
-  LoadInst *load = builder.CreateLoad(ty, basePtr);
+  // performLoadBB: Return the loaded value.
+  builder.SetInsertPoint(performLoadBB);
+  LoadInst *load = builder.CreateLoad(Type, ptr);
   builder.CreateRet(load);
 
-  // SanitizeLoadBB: Apply remediation strategy
-  builder.SetInsertPoint(SanitizeLoadBB);
+  // handleInvalidLoadBB: Apply remediation strategy
+  builder.SetInsertPoint(handleInvalidLoadBB);
   builder.CreateCall(getOrCreateReportSanitizerTriggered(M));
   if (Function *fn = getOrCreateRemediationBehavior(M, strategy)) {
     builder.CreateCall(fn);
     builder.CreateUnreachable();
   } else {
-    builder.CreateRet(Constant::getNullValue(ty));
+    builder.CreateRet(Constant::getNullValue(Type));
   }
 
-  validateIR(resolveLoadFn);
-  recordPatchFunction(resolveLoadFn);
-  return resolveLoadFn;
+  validateIR(wrapperFn);
+  recordPatchFunction(wrapperFn);
+  return wrapperFn;
 }
 
 static Function *getOrCreateBoundsCheckStoreSanitizer(
-    Function *F, Type *ty, Vulnerability::RemediationStrategies strategy,
+    Function *F, Type *Type, Vulnerability::RemediationStrategies strategy,
     BoundsClass cls) {
   std::string handlerName =
-      "__resolve_bound_st_" + getLLVMType(ty) + "_" + classTag(cls);
+      "__resolve_bound_st_" + getLLVMType(Type) + "_" + classTag(cls);
   Module *M = F->getParent();
   LLVMContext &Ctx = M->getContext();
 
   IRBuilder<> builder(Ctx);
-
   // TODO: handle address spaces other than 0
-  auto ptr_ty = PointerType::get(Ctx, 0);
-  auto void_ty = Type::getVoidTy(Ctx);
+  auto ptrType = PointerType::get(Ctx, 0);
+  auto voidType = Type::getVoidTy(Ctx);
 
-  FunctionType *resolveStoreFnTy =
-      FunctionType::get(void_ty, {ptr_ty, ty}, false);
+  FunctionType *wrapperType =
+      FunctionType::get(voidType, {ptrType, Type}, false);
 
-  Function *resolveStoreFn =
-      getOrCreateResolveHelper(M, handlerName, resolveStoreFnTy);
-  if (!resolveStoreFn->empty()) {
-    recordPatchFunction(resolveStoreFn);
-    return resolveStoreFn;
+  Function *wrapperFn = getOrCreateResolveHelper(M, handlerName, wrapperType);
+  if (!wrapperFn->empty()) {
+    recordPatchFunction(wrapperFn);
+    return wrapperFn;
   }
 
-  BasicBlock *EntryBB = BasicBlock::Create(Ctx, "entry", resolveStoreFn);
-  BasicBlock *CheckAccessBB =
-      BasicBlock::Create(Ctx, "check.access", resolveStoreFn);
-  BasicBlock *NormalStoreBB =
-      BasicBlock::Create(Ctx, "safe.store", resolveStoreFn);
-  BasicBlock *SanitizeStoreBB =
-      BasicBlock::Create(Ctx, "sanitize.store", resolveStoreFn);
+  BasicBlock *entryBB = BasicBlock::Create(Ctx, "entry", wrapperFn);
+  BasicBlock *checkBoundsBB =
+      BasicBlock::Create(Ctx, "check.access", wrapperFn);
+  BasicBlock *performStoreBB = BasicBlock::Create(Ctx, "safe.store", wrapperFn);
+  BasicBlock *handleInvalidStoreBB =
+      BasicBlock::Create(Ctx, "sanitize.store", wrapperFn);
 
-  builder.SetInsertPoint(EntryBB);
-  Value *basePtr = resolveStoreFn->getArg(0);
-  Value *storedVal = resolveStoreFn->getArg(1);
+  builder.SetInsertPoint(entryBB);
+  Value *ptr = wrapperFn->getArg(0);
+  Value *storedValue = wrapperFn->getArg(1);
 
-  createSanitizerGateBranch(builder, F, 0, NormalStoreBB, CheckAccessBB);
+  createSanitizerGateBranch(builder, F, 0, performStoreBB, checkBoundsBB);
 
-  builder.SetInsertPoint(CheckAccessBB);
-  Value *withinBounds = builder.CreateCall(
-      getOrCreateAccessOk(M, cls), {basePtr, ConstantExpr::getSizeOf(ty)});
+  builder.SetInsertPoint(checkBoundsBB);
+  Value *accessInBounds = builder.CreateCall(
+      getOrCreateAccessOk(M, cls), {ptr, ConstantExpr::getSizeOf(Type)});
 
-  builder.CreateCondBr(withinBounds, NormalStoreBB, SanitizeStoreBB);
+  builder.CreateCondBr(accessInBounds, performStoreBB, handleInvalidStoreBB);
 
-  builder.SetInsertPoint(NormalStoreBB);
-  builder.CreateStore(storedVal, basePtr);
+  builder.SetInsertPoint(performStoreBB);
+  builder.CreateStore(storedValue, ptr);
   builder.CreateRetVoid();
 
-  // SanitizeStoreBB: Apply remediation strategy
-  builder.SetInsertPoint(SanitizeStoreBB);
+  // handleInvalidStoreBB: Apply remediation strategy
+  builder.SetInsertPoint(handleInvalidStoreBB);
   builder.CreateCall(getOrCreateReportSanitizerTriggered(M));
   if (Function *fn = getOrCreateRemediationBehavior(M, strategy)) {
     builder.CreateCall(fn);
@@ -278,9 +273,9 @@ static Function *getOrCreateBoundsCheckStoreSanitizer(
     builder.CreateRetVoid();
   }
 
-  validateIR(resolveStoreFn);
-  recordPatchFunction(resolveStoreFn);
-  return resolveStoreFn;
+  validateIR(wrapperFn);
+  recordPatchFunction(wrapperFn);
+  return wrapperFn;
 }
 
 static Function *getOrCreateBoundsCheckMemcpySanitizer(
@@ -293,48 +288,48 @@ static Function *getOrCreateBoundsCheckMemcpySanitizer(
 
   IRBuilder<> builder(Ctx);
 
-  auto ptr_ty = PointerType::get(Ctx, 0);
-  auto size_ty = Type::getInt64Ty(Ctx);
+  auto ptrType = PointerType::get(Ctx, 0);
+  auto sizeType = Type::getInt64Ty(Ctx);
 
-  FunctionType *resolveMemmoveFnTy =
-      FunctionType::get(ptr_ty, {ptr_ty, ptr_ty, size_ty}, false);
+  FunctionType *wrapperType =
+      FunctionType::get(ptrType, {ptrType, ptrType, sizeType}, false);
 
-  Function *resolveMemmoveFn =
-      getOrCreateResolveHelper(M, handlerName, resolveMemmoveFnTy);
-  if (!resolveMemmoveFn->empty()) {
-    recordPatchFunction(resolveMemmoveFn);
-    return resolveMemmoveFn;
+  Function *wrapperFn = getOrCreateResolveHelper(M, handlerName, wrapperType);
+  if (!wrapperFn->empty()) {
+    recordPatchFunction(wrapperFn);
+    return wrapperFn;
   }
 
-  BasicBlock *EntryBB = BasicBlock::Create(Ctx, "entry", resolveMemmoveFn);
-  BasicBlock *CheckAccessBB =
-      BasicBlock::Create(Ctx, "check.access", resolveMemmoveFn);
-  BasicBlock *NormalBB =
-      BasicBlock::Create(Ctx, "safe.memcpy", resolveMemmoveFn);
+  BasicBlock *entryBB = BasicBlock::Create(Ctx, "entry", wrapperFn);
+  BasicBlock *checkBoundsBB =
+      BasicBlock::Create(Ctx, "check.access", wrapperFn);
+  BasicBlock *performMemmoveBB =
+      BasicBlock::Create(Ctx, "safe.memcpy", wrapperFn);
   BasicBlock *SanitizeMemcpyBB =
-      BasicBlock::Create(Ctx, "sanitize.memcpy", resolveMemmoveFn);
+      BasicBlock::Create(Ctx, "sanitize.memcpy", wrapperFn);
 
-  builder.SetInsertPoint(EntryBB);
+  builder.SetInsertPoint(entryBB);
   // Extract dst, src, size arguments from function
-  Value *dstPtr = resolveMemmoveFn->getArg(0);
-  Value *srcPtr = resolveMemmoveFn->getArg(1);
-  Value *sizeArg = resolveMemmoveFn->getArg(2);
+  Value *dstPtr = wrapperFn->getArg(0);
+  Value *srcPtr = wrapperFn->getArg(1);
+  Value *sizeArg = wrapperFn->getArg(2);
 
-  createSanitizerGateBranch(builder, F, 0, NormalBB, CheckAccessBB);
+  createSanitizerGateBranch(builder, F, 0, performMemmoveBB, checkBoundsBB);
 
-  builder.SetInsertPoint(CheckAccessBB);
-  Value *check_src_access =
+  builder.SetInsertPoint(checkBoundsBB);
+  Value *checkSrcBounds =
       builder.CreateCall(getOrCreateAccessOk(M, srcCls), {srcPtr, sizeArg});
-  Value *check_dst_access =
+  Value *checkDstBounds =
       builder.CreateCall(getOrCreateAccessOk(M, dstCls), {dstPtr, sizeArg});
 
-  Value *withinBounds = builder.CreateAnd(check_src_access, check_dst_access);
-  builder.CreateCondBr(withinBounds, NormalBB, SanitizeMemcpyBB);
+  Value *accessInBounds = builder.CreateAnd(checkSrcBounds, checkDstBounds);
+  builder.CreateCondBr(accessInBounds, performMemmoveBB, SanitizeMemcpyBB);
 
-  // NormalBB: Call memcpy and return the ptr
-  builder.SetInsertPoint(NormalBB);
+  // performMemmoveBB: Call memcpy and return the ptr
+  builder.SetInsertPoint(performMemmoveBB);
   FunctionCallee memcpyFn = M->getOrInsertFunction(
-      "memcpy", FunctionType::get(ptr_ty, {ptr_ty, ptr_ty, size_ty}, false));
+      "memcpy",
+      FunctionType::get(ptrType, {ptrType, ptrType, sizeType}, false));
   Value *memcpyPtr = builder.CreateCall(memcpyFn, {dstPtr, srcPtr, sizeArg});
   builder.CreateRet(memcpyPtr);
 
@@ -347,9 +342,9 @@ static Function *getOrCreateBoundsCheckMemcpySanitizer(
   } else {
     builder.CreateRet(dstPtr);
   }
-  validateIR(resolveMemmoveFn);
-  recordPatchFunction(resolveMemmoveFn);
-  return resolveMemmoveFn;
+  validateIR(wrapperFn);
+  recordPatchFunction(wrapperFn);
+  return wrapperFn;
 }
 
 static Function *getOrCreateBoundsCheckMemmoveSanitizer(
@@ -362,53 +357,54 @@ static Function *getOrCreateBoundsCheckMemmoveSanitizer(
 
   IRBuilder<> builder(Ctx);
 
-  auto ptr_ty = PointerType::get(Ctx, 0);
-  auto size_ty = Type::getInt64Ty(Ctx);
+  auto ptrType = PointerType::get(Ctx, 0);
+  auto sizeType = Type::getInt64Ty(Ctx);
 
-  FunctionType *resolveMemmoveFnTy =
-      FunctionType::get(ptr_ty, {ptr_ty, ptr_ty, size_ty}, false);
+  FunctionType *wrapperType =
+      FunctionType::get(ptrType, {ptrType, ptrType, sizeType}, false);
 
-  Function *resolveMemmoveFn =
-      getOrCreateResolveHelper(M, handlerName, resolveMemmoveFnTy);
-  if (!resolveMemmoveFn->empty()) {
-    recordPatchFunction(resolveMemmoveFn);
-    return resolveMemmoveFn;
+  Function *wrapperFn = getOrCreateResolveHelper(M, handlerName, wrapperType);
+  if (!wrapperFn->empty()) {
+    recordPatchFunction(wrapperFn);
+    return wrapperFn;
   }
 
-  BasicBlock *EntryBB = BasicBlock::Create(Ctx, "entry", resolveMemmoveFn);
-  BasicBlock *CheckAccessBB =
-      BasicBlock::Create(Ctx, "check.access", resolveMemmoveFn);
-  BasicBlock *NormalBB =
-      BasicBlock::Create(Ctx, "safe.memmove", resolveMemmoveFn);
-  BasicBlock *SanitizeMemmoveBB =
-      BasicBlock::Create(Ctx, "sanitize.memmove", resolveMemmoveFn);
+  BasicBlock *entryBB = BasicBlock::Create(Ctx, "entry", wrapperFn);
+  BasicBlock *checkBoundsBB =
+      BasicBlock::Create(Ctx, "check.access", wrapperFn);
+  BasicBlock *performMemmoveBB =
+      BasicBlock::Create(Ctx, "safe.memmove", wrapperFn);
+  BasicBlock *handleInvalidMemmoveBB =
+      BasicBlock::Create(Ctx, "sanitize.memmove", wrapperFn);
 
-  builder.SetInsertPoint(EntryBB);
+  builder.SetInsertPoint(entryBB);
   // Extract dst, src, size arguments from function
-  Value *dstPtr = resolveMemmoveFn->getArg(0);
-  Value *srcPtr = resolveMemmoveFn->getArg(1);
-  Value *sizeArg = resolveMemmoveFn->getArg(2);
+  Value *dstPtr = wrapperFn->getArg(0);
+  Value *srcPtr = wrapperFn->getArg(1);
+  Value *sizeArg = wrapperFn->getArg(2);
 
-  createSanitizerGateBranch(builder, F, 0, NormalBB, CheckAccessBB);
+  createSanitizerGateBranch(builder, F, 0, performMemmoveBB, checkBoundsBB);
 
-  builder.SetInsertPoint(CheckAccessBB);
-  Value *check_src_access =
+  builder.SetInsertPoint(checkBoundsBB);
+  Value *checkSrcBounds =
       builder.CreateCall(getOrCreateAccessOk(M, srcCls), {srcPtr, sizeArg});
-  Value *check_dst_access =
+  Value *checkDstBounds =
       builder.CreateCall(getOrCreateAccessOk(M, dstCls), {dstPtr, sizeArg});
 
-  Value *withinBounds = builder.CreateAnd(check_src_access, check_dst_access);
-  builder.CreateCondBr(withinBounds, NormalBB, SanitizeMemmoveBB);
+  Value *accessInBounds = builder.CreateAnd(checkSrcBounds, checkDstBounds);
+  builder.CreateCondBr(accessInBounds, performMemmoveBB,
+                       handleInvalidMemmoveBB);
 
-  // NormalBB: Call memcpy and return the ptr
-  builder.SetInsertPoint(NormalBB);
+  // performMemmoveBB: Call memcpy and return the ptr
+  builder.SetInsertPoint(performMemmoveBB);
   FunctionCallee memmoveFn = M->getOrInsertFunction(
-      "memmove", FunctionType::get(ptr_ty, {ptr_ty, ptr_ty, size_ty}, false));
+      "memmove",
+      FunctionType::get(ptrType, {ptrType, ptrType, sizeType}, false));
   Value *memmovePtr = builder.CreateCall(memmoveFn, {dstPtr, srcPtr, sizeArg});
   builder.CreateRet(memmovePtr);
 
   // SanitizeMemcpyBB: Remediate memcpy returns null pointer.
-  builder.SetInsertPoint(SanitizeMemmoveBB);
+  builder.SetInsertPoint(handleInvalidMemmoveBB);
   builder.CreateCall(getOrCreateReportSanitizerTriggered(M));
   if (Function *fn = getOrCreateRemediationBehavior(M, strategy)) {
     builder.CreateCall(fn);
@@ -417,9 +413,9 @@ static Function *getOrCreateBoundsCheckMemmoveSanitizer(
     builder.CreateRet(dstPtr);
   }
 
-  validateIR(resolveMemmoveFn);
-  recordPatchFunction(resolveMemmoveFn);
-  return resolveMemmoveFn;
+  validateIR(wrapperFn);
+  recordPatchFunction(wrapperFn);
+  return wrapperFn;
 }
 
 static Function *getOrCreateBoundsCheckMemsetSanitizer(
@@ -431,63 +427,62 @@ static Function *getOrCreateBoundsCheckMemsetSanitizer(
 
   IRBuilder<> builder(Ctx);
 
-  auto ptr_ty = PointerType::get(Ctx, 0);
-  auto i32_ty = Type::getInt32Ty(Ctx);
-  auto size_ty = Type::getInt64Ty(Ctx);
+  auto ptrType = PointerType::get(Ctx, 0);
+  auto intType = Type::getInt32Ty(Ctx);
+  auto sizeType = Type::getInt64Ty(Ctx);
 
-  FunctionType *resolveMemsetFnTy =
-      FunctionType::get(ptr_ty, {ptr_ty, i32_ty, size_ty}, false);
+  FunctionType *wrapperType =
+      FunctionType::get(ptrType, {ptrType, intType, sizeType}, false);
 
-  Function *resolveMemsetFn =
-      getOrCreateResolveHelper(M, handlerName, resolveMemsetFnTy);
-  if (!resolveMemsetFn->empty()) {
-    recordPatchFunction(resolveMemsetFn);
-    return resolveMemsetFn;
+  Function *wrapperFn = getOrCreateResolveHelper(M, handlerName, wrapperType);
+  if (!wrapperFn->empty()) {
+    recordPatchFunction(wrapperFn);
+    return wrapperFn;
   }
 
-  BasicBlock *EntryBB = BasicBlock::Create(Ctx, "entry", resolveMemsetFn);
-  BasicBlock *CheckAccessBB =
-      BasicBlock::Create(Ctx, "check.access", resolveMemsetFn);
-  BasicBlock *NormalBB =
-      BasicBlock::Create(Ctx, "safe.memset", resolveMemsetFn);
-  BasicBlock *SanitizeMemsetBB =
-      BasicBlock::Create(Ctx, "sanitize.memset", resolveMemsetFn);
+  BasicBlock *entryBB = BasicBlock::Create(Ctx, "entry", wrapperFn);
+  BasicBlock *checkBoundsBB =
+      BasicBlock::Create(Ctx, "check.access", wrapperFn);
+  BasicBlock *performMemmoveBB =
+      BasicBlock::Create(Ctx, "safe.memset", wrapperFn);
+  BasicBlock *handleInvalidMemsetBB =
+      BasicBlock::Create(Ctx, "sanitize.memset", wrapperFn);
 
-  builder.SetInsertPoint(EntryBB);
+  builder.SetInsertPoint(entryBB);
   // Extract arguments for memset
-  Value *basePtr = resolveMemsetFn->getArg(0);
-  Value *valueArg = resolveMemsetFn->getArg(1);
-  Value *accessSize = resolveMemsetFn->getArg(2);
+  Value *ptr = wrapperFn->getArg(0);
+  Value *valueArg = wrapperFn->getArg(1);
+  Value *accessSize = wrapperFn->getArg(2);
 
-  createSanitizerGateBranch(builder, F, 0, NormalBB, CheckAccessBB);
+  createSanitizerGateBranch(builder, F, 0, performMemmoveBB, checkBoundsBB);
 
-  builder.SetInsertPoint(CheckAccessBB);
-  Value *check_dst_access =
-      builder.CreateCall(getOrCreateAccessOk(M, cls), {basePtr, accessSize});
-  builder.CreateCondBr(check_dst_access, NormalBB, SanitizeMemsetBB);
+  builder.SetInsertPoint(checkBoundsBB);
+  Value *checkDstBounds =
+      builder.CreateCall(getOrCreateAccessOk(M, cls), {ptr, accessSize});
+  builder.CreateCondBr(checkDstBounds, performMemmoveBB, handleInvalidMemsetBB);
 
-  // NormalBB: call memset and return the pointer
-  builder.SetInsertPoint(NormalBB);
+  // performMemmoveBB: call memset and return the pointer
+  builder.SetInsertPoint(performMemmoveBB);
 
   FunctionCallee memsetFn = M->getOrInsertFunction(
-      "memset", FunctionType::get(ptr_ty, {ptr_ty, i32_ty, size_ty}, false));
+      "memset",
+      FunctionType::get(ptrType, {ptrType, intType, sizeType}, false));
 
-  Value *memsetPtr =
-      builder.CreateCall(memsetFn, {basePtr, valueArg, accessSize});
+  Value *memsetPtr = builder.CreateCall(memsetFn, {ptr, valueArg, accessSize});
   builder.CreateRet(memsetPtr);
 
-  builder.SetInsertPoint(SanitizeMemsetBB);
+  builder.SetInsertPoint(handleInvalidMemsetBB);
   builder.CreateCall(getOrCreateReportSanitizerTriggered(M));
   if (Function *fn = getOrCreateRemediationBehavior(M, strategy)) {
     builder.CreateCall(fn);
     builder.CreateUnreachable();
   } else {
-    builder.CreateRet(basePtr);
+    builder.CreateRet(ptr);
   }
 
-  validateIR(resolveMemsetFn);
-  recordPatchFunction(resolveMemsetFn);
-  return resolveMemsetFn;
+  validateIR(wrapperFn);
+  recordPatchFunction(wrapperFn);
+  return wrapperFn;
 }
 
 static Function *getOrCreateResolveGep(Function *F, BoundsClass cls) {
@@ -497,69 +492,69 @@ static Function *getOrCreateResolveGep(Function *F, BoundsClass cls) {
 
   IRBuilder<> builder(Ctx);
 
-  auto ptr_ty = PointerType::get(Ctx, 0);
-  auto size_ty = Type::getInt64Ty(Ctx);
+  auto ptrType = PointerType::get(Ctx, 0);
+  auto sizeType = Type::getInt64Ty(Ctx);
 
-  FunctionType *resolveGepFnTy =
-      FunctionType::get(ptr_ty, {ptr_ty, ptr_ty}, false);
+  FunctionType *gepWrapperType =
+      FunctionType::get(ptrType, {ptrType, ptrType}, false);
 
-  Function *resolveGepFn =
-      getOrCreateResolveHelper(M, handlerName, resolveGepFnTy);
-  if (!resolveGepFn->empty()) {
-    recordPatchFunction(resolveGepFn);
-    return resolveGepFn;
+  Function *wrapperFn =
+      getOrCreateResolveHelper(M, handlerName, gepWrapperType);
+  if (!wrapperFn->empty()) {
+    recordPatchFunction(wrapperFn);
+    return wrapperFn;
   }
 
   // Adding attribute to always inline
-  resolveGepFn->addFnAttr(Attribute::AlwaysInline);
+  wrapperFn->addFnAttr(Attribute::AlwaysInline);
 
-  BasicBlock *EntryBB = BasicBlock::Create(Ctx, "entry", resolveGepFn);
-  BasicBlock *GetBaseAndLimitBB =
-      BasicBlock::Create(Ctx, "get.bounds", resolveGepFn);
-  BasicBlock *CheckComputedPtrBB =
-      BasicBlock::Create(Ctx, "check.access", resolveGepFn);
-  BasicBlock *NormalBB = BasicBlock::Create(Ctx, "safe.ptr", resolveGepFn);
-  BasicBlock *OnePastBB = BasicBlock::Create(Ctx, "tainted.ptr", resolveGepFn);
+  BasicBlock *entryBB = BasicBlock::Create(Ctx, "entry", wrapperFn);
+  BasicBlock *getBoundsBB = BasicBlock::Create(Ctx, "get.bounds", wrapperFn);
+  BasicBlock *checkBoundsBB =
+      BasicBlock::Create(Ctx, "check.access", wrapperFn);
+  BasicBlock *inBoundsBB = BasicBlock::Create(Ctx, "ptr.inbounds", wrapperFn);
+  BasicBlock *onePastBB = BasicBlock::Create(Ctx, "ptr.oob", wrapperFn);
 
-  builder.SetInsertPoint(EntryBB);
+  builder.SetInsertPoint(entryBB);
   // Extract the base and derived pointer
-  Value *basePtr = resolveGepFn->getArg(0);
-  Value *derivedPtr = resolveGepFn->getArg(1);
-  createSanitizerGateBranch(builder, F, 0, NormalBB, GetBaseAndLimitBB);
+  Value *rootPtr = wrapperFn->getArg(0);
+  Value *derivedPtr = wrapperFn->getArg(1);
+  createSanitizerGateBranch(builder, F, 0, inBoundsBB, getBoundsBB);
 
-  builder.SetInsertPoint(GetBaseAndLimitBB);
-  Value *baseAndLimit =
-      builder.CreateCall(getOrCreateResolveGetBounds(M, cls), {basePtr});
-  Value *baseValue = builder.CreateExtractValue(baseAndLimit, 0);
-  Value *limitValue = builder.CreateExtractValue(baseAndLimit, 1);
+  builder.SetInsertPoint(getBoundsBB);
+  Value *bounds =
+      builder.CreateCall(getOrCreateResolveGetBounds(M, cls), {rootPtr});
+  Value *lowerBound = builder.CreateExtractValue(bounds, 0);
+  Value *upperBound = builder.CreateExtractValue(bounds, 1);
 
-  Value *baseInt = builder.CreatePtrToInt(baseValue, size_ty);
-  Value *limitInt = builder.CreatePtrToInt(limitValue, size_ty);
+  Value *lowerBoundInt = builder.CreatePtrToInt(lowerBound, sizeType);
+  Value *upperBoundInt = builder.CreatePtrToInt(upperBound, sizeType);
   Value *isSentinel =
-      builder.CreateICmpEQ(limitInt, ConstantInt::get(size_ty, 0));
-  builder.CreateCondBr(isSentinel, NormalBB, CheckComputedPtrBB);
+      builder.CreateICmpEQ(upperBoundInt, ConstantInt::get(sizeType, 0));
+  builder.CreateCondBr(isSentinel, inBoundsBB, checkBoundsBB);
 
-  builder.SetInsertPoint(CheckComputedPtrBB);
-  Value *derivedInt = builder.CreatePtrToInt(derivedPtr, size_ty);
-  Value *underLimit = builder.CreateICmpULE(derivedInt, limitInt);
-  Value *aboveBase = builder.CreateICmpUGE(derivedInt, baseInt);
-  Value *withinBounds = builder.CreateAnd(underLimit, aboveBase);
+  builder.SetInsertPoint(checkBoundsBB);
+  Value *derivedInt = builder.CreatePtrToInt(derivedPtr, sizeType);
+  Value *underLimit = builder.CreateICmpULE(derivedInt, upperBoundInt);
+  Value *aboveBase = builder.CreateICmpUGE(derivedInt, lowerBoundInt);
+  Value *accessInBounds = builder.CreateAnd(underLimit, aboveBase);
 
-  builder.CreateCondBr(withinBounds, NormalBB, OnePastBB);
+  builder.CreateCondBr(accessInBounds, inBoundsBB, onePastBB);
 
-  builder.SetInsertPoint(NormalBB);
+  builder.SetInsertPoint(inBoundsBB);
   builder.CreateRet(derivedPtr);
 
-  builder.SetInsertPoint(OnePastBB);
+  builder.SetInsertPoint(onePastBB);
 
   // Return a pointer that is clamped at one past the last valid byte address
-  Value *onePastInt = builder.CreateAdd(limitInt, ConstantInt::get(size_ty, 1));
-  Value *onePastPtr = builder.CreateIntToPtr(onePastInt, ptr_ty);
+  Value *onePastInt =
+      builder.CreateAdd(upperBoundInt, ConstantInt::get(sizeType, 1));
+  Value *onePastPtr = builder.CreateIntToPtr(onePastInt, ptrType);
   builder.CreateRet(onePastPtr);
 
-  validateIR(resolveGepFn);
-  recordPatchFunction(resolveGepFn);
-  return resolveGepFn;
+  validateIR(wrapperFn);
+  recordPatchFunction(wrapperFn);
+  return wrapperFn;
 }
 
 void instrumentGep(Function *F) {
@@ -567,7 +562,7 @@ void instrumentGep(Function *F) {
   LLVMContext &Ctx = M->getContext();
   IRBuilder<> builder(Ctx);
   const DataLayout &DL = M->getDataLayout();
-  std::vector<GetElementPtrInst *> gepList;
+  SmallVector<GetElementPtrInst *> gepList;
   std::unordered_set<GetElementPtrInst *> visitedGep;
 
   auto handle_gep = [&](auto *gep) {
@@ -579,7 +574,7 @@ void instrumentGep(Function *F) {
       return;
     }
 
-    Value *basePtr = gep->getPointerOperand();
+    Value *ptr = gep->getPointerOperand();
     GetElementPtrInst *derivedPtr = gep;
     gep->setIsInBounds(false);
 
@@ -601,9 +596,9 @@ void instrumentGep(Function *F) {
     }
 
     builder.SetInsertPoint(derivedPtr->getNextNode());
-    BoundsClass cls = classifyPointer(basePtr);
-    auto resolveGepCall = builder.CreateCall(getOrCreateResolveGep(F, cls),
-                                             {basePtr, derivedPtr});
+    BoundsClass cls = classifyPointer(ptr);
+    auto resolveGepCall =
+        builder.CreateCall(getOrCreateResolveGep(F, cls), {ptr, derivedPtr});
 
     // Iterate over all the users of the gep instruction and
     // replace their operands with resolve_gep result
@@ -629,7 +624,7 @@ void instrumentMemcpy(Function *F,
                       Vulnerability::RemediationStrategies strategy) {
   LLVMContext &Ctx = F->getContext();
   IRBuilder<> builder(Ctx);
-  std::vector<Instruction *> memcpyList;
+  SmallVector<Instruction *> memcpyList;
 
   for (auto &BB : *F) {
     for (auto &inst : BB) {
@@ -656,18 +651,18 @@ void instrumentMemcpy(Function *F,
     }
   }
 
-  for (auto Inst : memcpyList) {
-    builder.SetInsertPoint(Inst);
+  for (auto *memcpy : memcpyList) {
+    builder.SetInsertPoint(memcpy);
 
     Value *dstPtr = nullptr;
     Value *srcPtr = nullptr;
     Value *sizeArg = nullptr;
 
-    if (auto *MI = dyn_cast<MemCpyInst>(Inst)) {
+    if (auto *MI = dyn_cast<MemCpyInst>(memcpy)) {
       dstPtr = MI->getDest();
       srcPtr = MI->getSource();
       sizeArg = MI->getLength();
-    } else if (auto *MC = dyn_cast<CallInst>(Inst)) {
+    } else if (auto *MC = dyn_cast<CallInst>(memcpy)) {
       dstPtr = MC->getArgOperand(0);
       srcPtr = MC->getArgOperand(1);
       sizeArg = MC->getArgOperand(2);
@@ -675,11 +670,11 @@ void instrumentMemcpy(Function *F,
 
     BoundsClass srcCls = classifyPointer(srcPtr);
     BoundsClass dstCls = classifyPointer(dstPtr);
-    auto memcpyFn =
+    auto wrapperFn =
         getOrCreateBoundsCheckMemcpySanitizer(F, strategy, srcCls, dstCls);
-    auto memcpyCall = builder.CreateCall(memcpyFn, {dstPtr, srcPtr, sizeArg});
-    Inst->replaceAllUsesWith(memcpyCall);
-    Inst->eraseFromParent();
+    auto wrapperCall = builder.CreateCall(wrapperFn, {dstPtr, srcPtr, sizeArg});
+    memcpy->replaceAllUsesWith(wrapperCall);
+    memcpy->eraseFromParent();
   }
 }
 
@@ -687,7 +682,7 @@ void instrumentMemset(Function *F,
                       Vulnerability::RemediationStrategies strategy) {
   LLVMContext &Ctx = F->getContext();
   IRBuilder<> builder(Ctx);
-  std::vector<Instruction *> memsetList;
+  SmallVector<Instruction *> memsetList;
 
   for (auto &BB : *F) {
     for (auto &inst : BB) {
@@ -714,19 +709,19 @@ void instrumentMemset(Function *F,
     }
   }
 
-  for (auto Inst : memsetList) {
-    builder.SetInsertPoint(Inst);
+  for (auto *memset : memsetList) {
+    builder.SetInsertPoint(memset);
 
-    Value *basePtr = nullptr;
+    Value *ptr = nullptr;
     Value *valueArg = nullptr;
     Value *sizeArg = nullptr;
 
-    if (auto *MI = dyn_cast<MemSetInst>(Inst)) {
-      basePtr = MI->getDest();
+    if (auto *MI = dyn_cast<MemSetInst>(memset)) {
+      ptr = MI->getDest();
       valueArg = MI->getValue();
       sizeArg = MI->getLength();
-    } else if (auto *MC = dyn_cast<CallInst>(Inst)) {
-      basePtr = MC->getArgOperand(0);
+    } else if (auto *MC = dyn_cast<CallInst>(memset)) {
+      ptr = MC->getArgOperand(0);
       valueArg = MC->getArgOperand(1);
       sizeArg = MC->getArgOperand(2);
     }
@@ -743,12 +738,11 @@ void instrumentMemset(Function *F,
       sizeArg = builder.CreateIntCast(sizeArg, ExpectedLengthTy, false);
     }
 
-    BoundsClass cls = classifyPointer(basePtr);
-    auto memsetFn = getOrCreateBoundsCheckMemsetSanitizer(F, strategy, cls);
-    auto memsetCall =
-        builder.CreateCall(memsetFn, {basePtr, valueArg, sizeArg});
-    Inst->replaceAllUsesWith(memsetCall);
-    Inst->eraseFromParent();
+    BoundsClass cls = classifyPointer(ptr);
+    auto wrapperFn = getOrCreateBoundsCheckMemsetSanitizer(F, strategy, cls);
+    auto wrapperCall = builder.CreateCall(wrapperFn, {ptr, valueArg, sizeArg});
+    memset->replaceAllUsesWith(wrapperCall);
+    memset->eraseFromParent();
   }
 }
 
@@ -756,7 +750,7 @@ void instrumentMemmove(Function *F,
                        Vulnerability::RemediationStrategies strategy) {
   LLVMContext &Ctx = F->getContext();
   IRBuilder<> builder(Ctx);
-  std::vector<Instruction *> memmoveList;
+  SmallVector<Instruction *> memmoveList;
 
   for (auto &BB : *F) {
     for (auto &inst : BB) {
@@ -783,18 +777,18 @@ void instrumentMemmove(Function *F,
     }
   }
 
-  for (auto Inst : memmoveList) {
-    builder.SetInsertPoint(Inst);
+  for (auto *memmove : memmoveList) {
+    builder.SetInsertPoint(memmove);
 
     Value *dstPtr = nullptr;
     Value *srcPtr = nullptr;
     Value *sizeArg = nullptr;
 
-    if (auto *MI = dyn_cast<MemMoveInst>(Inst)) {
+    if (auto *MI = dyn_cast<MemMoveInst>(memmove)) {
       dstPtr = MI->getDest();
       srcPtr = MI->getSource();
       sizeArg = MI->getLength();
-    } else if (auto *MC = dyn_cast<CallInst>(Inst)) {
+    } else if (auto *MC = dyn_cast<CallInst>(memmove)) {
       dstPtr = MC->getArgOperand(0);
       srcPtr = MC->getArgOperand(1);
       sizeArg = MC->getArgOperand(2);
@@ -802,11 +796,11 @@ void instrumentMemmove(Function *F,
 
     BoundsClass srcCls = classifyPointer(srcPtr);
     BoundsClass dstCls = classifyPointer(dstPtr);
-    auto memmoveFn =
+    auto wrapperFn =
         getOrCreateBoundsCheckMemmoveSanitizer(F, strategy, srcCls, dstCls);
-    auto memmoveCall = builder.CreateCall(memmoveFn, {dstPtr, srcPtr, sizeArg});
-    Inst->replaceAllUsesWith(memmoveCall);
-    Inst->eraseFromParent();
+    auto wrapperCall = builder.CreateCall(wrapperFn, {dstPtr, srcPtr, sizeArg});
+    memmove->replaceAllUsesWith(wrapperCall);
+    memmove->eraseFromParent();
   }
 }
 
@@ -815,8 +809,8 @@ void instrumentLoadStore(Function *F,
   LLVMContext &Ctx = F->getContext();
   IRBuilder<> builder(Ctx);
 
-  std::vector<LoadInst *> loadList;
-  std::vector<StoreInst *> storeList;
+  SmallVector<LoadInst *> loadList;
+  SmallVector<StoreInst *> storeList;
 
   switch (strategy) {
   case Vulnerability::RemediationStrategies::CONTINUE:
@@ -849,49 +843,49 @@ void instrumentLoadStore(Function *F,
     }
   }
 
-  for (auto Inst : loadList) {
-    builder.SetInsertPoint(Inst);
-    auto ptr = Inst->getPointerOperand();
-    auto valueTy = Inst->getType();
+  for (auto *load : loadList) {
+    builder.SetInsertPoint(load);
+    auto ptr = load->getPointerOperand();
+    auto valueType = load->getType();
 
     // Skip trivially correct accesses to stack values in this function (i.e.,
     // most automatic variables) Skip if ptr is an alloca and types are the same
     if (auto *alloca = dyn_cast<AllocaInst>(ptr)) {
-      if (alloca->getAllocatedType() == valueTy)
+      if (alloca->getAllocatedType() == valueType)
         continue;
     }
 
     BoundsClass cls = classifyPointer(ptr);
-    auto loadFn =
-        getOrCreateBoundsCheckLoadSanitizer(F, valueTy, strategy, cls);
+    auto wrapperFn =
+        getOrCreateBoundsCheckLoadSanitizer(F, valueType, strategy, cls);
 
-    auto sanitizedLoad = builder.CreateCall(loadFn, {ptr});
-    Inst->replaceAllUsesWith(sanitizedLoad);
-    Inst->removeFromParent();
-    Inst->deleteValue();
+    auto wrapperCall = builder.CreateCall(wrapperFn, {ptr});
+    load->replaceAllUsesWith(wrapperCall);
+    load->removeFromParent();
+    load->deleteValue();
   }
 
-  for (auto Inst : storeList) {
-    builder.SetInsertPoint(Inst);
-    auto ptr = Inst->getPointerOperand();
-    auto valueTy = Inst->getValueOperand()->getType();
+  for (auto *store : storeList) {
+    builder.SetInsertPoint(store);
+    auto ptr = store->getPointerOperand();
+    auto valueType = store->getValueOperand()->getType();
 
     // Skip trivially correct accesses to stack values in this function (i.e.,
     // most automatic variables) Skip if ptr is an alloca and types are the same
     if (auto *alloca = dyn_cast<AllocaInst>(ptr)) {
-      if (alloca->getAllocatedType() == valueTy)
+      if (alloca->getAllocatedType() == valueType)
         continue;
     }
 
     BoundsClass cls = classifyPointer(ptr);
-    auto storeFn =
-        getOrCreateBoundsCheckStoreSanitizer(F, valueTy, strategy, cls);
+    auto wrapperFn =
+        getOrCreateBoundsCheckStoreSanitizer(F, valueType, strategy, cls);
 
-    auto sanitizedStore =
-        builder.CreateCall(storeFn, {ptr, Inst->getValueOperand()});
-    Inst->replaceAllUsesWith(sanitizedStore);
-    Inst->removeFromParent();
-    Inst->deleteValue();
+    auto wrapperCall =
+        builder.CreateCall(wrapperFn, {ptr, store->getValueOperand()});
+    store->replaceAllUsesWith(wrapperCall);
+    store->removeFromParent();
+    store->deleteValue();
   }
 }
 
