@@ -27,12 +27,12 @@ static void wrapLibraryFunction(Function *F, StringRef libraryFunctionName,
   LLVMContext &Ctx = M->getContext();
   IRBuilder<> builder(Ctx);
 
-  SmallVector<call *, 8> matchingCalls;
+  SmallVector<CallInst *, 8> matchingCalls;
 
   SmallString<16> wrapperName = {"__resolve_", libraryFunctionName};
   FunctionCallee wrapperCallee = M->getOrInsertFunction(wrapperName, Type);
 
-  auto replaceCall = [&](call *call) {
+  auto replaceCall = [&](CallInst *call) {
     builder.SetInsertPoint(call);
     SmallVector<Value *, 8> args(call->arg_begin(), call->arg_end());
     CallInst *wrapperCall =
@@ -44,17 +44,17 @@ static void wrapLibraryFunction(Function *F, StringRef libraryFunctionName,
 
   for (auto &BB : *F) {
     for (auto &inst : BB) {
-      if (auto *call = dyn_cast<call>(&inst)) {
+      if (auto *call = dyn_cast<CallInst>(&inst)) {
         Function *callee = call->getCalledFunction();
 
-        if (calleee && callee->getName() == name) {
+        if (callee && callee->getName() == libraryFunctionName) {
           matchingCalls.push_back(call);
         }
       }
     }
   }
 
-  for (auto call : matchingCalls) {
+  for (auto *call : matchingCalls) {
     replaceCall(call);
   }
 }
