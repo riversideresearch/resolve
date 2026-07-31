@@ -317,7 +317,7 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
 
     for (GlobalVariable *global : globalsToRegister) {
       uint64_t size = DL.getTypeAllocSize(global->getValueType());
-      builder.CreateCall(registerGlobalFn,
+      builder.CreateCall(registerGlobalsFn,
                          {global, ConstantInt::get(intType, size)});
     }
     builder.CreateRetVoid();
