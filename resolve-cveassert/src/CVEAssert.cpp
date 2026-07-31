@@ -281,29 +281,29 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
     auto intType = Type::getInt64Ty(Ctx);
     auto voidType = Type::getVoidTy(Ctx);
 
-    FunctionCallee registerFn = M.getOrInsertFunction(
+    FunctionCallee registerGlobalsFn = M.getOrInsertFunction(
         "__resolve_register_global",
         FunctionType::get(voidType, {ptrType, intType}, false));
 
-    SmallVector<GlobalVariable *, 16> targets;
-    for (GlobalVariable &G : M.globals()) {
-      if (G.isDeclaration()) // external: defining TU registers it
+    SmallVector<GlobalVariable *, 16> globalsToRegister;
+    for (GlobalVariable &global : M.globals()) {
+      if (global.isDeclaration()) // external: defining TU registers it
         continue;
-      if (G.isThreadLocal()) // TLS: ctor captures one thread's &G
+      if (global.isThreadLocal()) // TLS: ctor captures one thread's &G
         continue;
-      if (G.getType()->getPointerAddressSpace() !=
+      if (global.getType()->getPointerAddressSpace() !=
           0) // non-default AS: not flat-addressable
         continue;
-      if (G.getName().starts_with("llvm.")) // used/global_ctors/metadata
+      if (global.getName().starts_with("llvm.")) // used/global_ctors/metadata
         continue;
-      if (G.getName().starts_with("__resolve_"))
+      if (global.getName().starts_with("__resolve_"))
         continue;
-      if (DL.getTypeAllocSize(G.getValueType()) == 0)
+      if (DL.getTypeAllocSize(global.getValueType()) == 0)
         continue;
-      targets.push_back(&G);
+      globalsToRegister.push_back(&global);
     }
 
-    if (targets.empty())
+    if (globalsToRegister.empty())
       return;
 
     Function *ctor = Function::Create(FunctionType::get(voidType, {}, false),
@@ -312,10 +312,13 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
 
     ctor->setMetadata("cve.noinstrument", MDNode::get(Ctx, {}));
 
-    IRBuilder<> builder(BasicBlock::Create(Ctx, "entry", ctor));
-    for (GlobalVariable *G : targets) {
-      uint64_t size = DL.getTypeAllocSize(G->getValueType());
-      builder.CreateCall(registerFn, {G, ConstantInt::get(intType, size)});
+    BasicBlock *entryBB = BasicBlock::Create(Ctx, "entry", ctor);
+    IRBuilder<> builder(entryBB);
+
+    for (GlobalVariable *global : globalsToRegister) {
+      uint64_t size = DL.getTypeAllocSize(global->getValueType());
+      builder.CreateCall(registerGlobalFn,
+                         {global, ConstantInt::get(intType, size)});
     }
     builder.CreateRetVoid();
 
