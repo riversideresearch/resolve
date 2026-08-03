@@ -3,6 +3,7 @@
  *   LGPL-3; See LICENSE.txt in the repo root for details.
  */
 
+#include "llvm/ADT/APInt.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/AsmParser/Parser.h"
