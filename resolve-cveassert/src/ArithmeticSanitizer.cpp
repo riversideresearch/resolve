@@ -15,7 +15,7 @@
 
 #include "CVEAssert.hpp"
 #include "IRUtils.hpp"
-#include "Vulnerability.hpp"
+#include "Remediation.hpp"
 
 #include <deque>
 #include <memory>
@@ -90,23 +90,22 @@ static void widenIntOverflow(Function *F) {
   }
 }
 
-void sanitizeDivideByZero(Function *F,
-                          Vulnerability::RemediationStrategies strategy) {
+void sanitizeDivideByZero(Function *F, RemediationStrategies strategy) {
   Module *M = F->getParent();
   auto &Ctx = M->getContext();
   IRBuilder<> builder(Ctx);
   std::vector<Instruction *> worklist;
 
   switch (strategy) {
-  case Vulnerability::RemediationStrategies::CONTINUE:
-  case Vulnerability::RemediationStrategies::EXIT:
-  case Vulnerability::RemediationStrategies::RECOVER:
+  case RemediationStrategies::CONTINUE:
+  case RemediationStrategies::EXIT:
+  case RemediationStrategies::RECOVER:
     break;
 
   default:
     llvm::errs() << "[CVEAssert] Error: sanitizeDivideByZero does not support "
                  << " remediation strategy defaulting to continue strategy!\n";
-    strategy = Vulnerability::RemediationStrategies::CONTINUE;
+    strategy = RemediationStrategies::CONTINUE;
     break;
   }
 
@@ -253,28 +252,27 @@ void sanitizeDivideByZero(Function *F,
   }
 }
 
-void sanitizeIntOverflow(Function *F,
-                         Vulnerability::RemediationStrategies strategy) {
+void sanitizeIntOverflow(Function *F, RemediationStrategies strategy) {
   std::vector<Instruction *> worklist;
   Module *M = F->getParent();
   auto &Ctx = M->getContext();
   IRBuilder<> builder(Ctx);
 
   switch (strategy) {
-  case Vulnerability::RemediationStrategies::WIDEN:
+  case RemediationStrategies::WIDEN:
     return widenIntOverflow(F);
 
-  case Vulnerability::RemediationStrategies::RECOVER:
-  case Vulnerability::RemediationStrategies::EXIT:
-  case Vulnerability::RemediationStrategies::WRAP:
-  case Vulnerability::RemediationStrategies::SAT:
+  case RemediationStrategies::RECOVER:
+  case RemediationStrategies::EXIT:
+  case RemediationStrategies::WRAP:
+  case RemediationStrategies::SAT:
     break;
 
   default:
     llvm::errs()
         << "[CVEAssert] Error: sanitizeIntOverflow does not support "
            "remediation strategy specified defaulting to wrap strategy!\n";
-    strategy = Vulnerability::RemediationStrategies::WRAP;
+    strategy = RemediationStrategies::WRAP;
     break;
   }
 
@@ -411,7 +409,7 @@ void sanitizeIntOverflow(Function *F,
     builder.CreateBr(joinResultBB);
 
     builder.SetInsertPoint(&*joinResultBB->begin());
-    if (strategy == Vulnerability::RemediationStrategies::SAT) {
+    if (strategy == RemediationStrategies::SAT) {
       binary_inst->replaceAllUsesWith(satResult);
     } else {
       binary_inst->replaceAllUsesWith(safeResult);
@@ -421,22 +419,21 @@ void sanitizeIntOverflow(Function *F,
   }
 }
 
-void sanitizeBitShift(Function *F,
-                      Vulnerability::RemediationStrategies strategy) {
+void sanitizeBitShift(Function *F, RemediationStrategies strategy) {
   Module *M = F->getParent();
   auto &Ctx = M->getContext();
   IRBuilder<> builder(Ctx);
   std::vector<Instruction *> worklist;
 
   switch (strategy) {
-  case Vulnerability::RemediationStrategies::EXIT:
-  case Vulnerability::RemediationStrategies::RECOVER:
+  case RemediationStrategies::EXIT:
+  case RemediationStrategies::RECOVER:
     break;
 
   default:
     llvm::errs() << "[CVEAssert] Error: sanitizeBitShift does not support "
                  << " remediation strategy defaulting to EXIT strategy!\n";
-    strategy = Vulnerability::RemediationStrategies::EXIT;
+    strategy = RemediationStrategies::EXIT;
     break;
   }
 

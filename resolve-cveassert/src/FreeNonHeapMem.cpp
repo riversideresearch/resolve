@@ -7,8 +7,9 @@
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/InlineAsm.h"
 
+#include "CVEAssert.hpp"
 #include "IRUtils.hpp"
-#include "Vulnerability.hpp"
+#include "Remediation.hpp"
 
 using namespace llvm;
 
@@ -57,8 +58,8 @@ Function *getOrCreateIsHeap(Function *F) {
   return cveIsHeapFn;
 }
 
-Function *getOrCreateFreeOfNonHeapSanitizer(
-    Function *F, Vulnerability::RemediationStrategies strategy) {
+Function *getOrCreateFreeOfNonHeapSanitizer(Function *F,
+                                            RemediationStrategies strategy) {
   std::string handlerName = "__cve_nonheap_free";
   Module *M = F->getParent();
   LLVMContext &Ctx = M->getContext();
@@ -119,8 +120,7 @@ Function *getOrCreateFreeOfNonHeapSanitizer(
   return cveFreeNonHeapFn;
 }
 
-void sanitizeFreeOfNonHeap(Function *F,
-                           Vulnerability::RemediationStrategies strategy) {
+void sanitizeFreeOfNonHeap(Function *F, RemediationStrategies strategy) {
   LLVMContext &Ctx = F->getContext();
   IRBuilder<> builder(Ctx);
   std::vector<CallInst *> workList;

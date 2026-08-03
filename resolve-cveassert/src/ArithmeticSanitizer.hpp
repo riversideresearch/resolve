@@ -5,11 +5,8 @@
 
 #pragma once
 
-#include "Vulnerability.hpp"
+#include "Remediation.hpp"
 #include "llvm/IR/Function.h"
-void sanitizeDivideByZero(llvm::Function *F,
-                          Vulnerability::RemediationStrategies strategy);
-void sanitizeIntOverflow(llvm::Function *F,
-                         Vulnerability::RemediationStrategies strategy);
-void sanitizeBitShift(llvm::Function *F,
-                      Vulnerability::RemediationStrategies strategy);
+void sanitizeDivideByZero(llvm::Function *F, RemediationStrategies strategy);
+void sanitizeIntOverflow(llvm::Function *F, RemediationStrategies strategy);
+void sanitizeBitShift(llvm::Function *F, RemediationStrategies strategy);

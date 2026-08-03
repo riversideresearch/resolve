@@ -4,7 +4,8 @@
  */
 
 #pragma once
-#include "Vulnerability.hpp"
+#include "Remediation.hpp"
+
 #include "llvm/ADT/StringRef.h"
 #include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/Function.h"
@@ -17,9 +18,8 @@
 
 std::string getLLVMType(llvm::Type *ty);
 llvm::Function *getOrCreateResolveReportSanitizerTriggered(llvm::Module *M);
-llvm::Function *
-getOrCreateRemediationBehavior(llvm::Module *M,
-                               Vulnerability::RemediationStrategies strategy);
+llvm::Function *getOrCreateRemediationBehavior(llvm::Module *M,
+                                               RemediationStrategies strategy);
 llvm::Function *
 getOrCreateResolveHelper(llvm::Module *M, std::string fn_name,
                          llvm::FunctionType *fn_type,

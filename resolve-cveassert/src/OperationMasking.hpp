@@ -5,8 +5,9 @@
 
 #pragma once
 
+#include "Contract.hpp"
+#include "Remediation.hpp"
 #include "llvm/IR/Function.h"
 #include <string>
-void sanitizeUndesirableOperationInFunction(llvm::Function *F,
-                                            std::string fnName,
-                                            unsigned int argNum);
+void sanitizeContract(llvm::Function *F, Contract contract,
+                      RemediationStrategies policy);

@@ -23,6 +23,7 @@ add_library(CVEAssert SHARED
   src/FreeNonHeapMem.cpp
   src/NullPointerSanitizer.cpp
   src/OperationMasking.cpp
+  src/VulnerabilityParser.cpp
 )
 
 # LLVM is normally built without RTTI. Be consistent with that.
