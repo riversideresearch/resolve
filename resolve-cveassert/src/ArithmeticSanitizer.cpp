@@ -126,13 +126,13 @@ void sanitizeDivideByZero(Function *F,
   }
 
   // Loop over each instruction in the list
-  for (auto *binaryOp : worklist) {
+  for (auto *binaryInst : worklist) {
     Value *dividend;
     Value *divisor;
     Value *isZero;
 
-    BasicBlock *checkMapEntryBB = binaryOp->getParent();
-    BasicBlock *joinResultBB = checkMapEntryBB->splitBasicBlock(binaryOp);
+    BasicBlock *checkMapEntryBB = binaryInst->getParent();
+    BasicBlock *joinResultBB = checkMapEntryBB->splitBasicBlock(binaryInst);
     BasicBlock *checkZeroBB = BasicBlock::Create(Ctx, "check.zero", F);
     BasicBlock *preserveDivBB =
         BasicBlock::Create(Ctx, "safe.div", F, joinResultBB);
@@ -147,10 +147,10 @@ void sanitizeDivideByZero(Function *F,
     builder.SetInsertPoint(checkZeroBB);
 
     // Extract dividend and divisor
-    dividend = binaryOp->getOperand(0);
-    divisor = binaryOp->getOperand(1);
+    dividend = binaryInst->getOperand(0);
+    divisor = binaryInst->getOperand(1);
 
-    switch (binaryOp->getOpcode()) {
+    switch (binaryInst->getOpcode()) {
     case Instruction::SDiv:
     case Instruction::UDiv:
     case Instruction::SRem:
@@ -168,6 +168,26 @@ void sanitizeDivideByZero(Function *F,
     builder.CreateCondBr(isZero, remedDivBB, preserveDivBB);
 
     builder.SetInsertPoint(remedDivBB);
+    builder.CreateCall(getOrCreateResolveReportSanitizerTriggered(M));
+
+    // TODO: Implement continue strategy for div-zero
+    Constant *recoveryValue = nullptr;
+    if (strategy == Vulnerability::RemediationStrategies::CONTINUE) {
+
+      Type *type = binary_inst->getType();
+      unsigned bitWidth = type->getIntegerBitWidth();
+
+      if (binaryInst->getOpcode() == Instruction::SDiv) {
+        recoveryValue =
+            ConstantInt::get(type, APInt::getSignedMaxValue(bitWidth));
+
+      } else {
+        recoveryValue = ConstantInt::get(type, APInt::getMaxValue(bitWidth));
+      }
+
+      builder.CreateRet(recoveryValue);
+    }
+
     if (Function *fn = getOrCreateRemediationBehavior(M, strategy)) {
       builder.CreateCall(fn);
     }
@@ -175,7 +195,7 @@ void sanitizeDivideByZero(Function *F,
     Value *safeIntDivisor;
     Value *safeFpDivisor;
 
-    switch (binaryOp->getOpcode()) {
+    switch (binaryInst->getOpcode()) {
     case Instruction::UDiv:
       safeIntDivisor = ConstantInt::get(divisor->getType(), 1);
       safeDiv = builder.CreateUDiv(dividend, safeIntDivisor);
@@ -187,7 +207,7 @@ void sanitizeDivideByZero(Function *F,
       break;
 
     case Instruction::FDiv:
-      safeFpDivisor = ConstantFP::get(binaryOp->getType(), 1.0);
+      safeFpDivisor = ConstantFP::get(binaryInst->getType(), 1.0);
       safeDiv = builder.CreateFDiv(dividend, safeFpDivisor);
       break;
 
@@ -211,7 +231,7 @@ void sanitizeDivideByZero(Function *F,
     builder.SetInsertPoint(preserveDivBB);
     Value *normalResult = nullptr;
 
-    switch (binaryOp->getOpcode()) {
+    switch (binaryInst->getOpcode()) {
     case Instruction::SDiv:
       normalResult = builder.CreateSDiv(dividend, divisor);
       builder.CreateBr(joinResultBB);
@@ -244,12 +264,12 @@ void sanitizeDivideByZero(Function *F,
     }
 
     builder.SetInsertPoint(&*joinResultBB->begin());
-    PHINode *phi = builder.CreatePHI(binaryOp->getType(), 2);
+    PHINode *phi = builder.CreatePHI(binaryInst->getType(), 2);
     phi->addIncoming(safeDiv, remedDivBB);
     phi->addIncoming(normalResult, preserveDivBB);
 
-    binaryOp->replaceAllUsesWith(phi);
-    binaryOp->eraseFromParent();
+    binaryInst->replaceAllUsesWith(phi);
+    binaryInst->eraseFromParent();
   }
 }
 
@@ -293,29 +313,29 @@ void sanitizeIntOverflow(Function *F,
   Value *op1;
   Value *op2;
 
-  for (auto *binaryOp : worklist) {
-    if (!binaryOp->hasNoSignedWrap() && !binaryOp->hasNoUnsignedWrap()) {
+  for (auto *binaryInst : worklist) {
+    if (!binaryInst->hasNoSignedWrap() && !binaryInst->hasNoUnsignedWrap()) {
       continue;
     }
 
-    op1 = binaryOp->getOperand(0);
-    op2 = binaryOp->getOperand(1);
+    op1 = binaryInst->getOperand(0);
+    op2 = binaryInst->getOperand(1);
 
-    builder.SetInsertPoint(binaryOp);
+    builder.SetInsertPoint(binaryInst);
 
     auto insertSafeOp = [&builder,
-                         M](Instruction *binaryOp, Value *op1,
+                         M](Instruction *binaryInst, Value *op1,
                             Value *op2) -> std::pair<Value *, Value *> {
       Intrinsic::ID intrinsic_id;
-      Type *BinOpType = binaryOp->getType();
+      Type *BinOpType = binaryInst->getType();
       bool isUnsigned = false;
 
       // Heuristic: If instruction has NUW but not NSW then, treat as unsigned
-      if (binaryOp->hasNoUnsignedWrap() && !binaryOp->hasNoSignedWrap()) {
+      if (binaryInst->hasNoUnsignedWrap() && !binaryInst->hasNoSignedWrap()) {
         isUnsigned = true;
       }
 
-      switch (binaryOp->getOpcode()) {
+      switch (binaryInst->getOpcode()) {
       case Instruction::Add:
         intrinsic_id = isUnsigned ? Intrinsic::uadd_with_overflow
                                   : Intrinsic::sadd_with_overflow;
@@ -343,17 +363,17 @@ void sanitizeIntOverflow(Function *F,
       return {result, isOverflow};
     };
 
-    auto insertSatOp = [&builder, M](Instruction *binaryOp, Value *op1,
+    auto insertSatOp = [&builder, M](Instruction *binaryInst, Value *op1,
                                      Value *op2) -> Instruction * {
       Intrinsic::ID intrinsic_id;
-      Type *BinOpType = binaryOp->getType();
+      Type *BinOpType = binaryInst->getType();
       bool isUnsigned = false;
 
-      if (binaryOp->hasNoUnsignedWrap() && !binaryOp->hasNoSignedWrap()) {
+      if (binaryInst->hasNoUnsignedWrap() && !binaryInst->hasNoSignedWrap()) {
         isUnsigned = true;
       }
 
-      switch (binaryOp->getOpcode()) {
+      switch (binaryInst->getOpcode()) {
       case Instruction::Add:
         intrinsic_id = isUnsigned ? Intrinsic::uadd_sat : Intrinsic::sadd_sat;
         break;
@@ -378,7 +398,7 @@ void sanitizeIntOverflow(Function *F,
       // Add fracBits parameter for saturated multiplication operations
       // LLVM LangRef:
       // https://llvm.org/docs/LangRef.html#fixed-point-arithmetic-intrinsics
-      if (binaryOp->getOpcode() == Instruction::Mul) {
+      if (binaryInst->getOpcode() == Instruction::Mul) {
         Value *fracBits = ConstantInt::get(BinOpType, 0);
         return builder.CreateCall(satOp, {op1, op2, fracBits});
 
@@ -387,11 +407,11 @@ void sanitizeIntOverflow(Function *F,
       }
     };
 
-    auto [safeResult, isOverflow] = insertSafeOp(binaryOp, op1, op2);
-    auto satResult = insertSatOp(binaryOp, op1, op2);
+    auto [safeResult, isOverflow] = insertSafeOp(binaryInst, op1, op2);
+    auto satResult = insertSatOp(binaryInst, op1, op2);
 
-    BasicBlock *checkMapEntryBB = binaryOp->getParent();
-    BasicBlock *joinResultBB = checkMapEntryBB->splitBasicBlock(binaryOp);
+    BasicBlock *checkMapEntryBB = binaryInst->getParent();
+    BasicBlock *joinResultBB = checkMapEntryBB->splitBasicBlock(binaryInst);
     BasicBlock *checkOverflowBB = BasicBlock::Create(Ctx, "check.overflow", F);
     BasicBlock *remedOverflowBB =
         BasicBlock::Create(Ctx, "sanitize.overflow", F, joinResultBB);
@@ -412,12 +432,12 @@ void sanitizeIntOverflow(Function *F,
 
     builder.SetInsertPoint(&*joinResultBB->begin());
     if (strategy == Vulnerability::RemediationStrategies::SAT) {
-      binaryOp->replaceAllUsesWith(satResult);
+      binaryInst->replaceAllUsesWith(satResult);
     } else {
-      binaryOp->replaceAllUsesWith(safeResult);
+      binaryInst->replaceAllUsesWith(safeResult);
     }
 
-    binaryOp->eraseFromParent();
+    binaryInst->eraseFromParent();
   }
 }
 
@@ -457,13 +477,13 @@ void sanitizeBitShift(Function *F,
     }
   }
 
-  for (auto *binaryOp : worklist) {
+  for (auto *binaryInst : worklist) {
     Value *isNegative;
     Value *isGreaterThanBitwidth;
     Value *CheckShiftAmtCond;
 
-    BasicBlock *checkMapEntryBB = binaryOp->getParent();
-    BasicBlock *joinResultBB = checkMapEntryBB->splitBasicBlock(binaryOp);
+    BasicBlock *checkMapEntryBB = binaryInst->getParent();
+    BasicBlock *joinResultBB = checkMapEntryBB->splitBasicBlock(binaryInst);
     BasicBlock *checkShiftBB = BasicBlock::Create(Ctx, "check.zero", F);
     BasicBlock *preserveShiftBB =
         BasicBlock::Create(Ctx, "safe.shift", F, joinResultBB);
@@ -476,8 +496,8 @@ void sanitizeBitShift(Function *F,
                               preserveShiftBB, checkShiftBB);
 
     builder.SetInsertPoint(checkShiftBB);
-    Value *shifted_value = binaryOp->getOperand(0);
-    Value *bit_pos = binaryOp->getOperand(1);
+    Value *shifted_value = binaryInst->getOperand(0);
+    Value *bit_pos = binaryInst->getOperand(1);
     unsigned BitWidth = shifted_value->getType()->getIntegerBitWidth();
 
     isNegative =
@@ -494,7 +514,7 @@ void sanitizeBitShift(Function *F,
     Value *safeShift = nullptr;
     Value *safeBitPos;
 
-    switch (binaryOp->getOpcode()) {
+    switch (binaryInst->getOpcode()) {
     case Instruction::Shl:
       safeBitPos = ConstantInt::get(bit_pos->getType(), 0);
       safeShift = builder.CreateShl(shifted_value, safeBitPos);
@@ -515,7 +535,7 @@ void sanitizeBitShift(Function *F,
     builder.SetInsertPoint(preserveShiftBB);
     Value *normalResult = nullptr;
 
-    switch (binaryOp->getOpcode()) {
+    switch (binaryInst->getOpcode()) {
     case Instruction::Shl:
       normalResult = builder.CreateShl(shifted_value, bit_pos);
       builder.CreateBr(joinResultBB);
@@ -533,11 +553,11 @@ void sanitizeBitShift(Function *F,
     }
 
     builder.SetInsertPoint(&*joinResultBB->begin());
-    PHINode *phi = builder.CreatePHI(binaryOp->getType(), 2);
+    PHINode *phi = builder.CreatePHI(binaryInst->getType(), 2);
     phi->addIncoming(safeShift, remedShiftBB);
     phi->addIncoming(normalResult, preserveShiftBB);
 
-    binaryOp->replaceAllUsesWith(phi);
-    binaryOp->eraseFromParent();
+    binaryInst->replaceAllUsesWith(phi);
+    binaryInst->eraseFromParent();
   }
 }
