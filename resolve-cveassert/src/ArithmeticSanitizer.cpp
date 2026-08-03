@@ -174,7 +174,7 @@ void sanitizeDivideByZero(Function *F,
     Constant *recoveryValue = nullptr;
     if (strategy == Vulnerability::RemediationStrategies::CONTINUE) {
 
-      Type *type = binary_inst->getType();
+      Type *type = binaryInst->getType();
       unsigned bitWidth = type->getIntegerBitWidth();
 
       if (binaryInst->getOpcode() == Instruction::SDiv) {
