@@ -40,7 +40,8 @@ static void emitPreconditions(Function *wrapperFn, BasicBlock *entryBB,
     Value *zero = ConstantInt::get(arg->getType(), 0);
     Cond = builder.CreateICmpEQ(arg, zero);
   } else if (precond.kind == PredicateKind::NonNull) {
-    Value *nullPtr = ConstantPointerNull::get(cast<PointerType>(arg->getType()));
+    Value *nullPtr =
+        ConstantPointerNull::get(cast<PointerType>(arg->getType()));
     Cond = builder.CreateICmpNE(arg, nullPtr);
   }
 
