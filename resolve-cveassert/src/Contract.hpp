@@ -12,7 +12,7 @@
 
 enum class PredicateKind {
   InBounds,
-  NotNull,
+  NonNull,
   NonZero,
 };
 
