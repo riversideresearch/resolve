@@ -1,26 +1,29 @@
-use std::collections::HashMap;
+use std::mem::*;
 
-use crate::model::*;
+use crate::builder::*;
+use crate::schema::*;
 
-const VERSION: u8 = 0;
+pub struct FactsBuf(Vec<u32>);
 
-// A frame is self-delimiting so multiple `.facts` contributions can be
-// concatenated by the linker and decoded one after another.
-const FRAME_LEN_OFFSET: usize = 1;
-const INTERN_POOL_OFFSET: usize = 5;
-const MODULE_COUNT_OFFSET: usize = 9;
-const HEADER_LEN: usize = 13;
-
-pub struct FactsBuf(Vec<u8>);
+impl FactsBuf {
+    pub fn as_bytes(&self) -> &[u8] {
+        unsafe {
+            std::slice::from_raw_parts(
+                self.0.as_ptr().cast::<u8>(),
+                self.0.len() * size_of::<u32>(),
+            )
+        }
+    }
+}
 
 #[unsafe(no_mangle)]
 pub extern "C" fn facts_buf_len(b: *const FactsBuf) -> usize {
-    unsafe { b.as_ref() }.map_or(0, |buf| buf.0.len())
+    unsafe { b.as_ref() }.map_or(0, |buf| buf.as_bytes().len())
 }
 
 #[unsafe(no_mangle)]
 pub extern "C" fn facts_buf_data(b: *const FactsBuf) -> *const u8 {
-    unsafe { b.as_ref() }.map_or(std::ptr::null(), |buf| buf.0.as_ptr())
+    unsafe { b.as_ref() }.map_or(std::ptr::null(), |buf| buf.as_bytes().as_ptr())
 }
 
 #[unsafe(no_mangle)]
@@ -33,201 +36,86 @@ pub extern "C" fn facts_buf_free(b: *mut FactsBuf) {
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn facts_serialize(b: *const ProgramFacts) -> *mut FactsBuf {
-    let Some(b) = (unsafe { b.as_ref() }) else {
+pub extern "C" fn facts_freeze(b: *mut ProgramFacts) -> *mut FactsBuf {
+    if b.is_null() {
         return std::ptr::null_mut();
-    };
+    }
 
-    Box::into_raw(Box::new(FactsBuf(b.serialize())))
+    let b = unsafe { Box::from_raw(b) };
+    Box::into_raw(Box::new(b.freeze()))
 }
 
 impl ProgramFacts {
-    pub fn serialize(&self) -> Vec<u8> {
-        let mut buf: Vec<u8> = Vec::new();
-
-        let mut i = Interner::default();
-
-        // 0 - version
-        buf.push(VERSION);
-
-        // 1..5 - total frame length (patched after the intern pool is added)
-        // 5..9 - intern pool offset (patched before the intern pool is added)
-        // 9..13 - module count
-        buf.resize(HEADER_LEN, 0);
-        buf[MODULE_COUNT_OFFSET..HEADER_LEN].copy_from_slice(
-            &u32::try_from(self.modules.len())
-                .expect("too many modules")
-                .to_le_bytes(),
-        );
-
-        // sort modules (stability)
-        let mut modules: Vec<_> = self.modules.iter().collect();
-        modules.sort_unstable_by_key(|(module_id, _)| *module_id);
-
-        for (k, v) in modules {
-            // u32: module ID
-            buf.extend_from_slice(&k.to_le_bytes());
-
-            // This modules facts
-            buf.extend_from_slice(&v.serialize(&mut i));
+    pub fn freeze(self) -> FactsBuf {
+        let capacity = self.modules.iter().map(ModuleBuilder::word_len).sum();
+        let mut words = Vec::with_capacity(capacity);
+        for module in self.modules {
+            module.serialize_into(&mut words);
         }
 
-        let pool_start = u32::try_from(buf.len()).expect("facts frame exceeds 4 GiB");
-        buf[INTERN_POOL_OFFSET..MODULE_COUNT_OFFSET].copy_from_slice(&pool_start.to_le_bytes());
-
-        buf.extend_from_slice(&i.as_bytes());
-
-        let frame_len = u32::try_from(buf.len()).expect("facts frame exceeds 4 GiB");
-        buf[FRAME_LEN_OFFSET..INTERN_POOL_OFFSET].copy_from_slice(&frame_len.to_le_bytes());
-
-        buf
+        FactsBuf(words)
     }
 }
 
-impl ModuleFacts {
-    pub fn serialize(&self, i: &mut Interner) -> Vec<u8> {
-        let mut buf: Vec<u8> = Vec::new();
+impl ModuleBuilder {
+    fn word_len(&self) -> usize {
+        size_of::<ModuleHeader>() / size_of::<u32>()
+            + self.nodes.len() * size_of::<Node>() / size_of::<u32>()
+            + self.edges.len() * size_of::<Edge>() / size_of::<u32>()
+            + self.pool.bytes().len().div_ceil(size_of::<u32>())
+    }
 
-        // u32: num nodes
-        buf.extend_from_slice(
-            &u32::try_from(self.nodes.len())
-                .expect("too many nodes")
-                .to_le_bytes(),
-        );
+    fn serialize_into(mut self, words: &mut Vec<u32>) {
+        let pool_len = self.pool.bytes().len();
+        let padded_pool_len = pool_len.checked_add(3).expect("intern pool is too large") & !3;
+        let header = ModuleHeader {
+            version: FORMAT_VERSION,
+            node_count: u32::try_from(self.nodes.len()).expect("module has too many nodes"),
+            edge_count: u32::try_from(self.edges.len()).expect("module has too many edges"),
+            string_pool_len: u32::try_from(padded_pool_len)
+                .expect("module intern pool exceeds 4 GiB"),
+        };
 
-        // NODES:
-
-        // sort nodes (stability)
-        let mut nodes: Vec<_> = self.nodes.iter().collect();
-        nodes.sort_unstable_by_key(|(node_id, _)| *node_id);
-
-        for (k, v) in nodes {
-            // nodeID: u32
-            buf.extend_from_slice(&k.to_le_bytes());
-
-            // NODE
-            buf.extend_from_slice(&v.serialize(i));
+        push_header(words, &header);
+        for node in &self.nodes {
+            push_node(words, node);
         }
 
-        // u32: num edges
-        buf.extend_from_slice(
-            &u32::try_from(self.edges.len())
-                .expect("too many edges")
-                .to_le_bytes(),
-        );
-
-        // EDGES:
-
-        // sort edges (stability)
-        let mut edges: Vec<_> = self.edges.iter().collect();
-        edges.sort_unstable_by_key(|(id, _)| (id.first, id.second));
-
-        for (k, v) in edges {
-            // edgeID: u32, u32
-            buf.extend_from_slice(&k.first.to_le_bytes());
-            buf.extend_from_slice(&k.second.to_le_bytes());
-
-            // EDGE
-            buf.extend_from_slice(&v.serialize());
+        self.edges.sort_unstable_by_key(|edge| (edge.src, edge.dst));
+        for edge in &self.edges {
+            push_edge(words, edge);
         }
 
-        buf
+        for chunk in self.pool.bytes().chunks(size_of::<u32>()) {
+            let mut bytes = [0; size_of::<u32>()];
+            bytes[..chunk.len()].copy_from_slice(chunk);
+            words.push(u32::from_ne_bytes(bytes));
+        }
     }
 }
 
-const P_IDX: u16 = 0;
-const P_NAME: u16 = 1;
-const P_OPCODE: u16 = 2;
-const P_LINKAGE: u16 = 3;
-const P_CALL_TYPE: u16 = 4;
-const P_SOURCE_LOC: u16 = 5;
-const P_SOURCE_FILE: u16 = 6;
-const P_FUNCTION_TYPE: u16 = 7;
-const P_ADDRESS_TAKEN: u16 = 8;
-
-impl NodeProps {
-    fn mask(&self) -> u16 {
-        let mut mask: u16 = 0;
-        mask |= (self.idx.is_some() as u16) << P_IDX;
-        mask |= (self.name.is_some() as u16) << P_NAME;
-        mask |= (self.opcode.is_some() as u16) << P_OPCODE;
-        mask |= (self.linkage.is_some() as u16) << P_LINKAGE;
-        mask |= (self.call_type.is_some() as u16) << P_CALL_TYPE;
-        mask |= (self.source_loc.is_some() as u16) << P_SOURCE_LOC;
-        mask |= (self.source_file.is_some() as u16) << P_SOURCE_FILE;
-        mask |= (self.function_type.is_some() as u16) << P_FUNCTION_TYPE;
-        mask |= ((self.address_taken == Some(true)) as u16) << P_ADDRESS_TAKEN;
-        mask
-    }
+fn push_header(words: &mut Vec<u32>, header: &ModuleHeader) {
+    words.extend_from_slice(&[
+        header.version,
+        header.node_count,
+        header.edge_count,
+        header.string_pool_len,
+    ]);
 }
 
-impl Node {
-    pub fn serialize(&self, i: &mut Interner) -> Vec<u8> {
-        let mut buf: Vec<u8> = Vec::new();
-
-        // 0 - type
-        buf.push(self.ty as u8);
-
-        // 1-2 - prop mask, little-endian
-        buf.extend_from_slice(&self.props.mask().to_le_bytes());
-
-        let props = &self.props;
-
-        // u32: index prop
-        if let Some(idx) = props.idx {
-            buf.extend_from_slice(&idx.to_le_bytes());
-        }
-
-        // u32: interned string name
-        if let Some(name) = &props.name {
-            buf.extend_from_slice(&i.intern(name).to_le_bytes());
-        }
-
-        // u32 (interned): opcode
-        if let Some(opcode) = &props.opcode {
-            buf.extend_from_slice(&i.intern(opcode).to_le_bytes());
-        }
-
-        // u8: linkage
-        if let Some(linkage) = props.linkage {
-            buf.push(linkage as u8);
-        }
-
-        // u8: call_type
-        if let Some(call_type) = props.call_type {
-            buf.push(call_type as u8);
-        }
-
-        // u32 + u32: source_loc
-        if let Some((first, second)) = props.source_loc {
-            buf.extend_from_slice(&first.to_le_bytes());
-            buf.extend_from_slice(&second.to_le_bytes());
-        }
-
-        // u32 (interned): source_file
-        if let Some(source_file) = &props.source_file {
-            buf.extend_from_slice(&i.intern(source_file).to_le_bytes());
-        }
-
-        // u32 (interned): function_type
-        if let Some(function_type) = &props.function_type {
-            buf.extend_from_slice(&i.intern(function_type).to_le_bytes());
-        }
-
-        // u8: address_taken
-        // BIT PRESENCE IN MASK INDICATES TRUE
-
-        buf
-    }
+fn push_node(words: &mut Vec<u32>, node: &Node) {
+    words.extend_from_slice(&[
+        node.meta,
+        node.idx,
+        node.name.0,
+        node.opcode.0,
+        node.source_line,
+        node.source_col,
+        node.source_file.0,
+        node.function_type.0,
+    ]);
 }
 
-impl Edge {
-    pub fn serialize(&self) -> Vec<u8> {
-        let mut buf: Vec<u8> = Vec::new();
-
-        // edge kind bitset
-        buf.push(self.kinds);
-
-        buf
-    }
+fn push_edge(words: &mut Vec<u32>, edge: &Edge) {
+    words.extend_from_slice(&[edge.src, edge.dst, edge.kinds]);
 }

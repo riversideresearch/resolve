@@ -1,5 +1,87 @@
-use crate::model::*;
+use std::collections::*;
+
+use crate::interner::*;
+use crate::schema::*;
 use crate::utils::*;
+
+pub type ModuleHandle = u32;
+pub const INVALID_ID: u32 = u32::MAX;
+
+pub(crate) struct ModuleBuilder {
+    pub(crate) nodes: Vec<Node>,
+    pub(crate) edges: Vec<Edge>,
+    pub(crate) pool: Interner,
+    edge_indexes: HashMap<(NodeID, NodeID), usize>,
+}
+
+impl ModuleBuilder {
+    fn new(hint: usize) -> Self {
+        let edge_hint = hint.saturating_mul(2);
+        Self {
+            nodes: Vec::with_capacity(hint),
+            edges: Vec::with_capacity(edge_hint),
+            pool: Interner::default(),
+            edge_indexes: HashMap::with_capacity(edge_hint),
+        }
+    }
+
+    fn record_node(&mut self, ty: NodeType) -> NodeID {
+        let dense_id = u32::try_from(self.nodes.len()).expect("module has too many nodes");
+        self.nodes.push(Node::new(ty));
+        dense_id
+    }
+
+    fn node_mut(&mut self, id: NodeID) -> Option<&mut Node> {
+        self.nodes.get_mut(id as usize)
+    }
+
+    fn record_edge(&mut self, src: NodeID, dst: NodeID, kind: EdgeKind) {
+        if src as usize >= self.nodes.len() || dst as usize >= self.nodes.len() {
+            return;
+        }
+
+        let id = (src, dst);
+        let kind = 1u32 << kind as u8;
+        if let Some(&index) = self.edge_indexes.get(&id) {
+            self.edges[index].kinds |= kind;
+            return;
+        }
+
+        self.edge_indexes.insert(id, self.edges.len());
+        self.edges.push(Edge {
+            src,
+            dst,
+            kinds: kind,
+        });
+    }
+
+    fn intern_for_node(&mut self, id: NodeID, value: &str) -> Option<(NodeID, Interned)> {
+        self.nodes.get(id as usize)?;
+        let interned = self.pool.intern(value);
+        Some((id, interned))
+    }
+}
+
+#[derive(Default)]
+pub struct ProgramFacts {
+    pub(crate) modules: Vec<ModuleBuilder>,
+}
+
+impl ProgramFacts {
+    fn record_module(&mut self, hint: usize) -> ModuleHandle {
+        let index = u32::try_from(self.modules.len()).expect("program has too many modules");
+        self.modules.push(ModuleBuilder::new(hint));
+        index
+    }
+
+    fn module_mut(&mut self, module: ModuleHandle) -> Option<&mut ModuleBuilder> {
+        self.modules.get_mut(module as usize)
+    }
+
+    fn node_mut(&mut self, module: ModuleHandle, node: NodeID) -> Option<&mut Node> {
+        self.module_mut(module)?.node_mut(node)
+    }
+}
 
 #[unsafe(no_mangle)]
 pub extern "C" fn new_program_facts() -> *mut ProgramFacts {
@@ -16,40 +98,30 @@ pub extern "C" fn free_program_facts(b: *mut ProgramFacts) {
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn record_new_module(b: *mut ProgramFacts, id: ModuleID, hint: usize) {
+pub extern "C" fn record_new_module(b: *mut ProgramFacts, hint: usize) -> ModuleHandle {
     let Some(b) = (unsafe { b.as_mut() }) else {
-        return;
+        return INVALID_ID;
     };
 
-    let module = b.modules.entry(id).or_default();
-    module.nodes.reserve(hint);
-    module.edges.reserve(hint.saturating_mul(2));
+    b.record_module(hint)
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn record_node(
-    b: *mut ProgramFacts,
-    module: ModuleID,
-    node_id: NodeID,
-    ty: NodeType,
-) {
+pub extern "C" fn record_node(b: *mut ProgramFacts, module: ModuleHandle, ty: NodeType) -> NodeID {
     let Some(b) = (unsafe { b.as_mut() }) else {
-        return;
+        return INVALID_ID;
+    };
+    let Some(module) = b.module_mut(module) else {
+        return INVALID_ID;
     };
 
-    b.modules.entry(module).or_default().nodes.insert(
-        node_id,
-        Node {
-            ty,
-            props: NodeProps::default(),
-        },
-    );
+    module.record_node(ty)
 }
 
 #[unsafe(no_mangle)]
 pub extern "C" fn record_edge(
     b: *mut ProgramFacts,
-    module: ModuleID,
+    module: ModuleHandle,
     src: NodeID,
     dst: NodeID,
     kind: EdgeKind,
@@ -57,33 +129,21 @@ pub extern "C" fn record_edge(
     let Some(b) = (unsafe { b.as_mut() }) else {
         return;
     };
-    let Some(m) = b.modules.get_mut(&module) else {
+    let Some(module) = b.module_mut(module) else {
         return;
     };
-    let edge = m
-        .edges
-        .entry(EdgeID {
-            first: src,
-            second: dst,
-        })
-        .or_default();
-    edge.kinds |= 1u8 << (kind as u8);
+
+    module.record_edge(src, dst, kind);
 }
 
-// NODE PROPS:
-// note: I was trying to come up with a way to generate this ABI
-//       (the C++ used visitor pattern with llambdas) cleanly, and
-//       Opus came up with this macro magic. Seems solid to me :)
-macro_rules! node_prop_setter {
-    // string fields: (ptr, len)
-    ($fn:ident, $field:ident, str) => {
+macro_rules! node_scalar_setter {
+    ($fn:ident, $field:ident, $present:ident, $ty:ty) => {
         #[unsafe(no_mangle)]
         pub extern "C" fn $fn(
             b: *mut ProgramFacts,
-            module: ModuleID,
+            module: ModuleHandle,
             node_id: NodeID,
-            ptr: *const u8,
-            len: usize,
+            value: $ty,
         ) {
             let Some(b) = (unsafe { b.as_mut() }) else {
                 return;
@@ -91,40 +151,106 @@ macro_rules! node_prop_setter {
             let Some(node) = b.node_mut(module, node_id) else {
                 return;
             };
-            let Some(s) = (unsafe { as_str(ptr, len) }) else {
-                return;
-            };
-            node.props.$field = Some(s.to_owned());
-        }
-    };
-    // scalar / enum / bool fields, passed by value
-    ($fn:ident, $field:ident, $ty:ty) => {
-        #[unsafe(no_mangle)]
-        pub extern "C" fn $fn(b: *mut ProgramFacts, module: ModuleID, node_id: NodeID, value: $ty) {
-            let Some(b) = (unsafe { b.as_mut() }) else {
-                return;
-            };
-            let Some(node) = b.node_mut(module, node_id) else {
-                return;
-            };
-            node.props.$field = Some(value);
+
+            node.$field = value;
+            node.set_present($present);
         }
     };
 }
 
-node_prop_setter!(record_node_idx, idx, u32);
-node_prop_setter!(record_node_linkage, linkage, Linkage);
-node_prop_setter!(record_node_call_type, call_type, CallType);
-node_prop_setter!(record_node_address_taken, address_taken, bool);
-node_prop_setter!(record_node_name, name, str);
-node_prop_setter!(record_node_opcode, opcode, str);
-node_prop_setter!(record_node_source_file, source_file, str);
-node_prop_setter!(record_node_function_type, function_type, str);
+macro_rules! node_string_setter {
+    ($fn:ident, $field:ident, $present:ident) => {
+        #[unsafe(no_mangle)]
+        pub extern "C" fn $fn(
+            b: *mut ProgramFacts,
+            module: ModuleHandle,
+            node_id: NodeID,
+            ptr: *const u8,
+            len: usize,
+        ) {
+            let Some(b) = (unsafe { b.as_mut() }) else {
+                return;
+            };
+            let Some(value) = (unsafe { as_str(ptr, len) }) else {
+                return;
+            };
+            let Some(module) = b.module_mut(module) else {
+                return;
+            };
+            let Some((dense_id, interned)) = module.intern_for_node(node_id, value) else {
+                return;
+            };
+
+            let node = &mut module.nodes[dense_id as usize];
+            node.$field = interned;
+            node.set_present($present);
+        }
+    };
+}
+
+node_scalar_setter!(record_node_idx, idx, P_IDX, u32);
+node_string_setter!(record_node_name, name, P_NAME);
+node_string_setter!(record_node_opcode, opcode, P_OPCODE);
+node_string_setter!(record_node_source_file, source_file, P_SOURCE_FILE);
+node_string_setter!(record_node_function_type, function_type, P_FUNCTION_TYPE);
+
+#[unsafe(no_mangle)]
+pub extern "C" fn record_node_linkage(
+    b: *mut ProgramFacts,
+    module: ModuleHandle,
+    node_id: NodeID,
+    value: Linkage,
+) {
+    let Some(b) = (unsafe { b.as_mut() }) else {
+        return;
+    };
+    let Some(node) = b.node_mut(module, node_id) else {
+        return;
+    };
+    node.set_linkage(value);
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn record_node_call_type(
+    b: *mut ProgramFacts,
+    module: ModuleHandle,
+    node_id: NodeID,
+    value: CallType,
+) {
+    let Some(b) = (unsafe { b.as_mut() }) else {
+        return;
+    };
+    let Some(node) = b.node_mut(module, node_id) else {
+        return;
+    };
+    node.set_call_type(value);
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn record_node_address_taken(
+    b: *mut ProgramFacts,
+    module: ModuleHandle,
+    node_id: NodeID,
+    value: bool,
+) {
+    let Some(b) = (unsafe { b.as_mut() }) else {
+        return;
+    };
+    let Some(node) = b.node_mut(module, node_id) else {
+        return;
+    };
+
+    if value {
+        node.set_present(P_ADDRESS_TAKEN);
+    } else {
+        node.meta &= !P_ADDRESS_TAKEN;
+    }
+}
 
 #[unsafe(no_mangle)]
 pub extern "C" fn record_node_source_loc(
     b: *mut ProgramFacts,
-    module: ModuleID,
+    module: ModuleHandle,
     node_id: NodeID,
     line: u32,
     col: u32,
@@ -135,5 +261,8 @@ pub extern "C" fn record_node_source_loc(
     let Some(node) = b.node_mut(module, node_id) else {
         return;
     };
-    node.props.source_loc = Some((line, col));
+
+    node.source_line = line;
+    node.source_col = col;
+    node.set_present(P_SOURCE_LOC);
 }

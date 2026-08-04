@@ -12,3 +12,6 @@ parse_deps = false
 
 [parse.expand]
 crates = ["facts-rs"]
+
+[export]
+include = ["Node", "Edge", "ModuleHeader"]

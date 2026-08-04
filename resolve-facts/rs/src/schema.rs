@@ -1,7 +1,7 @@
 // notes:
 // - some fields are over-sized to pad the struct to alignment
 
-use std::mem::{align_of, size_of};
+use std::mem::*;
 
 pub const FORMAT_VERSION: u32 = 1;
 
@@ -13,6 +13,7 @@ pub type NodeID = u32;
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub struct Interned(pub u32);
 
+#[allow(dead_code)] // cbindgen
 #[repr(u8)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum NodeType {
@@ -24,6 +25,7 @@ pub enum NodeType {
     GlobalVariable = 5,
 }
 
+#[allow(dead_code)] // cbindgen
 #[repr(u8)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Linkage {
@@ -31,6 +33,7 @@ pub enum Linkage {
     ExternalLinkage = 1,
 }
 
+#[allow(dead_code)] // cbindgen
 #[repr(u8)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum CallType {
@@ -49,8 +52,10 @@ pub const P_SOURCE_FILE: u32 = 1 << 6;
 pub const P_FUNCTION_TYPE: u32 = 1 << 7;
 pub const P_ADDRESS_TAKEN: u32 = 1 << 8;
 
+#[allow(dead_code)] // cbindgen
 pub const PRESENT_MASK: u32 = u16::MAX as u32;
 pub const NODE_TYPE_SHIFT: u32 = 16;
+#[allow(dead_code)] // cbindgen
 pub const NODE_TYPE_MASK: u32 = 0xff << NODE_TYPE_SHIFT;
 pub const LINKAGE_SHIFT: u32 = 24;
 pub const LINKAGE_MASK: u32 = 0x0f << LINKAGE_SHIFT;
@@ -70,6 +75,7 @@ pub struct Node {
     pub function_type: Interned,
 }
 
+#[allow(dead_code)] // reader
 impl Node {
     pub const fn new(ty: NodeType) -> Self {
         Self {
@@ -126,6 +132,7 @@ impl Node {
     }
 }
 
+#[allow(dead_code)] // cbindgen
 #[repr(u8)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum EdgeKind {
@@ -146,6 +153,7 @@ pub struct Edge {
     pub kinds: u32,
 }
 
+#[allow(dead_code)] // reader
 impl Edge {
     pub const fn has_kind(&self, kind: EdgeKind) -> bool {
         self.kinds & (1 << kind as u8) != 0
@@ -161,6 +169,7 @@ pub struct ModuleHeader {
     pub string_pool_len: u32,
 }
 
+#[allow(dead_code)] // reader
 impl ModuleHeader {
     pub fn byte_len(&self) -> Option<usize> {
         let nodes = usize::try_from(self.node_count)
@@ -181,11 +190,13 @@ impl ModuleHeader {
 // "View" API:
 
 #[derive(Clone, Copy, Debug)]
+#[allow(dead_code)] // reader
 pub struct ModuleRef<'a> {
     bytes: &'a [u8],
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[allow(dead_code)] // reader
 pub enum ViewError {
     Misaligned,
     Truncated,
@@ -193,6 +204,7 @@ pub enum ViewError {
     UnalignedModuleLength,
 }
 
+#[allow(dead_code)] // reader
 impl<'a> ModuleRef<'a> {
     // Borrows the first complete module in "bytes" and returns the unconsumed suffix
     pub fn from_prefix(bytes: &'a [u8]) -> Result<(Self, &'a [u8]), ViewError> {
@@ -269,10 +281,12 @@ impl<'a> ModuleRef<'a> {
 
 // A non-owning view over a complete concatenation of modules
 #[derive(Clone, Copy, Debug)]
+#[allow(dead_code)] // reader
 pub struct FactsRef<'a> {
     bytes: &'a [u8],
 }
 
+#[allow(dead_code)] // reader
 impl<'a> FactsRef<'a> {
     pub const fn new(bytes: &'a [u8]) -> Self {
         Self { bytes }
@@ -285,6 +299,7 @@ impl<'a> FactsRef<'a> {
     }
 }
 
+#[allow(dead_code)] // reader
 pub struct ModuleIter<'a> {
     remaining: &'a [u8],
 }
@@ -310,8 +325,9 @@ impl<'a> Iterator for ModuleIter<'a> {
     }
 }
 
-// Lil codex-generated compile time assertion to alert us when we break sizes
-const _: () = {
+/// cbindgen:ignore
+#[allow(dead_code)] // cbindgen
+const LAYOUT_ASSERTIONS: () = {
     assert!(size_of::<Interned>() == 4);
     assert!(align_of::<Interned>() == 4);
     assert!(size_of::<ModuleHeader>() == 16);

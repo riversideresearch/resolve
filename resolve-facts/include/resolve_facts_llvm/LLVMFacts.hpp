@@ -9,7 +9,6 @@
 #include "facts_rs.hpp"
 
 #include "llvm/ADT/ArrayRef.h"
-#include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/Constants.h"
@@ -17,14 +16,13 @@
 #include "llvm/IR/GlobalVariable.h"
 #include "llvm/IR/Instruction.h"
 #include "llvm/IR/Module.h"
-#include "llvm/Support/FileSystem.h"
 
 #include <cassert>
 #include <cstdint>
 #include <stdexcept>
 #include <unordered_map>
 
-using NodeId = uint32_t;
+using NodeId = NodeID;
 
 // Owns a Rust FactsBuf for the duration of the C++ embedding call.
 class SerializedFacts {
@@ -46,26 +44,41 @@ public:
 // ProgramFacts context. This owns no C++ facts model.
 class LLVMFacts {
   ProgramFacts *facts = new_program_facts();
-  NodeId next_node_id = 1;
 
-  std::unordered_map<const llvm::Module *, NodeId> moduleIDs;
+  std::unordered_map<const llvm::Module *, ModuleHandle> moduleHandles;
   std::unordered_map<const llvm::Function *, NodeId> functionIDs;
   std::unordered_map<const llvm::BasicBlock *, NodeId> basicBlockIDs;
   std::unordered_map<const llvm::Argument *, NodeId> argumentIDs;
   std::unordered_map<const llvm::Instruction *, NodeId> instructionIDs;
   std::unordered_map<const llvm::GlobalVariable *, NodeId> globalVarIDs;
 
-  void recordNewModule(const NodeId id, const size_t size_hint) {
-    ::record_new_module(facts, id, size_hint);
+  ModuleHandle recordNewModule(const size_t size_hint) {
+    const auto module = ::record_new_module(facts, size_hint);
+    assert(module != INVALID_ID);
+    return module;
   }
 
-  void recordNode(const NodeId module, const NodeId id, const NodeType type) {
-    ::record_node(facts, module, id, type);
+  NodeId recordNode(const ModuleHandle module, const NodeType type) {
+    const auto node = ::record_node(facts, module, type);
+    assert(node != INVALID_ID);
+    return node;
+  }
+
+  ModuleHandle addModule(const llvm::Module &M) {
+    if (const auto it = moduleHandles.find(&M); it != moduleHandles.end()) {
+      return it->second;
+    }
+
+    const auto module = recordNewModule(2 * M.getInstructionCount());
+    moduleHandles[&M] = module;
+    const auto moduleNode = recordNode(module, NodeType::Module);
+    assert(moduleNode == 0);
+    return module;
   }
 
   template <typename N> NodeId nodeId(const N &node) { return addNode(node); }
 
-  template <typename N> NodeId moduleId(const N &node) {
+  template <typename N> ModuleHandle moduleId(const N &node) {
     return getModuleId(node);
   }
 
@@ -81,23 +94,13 @@ public:
   LLVMFacts &operator=(const LLVMFacts &) = delete;
 
   NodeId addNode(const llvm::Module &M) {
-    if (moduleIDs.find(&M) == moduleIDs.end()) {
-      llvm::SmallString<128> src_path = llvm::StringRef(M.getSourceFileName());
-      llvm::sys::fs::make_absolute(src_path);
-      auto id =
-          static_cast<NodeId>(std::hash<std::string>{}(std::string(src_path)));
-
-      moduleIDs[&M] = id;
-      recordNewModule(id, 2 * M.getInstructionCount());
-      recordNode(id, id, NodeType::Module);
-      return id;
-    }
-    return moduleIDs[&M];
+    addModule(M);
+    return 0;
   }
 
-  NodeId getModuleId(const llvm::Module &M) { return addNode(M); }
+  ModuleHandle getModuleId(const llvm::Module &M) { return addModule(M); }
 
-  template <typename T> NodeId getModuleId(const T &i) {
+  template <typename T> ModuleHandle getModuleId(const T &i) {
     const llvm::Module *module;
 
     constexpr bool parent_is_module =
@@ -112,7 +115,7 @@ public:
     }
 
     assert(module);
-    return addNode(*module);
+    return addModule(*module);
   }
 
   template <typename T> static std::size_t getIndexInParent(const T &item) {
@@ -122,9 +125,8 @@ public:
 
   NodeId addNode(const llvm::GlobalVariable &GV) {
     if (globalVarIDs.find(&GV) == globalVarIDs.end()) {
-      const auto id = next_node_id++;
+      const auto id = recordNode(getModuleId(GV), NodeType::GlobalVariable);
       globalVarIDs[&GV] = id;
-      recordNode(getModuleId(GV), id, NodeType::GlobalVariable);
       return id;
     }
     return globalVarIDs[&GV];
@@ -132,9 +134,8 @@ public:
 
   NodeId addNode(const llvm::Function &F) {
     if (functionIDs.find(&F) == functionIDs.end()) {
-      const auto id = next_node_id++;
+      const auto id = recordNode(getModuleId(F), NodeType::Function);
       functionIDs[&F] = id;
-      recordNode(getModuleId(F), id, NodeType::Function);
       return id;
     }
     return functionIDs[&F];
@@ -142,9 +143,8 @@ public:
 
   NodeId addNode(const llvm::Argument &A) {
     if (argumentIDs.find(&A) == argumentIDs.end()) {
-      const auto id = next_node_id++;
+      const auto id = recordNode(getModuleId(A), NodeType::Argument);
       argumentIDs[&A] = id;
-      recordNode(getModuleId(A), id, NodeType::Argument);
       return id;
     }
     return argumentIDs[&A];
@@ -152,9 +152,8 @@ public:
 
   NodeId addNode(const llvm::BasicBlock &BB) {
     if (basicBlockIDs.find(&BB) == basicBlockIDs.end()) {
-      const auto id = next_node_id++;
+      const auto id = recordNode(getModuleId(BB), NodeType::BasicBlock);
       basicBlockIDs[&BB] = id;
-      recordNode(getModuleId(BB), id, NodeType::BasicBlock);
       return id;
     }
     return basicBlockIDs[&BB];
@@ -162,9 +161,8 @@ public:
 
   NodeId addNode(const llvm::Instruction &I) {
     if (instructionIDs.find(&I) == instructionIDs.end()) {
-      const auto id = next_node_id++;
+      const auto id = recordNode(getModuleId(I), NodeType::Instruction);
       instructionIDs[&I] = id;
-      recordNode(getModuleId(I), id, NodeType::Instruction);
       return id;
     }
     return instructionIDs[&I];
@@ -227,8 +225,9 @@ public:
     ::record_node_address_taken(facts, moduleId(node), nodeId(node), true);
   }
 
-  SerializedFacts serialize() const {
-    auto *buf = facts_serialize(facts);
+  SerializedFacts serialize() {
+    auto *buf = facts_freeze(facts);
+    facts = nullptr;
     if (!buf) {
       throw std::runtime_error("failed to serialize Rust ProgramFacts context");
     }
