@@ -68,7 +68,7 @@ static BoundsClass classifyPointer(const Value *ptr) {
 static FunctionCallee getOrCreateResolveGetBounds(Module *M, BoundsClass cls) {
   auto &Ctx = M->getContext();
   auto ptrType = PointerType::get(Ctx, 0);
-  auto struct_ty = StructType::get(Ctx, {ptrType, ptrType}, false);
+  auto structType = StructType::get(Ctx, {ptrType, ptrType}, false);
 
   MemoryEffects ME = MemoryEffects::none();
 
@@ -94,7 +94,17 @@ static FunctionCallee getOrCreateResolveGetBounds(Module *M, BoundsClass cls) {
   }
 
   return M->getOrInsertFunction(
-      name, FunctionType::get(struct_ty, {ptrType}, false), attrs);
+      name, FunctionType::get(structType, {ptrType}, false), attrs);
+}
+
+static FunctionCallee getOrCreateReportAccessViolation(Module *M) {
+  auto &Ctx = M->getContext();
+  auto ptrSize = PointerType::get(Ctx, 0);
+  auto sizeType = Type::getInt64Ty(Ctx);
+  auto voidType = Type::getVoidTy(Ctx);
+  return M->getOrInsertFunction(
+      "__resolve_report_violation",
+      FunctionType::get(voidType, {ptrType, sizeType, ptrType}));
 }
 
 static Function *getOrCreateAccessOk(Module *M, BoundsClass cls) {
