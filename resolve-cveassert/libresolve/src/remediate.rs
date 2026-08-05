@@ -27,7 +27,7 @@ pub extern "C" fn __resolve_alloca(ptr: *mut c_void, size: usize) -> () {
 
 #[unsafe(no_mangle)]
 pub extern "C" fn __resolve_register_global(ptr: *mut c_void, size: usize) {
-    GLOBALS.lock().push(ShadowObject::new(AllocType::Global, ptr as Vaddr, size));
+    GLOBALS.lock().push(ShadowObject::new(AllocType::Global, ptr as Vaddr, size + 1));
 }
 
 #[unsafe(no_mangle)]
