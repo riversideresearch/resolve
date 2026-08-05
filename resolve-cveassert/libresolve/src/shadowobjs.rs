@@ -344,7 +344,13 @@ thread_local! {
 pub static GLOBALS: MutexWrap<Vec<ShadowObject>> = MutexWrap::new(Vec::new());
 
 pub fn lookup_global(p: Vaddr) -> Option<ShadowObject> {
-    GLOBALS.lock().iter().find(|obj| obj.contains(p) || obj.past_limit() == p).copied()
+    let globals = GLOBALS.lock();
+
+    globals
+        .iter()
+        .find(|obj| obj.contains(p))
+        .or_else(|| globals.iter().find(|obj| obj.past_limit() == p))
+        .copied()
 }
 
 #[cfg(test)]
