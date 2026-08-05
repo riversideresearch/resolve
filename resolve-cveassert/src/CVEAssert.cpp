@@ -298,6 +298,8 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
         continue;
       if (G.getName().starts_with("__resolve_"))
         continue;
+      if (G.getName().contains(".sanmap"))
+        continue;
       if (DL.getTypeAllocSize(G.getValueType()) == 0)
         continue;
       targets.push_back(&G);
