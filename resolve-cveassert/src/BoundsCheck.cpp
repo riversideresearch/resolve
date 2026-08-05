@@ -99,7 +99,7 @@ static FunctionCallee getOrCreateResolveGetBounds(Module *M, BoundsClass cls) {
 
 static FunctionCallee getOrCreateReportAccessViolation(Module *M) {
   auto &Ctx = M->getContext();
-  auto ptrSize = PointerType::get(Ctx, 0);
+  auto ptrType = PointerType::get(Ctx, 0);
   auto sizeType = Type::getInt64Ty(Ctx);
   auto voidType = Type::getVoidTy(Ctx);
   return M->getOrInsertFunction(
