@@ -104,7 +104,7 @@ static FunctionCallee getOrCreateReportAccessViolation(Module *M) {
   auto voidType = Type::getVoidTy(Ctx);
   return M->getOrInsertFunction(
       "__resolve_report_violation",
-      FunctionType::get(voidType, {ptrType, sizeType, ptrType}));
+      FunctionType::get(voidType, {ptrType, sizeType, ptrType}, false));
 }
 
 static Function *getOrCreateAccessOk(Module *M, BoundsClass cls) {
