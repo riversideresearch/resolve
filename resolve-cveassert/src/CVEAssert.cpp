@@ -300,8 +300,6 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
         continue;
       if (DL.getTypeAllocSize(G.getValueType()) == 0)
         continue;
-      if (G.isConstant()) // skip constant globals (e.g., string literals)
-        continue;
       targets.push_back(&G);
     }
 
