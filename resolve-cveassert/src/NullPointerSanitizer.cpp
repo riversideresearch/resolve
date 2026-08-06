@@ -18,7 +18,7 @@
 using namespace llvm;
 
 static Function *
-getOrCreateNullPtrLoadSanitizer(Function *F, Type *valueType,
+getOrCreateLoadWrapper(Function *F, Type *valueType,
                                 Vulnerability::RemediationStrategies strategy) {
   std::string handlerName = "__resolve_null_check_ld_" + getLLVMType(valueType);
   Module *M = F->getParent();
@@ -81,7 +81,7 @@ getOrCreateNullPtrLoadSanitizer(Function *F, Type *valueType,
   return wrapperFn;
 }
 
-static Function *getOrCreateNullPtrStoreSanitizer(
+static Function *getOrCreateStoreWrapper(
     Function *F, Type *valueType,
     Vulnerability::RemediationStrategies strategy) {
   std::string handlerName = "__resolve_null_check_st_" + getLLVMType(valueType);
@@ -187,7 +187,7 @@ void sanitizeNullPointers(Function *F,
     builder.SetInsertPoint(load);
     auto valueType = load->getType();
 
-    auto loadFn = getOrCreateNullPtrLoadSanitizer(F, valueType, strategy);
+    auto loadFn = getOrCreateLoadWrapper(F, valueType, strategy);
 
     auto sanitizedLoad =
         builder.CreateCall(loadFn, {load->getPointerOperand()});
@@ -199,7 +199,7 @@ void sanitizeNullPointers(Function *F,
   for (auto *store : storeList) {
     builder.SetInsertPoint(store);
     auto valueType = store->getValueOperand()->getType();
-    auto storeFn = getOrCreateNullPtrStoreSanitizer(F, valueType, strategy);
+    auto storeFn = getOrCreateStoreWrapper(F, valueType, strategy);
 
     auto sanitizedStore = builder.CreateCall(
         storeFn, {store->getPointerOperand(), store->getValueOperand()});
