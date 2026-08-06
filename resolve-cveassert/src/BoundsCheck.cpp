@@ -353,7 +353,6 @@ getOrCreateMemcpyWrapper(Function *F,
 
   // SanitizeMemcpyBB: Remediate memcpy returns null pointer.
   builder.SetInsertPoint(SanitizeMemcpyBB);
-  builder.CreateCall(getOrCreateReportSanitizerTriggered(M));
   if (Function *fn = getOrCreateRemediationBehavior(M, strategy)) {
     builder.CreateCall(fn);
     builder.CreateUnreachable();
@@ -424,7 +423,6 @@ getOrCreateMemmoveWrapper(Function *F,
 
   // SanitizeMemcpyBB: Remediate memcpy returns null pointer.
   builder.SetInsertPoint(handleInvalidMemmoveBB);
-  builder.CreateCall(getOrCreateReportSanitizerTriggered(M));
   if (Function *fn = getOrCreateRemediationBehavior(M, strategy)) {
     builder.CreateCall(fn);
     builder.CreateUnreachable();
@@ -492,7 +490,6 @@ getOrCreateMemsetWrapper(Function *F,
   builder.CreateRet(memsetPtr);
 
   builder.SetInsertPoint(handleInvalidMemsetBB);
-  builder.CreateCall(getOrCreateReportSanitizerTriggered(M));
   if (Function *fn = getOrCreateRemediationBehavior(M, strategy)) {
     builder.CreateCall(fn);
     builder.CreateUnreachable();
