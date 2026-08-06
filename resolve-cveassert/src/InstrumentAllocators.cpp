@@ -106,11 +106,11 @@ void instrumentAlloca(Function *F) {
   // 2. alloca T, i64 N where N is constant
   auto create_transformed_array_alloca = [&](auto *oldAlloca) -> AllocaInst * {
     builder.SetInsertPoint(oldAlloca->getNextNode());
-    ArrayType *arrTy = dyn_cast<ArrayType>(oldAlloca->getAllocatedType());
-    uint64_t numElements = arrTy->getNumElements();
-    Type *elemTy = arrTy->getElementType();
+    ArrayType *arrType = dyn_cast<ArrayType>(oldAlloca->getAllocatedType());
+    uint64_t numElements = arrType->getNumElements();
+    Type *elemType = arrType->getElementType();
     uint64_t size = numElements + 1;
-    ArrayType *newArrayTy = ArrayType::get(elemTy, size);
+    ArrayType *newArrayTy = ArrayType::get(elemType, size);
     AllocaInst *transformedAlloca = builder.CreateAlloca(
         newArrayTy, nullptr, oldAlloca->getName() + ".inst");
     transformedAlloca->setAlignment(oldAlloca->getAlign());
