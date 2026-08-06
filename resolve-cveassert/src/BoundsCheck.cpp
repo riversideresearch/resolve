@@ -117,7 +117,7 @@ static Function *getOrCreateAccessOk(Module *M, BoundsClass cls) {
   auto boolType = Type::getIntNTy(Ctx, 1);
 
   FunctionType *accessCheckType =
-      FunctionType::get(boolType, {ptrType, sizeType}, false);
+      FunctionType::get(boolType, {ptrType, sizeType, ptrType}, false);
 
   Function *accessOkFn =
       getOrCreateResolveHelper(M, handlerName, accessCheckType);
@@ -142,6 +142,7 @@ static Function *getOrCreateAccessOk(Module *M, BoundsClass cls) {
 
   Value *ptr = accessOkFn->getArg(0);
   Value *accessSize = accessOkFn->getArg(1);
+  Value *fnName = accessOkFn->getArg(2);
 
   Value *bounds = builder.CreateCall(getOrCreateResolveGetBounds(M, cls), {ptr},
                                      "resolve.bounds");
@@ -165,6 +166,7 @@ static Function *getOrCreateAccessOk(Module *M, BoundsClass cls) {
   builder.CreateRet(ConstantInt::getTrue(Ctx));
 
   builder.SetInsertPoint(accessDeniedBB);
+  builder.CreateCall(getOrCreateReportAccessViolation(M), { ptr, accessSize, fnName }); 
   builder.CreateRet(ConstantInt::getFalse(Ctx));
 
   validateIR(accessOkFn);
@@ -203,8 +205,10 @@ static Function *getOrCreateBoundsCheckLoadSanitizer(
   createSanitizerGateBranch(builder, F, 0, performLoadBB, checkBoundsBB);
 
   builder.SetInsertPoint(checkBoundsBB);
+  // TODO: Add global variable for function name to be passed into function
+  Value *affectedFnName = builder.CreateGlobalStringPtr(F->getName(), "", 0, M);
   Value *accessInBounds = builder.CreateCall(
-      getOrCreateAccessOk(M, cls), {ptr, ConstantExpr::getSizeOf(Type)});
+      getOrCreateAccessOk(M, cls), {ptr, ConstantExpr::getSizeOf(Type), affectedFnName });
 
   builder.CreateCondBr(accessInBounds, performLoadBB, handleInvalidLoadBB);
 
@@ -215,7 +219,7 @@ static Function *getOrCreateBoundsCheckLoadSanitizer(
 
   // handleInvalidLoadBB: Apply remediation strategy
   builder.SetInsertPoint(handleInvalidLoadBB);
-  builder.CreateCall(getOrCreateReportSanitizerTriggered(M));
+  //builder.CreateCall(getOrCreateReportSanitizerTriggered(M));
   if (Function *fn = getOrCreateRemediationBehavior(M, strategy)) {
     builder.CreateCall(fn);
     builder.CreateUnreachable();
@@ -264,8 +268,10 @@ static Function *getOrCreateBoundsCheckStoreSanitizer(
   createSanitizerGateBranch(builder, F, 0, performStoreBB, checkBoundsBB);
 
   builder.SetInsertPoint(checkBoundsBB);
+  // TODO: Add global variable for affected function name
+  Value *affectedFnName = builder.CreateGlobalStringPtr(F->getName());
   Value *accessInBounds = builder.CreateCall(
-      getOrCreateAccessOk(M, cls), {ptr, ConstantExpr::getSizeOf(Type)});
+      getOrCreateAccessOk(M, cls), {ptr, ConstantExpr::getSizeOf(Type), affectedFnName });
 
   builder.CreateCondBr(accessInBounds, performStoreBB, handleInvalidStoreBB);
 
@@ -275,7 +281,7 @@ static Function *getOrCreateBoundsCheckStoreSanitizer(
 
   // handleInvalidStoreBB: Apply remediation strategy
   builder.SetInsertPoint(handleInvalidStoreBB);
-  builder.CreateCall(getOrCreateReportSanitizerTriggered(M));
+  //builder.CreateCall(getOrCreateReportSanitizerTriggered(M));
   if (Function *fn = getOrCreateRemediationBehavior(M, strategy)) {
     builder.CreateCall(fn);
     builder.CreateUnreachable();
