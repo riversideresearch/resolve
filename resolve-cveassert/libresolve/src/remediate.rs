@@ -7,7 +7,7 @@ use libc::{
 use crate::shadowobjs::{ALIVE_OBJ_LIST, AllocType, FREED_OBJ_LIST, GLOBALS, SHADOW_STACK, ShadowObject, Vaddr, lookup_global};
 
 use log::{info, warn};
-
+use std::ffi::CStr;
 /**
  * @brief - Allocator interface for stack objects
  * @input - size of the pointer allocation in bytes
@@ -22,7 +22,10 @@ pub extern "C" fn __resolve_alloca(ptr: *mut c_void, size: usize) -> () {
          ss.add_shadow_object(base, size)
     );
 
-    info!("[STACK] Object allocated with size: {size}, address: 0x{base:x}");
+    info!("[STACK] Registered stack object: addr={:p}, size={}",
+        ptr,
+        size
+    );
 }
 
 #[unsafe(no_mangle)]
@@ -31,15 +34,18 @@ pub extern "C" fn __resolve_register_global(ptr: *mut c_void, size: usize) {
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn __resolve_invalidate_stack_range(base: *mut c_void, size: usize) {
-    let base = base as Vaddr;
+pub extern "C" fn __resolve_invalidate_stack_range(ptr: *mut c_void, size: usize) {
+    let base = ptr as Vaddr;
 
     SHADOW_STACK.with_borrow_mut(
         |ss|
          ss.invalidate_at(base, size)
     );
 
-    info!("[STACK] Free addr 0x{base:x} size {size}");
+    info!("[STACK] Unregistered stack object: addr={:p}, size={}",
+          ptr,
+          size
+    );
 }
 
 /**
@@ -61,8 +67,9 @@ pub extern "C" fn __resolve_malloc(size: usize) -> *mut c_void {
     }
 
     info!(
-        "[HEAP] Object allocated with size: {size}, address: 0x{:x}",
-        ptr as Vaddr
+        "[HEAP] Registered heap object (malloc): addr={:p}, size={}",
+        ptr,
+        size
     );
 
     ptr
@@ -75,15 +82,7 @@ pub extern "C" fn __resolve_malloc(size: usize) -> *mut c_void {
  */
 #[unsafe(no_mangle)]
 pub extern "C" fn __resolve_free(ptr: *mut c_void) -> () {
-    // Insert a function to find the object and return the pointer size
-    // Do I need to handle if the sobj cannot be found?
-
-    info!(
-        "[FREE] Allocated object freed at address: 0x{:x}",
-        ptr as Vaddr
-    );
-
-    let ptr_size = {
+    let obj_size = {
         let mut obj_list = ALIVE_OBJ_LIST.lock();
         let sobj_opt = obj_list.search_intersection(ptr as Vaddr);
         let size = sobj_opt.map(|o| o.size());
@@ -93,25 +92,32 @@ pub extern "C" fn __resolve_free(ptr: *mut c_void) -> () {
     };
 
     // Check if the shadow object exists
-    match ptr_size {
+    match obj_size {
         Some(size) => {
             info!(
-                "[FREE] Found shadow object for allocated object, 0x{:x}, size = {size}",
+                "[HEAP] Found shadow object for allocated object, 0x{:x}, size = {size}",
                 ptr as Vaddr,
+            );
+
+            info!("[HEAP] Unregistered heap object: addr={:p}, size={}",
+                  ptr,
+                  size
             );
         }
         None => {
             warn!(
-                "[FREE] No shadow object found for allocated object: 0x{:x}",
+                "[HEAP] No shadow object found for allocated object: 0x{:x}",
                 ptr as Vaddr
             );
         }
     }
 
+
     {
+
         // Insert shadow object into freed object list
         let mut freed_guard = FREED_OBJ_LIST.lock();
-        freed_guard.add_shadow_object(AllocType::Unallocated, ptr as Vaddr, ptr_size.unwrap_or(0));
+        freed_guard.add_shadow_object(AllocType::Unallocated, ptr as Vaddr, obj_size.unwrap_or(0));
     }
 
     let _ = unsafe { free(ptr) };
@@ -148,8 +154,9 @@ pub extern "C" fn __resolve_realloc(ptr: *mut c_void, size: usize) -> *mut c_voi
     }
 
     info!(
-        "[HEAP] Allocated object reallocated mem from src: {ptr:?}, size: {size}, dst ptr: 0x{:x}",
-        realloc_ptr as Vaddr
+        "[HEAP] Registered heap object (realloc): addr={:p}, size={}",
+        realloc_ptr,
+        size
     );
 
     realloc_ptr
@@ -177,8 +184,9 @@ pub extern "C" fn __resolve_calloc(n_items: usize, item_size: usize) -> *mut c_v
     }
 
     info!(
-        "[HEAP] Logging allocation with {n_items} items, size (bytes): {size}, dst ptr: 0x{:x}",
-        ptr as Vaddr
+        "[HEAP] Registered heap object (calloc): addr={:p}, size={}",
+        ptr,
+        size
     );
 
     ptr
@@ -208,8 +216,9 @@ pub extern "C" fn __resolve_strdup(ptr: *mut c_char) -> *mut c_char {
     }
 
     info!(
-        "[HEAP] Logging 'strdup' function call with dst ptr: 0x{:x}",
-        string_ptr as Vaddr
+        "[HEAP] Registered heap object (strdup): addr={:p}, size={}",
+        string_ptr,
+        sizeofstr
     );
 
     string_ptr
@@ -244,8 +253,9 @@ pub extern "C" fn __resolve_strndup(ptr: *mut c_char, size: usize) -> *mut c_cha
     }
 
     info!(
-        "[HEAP] Logging 'strndup' function call with size (bytes): {size}, dst ptr: {:?}",
-        string_ptr as Vaddr
+        "[HEAP] Registered heap object (strndup): addr={:p}, size={}",
+        string_ptr,
+        sizeofstr
     );
 
     string_ptr
@@ -356,8 +366,22 @@ pub extern "C" fn resolve_obj_type(base_ptr: *mut c_void) -> AllocType {
  * @brief - Logs when program enters sanitization basic block
  */
 #[unsafe(no_mangle)]
-pub extern "C" fn __resolve_report_violation() -> () {
-    info!("[RESOLVE] sanitizer triggered");
+pub extern "C" fn __resolve_report_violation(
+    ptr: *mut c_void,
+    access_size: usize,
+    function: *mut c_char,
+) {
+    let function = unsafe { CStr::from_ptr(function).to_string_lossy() };
+
+    let bounds = __resolve_get_bounds(ptr);
+    
+    info!("[RESOLVE] Invalid memory access: address={:p}, size={}, bounds=[{:p}, {:p}) function={}",
+          ptr,
+          access_size,
+          bounds.base,
+          bounds.limit,
+          function
+    );
 }
 
 #[cfg(test)]
