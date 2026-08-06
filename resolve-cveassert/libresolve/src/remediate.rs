@@ -363,7 +363,7 @@ pub extern "C" fn resolve_obj_type(base_ptr: *mut c_void) -> AllocType {
 }
 
 /**
- * @brief - Logs when program enters sanitization basic block
+ * @brief - Logs invalid memory accesses
  */
 #[unsafe(no_mangle)]
 pub extern "C" fn __resolve_report_violation(
