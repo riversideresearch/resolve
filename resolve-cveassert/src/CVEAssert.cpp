@@ -298,7 +298,8 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
         continue;
       if (G.getName().starts_with("__resolve_"))
         continue;
-      if (G.getName().contains(".sanmap"))
+      if (G.getName().contains(
+              ".sanmap")) // sanitizer map globals for targeted sanitization
         continue;
       if (DL.getTypeAllocSize(G.getValueType()) == 0)
         continue;
