@@ -19,7 +19,7 @@ using namespace llvm;
 
 static Function *
 getOrCreateLoadWrapper(Function *F, Type *valueType,
-                                Vulnerability::RemediationStrategies strategy) {
+                       Vulnerability::RemediationStrategies strategy) {
   std::string handlerName = "__resolve_null_check_ld_" + getLLVMType(valueType);
   Module *M = F->getParent();
   LLVMContext &Ctx = M->getContext();
@@ -81,9 +81,9 @@ getOrCreateLoadWrapper(Function *F, Type *valueType,
   return wrapperFn;
 }
 
-static Function *getOrCreateStoreWrapper(
-    Function *F, Type *valueType,
-    Vulnerability::RemediationStrategies strategy) {
+static Function *
+getOrCreateStoreWrapper(Function *F, Type *valueType,
+                        Vulnerability::RemediationStrategies strategy) {
   std::string handlerName = "__resolve_null_check_st_" + getLLVMType(valueType);
   Module *M = F->getParent();
   LLVMContext &Ctx = M->getContext();

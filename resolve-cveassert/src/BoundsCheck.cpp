@@ -204,8 +204,6 @@ getOrCreateLoadWrapper(Function *F, Type *Type,
   createSanitizerGateBranch(builder, F, 0, performLoadBB, checkBoundsBB);
 
   builder.SetInsertPoint(checkBoundsBB);
-  // TODO: Add global variable for function name to be passed into function
-  Value *affectedFnName = builder.CreateGlobalStringPtr(F->getName(), "", 0, M);
   Value *accessInBounds = builder.CreateCall(
       getOrCreateAccessOk(M, cls), {ptr, ConstantExpr::getSizeOf(Type)});
 
@@ -267,8 +265,6 @@ getOrCreateStoreWrapper(Function *F, Type *Type,
   createSanitizerGateBranch(builder, F, 0, performStoreBB, checkBoundsBB);
 
   builder.SetInsertPoint(checkBoundsBB);
-  // TODO: Add global variable for affected function name
-  Value *affectedFnName = builder.CreateGlobalStringPtr(F->getName());
   Value *accessInBounds = builder.CreateCall(
       getOrCreateAccessOk(M, cls), {ptr, ConstantExpr::getSizeOf(Type)});
 
