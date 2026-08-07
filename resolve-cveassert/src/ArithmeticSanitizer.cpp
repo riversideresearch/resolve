@@ -43,7 +43,7 @@ static Constant *getContinueValue(Instruction *I) {
       return ConstantInt::get(Ty, APInt::getMaxValue(bitwidth));
 
     default:
-      llvm_unreachable("[CVEAssert] Unsupported integer operation");
+      llvm_unreachable("Unsupported integer operation");
     }
   }
 
