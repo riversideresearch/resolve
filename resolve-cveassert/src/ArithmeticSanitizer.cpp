@@ -27,7 +27,7 @@
 
 using namespace llvm;
 
-Constant *getContinueValue(Instruction *I) {
+static Constant *getContinueValue(Instruction *I) {
   Type *Ty = I->getType();
 
   if (Ty->isIntegerTy()) {
@@ -199,9 +199,7 @@ void sanitizeDivideByZero(Function *F,
     builder.SetInsertPoint(remedDivBB);
     builder.CreateCall(getOrCreateResolveReportSanitizerTriggered(M));
 
-    // TODO: Implement continue strategy for div-zero
     Value *remedValue = nullptr;
-
     switch (strategy) {
     case Vulnerability::RemediationStrategies::CONTINUE:
       remedValue = getContinueValue(binaryInst);
@@ -219,7 +217,6 @@ void sanitizeDivideByZero(Function *F,
 
     builder.SetInsertPoint(preserveDivBB);
 
-    // Perform the division operation with the given operands.
     Value *divOp = nullptr;
     switch (binaryInst->getOpcode()) {
     case Instruction::SDiv:
