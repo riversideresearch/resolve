@@ -19,12 +19,40 @@
 #include "Vulnerability.hpp"
 
 #include <deque>
+#include <limits>
 #include <memory>
 #include <optional>
 #include <utility>
 #include <vector>
 
 using namespace llvm;
+
+Constant *getContinueValue(Instruction *I) {
+  Type *Ty = I->getType();
+
+  if (Ty->isIntegerTy()) {
+    unsigned bitwidth = Ty->getIntegerBitWidth();
+
+    switch (I->getOpcode()) {
+    case Instruction::SDiv:
+    case Instruction::SRem:
+      return ConstantInt::get(Ty, APInt::getSignedMaxValue(bitwidth));
+
+    case Instruction::UDiv:
+    case Instruction::URem:
+      return ConstantInt::get(Ty, APInt::getMaxValue(bitwidth));
+
+    default:
+      llvm_unreachable("[CVEAssert] Unsupported integer operation");
+    }
+  }
+
+  if (Ty->isFloatTy())
+    return ConstantFP::get(Ty, APFloat(std::numeric_limits<float>::max()));
+
+  if (Ty->isDoubleTy())
+    return ConstantFP::get(Ty, APFloat(std::numeric_limits<double>::max()));
+}
 
 static void widenIntOverflow(Function *F) {
   // Basic algorithm:
@@ -136,7 +164,7 @@ void sanitizeDivideByZero(Function *F,
     BasicBlock *joinResultBB = checkMapEntryBB->splitBasicBlock(binaryInst);
     BasicBlock *checkZeroBB = BasicBlock::Create(Ctx, "check.zero", F);
     BasicBlock *preserveDivBB =
-        BasicBlock::Create(Ctx, "safe.div", F, joinResultBB);
+        BasicBlock::Create(Ctx, "perform.div", F, joinResultBB);
     BasicBlock *remedDivBB =
         BasicBlock::Create(Ctx, "sanitize.div", F, joinResultBB);
 
@@ -172,102 +200,66 @@ void sanitizeDivideByZero(Function *F,
     builder.CreateCall(getOrCreateResolveReportSanitizerTriggered(M));
 
     // TODO: Implement continue strategy for div-zero
-    Constant *recoveryValue = nullptr;
-    if (strategy == Vulnerability::RemediationStrategies::CONTINUE) {
+    Value *remedValue = nullptr;
 
-      Type *type = binaryInst->getType();
-      unsigned bitWidth = type->getIntegerBitWidth();
-
-      if (binaryInst->getOpcode() == Instruction::SDiv) {
-        recoveryValue =
-            ConstantInt::get(type, APInt::getSignedMaxValue(bitWidth));
-
-      } else {
-        recoveryValue = ConstantInt::get(type, APInt::getMaxValue(bitWidth));
-      }
-
-      builder.CreateRet(recoveryValue);
-    }
-
-    if (Function *fn = getOrCreateRemediationBehavior(M, strategy)) {
-      builder.CreateCall(fn);
-    }
-    Value *safeDiv = nullptr;
-    Value *safeIntDivisor;
-    Value *safeFpDivisor;
-
-    switch (binaryInst->getOpcode()) {
-    case Instruction::UDiv:
-      safeIntDivisor = ConstantInt::get(divisor->getType(), 1);
-      safeDiv = builder.CreateUDiv(dividend, safeIntDivisor);
+    switch (strategy) {
+    case Vulnerability::RemediationStrategies::CONTINUE:
+      remedValue = getContinueValue(binaryInst);
+      builder.CreateBr(joinResultBB);
       break;
 
-    case Instruction::SDiv:
-      safeIntDivisor = ConstantInt::get(divisor->getType(), 1);
-      safeDiv = builder.CreateSDiv(dividend, safeIntDivisor);
-      break;
+    case Vulnerability::RemediationStrategies::EXIT:
+    case Vulnerability::RemediationStrategies::RECOVER:
+      builder.CreateCall(getOrCreateRemediationBehavior(M, strategy));
 
-    case Instruction::FDiv:
-      safeFpDivisor = ConstantFP::get(binaryInst->getType(), 1.0);
-      safeDiv = builder.CreateFDiv(dividend, safeFpDivisor);
-      break;
-
-    case Instruction::URem:
-      safeIntDivisor = ConstantInt::get(divisor->getType(), 1);
-      safeDiv = builder.CreateURem(dividend, safeIntDivisor);
-      break;
-
-    case Instruction::SRem:
-      safeIntDivisor = ConstantInt::get(divisor->getType(), 1);
-      safeDiv = builder.CreateSRem(dividend, safeIntDivisor);
-      break;
-
-    case Instruction::FRem:
-      safeFpDivisor = ConstantFP::get(divisor->getType(), 1.0);
-      safeDiv = builder.CreateFRem(dividend, safeFpDivisor);
+      // EXIT/RECOVER transfer control elsewhere
+      builder.CreateUnreachable();
       break;
     }
-    builder.CreateBr(joinResultBB);
 
     builder.SetInsertPoint(preserveDivBB);
-    Value *normalResult = nullptr;
 
+    // Perform the division operation with the given operands.
+    Value *divOp = nullptr;
     switch (binaryInst->getOpcode()) {
     case Instruction::SDiv:
-      normalResult = builder.CreateSDiv(dividend, divisor);
-      builder.CreateBr(joinResultBB);
-      break;
-
-    case Instruction::UDiv:
-      normalResult = builder.CreateUDiv(dividend, divisor);
-      builder.CreateBr(joinResultBB);
-      break;
-
-    case Instruction::FDiv:
-      normalResult = builder.CreateFDiv(dividend, divisor);
+      divOp = builder.CreateSDiv(dividend, divisor);
       builder.CreateBr(joinResultBB);
       break;
 
     case Instruction::SRem:
-      normalResult = builder.CreateSRem(dividend, divisor);
+      divOp = builder.CreateSRem(dividend, divisor);
+      builder.CreateBr(joinResultBB);
+      break;
+
+    case Instruction::UDiv:
+      divOp = builder.CreateUDiv(dividend, divisor);
       builder.CreateBr(joinResultBB);
       break;
 
     case Instruction::URem:
-      normalResult = builder.CreateURem(dividend, divisor);
+      divOp = builder.CreateURem(dividend, divisor);
+      builder.CreateBr(joinResultBB);
+      break;
+
+    case Instruction::FDiv:
+      divOp = builder.CreateFDiv(dividend, divisor);
       builder.CreateBr(joinResultBB);
       break;
 
     case Instruction::FRem:
-      normalResult = builder.CreateFRem(dividend, divisor);
+      divOp = builder.CreateFRem(dividend, divisor);
       builder.CreateBr(joinResultBB);
       break;
     }
 
     builder.SetInsertPoint(&*joinResultBB->begin());
     PHINode *phi = builder.CreatePHI(binaryInst->getType(), 2);
-    phi->addIncoming(safeDiv, remedDivBB);
-    phi->addIncoming(normalResult, preserveDivBB);
+    phi->addIncoming(divOp, preserveDivBB);
+
+    if (strategy == Vulnerability::RemediationStrategies::CONTINUE) {
+      phi->addIncoming(remedValue, remedDivBB);
+    }
 
     binaryInst->replaceAllUsesWith(phi);
     binaryInst->eraseFromParent();
