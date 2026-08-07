@@ -55,7 +55,7 @@ GlobalVariable *initSanitizerMap(Function &F) {
   Module *M = F.getParent();
   LLVMContext &Ctx = M->getContext();
   Type *boolType = Type::getInt1Ty(Ctx);
-  ArrayType *ArrayType = ArrayType::get(boolType, 6);
+  ArrayType *ArrayType = ArrayType::get(boolType, NumSanitizerFlags);
 
   std::string globalName = F.getName().str() + ".sanmap";
 
