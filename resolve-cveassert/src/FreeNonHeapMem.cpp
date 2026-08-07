@@ -90,18 +90,8 @@ Function *getOrCreateFreeOfNonHeapSanitizer(
   builder.SetInsertPoint(entryBB);
   Argument *ptr = sanitizerFn->getArg(0);
 
-  Value *sanitizerMapPtr =
-      builder.CreateGEP(sanitizerMap->getValueType(), sanitizerMap,
-                        {builder.getInt64(0), builder.getInt64(0)});
-  Value *sanitizerEnabled = builder.CreateCall(
-      getOrCreateSanitizerMapEntry(M),
-      {sanitizerMapPtr, ConstantInt::get(pointerIntegerType, 2)});
-  Value *sanitizerDisabled =
-      builder.CreateICmpEQ(sanitizerEnabled, ConstantInt::get(boolType, 0));
-  builder.CreateCondBr(sanitizerDisabled, freeHeapBB, checkHeapBB);
+  createSanitizerGateBranch(builder, F, 2, freeHeapBB, checkHeapBB);
 
-  // Call Is Heap Func
-  // Branch if True
   builder.SetInsertPoint(checkHeapBB);
   Value *isHeapPtr = builder.CreateCall(getOrCreateIsHeap(F), {ptr});
   builder.CreateCondBr(isHeapPtr, freeHeapBB, handleInvalidFreeBB);
