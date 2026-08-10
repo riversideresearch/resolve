@@ -3,8 +3,8 @@
 use libc::{c_char, c_void, calloc, free, malloc, realloc, strdup, strlen, strndup, strnlen};
 
 use crate::shadowobjs::{
-    ALIVE_OBJ_LIST, AllocType, FREED_OBJ_LIST, GLOBALS, SHADOW_STACK, ShadowObject, Vaddr,
-    lookup_global,
+    lookup_global, AllocType, ShadowObject, Vaddr, ALIVE_OBJ_LIST, FREED_OBJ_LIST, GLOBALS,
+    SHADOW_STACK,
 };
 
 use log::{info, warn};
@@ -39,6 +39,10 @@ pub extern "C" fn __resolve_register_global(ptr: *mut c_void, size: usize) {
     GLOBALS
         .lock()
         .push(ShadowObject::new(AllocType::Global, ptr as Vaddr, size));
+    info!(
+        "[GLOBAL] Registered global object: addr={:p}, size={}",
+        ptr, size
+    );
 }
 
 /**
@@ -107,8 +111,8 @@ pub extern "C" fn __resolve_free(ptr: *mut c_void) -> () {
     match obj_size {
         Some(size) => {
             info!(
-                "[HEAP] Found shadow object for allocated object: addr={:p}, size={}",
-                ptr, size
+                "[HEAP] Found shadow object for allocated object: 0x{:x}, size = {size}",
+                ptr as Vaddr,
             );
 
             info!(
@@ -118,8 +122,8 @@ pub extern "C" fn __resolve_free(ptr: *mut c_void) -> () {
         }
         None => {
             warn!(
-                "[HEAP] No shadow object found for allocated object: addr={:p}",
-                ptr
+                "[HEAP] No shadow object found for allocated object: 0x{:x}",
+                ptr as Vaddr
             );
         }
     }
