@@ -3,8 +3,8 @@
 use libc::{c_char, c_void, calloc, free, malloc, realloc, strdup, strlen, strndup, strnlen};
 
 use crate::shadowobjs::{
-    lookup_global, AllocType, ShadowObject, Vaddr, ALIVE_OBJ_LIST, FREED_OBJ_LIST, GLOBALS,
-    SHADOW_STACK,
+    ALIVE_OBJ_LIST, AllocType, FREED_OBJ_LIST, GLOBALS, SHADOW_STACK, ShadowObject, Vaddr,
+    lookup_global,
 };
 
 use log::{info, warn};
