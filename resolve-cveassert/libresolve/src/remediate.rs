@@ -107,8 +107,8 @@ pub extern "C" fn __resolve_free(ptr: *mut c_void) -> () {
     match obj_size {
         Some(size) => {
             info!(
-                "[HEAP] Found shadow object for allocated object, 0x{:x}, size = {size}",
-                ptr as Vaddr,
+                "[HEAP] Found shadow object for allocated object: addr={:p}, size={}",
+                ptr, size
             );
 
             info!(
@@ -118,8 +118,8 @@ pub extern "C" fn __resolve_free(ptr: *mut c_void) -> () {
         }
         None => {
             warn!(
-                "[HEAP] No shadow object found for allocated object: 0x{:x}",
-                ptr as Vaddr
+                "[HEAP] No shadow object found for allocated object: addr={:p}",
+                ptr
             );
         }
     }
