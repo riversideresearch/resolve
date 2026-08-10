@@ -408,7 +408,7 @@ pub extern "C" fn __resolve_report_violation(
     let bounds = __resolve_get_bounds(ptr);
 
     info!(
-        "[RESOLVE] Invalid memory access detected!\n\taddress = {:p}\n\tsize = {}\n\tbounds = [{:p}\n\t{:p}) function = {}",
+        "[RESOLVE] out-of-bounds error detected!\n\taddress = {:p}\n\tsize = {}\n\tbounds = [{:p}\n\t{:p})\n\tfunction = {}",
         ptr, access_size, bounds.base, bounds.limit, function
     );
 }
