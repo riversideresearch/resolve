@@ -269,6 +269,7 @@ pub extern "C" fn __resolve_strndup(ptr: *mut c_char, size: usize) -> *mut c_cha
 /**
  * @brief - RESOLVE wrapper for libc mmap
  */
+#[unsafe(no_mangle)]
 pub extern "C" fn __resolve_mmap(
     addr: *mut c_void,
     length: usize,
@@ -297,6 +298,7 @@ pub extern "C" fn __resolve_mmap(
 /**
  * @brief - RESOLVE wrapper for libc munmap
  */
+#[unsafe(no_mangle)]
 pub extern "C" fn __resolve_munmap(addr: *mut c_void, length: usize) -> c_int {
     let obj_size = {
         let mut obj_list = ALIVE_OBJ_LIST.lock();
