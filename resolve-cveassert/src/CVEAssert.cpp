@@ -271,6 +271,41 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
     return result;
   }
 
+  GlobalVariable *CreateTrackedGlobal(GlobalVariable *GV) {
+
+    auto *arrayType = dyn_cast<ArrayType>(GV->getValueType());
+    if (!arrayType)
+      return nullptr;
+
+    Type *elementType = arrayType->getElementType();
+    uint64_t numElements = arrayType->getNumElements();
+
+    ArrayType *newArrayType = ArrayType::get(elementType, numElements + 1);
+
+    // Extend the initializer
+    auto *oldInit = cast<ConstantArray>(GV->getInitializer());
+
+    SmallVector<Constant *, 16> elements;
+
+    for (unsigned i = 0; i < numElements; ++i) {
+      elements.push_back(cast<Constant>(oldInit->getAggregateElement(i)));
+    }
+
+    // Adding tainted element.
+    elements.push_back(Constant::getNullValue(elementType));
+
+    Constant *newInit = ConstantArray::get(newArrayType, elements);
+
+    auto *newGV = new GlobalVariable(*GV->getParent(), newArrayType,
+                                     GV->isConstant(), GV->getLinkage(),
+                                     newInit, GV->getName() + ".resolve");
+
+    newGV->setAlignment(GV->getAlign());
+    newGV->setSection(GV->getSection());
+    newGV->setUnnamedAddr(GV->getUnnamedAddr());
+    return newGV;
+  }
+
   void registerGlobals(Module &M) {
     if (M.getFunction("__resolve_register_globals_ctor"))
       return;
@@ -303,6 +338,9 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
         continue;
       if (DL.getTypeAllocSize(G.getValueType()) == 0)
         continue;
+
+      if (!G.getValueType()->isArrayTy()) // We only care about global arrays
+        continue;
       targets.push_back(&G);
     }
 
@@ -317,8 +355,12 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
 
     IRBuilder<> builder(BasicBlock::Create(Ctx, "entry", ctor));
     for (GlobalVariable *G : targets) {
+      // TODO: Create a helper that modifies the global
+      GlobalVariable *newGV = CreateTrackedGlobal(G);
       uint64_t size = DL.getTypeAllocSize(G->getValueType());
-      builder.CreateCall(registerFn, {G, ConstantInt::get(size_ty, size)});
+      builder.CreateCall(registerFn, {newGV, ConstantInt::get(size_ty, size)});
+      G->replaceAllUsesWith(newGV);
+      G->eraseFromParent();
     }
     builder.CreateRetVoid();
 
