@@ -1,10 +1,11 @@
 // Copyright (c) 2025 Riverside Research.
 // LGPL-3; See LICENSE.txt in the repo root for details.
-use libc::{
-    c_char, c_void, calloc, free, malloc, realloc, strdup, strlen, strndup, strnlen,
-};
+use libc::{c_char, c_void, calloc, free, malloc, realloc, strdup, strlen, strndup, strnlen};
 
-use crate::shadowobjs::{ALIVE_OBJ_LIST, AllocType, FREED_OBJ_LIST, GLOBALS, SHADOW_STACK, ShadowObject, Vaddr, lookup_global};
+use crate::shadowobjs::{
+    lookup_global, AllocType, ShadowObject, Vaddr, ALIVE_OBJ_LIST, FREED_OBJ_LIST, GLOBALS,
+    SHADOW_STACK,
+};
 
 use log::{info, warn};
 
@@ -17,27 +18,27 @@ use log::{info, warn};
 pub extern "C" fn __resolve_alloca(ptr: *mut c_void, size: usize) -> () {
     let base = ptr as Vaddr;
 
-    SHADOW_STACK.with_borrow_mut(
-        |ss|
-         ss.add_shadow_object(base, size)
-    );
+    SHADOW_STACK.with_borrow_mut(|ss| ss.add_shadow_object(base, size));
 
     info!("[STACK] Object allocated with size: {size}, address: 0x{base:x}");
 }
 
 #[unsafe(no_mangle)]
 pub extern "C" fn __resolve_register_global(ptr: *mut c_void, size: usize) {
-    GLOBALS.lock().push(ShadowObject::new(AllocType::Global, ptr as Vaddr, size));
+    GLOBALS
+        .lock()
+        .push(ShadowObject::new(AllocType::Global, ptr as Vaddr, size));
+    info!(
+        "[GLOBAL] Registered global object: addr={:p}, size={}",
+        ptr, size
+    );
 }
 
 #[unsafe(no_mangle)]
 pub extern "C" fn __resolve_invalidate_stack_range(base: *mut c_void, size: usize) {
     let base = base as Vaddr;
 
-    SHADOW_STACK.with_borrow_mut(
-        |ss|
-         ss.invalidate_at(base, size)
-    );
+    SHADOW_STACK.with_borrow_mut(|ss| ss.invalidate_at(base, size));
 
     info!("[STACK] Free addr 0x{base:x} size {size}");
 }
@@ -127,10 +128,10 @@ pub extern "C" fn __resolve_free(ptr: *mut c_void) -> () {
 #[unsafe(no_mangle)]
 pub extern "C" fn __resolve_realloc(ptr: *mut c_void, size: usize) -> *mut c_void {
     // Edge cases
-    // 1. returned memory may not be allocated 
+    // 1. returned memory may not be allocated
     // 2. pointer passed to realloc may be NULL
     // 3. size fits within original allocation (returns the original ptr)
-    
+
     // Consideration: Pointer passed in may be invalidated so we need a mechanism
     // to remove the shadow object for the orignal allocation
     let realloc_ptr = unsafe { realloc(ptr, size + 1) };
@@ -139,11 +140,10 @@ pub extern "C" fn __resolve_realloc(ptr: *mut c_void, size: usize) -> *mut c_voi
         return realloc_ptr;
     }
 
-
     {
         let mut obj_list = ALIVE_OBJ_LIST.lock();
         // Remove shadow object for original pointer
-        obj_list.invalidate_at(ptr as Vaddr); // if ptr == NULL this does not do anything 
+        obj_list.invalidate_at(ptr as Vaddr); // if ptr == NULL this does not do anything
         obj_list.add_shadow_object(AllocType::Heap, realloc_ptr as Vaddr, size);
     }
 
@@ -251,7 +251,6 @@ pub extern "C" fn __resolve_strndup(ptr: *mut c_char, size: usize) -> *mut c_cha
     string_ptr
 }
 
-
 #[derive(PartialEq)]
 #[repr(C)]
 pub struct ShadowObjBounds {
@@ -261,45 +260,49 @@ pub struct ShadowObjBounds {
 
 impl ShadowObjBounds {
     pub fn null() -> Self {
-        ShadowObjBounds { base: std::ptr::null_mut(), limit: std::ptr::null_mut() }
+        ShadowObjBounds {
+            base: std::ptr::null_mut(),
+            limit: std::ptr::null_mut(),
+        }
     }
 }
 
 impl From<&crate::shadowobjs::ShadowObject> for ShadowObjBounds {
     fn from(sobj: &crate::shadowobjs::ShadowObject) -> Self {
-        ShadowObjBounds { base: sobj.base as *mut c_void, limit: sobj.limit as *mut c_void }
+        ShadowObjBounds {
+            base: sobj.base as *mut c_void,
+            limit: sobj.limit as *mut c_void,
+        }
     }
 }
 
 /**
  * @brief - Helper function that queries the shadow stack
  *          to find a shadow obj where the ptr fits within
- *          its bounds of allocation 
+ *          its bounds of allocation
  * @input
- *  - ptr: ptr to allocation 
+ *  - ptr: ptr to allocation
  * @return struct containing the base and limit of the
- *         shadow object as pointers 
+ *         shadow object as pointers
  */
 #[unsafe(no_mangle)]
 pub extern "C" fn __resolve_get_bounds_stack(ptr: *mut c_void) -> ShadowObjBounds {
-    return SHADOW_STACK.with_borrow(
-        |ss| {
-            return match ss.search_intersection(ptr as Vaddr) {
-                Some(sobj) => { sobj.into() }
-                None => { ShadowObjBounds::null() }
-            }
-        }
-    );
+    return SHADOW_STACK.with_borrow(|ss| {
+        return match ss.search_intersection(ptr as Vaddr) {
+            Some(sobj) => sobj.into(),
+            None => ShadowObjBounds::null(),
+        };
+    });
 }
 
 /**
  * @brief - Helper function that queries heap sobj list
  *          to find a shadow obj where the ptr fits within
- *          its bounds of allocation 
+ *          its bounds of allocation
  * @input
- *  - ptr: ptr to allocation 
+ *  - ptr: ptr to allocation
  * @return struct containing the base and limit of the
- *         shadow object as pointers 
+ *         shadow object as pointers
  */
 #[unsafe(no_mangle)]
 pub extern "C" fn __resolve_get_bounds_heap(ptr: *mut c_void) -> ShadowObjBounds {
@@ -315,7 +318,7 @@ pub extern "C" fn __resolve_get_bounds_heap(ptr: *mut c_void) -> ShadowObjBounds
 pub extern "C" fn __resolve_get_bounds_global(ptr: *mut c_void) -> ShadowObjBounds {
     match lookup_global(ptr as Vaddr) {
         Some(obj) => (&obj).into(),
-        None => ShadowObjBounds::null()
+        None => ShadowObjBounds::null(),
     }
 }
 
@@ -324,15 +327,19 @@ pub extern "C" fn __resolve_get_bounds_global(ptr: *mut c_void) -> ShadowObjBoun
  *          allocation type already. Searches stack table ( O(log n) )
  *          before searching the heap table.
  * @input
- *  - ptr: ptr to allocation 
+ *  - ptr: ptr to allocation
  * @return struct containing the base and limit of the
- *         shadow object as pointers 
+ *         shadow object as pointers
  */
 #[unsafe(no_mangle)]
 pub extern "C" fn __resolve_get_bounds(ptr: *mut c_void) -> ShadowObjBounds {
     let mut sobj = __resolve_get_bounds_stack(ptr);
-    if sobj == ShadowObjBounds::null() { sobj = __resolve_get_bounds_heap(ptr)}
-    if sobj == ShadowObjBounds::null() { sobj = __resolve_get_bounds_global(ptr)}
+    if sobj == ShadowObjBounds::null() {
+        sobj = __resolve_get_bounds_heap(ptr)
+    }
+    if sobj == ShadowObjBounds::null() {
+        sobj = __resolve_get_bounds_global(ptr)
+    }
 
     sobj
 }
