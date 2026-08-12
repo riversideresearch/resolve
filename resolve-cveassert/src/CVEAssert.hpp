@@ -8,18 +8,18 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/IR/GlobalVariable.h"
 
-enum class SanitizerFlags : uint64_t {
-  DivideByZero = 0,
-  IntegerOverflow,
+enum class SanitizerFlag : uint64_t {
+  BoundsCheck = 0,
   NullPtr,
-  HeapOOB,
-  StackOOB,
   FreeNonHeap,
+  DivideByZero,
+  IntegerOverflow,
+  BitShift,
 
   Count
 };
 
-constexpr auto NumSanitizerFlags = static_cast<unsigned>(SanitizerFlags::Count);
+constexpr auto NumSanitizerFlags = static_cast<unsigned>(SanitizerFlag::Count);
 
 // Set value to true to get more verbose printouts
 extern bool CVE_ASSERT_DEBUG;

@@ -45,7 +45,8 @@ getOrCreateLoadWrapper(Function *F, Type *valueType,
 
   builder.SetInsertPoint(entryBB);
   Argument *ptr = wrapperFn->getArg(0);
-  createSanitizerGateBranch(builder, F, 1, performLoadBB, checkNullPtrBB);
+  createSanitizerGateBranch(builder, F, SanitizerFlag::NullPtr, performLoadBB,
+                            checkNullPtrBB);
 
   // Compare pointer with null (opaque ptrs use generic ptr type)
   // TODO: Sanitize other invalid pointers
@@ -112,7 +113,8 @@ getOrCreateStoreWrapper(Function *F, Type *valueType,
   builder.SetInsertPoint(entryBB);
   Argument *ptr = wrapperFn->getArg(0);
   Argument *storedValue = wrapperFn->getArg(1);
-  createSanitizerGateBranch(builder, F, 1, performStoreBB, checkNullPtrBB);
+  createSanitizerGateBranch(builder, F, SanitizerFlag::NullPtr, performStoreBB,
+                            checkNullPtrBB);
 
   // Compare pointer with null (opaque ptrs use generic ptr type)
   // TODO: Sanitize other invalid pointers

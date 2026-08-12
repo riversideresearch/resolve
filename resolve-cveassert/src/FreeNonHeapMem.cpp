@@ -90,7 +90,8 @@ Function *getOrCreateFreeOfNonHeapSanitizer(
   builder.SetInsertPoint(entryBB);
   Argument *ptr = sanitizerFn->getArg(0);
 
-  createSanitizerGateBranch(builder, F, 2, freeHeapBB, checkHeapBB);
+  createSanitizerGateBranch(builder, F, SanitizerFlag::FreeNonHeap, freeHeapBB,
+                            checkHeapBB);
 
   builder.SetInsertPoint(checkHeapBB);
   Value *isHeapPtr = builder.CreateCall(getOrCreateIsHeap(F), {ptr});

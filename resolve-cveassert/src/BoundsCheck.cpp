@@ -201,7 +201,8 @@ getOrCreateLoadWrapper(Function *F, Type *Type,
 
   builder.SetInsertPoint(entryBB);
   Value *ptr = wrapperFn->getArg(0);
-  createSanitizerGateBranch(builder, F, 0, performLoadBB, checkBoundsBB);
+  createSanitizerGateBranch(builder, F, SanitizerFlag::BoundsCheck,
+                            performLoadBB, checkBoundsBB);
 
   builder.SetInsertPoint(checkBoundsBB);
   Value *accessInBounds = builder.CreateCall(
@@ -262,7 +263,8 @@ getOrCreateStoreWrapper(Function *F, Type *Type,
   Value *ptr = wrapperFn->getArg(0);
   Value *storedValue = wrapperFn->getArg(1);
 
-  createSanitizerGateBranch(builder, F, 0, performStoreBB, checkBoundsBB);
+  createSanitizerGateBranch(builder, F, SanitizerFlag::BoundsCheck,
+                            performStoreBB, checkBoundsBB);
 
   builder.SetInsertPoint(checkBoundsBB);
   Value *accessInBounds = builder.CreateCall(
@@ -325,7 +327,8 @@ getOrCreateMemcpyWrapper(Function *F,
   Value *srcPtr = wrapperFn->getArg(1);
   Value *sizeArg = wrapperFn->getArg(2);
 
-  createSanitizerGateBranch(builder, F, 0, performMemmoveBB, checkBoundsBB);
+  createSanitizerGateBranch(builder, F, SanitizerFlag::BoundsCheck,
+                            performMemmoveBB, checkBoundsBB);
 
   // TODO: Get name of the affected function
   Value *affectedFnName;
@@ -397,7 +400,8 @@ getOrCreateMemmoveWrapper(Function *F,
   Value *srcPtr = wrapperFn->getArg(1);
   Value *sizeArg = wrapperFn->getArg(2);
 
-  createSanitizerGateBranch(builder, F, 0, performMemmoveBB, checkBoundsBB);
+  createSanitizerGateBranch(builder, F, SanitizerFlag::BoundsCheck,
+                            performMemmoveBB, checkBoundsBB);
 
   builder.SetInsertPoint(checkBoundsBB);
   Value *checkSrcBounds =
@@ -468,7 +472,8 @@ getOrCreateMemsetWrapper(Function *F,
   Value *valueArg = wrapperFn->getArg(1);
   Value *accessSize = wrapperFn->getArg(2);
 
-  createSanitizerGateBranch(builder, F, 0, performMemmoveBB, checkBoundsBB);
+  createSanitizerGateBranch(builder, F, SanitizerFlag::BoundsCheck,
+                            performMemmoveBB, checkBoundsBB);
 
   builder.SetInsertPoint(checkBoundsBB);
   Value *checkDstBounds =
@@ -532,7 +537,8 @@ static Function *getOrCreateGepWrapper(Function *F, BoundsClass cls) {
   // Extract the base and derived pointer
   Value *rootPtr = gepWrapper->getArg(0);
   Value *derivedPtr = gepWrapper->getArg(1);
-  createSanitizerGateBranch(builder, F, 0, inBoundsBB, getBoundsBB);
+  createSanitizerGateBranch(builder, F, SanitizerFlag::BoundsCheck, inBoundsBB,
+                            getBoundsBB);
 
   builder.SetInsertPoint(getBoundsBB);
   Value *bounds = builder.CreateCall(getOrCreateGetBounds(M, cls), {rootPtr});

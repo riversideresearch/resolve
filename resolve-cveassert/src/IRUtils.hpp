@@ -13,6 +13,7 @@
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Type.h"
 
+#include "CVEAssert.hpp"
 #include <string>
 
 std::string getLLVMType(llvm::Type *ty);
@@ -32,5 +33,5 @@ void endPatchRecordingAndWrite(llvm::Function *F);
 
 llvm::Function *getOrCreateSanitizerMapEntry(llvm::Module *M);
 void createSanitizerGateBranch(llvm::IRBuilder<> &Builder, llvm::Function *F,
-                               uint64_t Index, llvm::BasicBlock *DisabledBB,
+                               SanitizerFlag flag, llvm::BasicBlock *DisabledBB,
                                llvm::BasicBlock *EnabledBB);

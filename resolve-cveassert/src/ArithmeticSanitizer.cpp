@@ -141,7 +141,8 @@ void sanitizeDivideByZero(Function *F,
 
     checkMapEntryBB->getTerminator()->eraseFromParent();
     builder.SetInsertPoint(checkMapEntryBB);
-    createSanitizerGateBranch(builder, F, 3, preserveDivBB, checkZeroBB);
+    createSanitizerGateBranch(builder, F, SanitizerFlag::DivideByZero,
+                              preserveDivBB, checkZeroBB);
 
     builder.SetInsertPoint(checkZeroBB);
 
@@ -397,7 +398,8 @@ void sanitizeIntOverflow(Function *F,
 
     checkMapEntryBB->getTerminator()->eraseFromParent();
     builder.SetInsertPoint(checkMapEntryBB);
-    createSanitizerGateBranch(builder, F, 4, joinResultBB, checkOverflowBB);
+    createSanitizerGateBranch(builder, F, SanitizerFlag::IntegerOverflow,
+                              joinResultBB, checkOverflowBB);
 
     builder.SetInsertPoint(checkOverflowBB);
     builder.CreateCondBr(isOverflow, remedOverflowBB, joinResultBB);
@@ -470,7 +472,8 @@ void sanitizeBitShift(Function *F,
 
     checkMapEntryBB->getTerminator()->eraseFromParent();
     builder.SetInsertPoint(checkMapEntryBB);
-    createSanitizerGateBranch(builder, F, 5, preserveShiftBB, checkShiftBB);
+    createSanitizerGateBranch(builder, F, SanitizerFlag::BitShift,
+                              preserveShiftBB, checkShiftBB);
 
     builder.SetInsertPoint(checkShiftBB);
     Value *shifted_value = binaryOp->getOperand(0);

@@ -317,7 +317,7 @@ void endPatchRecordingAndWrite(Function *F) {
 }
 
 void createSanitizerGateBranch(IRBuilder<> &Builder, Function *F,
-                               uint64_t Index, BasicBlock *DisabledBB,
+                               SanitizerFlag flag, BasicBlock *DisabledBB,
                                BasicBlock *EnabledBB) {
   if (GlobalVariable *Map = getSanitizerMap(F)) {
     recordPatchGlobal(Map);
@@ -326,9 +326,9 @@ void createSanitizerGateBranch(IRBuilder<> &Builder, Function *F,
     auto usizeTy = Type::getInt64Ty(Ctx);
     Value *Zero = Builder.getInt64(0);
     Value *MapPtr = Builder.CreateGEP(Map->getValueType(), Map, {Zero, Zero});
-    Value *MapEntry =
-        Builder.CreateCall(getOrCreateSanitizerMapEntry(F->getParent()),
-                           {MapPtr, ConstantInt::get(usizeTy, Index)});
+    Value *MapEntry = Builder.CreateCall(
+        getOrCreateSanitizerMapEntry(F->getParent()),
+        {MapPtr, ConstantInt::get(usizeTy, static_cast<uint64_t>(flag))});
     Value *IsDisabled =
         Builder.CreateICmpEQ(MapEntry, ConstantInt::get(i1Ty, 0));
     Builder.CreateCondBr(IsDisabled, DisabledBB, EnabledBB);
