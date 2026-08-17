@@ -3,9 +3,14 @@ use std::mem::*;
 use crate::builder::*;
 use crate::schema::*;
 
+#[derive(Debug, Default)]
 pub struct FactsBuf(Vec<u32>);
 
 impl FactsBuf {
+    pub(crate) fn from_words(words: Vec<u32>) -> Self {
+        Self(words)
+    }
+
     pub fn as_bytes(&self) -> &[u8] {
         unsafe {
             std::slice::from_raw_parts(
@@ -13,6 +18,18 @@ impl FactsBuf {
                 self.0.len() * size_of::<u32>(),
             )
         }
+    }
+
+    pub fn view(&self) -> FactsRef<'_> {
+        FactsRef::new(self.as_bytes())
+    }
+
+    pub fn len(&self) -> usize {
+        self.as_bytes().len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
     }
 }
 

@@ -204,6 +204,21 @@ pub enum ViewError {
     UnalignedModuleLength,
 }
 
+impl std::fmt::Display for ViewError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Misaligned => f.write_str("facts bytes are not 4-byte aligned"),
+            Self::Truncated => f.write_str("facts module is truncated or has an invalid length"),
+            Self::UnsupportedVersion => f.write_str("facts module has an unsupported version"),
+            Self::UnalignedModuleLength => {
+                f.write_str("facts module length is not a multiple of 4 bytes")
+            }
+        }
+    }
+}
+
+impl std::error::Error for ViewError {}
+
 #[allow(dead_code)] // reader
 impl<'a> ModuleRef<'a> {
     // Borrows the first complete module in "bytes" and returns the unconsumed suffix
@@ -234,6 +249,10 @@ impl<'a> ModuleRef<'a> {
 
     pub fn header(&self) -> &'a ModuleHeader {
         unsafe { &*self.bytes.as_ptr().cast::<ModuleHeader>() }
+    }
+
+    pub const fn as_bytes(&self) -> &'a [u8] {
+        self.bytes
     }
 
     pub fn nodes(&self) -> &'a [Node] {
@@ -277,6 +296,10 @@ impl<'a> ModuleRef<'a> {
     pub fn string(&self, id: Interned) -> Option<&'a str> {
         std::str::from_utf8(self.string_bytes(id)?).ok()
     }
+
+    pub fn node(&self, id: NodeID) -> Option<&'a Node> {
+        self.nodes().get(id as usize)
+    }
 }
 
 // A non-owning view over a complete concatenation of modules
@@ -296,6 +319,10 @@ impl<'a> FactsRef<'a> {
         ModuleIter {
             remaining: self.bytes,
         }
+    }
+
+    pub const fn as_bytes(self) -> &'a [u8] {
+        self.bytes
     }
 }
 
