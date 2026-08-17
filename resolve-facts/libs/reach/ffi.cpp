@@ -13,7 +13,6 @@
 #include <utility>
 #include <vector>
 
-#include "reach/facts_view.hpp"
 #include "reach/graph.hpp"
 #include "reach/search.hpp"
 
@@ -126,11 +125,10 @@ extern "C" ReachGraph *reach_graph_build(const ReachFactsBuf *facts,
                                          ReachError **error) {
   clear_error(error);
   try {
-    const auto view = reach_facts::ProgramFactsView{facts};
     const auto symbols = loaded_symbols(options);
     const auto dynlink = options && options->dynlink != 0;
     return new ReachGraph{
-        graph::build_from_program_facts(view, dynlink, symbols)};
+        graph::build_from_program_facts(facts, dynlink, symbols)};
   } catch (const std::exception &exception) {
     set_error(error, exception.what());
   } catch (...) {

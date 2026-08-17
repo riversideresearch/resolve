@@ -20,6 +20,7 @@
 
 #include "config.hpp"
 #include "reach/facts.hpp"
+#include "reach/facts_owner.hpp"
 #include "reach/facts_view.hpp"
 #include "reach/ffi.h"
 #include "reach/util.hpp"
@@ -224,7 +225,7 @@ int main(int argc, char *argv[]) {
 
   time_point<system_clock> t0 = system_clock::now();
   const auto facts = reach_facts::FactsOwner::read({conf.facts_path});
-  const auto pf = facts.view();
+  const auto pf = reach_facts::ProgramFactsView{facts.get()};
 
   duration<double> facts_load_time = system_clock::now() - t0;
 
@@ -232,9 +233,10 @@ int main(int argc, char *argv[]) {
 
     auto nodes = 0;
     auto edges = 0;
-    for (const auto &[_, m] : pf.modules) {
-      nodes += m.nodes.size();
-      edges += m.edges.size();
+    for (uint32_t mid = 0; mid < pf.module_count(); ++mid) {
+      const auto m = pf.module(mid);
+      nodes += m.nodes().size();
+      edges += m.edges().size();
     }
     cout << "Loaded facts in " << facts_load_time.count()
          << " seconds. # nodes = " << nodes << " # edges = " << edges << endl;
@@ -279,13 +281,15 @@ int main(int argc, char *argv[]) {
   std::vector<NNodeId> candidate_ids;
 
   auto find_node = [&](const auto &node) -> std::optional<NNodeId> {
-    for (const auto &[mid, m] : pf.modules) {
+    for (uint32_t mid = 0; mid < pf.module_count(); ++mid) {
+      const auto m = pf.module(mid);
       if (node.file &&
-          !m.nodes.at(0).source_file().value_or("").contains(*node.file)) {
+          !m.node(0).source_file().value_or("").contains(*node.file)) {
         continue;
       }
 
-      for (const auto &[nid, n] : m.nodes) {
+      for (uint32_t nid = 0; nid < m.nodes().size(); ++nid) {
+        const auto n = m.node(nid);
         if (n.type() == facts_rs::NodeType::Function && n.name().has_value()) {
           const auto name = n.name().value();
           // Try an exact match on the function name
@@ -353,8 +357,8 @@ int main(int argc, char *argv[]) {
     // The graph may not have any edges from the src as all may be of the form
     // (dst -> src) If the explicit edge does not exist at least check that the
     // id is found in the total list of nodes
-    auto has_src = pf.containsNode(q.src);
-    auto has_dst = pf.containsNode(q.dst);
+    auto has_src = pf.contains_node(q.src);
+    auto has_dst = pf.contains_node(q.dst);
 
     if (!has_src) {
       print_missing(q.src, "src");

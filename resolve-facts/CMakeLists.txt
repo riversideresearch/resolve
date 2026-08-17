@@ -150,6 +150,7 @@ file(GLOB_RECURSE LIB
     "${CMAKE_CURRENT_SOURCE_DIR}/include/reach/*.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/include/reach/*.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/libs/reach/*.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/libs/reach/*.hpp"
 )
 
 # reach lib
@@ -168,6 +169,9 @@ target_include_directories(libreach PUBLIC
     "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
     "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>"
 )
+target_include_directories(libreach PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/libs"
+)
 target_link_libraries(libreach PUBLIC
     resolve_facts
     facts_rs
@@ -183,6 +187,7 @@ target_compile_features(libreach PUBLIC cxx_std_23)
 add_executable(reach src/reach/main.cpp)
 
 target_link_libraries(reach PRIVATE libreach json argparse)
+target_include_directories(reach PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/libs")
 
 if(COMMAND resolve_add_check_targets)
     resolve_add_check_targets(libreach ${LIB})

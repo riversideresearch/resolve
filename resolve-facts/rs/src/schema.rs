@@ -3,6 +3,8 @@
 
 use std::mem::*;
 
+use bytemuck::*;
+
 pub const FORMAT_VERSION: u32 = 1;
 
 macro_rules! enum_from_u8 {
@@ -25,7 +27,7 @@ pub type NodeID = u32;
 
 // Offset into modules interned string pool
 #[repr(transparent)]
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Pod, Zeroable)]
 pub struct Interned(pub u32);
 
 #[allow(dead_code)] // cbindgen
@@ -90,7 +92,7 @@ pub const CALL_TYPE_SHIFT: u32 = 28;
 pub const CALL_TYPE_MASK: u32 = 0x0f << CALL_TYPE_SHIFT;
 
 #[repr(C)]
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Pod, Zeroable)]
 pub struct Node {
     pub meta: u32,
     pub idx: u32,
@@ -215,7 +217,7 @@ enum_from_u8!(
 
 // A unique (src, dst) pair within a module. Edge arrays are sorted.
 #[repr(C)]
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Pod, Zeroable)]
 pub struct Edge {
     pub src: NodeID,
     pub dst: NodeID,
@@ -243,7 +245,7 @@ impl Edge {
 }
 
 #[repr(C)]
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Pod, Zeroable)]
 pub struct ModuleHeader {
     pub version: u32,
     pub node_count: u32,
@@ -318,7 +320,7 @@ impl<'a> ModuleRef<'a> {
             return Err(ViewError::Misaligned);
         }
 
-        let header = unsafe { &*bytes.as_ptr().cast::<ModuleHeader>() };
+        let header = bytemuck::from_bytes::<ModuleHeader>(&bytes[..size_of::<ModuleHeader>()]);
         if header.version != FORMAT_VERSION {
             return Err(ViewError::UnsupportedVersion);
         }
@@ -336,7 +338,7 @@ impl<'a> ModuleRef<'a> {
     }
 
     pub fn header(&self) -> &'a ModuleHeader {
-        unsafe { &*self.bytes.as_ptr().cast::<ModuleHeader>() }
+        bytemuck::from_bytes(&self.bytes[..size_of::<ModuleHeader>()])
     }
 
     pub const fn as_bytes(&self) -> &'a [u8] {
@@ -345,21 +347,17 @@ impl<'a> ModuleRef<'a> {
 
     pub fn nodes(&self) -> &'a [Node] {
         let header = self.header();
-        let data = unsafe { self.bytes.as_ptr().add(size_of::<ModuleHeader>()) };
-
-        unsafe { std::slice::from_raw_parts(data.cast::<Node>(), header.node_count as usize) }
+        let start = size_of::<ModuleHeader>();
+        let end = start + header.node_count as usize * size_of::<Node>();
+        bytemuck::cast_slice(&self.bytes[start..end])
     }
 
     pub fn edges(&self) -> &'a [Edge] {
         let header = self.header();
         let nodes_len = header.node_count as usize * size_of::<Node>();
-        let data = unsafe {
-            self.bytes
-                .as_ptr()
-                .add(size_of::<ModuleHeader>() + nodes_len)
-        };
-
-        unsafe { std::slice::from_raw_parts(data.cast::<Edge>(), header.edge_count as usize) }
+        let start = size_of::<ModuleHeader>() + nodes_len;
+        let end = start + header.edge_count as usize * size_of::<Edge>();
+        bytemuck::cast_slice(&self.bytes[start..end])
     }
 
     pub fn string_pool(&self) -> &'a [u8] {

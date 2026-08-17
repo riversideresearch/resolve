@@ -12,7 +12,10 @@
 #include <vector>
 
 #include "reach/facts.hpp"
-#include "reach/facts_view.hpp"
+
+namespace facts_rs {
+struct FactsBuf;
+}
 
 using NNodeId = resolve_facts::NamespacedNodeId;
 
@@ -59,7 +62,7 @@ struct T {
 bool wf(const E &g);
 
 T build_from_program_facts(
-    const reach_facts::ProgramFactsView &pf, bool dynlink,
+    const facts_rs::FactsBuf *facts, bool dynlink,
     const std::optional<std::vector<dlsym::loaded_symbol>> &loaded_syms);
 
 constexpr reach_facts::LoadOptions SIMPLE_LOAD_OPTIONS =

@@ -9,6 +9,7 @@ mod schema;
 mod utils;
 mod writer;
 
+pub use builder::{FactsBuilder, ModuleHandle};
 pub use reader::*;
 pub use schema::*;
 pub use writer::FactsBuf;

@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "reach/facts.hpp"
+#include "reach/facts_view.hpp"
 #include "reach/graph.hpp"
 #include "reach/util.hpp"
 
@@ -86,9 +87,9 @@ map_loaded_symbols_to_ids(const database &db,
   return loaded_ids;
 }
 
-T graph::build_from_program_facts(const reach_facts::ProgramFactsView &pf,
-                                  bool dynlink,
+T graph::build_from_program_facts(const facts_rs::FactsBuf *facts, bool dynlink,
                                   const optional<vector<symbol>> &loaded_syms) {
+  const reach_facts::ProgramFactsView pf{facts};
 
   T g;
 
@@ -110,33 +111,36 @@ T graph::build_from_program_facts(const reach_facts::ProgramFactsView &pf,
     syms = *loaded_syms;
   }
 
-  for (const auto &[mid, m] : pf.modules) {
+  for (uint32_t mid = 0; mid < pf.module_count(); ++mid) {
+    const auto m = pf.module(mid);
 
-    for (const auto &[eid, e] : m.edges) {
-      const auto &[s, d] = eid;
+    for (const auto &e : m.edges()) {
+      const auto s = e.src;
+      const auto d = e.dst;
       auto sid = std::make_pair(mid, s);
       auto did = std::make_pair(mid, d);
 
-      for (const auto &k : e.kinds()) {
-        // fn to first block
-        if (k == facts_rs::EdgeKind::EntryPoint) {
-          g.addEdge(did, sid, EdgeType::Contains);
-          // BB control flow
-        } else if (k == facts_rs::EdgeKind::ControlFlowTo) {
-          g.addEdge(did, sid, EdgeType::Succ);
-        } else if (k == facts_rs::EdgeKind::Calls) {
-          calls.emplace(sid, did);
-        }
+      // fn to first block
+      if (edge_has_kind(e, facts_rs::EdgeKind::EntryPoint)) {
+        g.addEdge(did, sid, EdgeType::Contains);
+      }
+      // BB control flow
+      if (edge_has_kind(e, facts_rs::EdgeKind::ControlFlowTo)) {
+        g.addEdge(did, sid, EdgeType::Succ);
+      }
+      if (edge_has_kind(e, facts_rs::EdgeKind::Calls)) {
+        calls.emplace(sid, did);
+      }
 
-        if (k == facts_rs::EdgeKind::Contains &&
-            m.nodes.at(s).type() == facts_rs::NodeType::BasicBlock &&
-            m.nodes.at(d).call_type().has_value()) {
-          bb_calls[sid].push_back(did);
-        }
+      if (edge_has_kind(e, facts_rs::EdgeKind::Contains) &&
+          m.node(s).type() == facts_rs::NodeType::BasicBlock &&
+          m.node(d).call_type().has_value()) {
+        bb_calls[sid].push_back(did);
       }
     }
 
-    for (const auto &[nid, n] : m.nodes) {
+    for (uint32_t nid = 0; nid < m.nodes().size(); ++nid) {
+      const auto n = m.node(nid);
       auto id = std::make_pair(mid, nid);
       if (n.linkage() == facts_rs::Linkage::ExternalLinkage) {
         externs_by_name[*n.name()].push_back(id);
@@ -161,10 +165,10 @@ T graph::build_from_program_facts(const reach_facts::ProgramFactsView &pf,
   // Calls
   for (const auto &[bb, instrs] : bb_calls) {
     const auto [mid, bbid] = bb;
-    const auto &module = pf.modules.at(mid);
+    const auto module = pf.module(mid);
     for (const auto &instr : instrs) {
       const auto [_, iid] = instr;
-      const auto n = module.nodes.at(iid);
+      const auto n = module.node(iid);
       const auto call_ty = n.call_type();
       // If direct, add one edge.
       if (call_ty == facts_rs::CallType::Direct) {
@@ -176,7 +180,7 @@ T graph::build_from_program_facts(const reach_facts::ProgramFactsView &pf,
         // "ptr (ptr)".
         const auto &[_, cid] = call_id;
 
-        const auto fn_name = module.nodes.at(cid).name();
+        const auto fn_name = module.node(cid).name();
         if (fn_name && *fn_name == "pthread_create") {
           for (const auto &fn : address_taken_by_sig.at("ptr (ptr)")) {
             g.addEdge(fn, bb, EdgeType::IndirectCall, INDIRECT_WEIGHT);
@@ -199,7 +203,7 @@ T graph::build_from_program_facts(const reach_facts::ProgramFactsView &pf,
       if (dynlink) {
         for (const auto &[_, handles] : externs_by_name) {
           for (const auto &h : handles) {
-            const auto n2 = pf.getNode(h);
+            const auto n2 = pf.node(h);
             if (n2.type() == facts_rs::NodeType::Function &&
                 n2.function_type() == n.function_type() &&
                 (!loaded_syms.has_value() || loaded_ids.contains(h))) {

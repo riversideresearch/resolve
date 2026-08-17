@@ -112,6 +112,13 @@ pub enum InvalidFacts {
         node: NodeID,
         value: u8,
     },
+    MissingModuleNode {
+        module: usize,
+    },
+    InvalidModuleNode {
+        module: usize,
+        value: u8,
+    },
     InvalidLinkage {
         module: usize,
         node: NodeID,
@@ -173,6 +180,13 @@ impl std::fmt::Display for InvalidFacts {
             } => write!(
                 f,
                 "module {module}, node {node} has invalid node type {value}"
+            ),
+            Self::MissingModuleNode { module } => {
+                write!(f, "module {module} has no module node at index 0")
+            }
+            Self::InvalidModuleNode { module, value } => write!(
+                f,
+                "module {module}, node 0 has node type {value}, not Module"
             ),
             Self::InvalidLinkage {
                 module,
@@ -385,7 +399,7 @@ fn append_reader(mut reader: impl Read, words: &mut Vec<u32>) -> Result<(), Appe
 }
 
 fn words_as_bytes(words: &[u32]) -> &[u8] {
-    unsafe { std::slice::from_raw_parts(words.as_ptr().cast::<u8>(), size_of_val(words)) }
+    bytemuck::cast_slice(words)
 }
 
 fn validate(bytes: &[u8]) -> Result<(), InvalidFacts> {
@@ -410,6 +424,18 @@ fn validate(bytes: &[u8]) -> Result<(), InvalidFacts> {
 }
 
 fn validate_module(module_index: usize, module: ModuleRef<'_>) -> Result<(), InvalidFacts> {
+    let Some(module_node) = module.nodes().first() else {
+        return Err(InvalidFacts::MissingModuleNode {
+            module: module_index,
+        });
+    };
+    if module_node.node_type_raw() != NodeType::Module as u8 {
+        return Err(InvalidFacts::InvalidModuleNode {
+            module: module_index,
+            value: module_node.node_type_raw(),
+        });
+    }
+
     for (node_index, node) in module.nodes().iter().enumerate() {
         let node_index = node_index as NodeID;
         let unknown = node.meta & PRESENT_MASK & !KNOWN_PROPERTIES;
