@@ -16,6 +16,7 @@
 #include "llvm/Support/Compression.h"
 
 using namespace llvm;
+using namespace facts_rs;
 
 std::string resolve::typeToString(const Type &type) {
   std::string str;

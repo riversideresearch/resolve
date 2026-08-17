@@ -1,4 +1,5 @@
 language = "C++"
+namespace = "facts_rs"
 pragma_once = true
 include_guard = "RESOLVE_FACTS_RS_H"
 header = """
@@ -14,4 +15,12 @@ parse_deps = false
 crates = ["facts-rs"]
 
 [export]
-include = ["Node", "Edge", "ModuleHeader"]
+include = [
+  "Node",
+  "Edge",
+  "ModuleHeader",
+  "FactsPath",
+  "FactsReadResult",
+  "FactsModuleCursor",
+  "FactsModuleView",
+]

@@ -10,6 +10,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <memory>
 #include <string>
 #include <unordered_map>
 #include <utility>
@@ -19,14 +20,49 @@
 
 #include "config.hpp"
 #include "reach/facts.hpp"
-#include "reach/graph.hpp"
-#include "reach/search.hpp"
+#include "reach/facts_view.hpp"
+#include "reach/ffi.h"
 #include "reach/util.hpp"
 
 using namespace std;
 using namespace chrono;
 namespace fs = filesystem;
 using json = nlohmann::json;
+
+string take_error(ReachError *error) {
+  if (!error) {
+    return "unknown libreach error";
+  }
+  const string message{reinterpret_cast<const char *>(reach_error_data(error)),
+                       reach_error_len(error)};
+  reach_error_free(error);
+  return message;
+}
+
+ReachStringView reach_string(const string &value) {
+  return {reinterpret_cast<const uint8_t *>(value.data()), value.size()};
+}
+
+ReachNodeId reach_node_id(const NNodeId id) { return {id.first, id.second}; }
+
+string reach_edge_type_to_string(const ReachEdgeType type) {
+  switch (type) {
+  case REACH_EDGE_DIRECT_CALL:
+    return "DirectCall";
+  case REACH_EDGE_INDIRECT_CALL:
+    return "IndirectCall";
+  case REACH_EDGE_CONTAINS:
+    return "Contains";
+  case REACH_EDGE_SUCCESSOR:
+    return "Succ";
+  case REACH_EDGE_EXTERNAL:
+    return "Extern";
+  case REACH_EDGE_EXTERNAL_INDIRECT_CALL:
+    return "ExternIndirectCall";
+  default:
+    throw runtime_error("unknown reach edge type");
+  }
+}
 
 // Load config from input file if it was given, then allow any
 // explicitly given command line arguments to override the input file.
@@ -181,23 +217,14 @@ int main(int argc, char *argv[]) {
   // Execute reachability queries.
   // First, build graph.
 
-  typedef graph::T (*graph_builder)(
-      const resolve_facts::ProgramFacts &, bool,
-      const optional<vector<dlsym::loaded_symbol>> &);
-
-  const unordered_map<string, graph_builder> graph_builders = {
-      {"cfg", graph::build_from_program_facts},
-  };
-
-  if (!graph_builders.contains(conf.graph_type)) {
+  if (conf.graph_type != "cfg") {
     cerr << "unknown graph type: '" << conf.graph_type << endl;
     exit(-1);
   }
 
   time_point<system_clock> t0 = system_clock::now();
-  ifstream facts(conf.facts_path);
-  const auto pf = resolve_facts::ProgramFacts::deserialize(facts);
-  facts.close();
+  const auto facts = reach_facts::FactsOwner::read({conf.facts_path});
+  const auto pf = facts.view();
 
   duration<double> facts_load_time = system_clock::now() - t0;
 
@@ -213,22 +240,34 @@ int main(int argc, char *argv[]) {
          << " seconds. # nodes = " << nodes << " # edges = " << edges << endl;
   }
 
+  vector<ReachLoadedSymbol> symbol_views;
+  if (loaded_syms) {
+    symbol_views.reserve(loaded_syms->size());
+    for (const auto &symbol : *loaded_syms) {
+      symbol_views.push_back(
+          {reach_string(symbol.symbol), reach_string(symbol.library)});
+    }
+  }
+  const ReachBuildOptions build_options = {
+      symbol_views.data(),
+      symbol_views.size(),
+      static_cast<uint8_t>(conf.dynlink),
+      static_cast<uint8_t>(loaded_syms.has_value()),
+  };
+
   t0 = system_clock::now();
-  const auto g =
-      graph_builders.at(conf.graph_type)(pf, conf.dynlink, loaded_syms);
+  ReachError *build_error = nullptr;
+  using GraphPtr = unique_ptr<ReachGraph, decltype(&reach_graph_free)>;
+  const GraphPtr g{reach_graph_build(facts.get(), &build_options, &build_error),
+                   reach_graph_free};
+  if (!g) {
+    throw runtime_error(take_error(build_error));
+  }
   duration<double> graph_build_time = system_clock::now() - t0;
 
   if (conf.verbose) {
-    auto edges = 0;
-    for (const auto &[_, e] : g.edges) {
-      edges += e.size();
-    }
-
     cout << "Loaded graph in " << graph_build_time.count()
-         << " seconds. # edges = " << edges << endl;
-  }
-  if (!graph::wf(g.edges)) {
-    cerr << "WARNING: graph not well-formed" << endl;
+         << " seconds. # edges = " << reach_graph_edge_count(g.get()) << endl;
   }
 
   // Then execute queries against the graph and accumulate results.
@@ -242,13 +281,13 @@ int main(int argc, char *argv[]) {
   auto find_node = [&](const auto &node) -> std::optional<NNodeId> {
     for (const auto &[mid, m] : pf.modules) {
       if (node.file &&
-          !m.nodes.at(mid).source_file.value_or("").contains(*node.file)) {
+          !m.nodes.at(0).source_file().value_or("").contains(*node.file)) {
         continue;
       }
 
       for (const auto &[nid, n] : m.nodes) {
-        if (n.type == NodeType::Function && n.name.has_value()) {
-          auto name = n.name.value();
+        if (n.type() == facts_rs::NodeType::Function && n.name().has_value()) {
+          const auto name = n.name().value();
           // Try an exact match on the function name
           if (name == node.function_name) {
             return std::optional{std::make_pair(mid, nid)};
@@ -260,7 +299,8 @@ int main(int argc, char *argv[]) {
           // Calling free() in 2025 is sad. I tried to be fancy with a
           // shared_ptr with a custom deallocator but was getting malloc
           // corruption errors.
-          auto ret = abi::__cxa_demangle(name.c_str(), NULL, NULL, NULL);
+          const string mangled{name};
+          auto ret = abi::__cxa_demangle(mangled.c_str(), NULL, NULL, NULL);
 
           if (ret) {
             std::string demangled{ret};
@@ -313,8 +353,8 @@ int main(int argc, char *argv[]) {
     // The graph may not have any edges from the src as all may be of the form
     // (dst -> src) If the explicit edge does not exist at least check that the
     // id is found in the total list of nodes
-    auto has_src = g.edges.contains(q.src) || pf.containsNode(q.src);
-    auto has_dst = g.edges.contains(q.dst) || pf.containsNode(q.dst);
+    auto has_src = pf.containsNode(q.src);
+    auto has_dst = pf.containsNode(q.dst);
 
     if (!has_src) {
       print_missing(q.src, "src");
@@ -326,32 +366,37 @@ int main(int argc, char *argv[]) {
     // If both src and dst exist, try to find path.
     if (has_src && has_dst) {
 
-      const auto paths =
-          search::k_paths_yen(g.edges, q.dst, q.src, conf.num_paths.value());
+      ReachError *query_error = nullptr;
+      using QueryPtr =
+          unique_ptr<ReachQueryResult, decltype(&reach_query_result_free)>;
+      const QueryPtr paths{
+          reach_graph_query(g.get(), reach_node_id(q.src), reach_node_id(q.dst),
+                            conf.num_paths.value(), &query_error),
+          reach_query_result_free};
+      if (!paths) {
+        throw runtime_error(take_error(query_error));
+      }
 
       duration<double> query_time = system_clock::now() - t0;
       qres.query_time = query_time.count();
 
-      vector<double> weights;
-      for (const auto &p : paths) {
-        weights.push_back(graph::path_weight(p));
-      }
-      if (!is_sorted(weights.begin(), weights.end())) {
-        cerr << "WARNING: paths not sorted by weight" << endl;
-      }
-
-      for (const auto &path : paths) {
-        vector<NNodeId> p_ids;
-        vector<string> edges;
-        for (const auto &e : path) {
-          const auto id = e.node;
-          p_ids.push_back(id);
-          edges.push_back(EdgeType_to_string(e.type));
+      for (size_t i = 0; i < reach_query_result_path_count(paths.get()); ++i) {
+        ReachPathView path{};
+        if (!reach_query_result_path(paths.get(), i, &path)) {
+          throw runtime_error("libreach returned an invalid path result");
         }
 
-        reverse(p_ids.begin(), p_ids.end());
-        reverse(edges.begin(), edges.end());
-        edges.pop_back();
+        vector<NNodeId> p_ids;
+        p_ids.reserve(path.node_count);
+        for (size_t j = 0; j < path.node_count; ++j) {
+          p_ids.emplace_back(path.nodes[j].module, path.nodes[j].node);
+        }
+
+        vector<string> edges;
+        edges.reserve(path.edge_count);
+        for (size_t j = 0; j < path.edge_count; ++j) {
+          edges.push_back(reach_edge_type_to_string(path.edges[j]));
+        }
 
         qres.paths.push_back({p_ids, edges});
       }

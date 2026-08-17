@@ -18,7 +18,6 @@ using namespace reach_facts;
 using namespace graph;
 using namespace std;
 using symbol = dlsym::loaded_symbol;
-using ProgramFacts = resolve_facts::ProgramFacts;
 using EdgeKind = resolve_facts::EdgeKind;
 using NodeType = resolve_facts::NodeType;
 
@@ -87,7 +86,8 @@ map_loaded_symbols_to_ids(const database &db,
   return loaded_ids;
 }
 
-T graph::build_from_program_facts(const ProgramFacts &pf, bool dynlink,
+T graph::build_from_program_facts(const reach_facts::ProgramFactsView &pf,
+                                  bool dynlink,
                                   const optional<vector<symbol>> &loaded_syms) {
 
   T g;
@@ -98,11 +98,11 @@ T graph::build_from_program_facts(const ProgramFacts &pf, bool dynlink,
   NodeMap<std::vector<NNodeId>> bb_calls;
 
   // For indirect calls we want to get all function that match a signature
-  std::unordered_map<string, std::vector<NNodeId>> address_taken_by_sig;
+  std::unordered_map<string_view, std::vector<NNodeId>> address_taken_by_sig;
 
   // We want to be able to link all externs of the same name together
   // and also externs to dynamic symbols if applicable.
-  unordered_map<string, vector<NNodeId>> externs_by_name;
+  unordered_map<string_view, vector<NNodeId>> externs_by_name;
 
   std::unordered_set<NNodeId, resolve_facts::pair_hash> loaded_ids;
   std::vector<symbol> syms;
@@ -117,20 +117,20 @@ T graph::build_from_program_facts(const ProgramFacts &pf, bool dynlink,
       auto sid = std::make_pair(mid, s);
       auto did = std::make_pair(mid, d);
 
-      for (const auto &k : e.kinds) {
+      for (const auto &k : e.kinds()) {
         // fn to first block
-        if (k == EdgeKind::EntryPoint) {
+        if (k == facts_rs::EdgeKind::EntryPoint) {
           g.addEdge(did, sid, EdgeType::Contains);
           // BB control flow
-        } else if (k == EdgeKind::ControlFlowTo) {
+        } else if (k == facts_rs::EdgeKind::ControlFlowTo) {
           g.addEdge(did, sid, EdgeType::Succ);
-        } else if (k == EdgeKind::Calls) {
+        } else if (k == facts_rs::EdgeKind::Calls) {
           calls.emplace(sid, did);
         }
 
-        if (k == EdgeKind::Contains &&
-            m.nodes.at(s).type == NodeType::BasicBlock &&
-            m.nodes.at(d).call_type.has_value()) {
+        if (k == facts_rs::EdgeKind::Contains &&
+            m.nodes.at(s).type() == facts_rs::NodeType::BasicBlock &&
+            m.nodes.at(d).call_type().has_value()) {
           bb_calls[sid].push_back(did);
         }
       }
@@ -138,18 +138,18 @@ T graph::build_from_program_facts(const ProgramFacts &pf, bool dynlink,
 
     for (const auto &[nid, n] : m.nodes) {
       auto id = std::make_pair(mid, nid);
-      if (n.linkage == Linkage::ExternalLinkage) {
-        externs_by_name[*n.name].push_back(id);
+      if (n.linkage() == facts_rs::Linkage::ExternalLinkage) {
+        externs_by_name[*n.name()].push_back(id);
       }
 
-      if (n.address_taken == true) {
-        auto sig = *n.function_type;
+      if (n.address_taken()) {
+        auto sig = *n.function_type();
         address_taken_by_sig[sig].push_back(id);
       }
 
-      if (n.type == NodeType::Function && dynlink) {
+      if (n.type() == facts_rs::NodeType::Function && dynlink) {
         for (const auto &sym : syms) {
-          if (sym.symbol == n.name) {
+          if (n.name() && sym.symbol == *n.name()) {
             loaded_ids.emplace(id);
             break;
           }
@@ -164,10 +164,10 @@ T graph::build_from_program_facts(const ProgramFacts &pf, bool dynlink,
     const auto &module = pf.modules.at(mid);
     for (const auto &instr : instrs) {
       const auto [_, iid] = instr;
-      const auto &n = module.nodes.at(iid);
-      const auto &call_ty = n.call_type;
+      const auto n = module.nodes.at(iid);
+      const auto call_ty = n.call_type();
       // If direct, add one edge.
-      if (call_ty == CallType::Direct) {
+      if (call_ty == facts_rs::CallType::Direct) {
         const auto &call_id = calls.at(instr);
         g.addEdge(call_id, bb, EdgeType::DirectCall);
 
@@ -176,8 +176,8 @@ T graph::build_from_program_facts(const ProgramFacts &pf, bool dynlink,
         // "ptr (ptr)".
         const auto &[_, cid] = call_id;
 
-        const auto &fn_name = module.nodes.at(cid).name;
-        if (fn_name == "pthread_create") {
+        const auto fn_name = module.nodes.at(cid).name();
+        if (fn_name && *fn_name == "pthread_create") {
           for (const auto &fn : address_taken_by_sig.at("ptr (ptr)")) {
             g.addEdge(fn, bb, EdgeType::IndirectCall, INDIRECT_WEIGHT);
           }
@@ -186,9 +186,9 @@ T graph::build_from_program_facts(const ProgramFacts &pf, bool dynlink,
         continue;
       }
 
-      if (address_taken_by_sig.contains(*n.function_type)) {
+      if (address_taken_by_sig.contains(*n.function_type())) {
         // Else indirect. Add edges for all compatible address-taken functions.
-        for (const auto &fn : address_taken_by_sig.at(*n.function_type)) {
+        for (const auto &fn : address_taken_by_sig.at(*n.function_type())) {
           g.addEdge(fn, bb, EdgeType::IndirectCall, INDIRECT_WEIGHT);
         }
       }
@@ -199,9 +199,9 @@ T graph::build_from_program_facts(const ProgramFacts &pf, bool dynlink,
       if (dynlink) {
         for (const auto &[_, handles] : externs_by_name) {
           for (const auto &h : handles) {
-            const auto &n2 = pf.getNode(h);
-            if (n2.type == NodeType::Function &&
-                n2.function_type == n.function_type &&
+            const auto n2 = pf.getNode(h);
+            if (n2.type() == facts_rs::NodeType::Function &&
+                n2.function_type() == n.function_type() &&
                 (!loaded_syms.has_value() || loaded_ids.contains(h))) {
               g.addEdge(h, bb, EdgeType::ExternIndirectCall, INDIRECT_WEIGHT);
             }

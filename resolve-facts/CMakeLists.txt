@@ -48,6 +48,9 @@ set_target_properties(facts_rs PROPERTIES
 )
 add_dependencies(facts_rs facts_rs_build)
 
+install(FILES "${FACTS_RS_STATICLIB}" DESTINATION ${CMAKE_INSTALL_LIBDIR})
+install(FILES "${FACTS_RS_HEADER}" DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+
 add_subdirectory(vendor/argparse)
 add_subdirectory(vendor/json)
 
@@ -74,7 +77,7 @@ file(GLOB_RECURSE SRC
 
 add_library(resolve_facts STATIC libs/resolve_facts/resolve_facts.cpp)
 target_include_directories(resolve_facts PUBLIC 
-    "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>/include"
+    "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
     "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>"
 )
 target_link_libraries(resolve_facts PRIVATE glaze::glaze)
@@ -117,7 +120,7 @@ target_link_libraries(resolve_facts_llvm PUBLIC
 )
 
 target_include_directories(resolve_facts_llvm PUBLIC
-    "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>/include"
+    "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
     "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>"
 )
 set_target_properties(resolve_facts_llvm PROPERTIES POSITION_INDEPENDENT_CODE ON)
@@ -144,6 +147,7 @@ file(GLOB_RECURSE SRC
 )
 
 file(GLOB_RECURSE LIB
+    "${CMAKE_CURRENT_SOURCE_DIR}/include/reach/*.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/include/reach/*.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/libs/reach/*.cpp"
 )
@@ -152,6 +156,7 @@ file(GLOB_RECURSE LIB
 add_library(libreach 
     libs/reach/distmap.cpp
     libs/reach/facts.cpp
+    libs/reach/ffi.cpp
     libs/reach/graph.cpp
     libs/reach/search.cpp
     libs/reach/util.cpp
@@ -160,10 +165,17 @@ add_library(libreach
 set_target_properties(libreach PROPERTIES OUTPUT_NAME "reach")
 
 target_include_directories(libreach PUBLIC
-    "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>/include"
+    "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
     "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>"
 )
-target_link_libraries(libreach PUBLIC resolve_facts json)
+target_link_libraries(libreach PUBLIC
+    resolve_facts
+    facts_rs
+    json
+    Threads::Threads
+    ${CMAKE_DL_LIBS}
+    m
+)
 
 target_compile_features(libreach PUBLIC cxx_std_23)
 

@@ -2,6 +2,7 @@
 compile_error!("the facts format currently requires a little-endian target");
 
 mod builder;
+mod ffi;
 mod interner;
 mod reader;
 mod schema;
