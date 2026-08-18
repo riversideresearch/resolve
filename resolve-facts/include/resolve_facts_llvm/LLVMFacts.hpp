@@ -23,7 +23,7 @@
 
 using NodeId = facts_rs::NodeID;
 
-// Owns a Rust FactsBuf for the duration of the C++ embedding call.
+// Owns a Rust FactsBuf
 class SerializedFacts {
   facts_rs::FactsBuf *buf = nullptr;
 
@@ -39,8 +39,7 @@ public:
   }
 };
 
-// LLVM-specific ID mapping and a thin recording facade over the Rust builder.
-// This owns no C++ facts model.
+// LLVM-specific ID mapping and recording, doesn't own FactsBuf
 class LLVMFacts {
   facts_rs::FactsBuilder *facts = facts_rs::facts_builder_new();
 

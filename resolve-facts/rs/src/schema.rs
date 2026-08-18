@@ -528,7 +528,7 @@ impl<'a> Iterator for ModuleIter<'a> {
 }
 
 /// cbindgen:ignore
-#[allow(dead_code)] // cbindgen
+#[allow(dead_code)]
 const LAYOUT_ASSERTIONS: () = {
     assert!(size_of::<Interned>() == 4);
     assert!(align_of::<Interned>() == 4);

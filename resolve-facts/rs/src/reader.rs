@@ -375,9 +375,10 @@ fn append_reader(mut reader: impl Read, words: &mut Vec<u32>) -> Result<(), Appe
             pending[pending_len..pending_len + copied].copy_from_slice(&bytes[..copied]);
             pending_len += copied;
             bytes = &bytes[copied..];
-            if pending_len == size_of::<u32>() {
-                words.push(u32::from_le_bytes(pending));
+            if pending_len != size_of::<u32>() {
+                continue;
             }
+            words.push(u32::from_le_bytes(pending));
         }
 
         let mut chunks = bytes.chunks_exact(size_of::<u32>());
