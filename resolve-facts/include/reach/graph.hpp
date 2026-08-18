@@ -13,6 +13,10 @@
 
 #include "reach/facts.hpp"
 
+namespace facts_rs {
+struct FactsBuf;
+}
+
 using NNodeId = resolve_facts::NamespacedNodeId;
 
 namespace graph {
@@ -58,7 +62,11 @@ struct T {
 bool wf(const E &g);
 
 T build_from_program_facts(
-    const resolve_facts::ProgramFacts &pf, bool dynlink,
+    const resolve_facts::ProgramFacts &facts, bool dynlink,
+    const std::optional<std::vector<dlsym::loaded_symbol>> &loaded_syms);
+
+T build_from_program_facts(
+    const facts_rs::FactsBuf *facts, bool dynlink,
     const std::optional<std::vector<dlsym::loaded_symbol>> &loaded_syms);
 
 constexpr reach_facts::LoadOptions SIMPLE_LOAD_OPTIONS =
@@ -103,6 +111,10 @@ T build_cfg(
 // Instruction-level granularity CFG (rather than BBs).
 T build_instr_cfg(
     const reach_facts::database &db, bool dynlink = false,
+    const std::optional<std::vector<dlsym::loaded_symbol>> &loaded_syms = {});
+
+T build_instr_cfg(
+    const facts_rs::FactsBuf *facts, bool dynlink = false,
     const std::optional<std::vector<dlsym::loaded_symbol>> &loaded_syms = {});
 } // namespace graph
 
