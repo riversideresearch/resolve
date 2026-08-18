@@ -8,6 +8,7 @@
 #include <fstream>
 #include <iostream>
 #include <string>
+#include <string_view>
 #include <unordered_map>
 #include <vector>
 
@@ -22,6 +23,10 @@ template <typename T> using NodeMap = resolve_facts::NodeMap<T>;
 using NodeType = resolve_facts::NodeType;
 using Linkage = resolve_facts::Linkage;
 using CallType = resolve_facts::CallType;
+
+namespace facts_rs {
+struct FactsBuf;
+}
 
 namespace reach_facts {
 
@@ -70,6 +75,10 @@ struct database {
 
 database load(std::istream &facts, LoadOptions options);
 database load(const std::filesystem::path &facts_dir, LoadOptions options);
+
+std::vector<NamespacedNodeId>
+find_functions_by_name_suffix(const facts_rs::FactsBuf *facts,
+                              std::string_view suffix);
 
 bool validate(const database &db);
 } // namespace reach_facts

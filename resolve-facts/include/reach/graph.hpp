@@ -108,6 +108,10 @@ T build_cfg(
 T build_instr_cfg(
     const reach_facts::database &db, bool dynlink = false,
     const std::optional<std::vector<dlsym::loaded_symbol>> &loaded_syms = {});
+
+T build_instr_cfg(
+    const facts_rs::FactsBuf *facts, bool dynlink = false,
+    const std::optional<std::vector<dlsym::loaded_symbol>> &loaded_syms = {});
 } // namespace graph
 
 namespace std {

@@ -20,6 +20,7 @@
 #include <cassert>
 #include <cstdint>
 #include <unordered_map>
+#include <utility>
 
 using NodeId = facts_rs::NodeID;
 
@@ -33,6 +34,8 @@ public:
 
   SerializedFacts(const SerializedFacts &) = delete;
   SerializedFacts &operator=(const SerializedFacts &) = delete;
+
+  const facts_rs::FactsBuf *get() const { return buf; }
 
   llvm::ArrayRef<uint8_t> bytes() const {
     return {facts_rs::facts_buf_data(buf), facts_rs::facts_buf_len(buf)};
@@ -94,6 +97,15 @@ public:
 
   LLVMFacts(const LLVMFacts &) = delete;
   LLVMFacts &operator=(const LLVMFacts &) = delete;
+
+  std::pair<facts_rs::ModuleHandle, NodeId>
+  getId(const llvm::Instruction &instruction) const {
+    const auto module = moduleHandles.find(instruction.getModule());
+    const auto node = instructionIDs.find(&instruction);
+    assert(module != moduleHandles.end());
+    assert(node != instructionIDs.end());
+    return {module->second, node->second};
+  }
 
   NodeId addNode(const llvm::Module &M) {
     addModule(M);

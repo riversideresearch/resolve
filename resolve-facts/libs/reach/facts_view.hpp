@@ -5,6 +5,7 @@
 
 #pragma once
 
+#include <algorithm>
 #include <bit>
 #include <cassert>
 #include <cstdint>
@@ -109,6 +110,21 @@ public:
 
   std::span<const facts_rs::Edge> edges() const {
     return {module_.edges, module_.edge_count};
+  }
+
+  std::span<const facts_rs::Edge> out_edges(const facts_rs::NodeID id) const {
+    const auto all = edges();
+    const auto begin = std::lower_bound(
+        all.begin(), all.end(), id,
+        [](const facts_rs::Edge &edge, const facts_rs::NodeID value) {
+          return edge.src < value;
+        });
+    const auto end = std::upper_bound(
+        begin, all.end(), id,
+        [](const facts_rs::NodeID value, const facts_rs::Edge &edge) {
+          return value < edge.src;
+        });
+    return all.subspan(begin - all.begin(), end - begin);
   }
 
   bool contains(const facts_rs::NodeID id) const { return id < nodes().size(); }

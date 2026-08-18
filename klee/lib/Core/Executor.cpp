@@ -56,8 +56,6 @@
 #include "klee/System/MemoryUsage.h"
 #include "klee/System/Time.h"
 
-#include "resolve_facts_llvm/resolve_facts_llvm.hpp"
-
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/IR/Attributes.h"
@@ -2115,9 +2113,7 @@ void Executor::transferToBasicBlock(BasicBlock *dst, BasicBlock *src,
 	goto cont;
       }
     }
-    const auto bb_id = resolve::facts.addNode(*dst);
-
-    klee_warning(("pruning state: " + std::to_string(bb_id)).c_str());
+    klee_warning("pruning state");
 
     // For debugging
     // std::cout << "call stack: " << std::endl;

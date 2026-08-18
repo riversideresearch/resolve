@@ -256,6 +256,170 @@ T graph::build_from_program_facts(const facts_rs::FactsBuf *facts, bool dynlink,
 
 // Same thing here as [build_cfg] (see above) wrt. Call edges going
 // through intermediate function nodes.
+T graph::build_instr_cfg(const facts_rs::FactsBuf *facts, bool dynlink,
+                         const optional<vector<symbol>> &loaded_syms) {
+  const reach_facts::ProgramFactsView pf{facts};
+  T g;
+
+  unordered_map<string_view, vector<NNodeId>> address_taken_by_sig;
+  unordered_map<string_view, vector<NNodeId>> externs_by_name;
+  unordered_set<NNodeId, resolve_facts::pair_hash> loaded_ids;
+
+  for (uint32_t mid = 0; mid < pf.module_count(); ++mid) {
+    const auto module = pf.module(mid);
+    for (uint32_t nid = 0; nid < module.nodes().size(); ++nid) {
+      const auto node = module.node(nid);
+      const auto id = make_pair(mid, nid);
+
+      if (node.linkage() == facts_rs::Linkage::ExternalLinkage) {
+        externs_by_name[*node.name()].push_back(id);
+      }
+      if (node.address_taken()) {
+        address_taken_by_sig[*node.function_type()].push_back(id);
+      }
+      if (dynlink && loaded_syms &&
+          node.type() == facts_rs::NodeType::Function) {
+        for (const auto &loaded : *loaded_syms) {
+          if (node.name() && loaded.symbol == *node.name()) {
+            loaded_ids.insert(id);
+            break;
+          }
+        }
+      }
+    }
+  }
+
+  auto instruction_bounds = [](const reach_facts::ModuleView module,
+                               const facts_rs::NodeID bb) {
+    pair<optional<facts_rs::NodeID>, optional<facts_rs::NodeID>> result;
+    for (const auto &edge : module.out_edges(bb)) {
+      if (edge_has_kind(edge, facts_rs::EdgeKind::Contains) &&
+          module.node(edge.dst).type() == facts_rs::NodeType::Instruction) {
+        if (!result.first) {
+          result.first = edge.dst;
+        }
+        result.second = edge.dst;
+      }
+    }
+    return result;
+  };
+
+  for (uint32_t mid = 0; mid < pf.module_count(); ++mid) {
+    const auto module = pf.module(mid);
+
+    for (uint32_t bb = 0; bb < module.nodes().size(); ++bb) {
+      if (module.node(bb).type() != facts_rs::NodeType::BasicBlock) {
+        continue;
+      }
+
+      optional<facts_rs::NodeID> previous;
+      for (const auto &edge : module.out_edges(bb)) {
+        if (!edge_has_kind(edge, facts_rs::EdgeKind::Contains) ||
+            module.node(edge.dst).type() != facts_rs::NodeType::Instruction) {
+          continue;
+        }
+
+        const auto instruction = edge.dst;
+        if (previous) {
+          g.addEdge(make_pair(mid, instruction), make_pair(mid, *previous),
+                    EdgeType::Succ);
+        }
+        previous = instruction;
+
+        const auto node = module.node(instruction);
+        const auto call_type = node.call_type();
+        if (!call_type) {
+          continue;
+        }
+
+        const auto instruction_id = make_pair(mid, instruction);
+        if (*call_type == facts_rs::CallType::Direct) {
+          optional<NNodeId> target;
+          for (const auto &call : module.out_edges(instruction)) {
+            if (edge_has_kind(call, facts_rs::EdgeKind::Calls)) {
+              target = make_pair(mid, call.dst);
+              break;
+            }
+          }
+          if (!target) {
+            throw runtime_error("direct call has no call edge");
+          }
+
+          g.addEdge(*target, instruction_id, EdgeType::DirectCall);
+          const auto [_, target_node] = *target;
+          if (module.node(target_node).name() == "pthread_create") {
+            if (const auto it = address_taken_by_sig.find("ptr (ptr)");
+                it != address_taken_by_sig.end()) {
+              for (const auto &function : it->second) {
+                g.addEdge(function, instruction_id, EdgeType::IndirectCall,
+                          INDIRECT_WEIGHT);
+              }
+            }
+          }
+          continue;
+        }
+
+        const auto signature = node.function_type();
+        if (!signature) {
+          throw runtime_error("indirect call has no function type");
+        }
+        if (const auto it = address_taken_by_sig.find(*signature);
+            it != address_taken_by_sig.end()) {
+          for (const auto &function : it->second) {
+            g.addEdge(function, instruction_id, EdgeType::IndirectCall,
+                      INDIRECT_WEIGHT);
+          }
+        }
+
+        if (dynlink) {
+          for (const auto &[_, handles] : externs_by_name) {
+            for (const auto &handle : handles) {
+              const auto function = pf.node(handle);
+              if (function.type() == facts_rs::NodeType::Function &&
+                  function.function_type() == signature &&
+                  (!loaded_syms || loaded_ids.contains(handle))) {
+                g.addEdge(handle, instruction_id, EdgeType::ExternIndirectCall,
+                          INDIRECT_WEIGHT);
+              }
+            }
+          }
+        }
+      }
+    }
+
+    for (const auto &edge : module.edges()) {
+      if (edge_has_kind(edge, facts_rs::EdgeKind::EntryPoint)) {
+        const auto bounds = instruction_bounds(module, edge.dst);
+        if (!bounds.first) {
+          throw runtime_error("entry block has no instruction");
+        }
+        g.addEdge(make_pair(mid, *bounds.first), make_pair(mid, edge.src),
+                  EdgeType::Contains);
+      }
+      if (edge_has_kind(edge, facts_rs::EdgeKind::ControlFlowTo)) {
+        const auto source = instruction_bounds(module, edge.src);
+        const auto destination = instruction_bounds(module, edge.dst);
+        if (!source.second || !destination.first) {
+          throw runtime_error("control-flow block has no instruction");
+        }
+        g.addEdge(make_pair(mid, *destination.first),
+                  make_pair(mid, *source.second), EdgeType::Succ);
+      }
+    }
+  }
+
+  for (const auto &[_, handles] : externs_by_name) {
+    for (size_t i = 0; i < handles.size(); ++i) {
+      for (size_t j = i + 1; j < handles.size(); ++j) {
+        g.addEdge(handles[i], handles[j], EdgeType::Extern, INDIRECT_WEIGHT);
+        g.addEdge(handles[j], handles[i], EdgeType::Extern, INDIRECT_WEIGHT);
+      }
+    }
+  }
+
+  return g;
+}
+
 T graph::build_instr_cfg(const database &db, bool dynlink,
                          const optional<vector<symbol>> &loaded_syms) {
   const auto loaded_ids = map_loaded_symbols_to_ids(db, loaded_syms);
