@@ -2,6 +2,7 @@
 
 include(CMakeFindDependencyMacro)
 find_dependency(glaze)
+find_dependency(Threads)
 
 if(NOT TARGET facts_rs)
   add_library(facts_rs STATIC IMPORTED)
