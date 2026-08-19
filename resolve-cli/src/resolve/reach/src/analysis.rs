@@ -2,7 +2,7 @@ use facts_rs::FactsBuf;
 
 use crate::{
     functions::FunctionIndex,
-    libreach::Graph,
+    libreach::{Graph, GraphBuildOptions},
     vulnerability::{ReachabilityStatus, VulnerabilityAnalysis},
 };
 
@@ -11,6 +11,7 @@ pub fn populate_reachability_results(
     facts: &FactsBuf,
     functions: &FunctionIndex,
     entry: &str,
+    graph_options: &GraphBuildOptions<'_>,
 ) -> Result<(), String> {
     let entry_id = functions
         .find(entry, "")
@@ -34,7 +35,7 @@ pub fn populate_reachability_results(
         return Ok(());
     }
 
-    let graph = Graph::build(facts)?;
+    let graph = Graph::build_with_options(facts, graph_options)?;
     println!(
         "[REACH] Built a libreach graph with {} edges.",
         graph.edge_count()

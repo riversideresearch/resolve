@@ -5,9 +5,11 @@ use std::{
 
 use clap::{ArgAction, Parser};
 use facts_rs::FactsBuf;
+use serde::Deserialize;
 
 use analysis::populate_reachability_results;
 use functions::FunctionIndex;
+use libreach::{GraphBuildOptions, LoadedSymbol};
 use serializer::write_report;
 use vcpkg::populate_version_results;
 use vulnerability::{VulnerabilityAnalysis, VulnerabilityJSON};
@@ -41,7 +43,19 @@ struct Args {
     /// Entry function to traverse to vulnerable sink from
     #[arg(short, long, default_value = "main")]
     entry: String,
-    // should we have no-ops for cli compatibility with old reach wrapper?
+
+    /// Include external-linkage functions as indirect-call targets
+    #[arg(long)]
+    dynlink: bool,
+
+    /// JSON log of symbols loaded through dlsym
+    #[arg(long)]
+    dlsym_log: Option<PathBuf>,
+}
+
+#[derive(Deserialize)]
+struct DlsymLog {
+    loaded_symbols: Vec<LoadedSymbol>,
 }
 
 fn load_vuln_json(path: &Path) -> Result<VulnerabilityJSON, String> {
@@ -54,6 +68,15 @@ fn load_vuln_json(path: &Path) -> Result<VulnerabilityJSON, String> {
 
 fn load_facts(paths: &[PathBuf]) -> Result<FactsBuf, String> {
     FactsBuf::read_files(paths).map_err(|error| format!("failed to load facts: {error}"))
+}
+
+fn load_dlsym_log(path: &Path) -> Result<Vec<LoadedSymbol>, String> {
+    let contents =
+        fs::read(path).map_err(|error| format!("failed to read '{}': {error}", path.display()))?;
+    let log: DlsymLog = serde_json::from_slice(&contents)
+        .map_err(|error| format!("failed to parse '{}': {error}", path.display()))?;
+
+    Ok(log.loaded_symbols)
 }
 
 fn run() -> Result<(), String> {
@@ -83,7 +106,18 @@ fn run() -> Result<(), String> {
     );
 
     let functions = FunctionIndex::build(&facts)?;
-    populate_reachability_results(&mut analyses, &facts, &functions, &args.entry)?;
+    let loaded_symbols = args.dlsym_log.as_deref().map(load_dlsym_log).transpose()?;
+    let graph_options = GraphBuildOptions {
+        loaded_symbols: loaded_symbols.as_deref(),
+        dynlink: args.dynlink,
+    };
+    populate_reachability_results(
+        &mut analyses,
+        &facts,
+        &functions,
+        &args.entry,
+        &graph_options,
+    )?;
     write_report(&args.output, &analyses, &facts, &functions)?;
 
     Ok(())

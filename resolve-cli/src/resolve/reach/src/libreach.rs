@@ -1,6 +1,7 @@
 use std::{ffi::c_void, ptr::NonNull, slice};
 
 use facts_rs::{FactsBuf, NodeID};
+use serde::Deserialize;
 
 #[repr(C)]
 struct ReachGraph {
@@ -15,6 +16,26 @@ struct ReachQueryResult {
 #[repr(C)]
 struct ReachError {
     _private: [u8; 0],
+}
+
+#[repr(C)]
+struct ReachStringView {
+    data: *const u8,
+    len: usize,
+}
+
+#[repr(C)]
+struct ReachLoadedSymbol {
+    symbol: ReachStringView,
+    library: ReachStringView,
+}
+
+#[repr(C)]
+struct ReachBuildOptions {
+    loaded_symbols: *const ReachLoadedSymbol,
+    loaded_symbol_count: usize,
+    dynlink: u8,
+    filter_loaded_symbols: u8,
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -69,6 +90,18 @@ pub struct ReachPath {
     pub edges: Vec<ReachEdgeType>,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct LoadedSymbol {
+    pub symbol: String,
+    pub library: String,
+}
+
+#[derive(Debug, Default)]
+pub struct GraphBuildOptions<'a> {
+    pub loaded_symbols: Option<&'a [LoadedSymbol]>,
+    pub dynlink: bool,
+}
+
 #[repr(C)]
 struct ReachPathView {
     nodes: *const ReachNodeID,
@@ -80,7 +113,7 @@ struct ReachPathView {
 unsafe extern "C" {
     fn reach_graph_build(
         facts: *const c_void,
-        options: *const (),
+        options: *const ReachBuildOptions,
         error: *mut *mut ReachError,
     ) -> *mut ReachGraph;
     fn reach_graph_free(graph: *mut ReachGraph);
@@ -111,12 +144,34 @@ pub struct Graph {
 }
 
 impl Graph {
-    pub fn build(facts: &FactsBuf) -> Result<Self, String> {
+    pub fn build_with_options(
+        facts: &FactsBuf,
+        options: &GraphBuildOptions<'_>,
+    ) -> Result<Self, String> {
+        let loaded_symbols = options
+            .loaded_symbols
+            .unwrap_or_default()
+            .iter()
+            .map(|symbol| ReachLoadedSymbol {
+                symbol: ReachStringView::new(&symbol.symbol),
+                library: ReachStringView::new(&symbol.library),
+            })
+            .collect::<Vec<_>>();
+        let ffi_options = ReachBuildOptions {
+            loaded_symbols: if loaded_symbols.is_empty() {
+                std::ptr::null()
+            } else {
+                loaded_symbols.as_ptr()
+            },
+            loaded_symbol_count: loaded_symbols.len(),
+            dynlink: u8::from(options.dynlink),
+            filter_loaded_symbols: u8::from(options.loaded_symbols.is_some()),
+        };
         let mut error = std::ptr::null_mut();
         let graph = unsafe {
             reach_graph_build(
                 std::ptr::from_ref(facts).cast(),
-                std::ptr::null(),
+                std::ptr::from_ref(&ffi_options),
                 &mut error,
             )
         };
@@ -152,6 +207,15 @@ impl Graph {
         let result = QueryResult { raw: result };
 
         result.paths()
+    }
+}
+
+impl ReachStringView {
+    fn new(value: &str) -> Self {
+        Self {
+            data: value.as_ptr(),
+            len: value.len(),
+        }
     }
 }
 
@@ -228,7 +292,7 @@ unsafe fn take_error(error: *mut ReachError, fallback: &str) -> String {
 mod tests {
     use facts_rs::{EdgeKind, FactsBuilder, NodeType};
 
-    use super::{Graph, ReachEdgeType, ReachNodeID};
+    use super::{Graph, GraphBuildOptions, ReachEdgeType, ReachNodeID};
 
     #[test]
     fn builds_and_queries_a_graph() {
@@ -239,7 +303,8 @@ mod tests {
         let block = builder.add_node(module, NodeType::BasicBlock).unwrap();
         assert!(builder.add_edge(module, function, block, EdgeKind::EntryPoint));
 
-        let graph = Graph::build(&builder.freeze()).unwrap();
+        let graph =
+            Graph::build_with_options(&builder.freeze(), &GraphBuildOptions::default()).unwrap();
         let paths = graph
             .query(
                 ReachNodeID {

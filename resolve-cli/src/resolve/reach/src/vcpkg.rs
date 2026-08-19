@@ -14,13 +14,26 @@ use crate::vulnerability::{ReachabilityStatus, VulnerabilityAnalysis};
 struct VcpkgManifest {
     name: Option<String>,
     version: Option<String>,
+    #[serde(rename = "version-semver")]
+    version_semver: Option<String>,
+    #[serde(rename = "version-string")]
+    version_string: Option<String>,
+    #[serde(rename = "version-date")]
+    version_date: Option<String>,
+}
+
+impl VcpkgManifest {
+    fn into_version(self) -> Option<String> {
+        self.version
+            .or(self.version_semver)
+            .or(self.version_string)
+            .or(self.version_date)
+    }
 }
 
 fn normalize_semver(version: &str) -> String {
     let version = version.trim();
-    let suffix_start = version
-        .find(|character| character == '-' || character == '+')
-        .unwrap_or(version.len());
+    let suffix_start = version.find(['-', '+']).unwrap_or(version.len());
     let (core, suffix) = version.split_at(suffix_start);
     let components: Vec<&str> = core.split('.').collect();
 
@@ -103,7 +116,7 @@ fn get_version(src_dir: &Path, package_name: &str) -> Result<(Option<String>, Pa
         return Ok((None, manifest_path));
     }
 
-    Ok((manifest.version, manifest_path))
+    Ok((manifest.into_version(), manifest_path))
 }
 
 pub fn populate_version_results(
@@ -120,8 +133,6 @@ pub fn populate_version_results(
             continue;
         };
 
-        sink.package_version = Some(actual_version.clone());
-
         println!(
             "[REACH] Populated package version for '{}' from '{}': {}",
             sink.vuln.package_name,
@@ -129,17 +140,22 @@ pub fn populate_version_results(
             actual_version
         );
 
-        if is_vulnerable(&sink.vuln.package_version, &actual_version)? {
-            println!(
+        match is_vulnerable(&sink.vuln.package_version, &actual_version) {
+            Ok(true) => println!(
                 "[REACH] Package version '{}' is vulnerable according to '{}'.",
                 actual_version, sink.vuln.package_version
-            );
-        } else {
-            sink.reachability = ReachabilityStatus::NotVulnerable;
-            println!(
-                "[REACH] Package version '{}' is not vulnerable according to '{}'.",
-                actual_version, sink.vuln.package_version
-            );
+            ),
+            Ok(false) => {
+                sink.reachability = ReachabilityStatus::NotVulnerable;
+                println!(
+                    "[REACH] Package version '{}' is not vulnerable according to '{}'.",
+                    actual_version, sink.vuln.package_version
+                );
+            }
+            Err(error) => println!(
+                "[REACH] WARNING: Could not compare the package version for '{}': {error}. Reachability analysis will continue.",
+                sink.vuln.package_name
+            ),
         }
     }
 
