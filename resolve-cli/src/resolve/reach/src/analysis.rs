@@ -9,9 +9,9 @@ use crate::{
 pub fn populate_reachability_results(
     analyses: &mut [VulnerabilityAnalysis],
     facts: &FactsBuf,
+    functions: &FunctionIndex,
     entry: &str,
 ) -> Result<(), String> {
-    let functions = FunctionIndex::build(facts)?;
     let entry_id = functions
         .find(entry, "")
         .ok_or_else(|| format!("entry function '{entry}' was not found in the facts"))?;

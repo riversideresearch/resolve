@@ -34,6 +34,19 @@ pub enum ReachEdgeType {
     ExternalIndirectCall,
 }
 
+impl ReachEdgeType {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::DirectCall => "DirectCall",
+            Self::IndirectCall => "IndirectCall",
+            Self::Contains => "Contains",
+            Self::Successor => "Succ",
+            Self::External => "Extern",
+            Self::ExternalIndirectCall => "ExternIndirectCall",
+        }
+    }
+}
+
 impl TryFrom<u8> for ReachEdgeType {
     type Error = String;
 

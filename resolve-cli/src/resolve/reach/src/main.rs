@@ -7,12 +7,15 @@ use clap::{ArgAction, Parser};
 use facts_rs::FactsBuf;
 
 use analysis::populate_reachability_results;
+use functions::FunctionIndex;
+use serializer::write_report;
 use vcpkg::populate_version_results;
 use vulnerability::{VulnerabilityAnalysis, VulnerabilityJSON};
 
 mod analysis;
 mod functions;
 mod libreach;
+mod serializer;
 mod vcpkg;
 mod vulnerability;
 
@@ -28,7 +31,7 @@ struct Args {
 
     /// The file to write the final report into
     #[arg(short, long, default_value = "reach.json")] // TODO: <input>.reach.json
-    output: Option<PathBuf>,
+    output: PathBuf,
 
     /// Source tree containing vcpkg-overlays
     #[arg(short, long)]
@@ -79,7 +82,9 @@ fn run() -> Result<(), String> {
         args.facts.len()
     );
 
-    populate_reachability_results(&mut analyses, &facts, &args.entry)?;
+    let functions = FunctionIndex::build(&facts)?;
+    populate_reachability_results(&mut analyses, &facts, &functions, &args.entry)?;
+    write_report(&args.output, &analyses, &facts, &functions)?;
 
     Ok(())
 }

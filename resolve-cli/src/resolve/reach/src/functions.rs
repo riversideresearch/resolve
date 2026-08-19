@@ -93,6 +93,13 @@ impl FunctionIndex {
 
         matches.first().map(|function| function.id)
     }
+
+    pub fn display_name(&self, id: ReachNodeID) -> Option<&str> {
+        self.functions
+            .iter()
+            .find(|function| function.id == id)
+            .map(|function| function.demangled.as_str())
+    }
 }
 
 impl Function {
