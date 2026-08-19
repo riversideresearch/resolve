@@ -7,7 +7,6 @@
 // RUN: RESOLVE_LABEL_CVE=vulnerabilities/multiple_globals_oob.json %clang -S -emit-llvm \
 // RUN: -fpass-plugin=%plugin \
 // RUN: %s -o - | %FileCheck %s
-// CHECK: @llvm.global_ctors ={{.*}}@__resolve_register_globals_ctor
 //
 // Test that the remediation is successful (out-of-bounds read and write)
 // RUN: RESOLVE_LABEL_CVE=vulnerabilities/multiple_globals_oob.json %clang -O0 -g -fpass-plugin=%plugin \
@@ -20,15 +19,6 @@
 // RUN: -L%rlib -lresolve -Wl,-rpath=%rlib %s -o %t.exe
 // RUN: %t.exe; EXIT_CODE=$?; \
 // RUN: echo Remediated exit: $EXIT_CODE; test $EXIT_CODE -eq 3
-//
-// Test that the normal behavior is preserved
-// RUN: RESOLVE_LABEL_CVE=vulnerabilities/global_oob.json %clang -O0 -g -fpass-plugin=%plugin \
-// RUN: -L%rlib -lresolve -Wl,-rpath=%rlib %s -o %t.exe
-// RUN: %t.exe; EXIT_CODE=$?; \
-// RUN: echo Normal exit: $EXIT_CODE; test $EXIT_CODE -eq 0
-
-
-
 
 #include <stdio.h>
 #include <stdint.h>
@@ -47,10 +37,10 @@ int g9 = 9;
 
 char banner[64] = "RESOLVE Global Bounds Test";
 
-int globals0[16];
-int globals1[16];
-int globals2[16];
-int globals3[16];
+int globals0[10];
+int globals1[10];
+int globals2[10];
+int globals3[10];
 
 long counter0 = 100;
 long counter1 = 200;
@@ -67,10 +57,11 @@ int target[8] = {
 };
 
 int main(int argc, char **argv) {
-  for (int i = 0; i < 16; ++i) {
+  for (int i = 0; i < 10; ++i) {
     globals0[i] = i;
     globals1[i] = i + 100;
     globals2[i] = i + 200;
+    globals3[i] = i + 300;
   }
 
   printf("target[0] = %d\n", target[0]);

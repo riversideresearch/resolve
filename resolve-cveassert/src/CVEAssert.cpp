@@ -215,7 +215,6 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
       sanitizeMemInstBounds(&F, vuln.Strategy);
       result = PreservedAnalyses::none();
       break;
-
     case VulnID::OOB_READ: /* OOB Read; found in stb-resize, lamartine challenge
                               problems */
     case VulnID::INCORRECT_BUF_SIZE: /* Incorrect buffer size calculation; found
@@ -283,15 +282,23 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
     ArrayType *newArrayType = ArrayType::get(elementType, numElements + 1);
 
     // Extend the initializer
-    auto *oldInit = cast<ConstantArray>(GV->getInitializer());
+    Constant *oldInit = GV->getInitializer();
 
     SmallVector<Constant *, 16> elements;
 
     for (unsigned i = 0; i < numElements; ++i) {
-      elements.push_back(cast<Constant>(oldInit->getAggregateElement(i)));
+      // Adding tainted element.
+      Constant *element = oldInit->getAggregateElement(i);
+
+      if (!element) {
+        errs() << "[CVEAssert] Failed to get element " << i << " from global "
+               << GV->getName() << "\n";
+        return nullptr;
+      }
+      elements.push_back(element);
     }
 
-    // Adding tainted element.
+    // Add tainted element.
     elements.push_back(Constant::getNullValue(elementType));
 
     Constant *newInit = ConstantArray::get(newArrayType, elements);
@@ -357,7 +364,7 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
     for (GlobalVariable *G : targets) {
       // TODO: Create a helper that modifies the global
       GlobalVariable *newGV = CreateTrackedGlobal(G);
-      uint64_t size = DL.getTypeAllocSize(G->getValueType());
+      uint64_t size = DL.getTypeAllocSize(G->getValueType()).getFixedValue();
       builder.CreateCall(registerFn, {newGV, ConstantInt::get(size_ty, size)});
       G->replaceAllUsesWith(newGV);
       G->eraseFromParent();
