@@ -22,18 +22,22 @@ mod vcpkg;
 mod vulnerability;
 
 #[derive(Parser, Debug)]
+#[command(
+    name = "resolve-reach",
+    about = "Analyze static reachability for known vulnerabilities"
+)]
 struct Args {
     /// Input vulnerabilities.json
     #[arg(short, long)]
     input: PathBuf,
 
-    /// Files containing facts (ELF, .so, .facts)
+    /// Files or directories containing facts (ELF, .so, .facts)
     #[arg(short, long, required = true, num_args=1, action= ArgAction::Append)]
     facts: Vec<PathBuf>,
 
     /// The file to write the final report into
-    #[arg(short, long, default_value = "reach.json")] // TODO: <input>.reach.json
-    output: PathBuf,
+    #[arg(short, long)]
+    output: Option<PathBuf>,
 
     /// Source tree containing vcpkg-overlays
     #[arg(short, long)]
@@ -66,8 +70,50 @@ fn load_vuln_json(path: &Path) -> Result<VulnerabilityJSON, String> {
         .map_err(|error| format!("failed to parse '{}': {error}", path.display()))
 }
 
-fn load_facts(paths: &[PathBuf]) -> Result<FactsBuf, String> {
-    FactsBuf::read_files(paths).map_err(|error| format!("failed to load facts: {error}"))
+fn expand_facts_paths(paths: &[PathBuf]) -> Result<Vec<PathBuf>, String> {
+    let mut files = Vec::new();
+
+    for path in paths {
+        if !path.is_dir() {
+            files.push(path.clone());
+            continue;
+        }
+
+        let mut directory_files = fs::read_dir(path)
+            .map_err(|error| format!("failed to read '{}': {error}", path.display()))?
+            .map(|entry| {
+                entry
+                    .map(|entry| entry.path())
+                    .map_err(|error| format!("failed to read '{}': {error}", path.display()))
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        directory_files.retain(|file| {
+            file.is_file()
+                && file
+                    .extension()
+                    .is_some_and(|extension| extension == "facts")
+        });
+        directory_files.sort();
+
+        if directory_files.is_empty() {
+            return Err(format!(
+                "facts directory '{}' contains no .facts files",
+                path.display()
+            ));
+        }
+        files.extend(directory_files);
+    }
+
+    Ok(files)
+}
+
+fn load_facts(paths: &[PathBuf]) -> Result<(FactsBuf, usize), String> {
+    let files = expand_facts_paths(paths)?;
+    let count = files.len();
+    let facts =
+        FactsBuf::read_files(&files).map_err(|error| format!("failed to load facts: {error}"))?;
+
+    Ok((facts, count))
 }
 
 fn load_dlsym_log(path: &Path) -> Result<Vec<LoadedSymbol>, String> {
@@ -82,6 +128,9 @@ fn load_dlsym_log(path: &Path) -> Result<Vec<LoadedSymbol>, String> {
 fn run() -> Result<(), String> {
     let args = Args::parse();
     let input = load_vuln_json(&args.input)?;
+    let output = args
+        .output
+        .unwrap_or_else(|| args.input.with_extension("reach.json"));
     let mut analyses: Vec<VulnerabilityAnalysis> =
         input.vulnerabilities.into_iter().map(Into::into).collect();
 
@@ -93,7 +142,7 @@ fn run() -> Result<(), String> {
         );
     }
 
-    let facts = load_facts(&args.facts)?;
+    let (facts, facts_file_count) = load_facts(&args.facts)?;
     let module_count = facts
         .view()
         .modules()
@@ -102,7 +151,7 @@ fn run() -> Result<(), String> {
 
     println!(
         "[REACH] Loaded {module_count} facts modules from {} input files.",
-        args.facts.len()
+        facts_file_count
     );
 
     let functions = FunctionIndex::build(&facts)?;
@@ -118,7 +167,7 @@ fn run() -> Result<(), String> {
         &args.entry,
         &graph_options,
     )?;
-    write_report(&args.output, &analyses, &facts, &functions)?;
+    write_report(&output, &analyses, &facts, &functions)?;
 
     Ok(())
 }

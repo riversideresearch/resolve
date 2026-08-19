@@ -1,8 +1,7 @@
 # Facts
 
-Fact generation is a static program analysis technique that extracts structured information about a program from its source code or intermediate representation (i.e. [LLVM-IR](https://llvm.org/docs/LangRef.html)). A *fact* is a piece of information that describes some property of a program. Facts can be used to describe relationships between code and data. The `EnhancedFacts` pass plugin constructs program facts based on the program's control- and data-flow, and embeds these facts into custom ELF sections for downstream analysis.
+Fact generation extracts structured information from [LLVM IR](https://llvm.org/docs/LangRef.html). Each fact describes a program node, property, or relationship.
 
-These facts are compressed with zstd and stored inside a custom ELF section in the compiled binary called `.facts`. Reachability analysis can be performed by the [reach](reach.md) tool, which consumes these facts in its analysis. The [reachability example](../examples/reachability.md) walks through generating and querying facts end-to-end.
+The compiler pass writes a compact binary format. It compresses the data with zstd and embeds it in the ELF `.facts` section.
 
-!!! note
-    Developed for easy parsing and to encourage compatibility with third party tools, the facts format can consume quite a bit of storage and memory, particularly when uncompressed, due to being text-based. 
+The [reach](reach.md) command reads facts from an ELF file or an extracted `.facts` file. The [reachability example](../examples/reachability.md) shows the complete workflow.

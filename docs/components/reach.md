@@ -1,114 +1,96 @@
 # Reach
 
-`reach` performs static reachability queries on `resolve` program metadata. It consumes the [fact files](facts.md) extracted from binaries by `linker` and determines whether a path exists from the program entry point to a specified vulnerability. When a path is found, `reach` packages the results into a `.json` object and writes them either to a user-specified path or to `stdout` by default. 
+`resolve reach` determines whether a program entry point can reach a vulnerable function. It uses static control-flow data from RESOLVE facts.
 
-A Python wrapper, `reach.py`, provides a convenient command-line interface to interact with `reach`. For more information about `reach`, see the [`reach`](https://github.com/riversideresearch/resolve/tree/main/reach) documentation.
+The command accepts facts from these sources:
 
-!!! tip
-    For a hands-on, end-to-end walkthrough of a reachability query, see the [reachability example](../examples/reachability.md).
+- An ELF executable or shared library that contains a `.facts` section.
+- An extracted `.facts` file.
+- A directory that contains one or more `.facts` files.
+- Multiple inputs through repeated `-f` arguments.
 
-## Developer Information
+The command writes one JSON result for each entry in `vulnerabilities.json`.
 
-### Run
+## Use the command
 
+```bash
+resolve reach \
+  --input vulnerabilities.json \
+  --facts program.facts \
+  --output reach.json
 ```
-cmake -B build && cmake --build build/
-./build/reach --help
+
+The command uses `main` as the default entry point. Use `--entry` to select a different function.
+
+```bash
+resolve reach -i vulnerabilities.json -f program.facts -e service_main
 ```
 
-### Description
+If you omit `--output`, the command derives the path from the input name. For example, `vulnerabilities.json` produces `vulnerabilities.reach.json`.
 
-This development is factored into a library part (under `lib/`) and an
-executable tool (under `src/`) that uses the library.
+Use `--src` to read a package version from a Vcpkg manifest. The result becomes unreachable when the installed version is outside the vulnerable range.
 
-See the `--help` output for command line arguments/options.
+## Dynamic-link analysis
 
-The minimum required arguments for performing a reachability query are
-`--facts_dir` (path to directory containing facts files extracted from
-the program binary), and the `--src` and `--dst` node IDs. The tool
-will construct a control-flow graph from the facts in `facts_dir`, and
-attempt to find the shortest path from `src` to `dst` in it.
+Use `--dynlink` to include compatible external-linkage functions as indirect-call targets.
 
-The `src` and `dst` node IDs should match how they appear in the facts
-files, which is determined by the [**RESOLVE** LLVM
-pass](https://github.com/riversideresearch/resolve/blob/main/resolve-cc/src/ResolveFactsPluginPass.cpp)
-that generates the facts.
-
-For example, if `nodeprops.facts` contains the following line:
+```bash
+resolve reach -i vulnerabilities.json -f program.facts --dynlink
 ```
-/src/guestbook/src/main.cpp:f_GLOBAL__sub_I_main.cpp,Function
+
+Use `--dlsym-log` with `--dynlink` to restrict those targets to observed symbols.
+
+```bash
+resolve reach \
+  -i vulnerabilities.json \
+  -f program.facts \
+  --dynlink \
+  --dlsym-log dlsym.json
 ```
-there is a node of type `Function` with ID
-`/src/guestbook/src/main.cpp:f_GLOBAL__sub_I_main.cpp`.
 
-Arguments can also be specified in an input JSON file instead of as
-command line arguments. See the `--input` argument. If an argument is
-provided in both the input file and at the command line, the command
-line argument takes precedence. The input file format is specified by
-the struct `config` in `src/config.hpp` (the JSON deserializer is
-auto-generated from this definition).
+The log has this structure:
 
-The input file format supports multiple queries (see struct `query`
-and the `queries` field of struct `config` in `src/config.hpp`).
+```json
+{
+  "loaded_symbols": [
+    {
+      "symbol": "plugin_entry",
+      "library": "libplugin.so"
+    }
+  ]
+}
+```
 
-### Architecture
+The graph matches the `symbol` value. The `library` value remains available for future matching changes.
 
-The implementation is organized roughly as follows:
+## Architecture
+
+The Rust command owns input parsing, function lookup, version comparison, and report generation. It calls `libreach` through a small C interface.
 
 ```mermaid
-graph LR;
-    A[/input.json<br>cmd args/]-.->B;
-    B[main.cpp]-->C;
-    C[[facts.hpp]]-->|facts database|D;
-    D[[graph.hpp]]-->|constructed graph|E;
-    E[[search.hpp]]-->|discovered paths|B;
-
-    F[(nodes.facts<br>nodeprops.facts<br>edges.facts)]-.->C;
-
-    B-.->O[/output.json/]
+graph LR
+    A[vulnerabilities.json] --> B[resolve-reach]
+    F[ELF or binary facts] --> B
+    B --> C[libreach]
+    C --> B
+    B --> O[reachability report]
 ```
 
-The main reads the input config (plus command line arguments), and
-then uses the functionality declared in `lib/facts.hpp` to load the
-facts files from the disk into an in-memory database. This database is
-used by `lib/graph.hpp` to build a graph, which is passed to
-`lib/search.hpp` for finding paths. Finally, the paths are packaged
-into a JSON object and written to the provided output path or to
-stdout if no path was given.
+The command loads all facts once. Then it builds one graph and uses that graph for all unresolved sinks.
 
-### Code
+## Developer commands
 
-Under `lib/`:
+Build the command:
 
-- facts.hpp, facts.cpp
-    - in-memory representation of fact databases, and loading from .facts files
-    - defns related to dlsym loaded symbol logs from dynamic analysis
-- graph.hpp, graph.cpp
-    - weighted directed graphs with integer node labels, and functions
-    for constructing them from facts databases
-    - `handle_map`s for mapping between string node IDs and their
-    integer labels (handles)
-- search.hpp, search.cpp
-    - pathfinding algorithms on graphs. Currently:
-        - BFS
-	    - Dijkstra's shortest path
-	    - Yen's K-shortest paths
-    - also computing distance maps for KLEE (min distance of each node
-    in the graph to a specified destination node)
-- util.hpp
-    - misc helper functions
-        - `at` function for vector and unordered_map with slightly better
-      error reporting
-	    - `time` function for measuring time to execute a given function
-- distmap.hpp, distmap.cpp
-    - compute distance maps and blacklists for directed KLEE
+```bash
+cmake -B build
+cmake --build build --target resolve-reach
+```
 
-Under `src/`:
+Run its existing tests:
 
-- config.hpp
-    - specifications of the tool's input and output formats as structs
-    - JSON serializers and deserializers are auto-generated from these
-    specifications via the Lohmann JSON library
-- main.cpp
-    - parse arguments, load facts, build graph, perform queries, output
-    results
+```bash
+cmake --build build --target test-resolve-reach
+```
+
+See the [reachability example](../examples/reachability.md) for a complete workflow.

@@ -3,7 +3,7 @@
  *   LGPL-3; See LICENSE.txt in the repo root for details.
  */
 
-#include "resolve_facts_llvm/resolve_facts_llvm.hpp"
+#include "resolve_facts_llvm/binary_facts_llvm.hpp"
 
 #include "llvm/IR/Module.h"
 #include "llvm/IR/PassManager.h"
@@ -12,8 +12,10 @@
 
 struct ResolveFactsPluginPass : public PassInfoMixin<ResolveFactsPluginPass> {
   PreservedAnalyses run(Module &M, ModuleAnalysisManager &) {
-    resolve::getModuleFacts(M);
-    resolve::embedFacts(M);
+    resolve::BinaryLLVMFacts facts;
+    resolve::getBinaryModuleFacts(facts, M);
+    const auto serialized = facts.serialize();
+    resolve::embedBinaryFacts(M, serialized.bytes());
     return PreservedAnalyses::all();
   }
 };
