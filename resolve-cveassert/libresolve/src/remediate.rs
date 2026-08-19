@@ -3,8 +3,8 @@
 use libc::{c_char, c_void, calloc, free, malloc, realloc, strdup, strlen, strndup, strnlen};
 
 use crate::shadowobjs::{
-    lookup_global, AllocType, ShadowObject, Vaddr, ALIVE_OBJ_LIST, FREED_OBJ_LIST, GLOBALS,
-    SHADOW_STACK,
+    ALIVE_OBJ_LIST, AllocType, FREED_OBJ_LIST, GLOBALS, SHADOW_STACK, ShadowObject, Vaddr,
+    lookup_global,
 };
 
 use log::{info, warn};
@@ -316,10 +316,17 @@ pub extern "C" fn __resolve_get_bounds_heap(ptr: *mut c_void) -> ShadowObjBounds
 
 #[unsafe(no_mangle)]
 pub extern "C" fn __resolve_get_bounds_global(ptr: *mut c_void) -> ShadowObjBounds {
-    match lookup_global(ptr as Vaddr) {
+    let bounds = match lookup_global(ptr as Vaddr) {
         Some(obj) => (&obj).into(),
         None => ShadowObjBounds::null(),
-    }
+    };
+
+    info!(
+        "[BOUNDS] Bounds for addr={:p} ({:p}, {:p})",
+        ptr, bounds.base, bounds.limit
+    );
+
+    bounds
 }
 
 /**

@@ -15,7 +15,7 @@
 // RUN: echo Remediated exit: $EXIT_CODE; test $EXIT_CODE -eq 3
 //
 // Test that the remediation is successful with optimizations
-// RUN: RESOLVE_LABEL_CVE=vulnerabilities/multiple_globals_oob.json %clang -O3 -fpass-plugin=%plugin \
+// RUN: RESOLVE_LABEL_CVE=vulnerabilities/multiple_globals_oob.json %clang -O3 -g -fpass-plugin=%plugin \
 // RUN: -L%rlib -lresolve -Wl,-rpath=%rlib %s -o %t.exe
 // RUN: %t.exe; EXIT_CODE=$?; \
 // RUN: echo Remediated exit: $EXIT_CODE; test $EXIT_CODE -eq 3
@@ -67,7 +67,7 @@ int main(int argc, char **argv) {
   printf("target[0] = %d\n", target[0]);
 
   /* Out-of-bounds read */
-  int value = target[20];
+  int value = target[9];
 
   printf("OOB read: %d\n", value);
 
