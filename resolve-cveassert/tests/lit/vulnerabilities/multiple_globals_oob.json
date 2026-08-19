@@ -1,0 +1,15 @@
+{
+    "vulnerabilities": [
+        {
+            "cve-id": "CVE-resolve-oob-global-3",
+            "cve-description": "",
+            "package-name": "resolve-test",
+            "package-version": "",
+            "cwe-id": "121",
+            "cwe-name": "Global OOB read and write",
+            "affected-function": "main",
+            "affected-file": "multiple_globals_oob.c",
+            "remediation-strategy": "exit"
+        }
+    ]
+}
