@@ -405,7 +405,7 @@ struct LabelCVEPass : public PassInfoMixin<LabelCVEPass> {
 
     if (!writePatch && (instrument_mem_inst.instrumentAlloca ||
                         instrument_mem_inst.instrumentMemAllocator)) {
-      registerGlobals(M);
+      // registerGlobals(M);
       result = PreservedAnalyses::none();
     }
     return result;
