@@ -4,10 +4,13 @@ use std::{
 };
 
 use clap::{ArgAction, Parser};
+use facts_rs::FactsBuf;
 
+use libreach::Graph;
 use vcpkg::populate_version_results;
 use vulnerability::{VulnerabilityAnalysis, VulnerabilityJSON};
 
+mod libreach;
 mod vcpkg;
 mod vulnerability;
 
@@ -44,6 +47,10 @@ fn load_vuln_json(path: &Path) -> Result<VulnerabilityJSON, String> {
         .map_err(|error| format!("failed to parse '{}': {error}", path.display()))
 }
 
+fn load_facts(paths: &[PathBuf]) -> Result<FactsBuf, String> {
+    FactsBuf::read_files(paths).map_err(|error| format!("failed to load facts: {error}"))
+}
+
 fn run() -> Result<(), String> {
     let args = Args::parse();
     let input = load_vuln_json(&args.input)?;
@@ -57,6 +64,24 @@ fn run() -> Result<(), String> {
             "[REACH] WARNING: No source code directory provided, package versions will not be populated."
         );
     }
+
+    let facts = load_facts(&args.facts)?;
+    let module_count = facts
+        .view()
+        .modules()
+        .try_fold(0usize, |count, module| module.map(|_| count + 1))
+        .map_err(|error| format!("failed to iterate over facts modules: {error}"))?;
+
+    println!(
+        "[REACH] Loaded {module_count} facts modules from {} input files.",
+        args.facts.len()
+    );
+
+    let graph = Graph::build(&facts)?;
+    println!(
+        "[REACH] Built a libreach graph with {} edges.",
+        graph.edge_count()
+    );
 
     Ok(())
 }
