@@ -1,6 +1,6 @@
 use std::{ffi::c_void, ptr::NonNull, slice};
 
-use facts_rs::FactsBuf;
+use facts_rs::{FactsBuf, NodeID};
 
 #[repr(C)]
 struct ReachGraph {
@@ -21,7 +21,7 @@ struct ReachError {
 #[repr(C)]
 pub struct ReachNodeID {
     pub module: u32,
-    pub node: u32,
+    pub node: NodeID,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -215,7 +215,7 @@ unsafe fn take_error(error: *mut ReachError, fallback: &str) -> String {
 mod tests {
     use facts_rs::{EdgeKind, FactsBuilder, NodeType};
 
-    use super::{ReachEdgeType, Graph, ReachNodeID};
+    use super::{Graph, ReachEdgeType, ReachNodeID};
 
     #[test]
     fn builds_and_queries_a_graph() {

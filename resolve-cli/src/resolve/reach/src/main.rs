@@ -6,10 +6,12 @@ use std::{
 use clap::{ArgAction, Parser};
 use facts_rs::FactsBuf;
 
-use libreach::Graph;
+use analysis::populate_reachability_results;
 use vcpkg::populate_version_results;
 use vulnerability::{VulnerabilityAnalysis, VulnerabilityJSON};
 
+mod analysis;
+mod functions;
 mod libreach;
 mod vcpkg;
 mod vulnerability;
@@ -35,7 +37,7 @@ struct Args {
     // TODO: C++ WORKER ARGS HERE FOR OTHER SETTINGS
     /// Entry function to traverse to vulnerable sink from
     #[arg(short, long, default_value = "main")]
-    entry: Option<String>,
+    entry: String,
     // should we have no-ops for cli compatibility with old reach wrapper?
 }
 
@@ -77,11 +79,7 @@ fn run() -> Result<(), String> {
         args.facts.len()
     );
 
-    let graph = Graph::build(&facts)?;
-    println!(
-        "[REACH] Built a libreach graph with {} edges.",
-        graph.edge_count()
-    );
+    populate_reachability_results(&mut analyses, &facts, &args.entry)?;
 
     Ok(())
 }
