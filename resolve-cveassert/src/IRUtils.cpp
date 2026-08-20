@@ -503,8 +503,8 @@ getOrCreateRemediationBehavior(Module *M,
   AttributeList attrs =
       AttributeList::get(Ctx, AttributeList::FunctionIndex, FnAttrs);
 
-  BasicBlock *BB = BasicBlock::Create(Ctx, "entry", fn);
-  IRBuilder<> builder(BB);
+  BasicBlock *entryBB = BasicBlock::Create(Ctx, "entry", fn);
+  IRBuilder<> builder(entryBB);
 
   switch (strategy) {
   case Vulnerability::RemediationStrategies::EXIT: {
