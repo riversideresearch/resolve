@@ -1,0 +1,73 @@
+[package]
+name = "resolve-cli"
+version = "0.1.0"
+edition = "2021"
+license = "LGPL-3.0"
+
+[[bin]]
+name = "resolve"
+path = "src/main.rs"
+
+[[bin]]
+name = "resolve-get-facts"
+path = "src/bin/resolve-get-facts.rs"
+
+[[bin]]
+name = "resolve-remediate"
+path = "src/bin/resolve-remediate.rs"
+
+[[bin]]
+name = "resolve-crash-analysis"
+path = "src/bin/resolve-crash-analysis.rs"
+
+[[bin]]
+name = "resolve-input-synthesis"
+path = "src/bin/resolve-input-synthesis.rs"
+
+[[bin]]
+name = "resolve-input-synthesis-setup"
+path = "src/bin/resolve-input-synthesis-setup.rs"
+
+[[bin]]
+name = "resolve-input-synthesis-improve-cve"
+path = "src/bin/resolve-input-synthesis-improve-cve.rs"
+
+[[bin]]
+name = "resolve-input-synthesis-reachability"
+path = "src/bin/resolve-input-synthesis-reachability.rs"
+
+[[bin]]
+name = "resolve-input-synthesis-synthesize"
+path = "src/bin/resolve-input-synthesis-synthesize.rs"
+
+[[bin]]
+name = "resolve-input-synthesis-run-all"
+path = "src/bin/resolve-input-synthesis-run-all.rs"
+
+[[bin]]
+name = "resolve-sbom"
+path = "src/bin/resolve-sbom.rs"
+
+[dependencies]
+anyhow.workspace = true
+clap.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+
+object.workspace = true
+memmap2.workspace = true
+
+tokio = { workspace = true, optional = true }
+reqwest = { workspace = true, optional = true }
+futures = { workspace = true, optional = true }
+
+tempfile.workspace = true
+phf.workspace = true
+
+[features]
+default = ["sbom"]
+sbom = ["tokio", "reqwest", "futures"]
+
+[lib]
+name = "resolve_cli"
+path = "src/lib.rs"
