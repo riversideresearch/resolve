@@ -1,0 +1,72 @@
+Inputs:
+- Evidence synthesis: `{SYNTHESIS_PATH}`
+- Thesis: `{THESIS_PATH}`
+- Antithesis: `{ANTITHESIS_PATH}`
+
+# Your task
+
+Write exactly two final public artifacts:
+1. `{VULNERABILITIES_PATH}`
+2. `{REPORT_PATH}`
+
+First resolve the disagreement between the thesis and antithesis. Use that final reconciliation decision to write both artifacts. Do not create a separate `reconciliation.md`.
+
+`{VULNERABILITIES_PATH}` must be valid JSON with this exact top-level shape:
+
+{{
+  "vulnerabilities": [
+    {{
+      "cve-id": "CVE-<project-or-package>-00001",
+      "cve-description": "...",
+      "package-name": "...",
+      "package-version": "...",
+      "cwe-id": "...",
+      "cwe-name": "...",
+      "affected-function": "...",
+      "affected-file": "...",
+      "remediation-strategy": "exit"
+    }}
+  ]
+}}
+
+JSON rules:
+- Use hyphenated keys exactly as shown, not snake_case.
+- `vulnerabilities` must be an array.
+- Include one entry per distinct reconciled root cause.
+- If no credible vulnerability/root cause was identified, write exactly `{{"vulnerabilities":[]}}`.
+- Include all required fields: `cve-id`, `cve-description`, `package-name`, `package-version`, `cwe-id`, `cwe-name`, `affected-function`, `affected-file`, and `remediation-strategy`. The `cwe-id` value must be the numeric string only, such as `121`, not `CWE-121`.
+- Add `undesirable-function` only when the crash occurs inside a dangerous callee and the caller is the affected function.
+- Do not include confidence scores, evidence blocks, comments, Markdown fences, trailing commas, or extra top-level keys in the JSON.
+
+Field rules:
+- Use `UNKNOWN` for package name or package version only if the crash artifacts and source tree do not provide enough evidence.
+- `affected-function` must be the vulnerable/root-cause function, not merely `main`, a harness, a signal handler, libc, libstdc++, allocator, or sanitizer frame unless that really is the root cause.
+- `affected-file` must be the project-relative source path containing `affected-function` when source is available.
+- `cve-description` must be concise and include component/version, input condition, bug class, root cause, and crash/security impact.
+
+CWE guidance:
+- Put only the numeric portion in `cwe-id`; for example CWE-121 is encoded as `"cwe-id": "121"`.
+- Use CWE-121 for stack-based buffer overflow / stack OOB.
+- Use CWE-122 for heap-based buffer overflow.
+- Use CWE-787 for out-of-bounds write.
+- Use CWE-125 for out-of-bounds read.
+- Use CWE-131 for incorrect buffer-size calculation.
+- Use CWE-369 for divide by zero.
+- Use CWE-190 for integer overflow.
+- Use CWE-476 for null pointer dereference.
+- Use CWE-590 for free of non-heap memory.
+- Use CWE-119 only if the evidence shows memory corruption but the more specific class is unclear.
+
+RESOLVE remediation guidance:
+- Prefer `"remediation-strategy": "exit"` for generated crash reports unless there is clear evidence supporting another strategy.
+- Use `"recover"` for memory corruption cases where continuing via recovery is intended.
+- Use `"sat"` or `"widen"` only for integer overflow findings.
+- Use `"continue"` for divide-by-zero or invalid operation masking only when continuing with a neutral value is appropriate.
+- Use `"none"` only if the vulnerability should be recorded but not remediated.
+
+`{REPORT_PATH}` must be markdown and must serve as the reconciliation decision document. It must:
+- List the final set of distinct root-cause vulnerabilities emitted to `{VULNERABILITIES_PATH}`, or explicitly state that the set is empty.
+- For each emitted vulnerability, give the exact JSON field values and the evidence supporting them.
+- Explain rejected thesis candidates and why they do not appear in JSON.
+- Explain antithesis objections that were accepted or overruled.
+- Summarize unresolved gaps and any reproduction/debugger commands that materially influenced the final result.

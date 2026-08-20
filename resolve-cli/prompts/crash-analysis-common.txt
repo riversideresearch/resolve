@@ -1,0 +1,13 @@
+`{CRASH_DIR}` contains crash artifacts for one or more crashes.
+{SOURCE_CONTEXT}
+
+Output directory: `{OUTPUT_PATH}`
+Temporary analysis directory: `{TMP_PATH}`
+
+General requirements:
+- Base every claim on inspected evidence: crash artifacts, core dumps, stack traces, registers, sanitizer logs, reproducers, debugger output, build metadata, and source code when available.
+- Use tools available in the environment, including `gdb`, when a binary/core pair or reproducible crash is available. If a tool is unavailable or an artifact cannot be inspected, record that limitation.
+- Do not update persistent agent instruction files such as `AGENTS.md`, `CLAUDE.md`, or `OPENCODE.md`.
+- Do not invent package names, versions, functions, files, inputs, or root causes. Use `UNKNOWN` for package name or package version only when the artifacts and source tree do not provide credible evidence.
+- Treat libc, libstdc++, allocator, signal-handler, sanitizer, and runtime frames as symptoms unless evidence shows they are the vulnerable component. Walk upward to the project function that passed bad data or performed the unsafe operation.
+- Deduplicate findings by distinct root cause. Multiple cores or reproducers for the same vulnerable function/condition should normally produce one vulnerability entry.

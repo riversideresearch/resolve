@@ -1,0 +1,12 @@
+# CVE
+
+`{CVE_PATH}` contains a description of a CVE affecting this project. It may point to a commit version that is different from the one currently checked out.
+
+# Your task
+
+Do the following:
+1) Check out or download the affected commit/version.
+2) Map the project architecture, dependencies, and build instructions and save them to `{AGENTS_FILE}`.
+3) Install the project dependencies. Ensure that the source code for all dependencies is available locally (not just pre-built binaries), so that subsequent analysis can inspect it.
+4) Build the project. Put build artifacts in a `build/` directory.
+5) Update `{AGENTS_FILE}` if necessary to account for any issues encountered when installing deps and building the project.

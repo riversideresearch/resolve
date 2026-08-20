@@ -1,0 +1,13 @@
+# Your task
+
+Perform the initial crash investigation and write an objective evidence synthesis to `{SYNTHESIS_PATH}`.
+
+The synthesis must be factual and evidence-first. Include:
+- Artifact inventory: binaries, core files, reproducers, logs, source/build files, and metadata inspected.
+- Debugger evidence: exact signal, crashing instruction/frame, thread/backtrace summary, relevant registers, fault address or arithmetic operands, mappings, and symbol/source-line information when available.
+- Reproduction evidence: whether a reproducer exists, whether it was run, observed command/output/exit status, and whether it matches the crash artifacts.
+- Source evidence: vulnerable operation candidates, caller/callee relationships, input-controlled values, package/project/version evidence, and project-relative source paths.
+- Crash grouping: whether artifacts represent one root cause or multiple distinct root causes.
+- Evidence gaps: important facts that could not be established.
+
+Do not produce `vulnerabilities.json` in this stage.

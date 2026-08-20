@@ -1,0 +1,16 @@
+`{SYNTHESIS_PATH}` contains the objective crash evidence.
+
+# Your task
+
+Write `{THESIS_PATH}`: the strongest evidence-backed affirmative case for each distinct vulnerability that should be emitted in RESOLVE `vulnerabilities.json`.
+
+For each candidate vulnerability, include:
+- Candidate ID using `CVE-<package-or-project>-00001`, incrementing for distinct root causes.
+- Root-cause function and project-relative source file.
+- Crash/security impact.
+- CWE ID/name selection and why it is the most specific supported class.
+- RESOLVE remediation strategy and any `undesirable-function` if the dangerous operation is in a callee while the caller is the affected function.
+- Direct evidence citations from `{SYNTHESIS_PATH}`.
+
+If the evidence supports no credible vulnerability, write that conclusion and explain why.
+Do not produce `vulnerabilities.json` in this stage.

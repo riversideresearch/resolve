@@ -1,0 +1,18 @@
+# CVE
+
+{CVE}
+
+`{NECESSARY_CONDITIONS_PATH}/` contains a collection of necessary conditions for triggering the above CVE. `{SUFFICIENT_CONDITIONS_PATH}/` contains a collection of sufficient conditions for triggering the above CVE.
+
+# Your task
+
+1) Determine if all of the necessary conditions are simultaneously satisfiable via user/client input to this project. If so, continue. If not (one or more of the necessary conditions is definitely not satisfiable), report the CVE as 'not triggerable', explain why not, and end the analysis.
+2) Determine if any of the sufficient conditions are definitely satisfiable via user/client input. If so, report the CVE as 'triggerable' and explain how. If not, report the CVE as inconclusive.
+
+Save a report in `{REACHABILITY_PATH}`.
+
+A condition is "necessary" if there is no way to trigger the bug without satisfying the condition. I.e., if the bug is triggered, the condition must be true. A condition is "sufficient" if satisfying the condition guarantees that the bug will be triggered.
+
+The CVE is triggerable only if a sufficient condition can be satisfied. The CVE is not triggerable only if a necessary condition can't be satisfied. Otherwise the CVE is inconclusive.
+
+If the only satisfiable sufficient condition(s) are machine-dependent (e.g., x86 or ARM) or depend on unreliable compiler features such as "typical" results of undefined behavior, the CVE is inconclusive.

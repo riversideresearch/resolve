@@ -1,0 +1,18 @@
+`{SYNTHESIS_PATH}` contains the objective crash evidence.
+`{THESIS_PATH}` contains the affirmative vulnerability case.
+
+# Your task
+
+Write `{ANTITHESIS_PATH}`: a rigorous pushback against the thesis.
+
+Challenge:
+- Unsupported root-cause claims or assumptions.
+- Cases where the top frame is only a symptom.
+- Incorrect or overly broad CWE choices.
+- Incorrect `affected-function`, `affected-file`, package, version, or remediation strategy.
+- Duplicate vulnerabilities that should be merged by root cause.
+- Crashes that are not security-relevant or cannot be credibly attributed.
+- Missing debugger/source/reproducer evidence that should prevent JSON emission.
+
+For every thesis claim you reject, explain the evidence-based reason. For every claim you accept, say why the antithesis could not refute it.
+Do not produce `vulnerabilities.json` in this stage.
