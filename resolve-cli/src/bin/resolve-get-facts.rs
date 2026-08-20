@@ -210,14 +210,23 @@ fn extract_facts(out_dir: &Path, target_bin: &Path) -> Result<()> {
         let mut cmd = Command::new("zstd");
         cmd.arg("-f").arg("-d");
 
+        let mut has_files = false;
         for (_, suffix) in FACT_SECTION_MAP {
-            cmd.arg(out_file(suffix));
+            let file_path = out_file(suffix);
+            // Only decompress non-empty files
+            if file_path.exists() && fs::metadata(&file_path)?.len() > 0 {
+                cmd.arg(&file_path);
+                has_files = true;
+            }
         }
 
-        let status = cmd.status().context("Failed to execute zstd")?;
+        // Only run zstd if there are files to decompress
+        if has_files {
+            let status = cmd.status().context("Failed to execute zstd")?;
 
-        if !status.success() {
-            anyhow::bail!("zstd decompression failed with status: {}", status);
+            if !status.success() {
+                anyhow::bail!("zstd decompression failed with status: {}", status);
+            }
         }
     }
 

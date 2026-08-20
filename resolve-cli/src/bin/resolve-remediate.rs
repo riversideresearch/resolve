@@ -26,7 +26,7 @@ static CWE_PATCHES: phf::Map<u32, &'static [usize]> = phf_map! {
 #[derive(Debug, Deserialize)]
 struct CweTarget {
     #[serde(rename = "cwe-id")]
-    cwe: u32,
+    cwe: String,  // CWE ID as string (e.g., "121")
     #[serde(rename = "affected-function")]
     function_name: String,
     #[serde(rename = "cve-id")]
@@ -38,6 +38,12 @@ impl CweTarget {
     fn symbol_name(&self) -> String {
         format!("{}.sanmap", self.function_name)
     }
+    
+    /// Parse CWE ID as u32
+    fn cwe_id(&self) -> Result<u32> {
+        self.cwe.parse::<u32>()
+            .with_context(|| format!("Failed to parse CWE ID '{}' as number", self.cwe))
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -48,7 +54,7 @@ struct VulnerabilitiesJson {
 #[derive(Debug, Deserialize)]
 struct Vulnerability {
     #[serde(rename = "cwe-id")]
-    cwe_id: u32,
+    cwe_id: String,  // CWE ID as string (e.g., "121")
     #[serde(rename = "affected-function")]
     affected_function: String,
     #[serde(rename = "cve-id")]
@@ -249,7 +255,9 @@ fn main() -> Result<()> {
         }
 
         // Patch the symbol - propagate errors like Python version does
-        patch_symbol(&args.target_bin, &cve.symbol_name(), cve.cwe, args.bit)?;
+        let cwe_id = cve.cwe_id()
+            .with_context(|| format!("Invalid CWE ID for {}", cve.cve_id))?;
+        patch_symbol(&args.target_bin, &cve.symbol_name(), cwe_id, args.bit)?;
     }
 
     Ok(())
