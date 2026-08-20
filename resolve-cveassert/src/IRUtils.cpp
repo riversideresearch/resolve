@@ -41,8 +41,8 @@ void validateIR(Function *F) {
 }
 
 static bool patchRecording = false;
-static std::vector<llvm::Function *> patchHelpers;
-static std::vector<llvm::GlobalVariable *> patchGlobals;
+static SmallVector<llvm::Function *> patchHelpers;
+static SmallVector<llvm::GlobalVariable *> patchGlobals;
 
 static void collectReferencedGlobals(Value *V, std::set<std::string> &Names,
                                      SmallPtrSetImpl<Value *> &Visited) {
@@ -182,7 +182,7 @@ static std::string renderPatchModule(Module &SourceModule, Function *Target) {
     }
   }
 
-  std::vector<GlobalAlias *> AliasesToErase;
+  SmallVector<GlobalAlias *> AliasesToErase;
   for (GlobalAlias &A : PatchModule->aliases()) {
     if (!A.hasName() || !ReferencedGlobals.contains(A.getName().str())) {
       AliasesToErase.push_back(&A);
@@ -192,7 +192,7 @@ static std::string renderPatchModule(Module &SourceModule, Function *Target) {
     A->eraseFromParent();
   }
 
-  std::vector<GlobalIFunc *> IFuncsToErase;
+  SmallVector<GlobalIFunc *> IFuncsToErase;
   for (GlobalIFunc &I : PatchModule->ifuncs()) {
     if (!I.hasName() || !ReferencedGlobals.contains(I.getName().str())) {
       IFuncsToErase.push_back(&I);
@@ -202,7 +202,7 @@ static std::string renderPatchModule(Module &SourceModule, Function *Target) {
     I->eraseFromParent();
   }
 
-  std::vector<GlobalVariable *> GlobalsToErase;
+  SmallVector<GlobalVariable *> GlobalsToErase;
   for (GlobalVariable &G : PatchModule->globals()) {
     if (isRecordedGlobal(&G, GlobalDefs)) {
       continue;
@@ -220,7 +220,7 @@ static std::string renderPatchModule(Module &SourceModule, Function *Target) {
     G->eraseFromParent();
   }
 
-  std::vector<Function *> FunctionsToErase;
+  SmallVector<Function *> FunctionsToErase;
   for (Function &F : *PatchModule) {
     if (isRecordedFunction(&F, FunctionDefs)) {
       continue;
@@ -317,7 +317,7 @@ void endPatchRecordingAndWrite(Function *F) {
 }
 
 void createSanitizerGateBranch(IRBuilder<> &Builder, Function *F,
-                               uint64_t Index, BasicBlock *DisabledBB,
+                               SanitizerFlag flag, BasicBlock *DisabledBB,
                                BasicBlock *EnabledBB) {
   if (GlobalVariable *Map = getSanitizerMap(F)) {
     recordPatchGlobal(Map);
@@ -326,9 +326,9 @@ void createSanitizerGateBranch(IRBuilder<> &Builder, Function *F,
     auto usizeTy = Type::getInt64Ty(Ctx);
     Value *Zero = Builder.getInt64(0);
     Value *MapPtr = Builder.CreateGEP(Map->getValueType(), Map, {Zero, Zero});
-    Value *MapEntry =
-        Builder.CreateCall(getOrCreateSanitizerMapEntry(F->getParent()),
-                           {MapPtr, ConstantInt::get(usizeTy, Index)});
+    Value *MapEntry = Builder.CreateCall(
+        getOrCreateSanitizerMapEntry(F->getParent()),
+        {MapPtr, ConstantInt::get(usizeTy, static_cast<uint64_t>(flag))});
     Value *IsDisabled =
         Builder.CreateICmpEQ(MapEntry, ConstantInt::get(i1Ty, 0));
     Builder.CreateCondBr(IsDisabled, DisabledBB, EnabledBB);
@@ -340,41 +340,39 @@ void createSanitizerGateBranch(IRBuilder<> &Builder, Function *F,
 
 Function *getOrCreateSanitizerMapEntry(Module *M) {
   LLVMContext &Ctx = M->getContext();
-  auto i1_ty = Type::getInt1Ty(Ctx);
-  auto ptr_ty = PointerType::get(Ctx, 0);
-  auto usize_ty = Type::getInt64Ty(Ctx);
-  auto arr_ty = ArrayType::get(i1_ty, 6);
+  auto boolType = Type::getInt1Ty(Ctx);
+  auto ptrType = PointerType::get(Ctx, 0);
+  auto indexType = Type::getInt64Ty(Ctx);
+  auto sanitizerMapType = ArrayType::get(boolType, NumSanitizerFlags);
 
-  FunctionType *sanitizerMapIdxFnTy =
-      FunctionType::get(i1_ty, {ptr_ty, usize_ty}, false);
+  FunctionType *mapLookupType =
+      FunctionType::get(boolType, {ptrType, indexType}, false);
 
-  Function *sanitizerMapIdxFn =
-      getOrCreateResolveHelper(M, "__cve_get_flag", sanitizerMapIdxFnTy);
-  if (!sanitizerMapIdxFn->empty()) {
-    recordPatchFunction(sanitizerMapIdxFn);
-    return sanitizerMapIdxFn;
+  Function *lookupFn =
+      getOrCreateResolveHelper(M, "__resolve_get_flag", mapLookupType);
+  if (!lookupFn->empty()) {
+    recordPatchFunction(lookupFn);
+    return lookupFn;
   }
 
-  IRBuilder<> builder(Ctx);
-
-  BasicBlock *EntryBB = BasicBlock::Create(Ctx, "entry", sanitizerMapIdxFn);
-  builder.SetInsertPoint(EntryBB);
+  BasicBlock *entryBB = BasicBlock::Create(Ctx, "entry", lookupFn);
+  IRBuilder<> builder(entryBB);
 
   // When indexing an array use two indices
   // 1. First index step from the global ptr
   // 2. Second index: the actual element index
-  Argument *mapPtr = sanitizerMapIdxFn->getArg(0);
-  Argument *idx = sanitizerMapIdxFn->getArg(1);
+  Argument *mapPtr = lookupFn->getArg(0);
+  Argument *index = lookupFn->getArg(1);
 
   Value *zero = builder.getInt64(0);
 
-  Value *sanitizerMapPtr = builder.CreateGEP(arr_ty, mapPtr, {zero, idx});
-  Value *flag = builder.CreateLoad(i1_ty, sanitizerMapPtr);
+  Value *flagPtr = builder.CreateGEP(sanitizerMapType, mapPtr, {zero, index});
+  Value *flag = builder.CreateLoad(boolType, flagPtr);
   builder.CreateRet(flag);
 
-  validateIR(sanitizerMapIdxFn);
-  recordPatchFunction(sanitizerMapIdxFn);
-  return sanitizerMapIdxFn;
+  validateIR(lookupFn);
+  recordPatchFunction(lookupFn);
+  return lookupFn;
 }
 
 std::string getLLVMType(Type *ty) {
@@ -413,134 +411,82 @@ std::string getLLVMType(Type *ty) {
   return escapeTypeToIdent(canon);
 }
 
-Function *getOrCreateResolveHelper(Module *M, std::string fn_name,
-                                   FunctionType *fn_type,
-                                   GlobalValue::LinkageTypes link_type) {
+Function *getOrCreateResolveHelper(Module *M, std::string fnName,
+                                   FunctionType *fnType,
+                                   GlobalValue::LinkageTypes linkType) {
   LLVMContext &Ctx = M->getContext();
-  if (auto handler = M->getFunction(fn_name))
+  if (auto handler = M->getFunction(fnName))
     return handler;
 
-  Function *resolveHelperFn = Function::Create(fn_type, link_type, fn_name, M);
-  resolveHelperFn->setMetadata("cve.noinstrument", MDNode::get(Ctx, {}));
-  return resolveHelperFn;
+  Function *helperFn = Function::Create(fnType, linkType, fnName, M);
+  helperFn->setMetadata("cve.noinstrument", MDNode::get(Ctx, {}));
+  return helperFn;
 }
 
-Function *getOrCreateIsHeap(Module *M, LLVMContext &Ctx) {
-  // TODO: handle address spaces other than 0
-  auto ptr_ty = PointerType::get(Ctx, 0);
-  auto i1_ty = Type::getInt1Ty(Ctx);
-
-  // TODO: write this in asm as some kind of sanitzer_rt?
-  FunctionType *resolveIsHeapFnTy = FunctionType::get(i1_ty, {ptr_ty}, false);
-
-  Function *resolveIsHeapFn =
-      getOrCreateResolveHelper(M, "__cve_is_heap", resolveIsHeapFnTy);
-
-  if (!resolveIsHeapFn->empty()) {
-    recordPatchFunction(resolveIsHeapFn);
-    return resolveIsHeapFn;
-  }
-
-  IRBuilder<> Builder(Ctx);
-  BasicBlock *Entry = BasicBlock::Create(Ctx, "entry", resolveIsHeapFn);
-  Builder.SetInsertPoint(Entry);
-
-  // Get function argument
-  Argument *InputPtr = resolveIsHeapFn->getArg(0);
-
-  FunctionType *AsmType = FunctionType::get(ptr_ty, {});
-  auto read_sp_asm = InlineAsm::get(AsmType, "mov %rsp, $0",
-                                    "=r,~{dirflag},~{fpsr},~{flags}", true);
-  auto read_sp = Builder.CreateCall(read_sp_asm, {});
-  // ($rsp <= InputPtr)
-  auto is_stack = Builder.CreateICmpULE(read_sp, InputPtr);
-
-  auto start = M->getOrInsertGlobal("_start", Type::getInt8Ty(Ctx));
-  auto end = M->getOrInsertGlobal("_end", Type::getInt8Ty(Ctx));
-
-  // ((InputPtr >= _start) && (InputPtr <= _end))
-  auto is_static = Builder.CreateAnd({
-      Builder.CreateICmpUGE(InputPtr, start),
-      Builder.CreateICmpULE(InputPtr, end),
-  });
-
-  // return !(is_stack || is_static);
-  auto result = Builder.CreateNot(Builder.CreateOr({is_stack, is_static}));
-  Builder.CreateRet(result);
-
-  validateIR(resolveIsHeapFn);
-  recordPatchFunction(resolveIsHeapFn);
-  return resolveIsHeapFn;
-}
-
-Function *getOrCreateResolveReportSanitizerTriggered(Module *M) {
+Function *getOrCreateReportSanitizerTriggered(Module *M) {
   auto &Ctx = M->getContext();
-  auto void_ty = Type::getVoidTy(Ctx);
+  auto voidType = Type::getVoidTy(Ctx);
 
-  FunctionType *resolveReportFnTy = FunctionType::get(void_ty, {}, false);
+  FunctionType *reportFnType = FunctionType::get(voidType, {}, false);
 
-  Function *resolveReportFn =
-      getOrCreateResolveHelper(M, "__resolve_report_violation",
-                               resolveReportFnTy, GlobalValue::WeakAnyLinkage);
-  if (!resolveReportFn->empty()) {
-    recordPatchFunction(resolveReportFn);
-    return resolveReportFn;
+  Function *reportFn =
+      getOrCreateResolveHelper(M, "__resolve_report_violation", reportFnType,
+                               GlobalValue::WeakAnyLinkage);
+  if (!reportFn->empty()) {
+    recordPatchFunction(reportFn);
+    return reportFn;
   }
 
-  BasicBlock *EntryBB = BasicBlock::Create(Ctx, "", resolveReportFn);
-  IRBuilder<> builder(EntryBB);
+  BasicBlock *entryBB = BasicBlock::Create(Ctx, "entry", reportFn);
+  IRBuilder<> builder(entryBB);
   builder.CreateRetVoid();
 
-  validateIR(resolveReportFn);
-  recordPatchFunction(resolveReportFn);
-  return resolveReportFn;
+  validateIR(reportFn);
+  recordPatchFunction(reportFn);
+  return reportFn;
 }
 
-Function *getOrCreateRecoverBufferFunction(Module *M) {
+Function *getOrCreateRecoverBufferFn(Module *M) {
   LLVMContext &Ctx = M->getContext();
 
-  auto ptr_ty = PointerType::get(M->getContext(), 0);
-  FunctionType *resolve_recover_buf_fn_ty =
-      FunctionType::get(ptr_ty, {}, false);
+  auto ptrType = PointerType::get(Ctx, 0);
+  FunctionType *fnTy = FunctionType::get(ptrType, {}, false);
 
-  auto resolveRecoverFn = getOrCreateResolveHelper(
-      M, "resolve_get_recover_longjmp_buf", resolve_recover_buf_fn_ty,
-      GlobalValue::WeakAnyLinkage);
-  if (!resolveRecoverFn->empty()) {
-    recordPatchFunction(resolveRecoverFn);
-    return resolveRecoverFn;
+  auto recoverBufferFn = getOrCreateResolveHelper(
+      M, "resolve_get_recover_longjmp_buf", fnTy, GlobalValue::WeakAnyLinkage);
+  if (!recoverBufferFn->empty()) {
+    recordPatchFunction(recoverBufferFn);
+    return recoverBufferFn;
   }
 
-  BasicBlock *EntryBB =
-      BasicBlock::Create(M->getContext(), "", resolveRecoverFn);
-  IRBuilder<> builder(EntryBB);
-  builder.SetInsertPoint(EntryBB);
-  builder.CreateRet(Constant::getNullValue(ptr_ty));
+  BasicBlock *entryBB = BasicBlock::Create(Ctx, "entry", recoverBufferFn);
+  IRBuilder<> builder(entryBB);
+  builder.CreateRet(Constant::getNullValue(ptrType));
 
-  resolveRecoverFn->setMetadata("cve.noinstrument", MDNode::get(Ctx, {}));
-  validateIR(resolveRecoverFn);
-  recordPatchFunction(resolveRecoverFn);
+  recoverBufferFn->setMetadata("cve.noinstrument", MDNode::get(Ctx, {}));
+  validateIR(recoverBufferFn);
+  recordPatchFunction(recoverBufferFn);
 
-  return resolveRecoverFn;
+  return recoverBufferFn;
 }
 
 Function *
 getOrCreateRemediationBehavior(Module *M,
                                Vulnerability::RemediationStrategies strategy) {
   auto &Ctx = M->getContext();
-  auto ptr_ty = PointerType::get(Ctx, 0);
-  auto void_ty = Type::getVoidTy(Ctx);
-  auto i32_ty = Type::getInt32Ty(Ctx);
+  auto ptrType = PointerType::get(Ctx, 0);
+  auto voidType = Type::getVoidTy(Ctx);
+  auto intType = Type::getInt32Ty(Ctx);
 
-  FunctionType *fnTy = FunctionType::get(void_ty, {}, false);
+  FunctionType *fnTy = FunctionType::get(voidType, {}, false);
 
   std::string fnName;
   switch (strategy) {
   case Vulnerability::RemediationStrategies::EXIT:
-    fnName = "__cve_exit";
+    fnName = "__resolve_exit";
     break;
   case Vulnerability::RemediationStrategies::RECOVER:
-    fnName = "__cve_recover";
+    fnName = "__resolve_recover";
     break;
   default:
     return nullptr;
@@ -552,13 +498,13 @@ getOrCreateRemediationBehavior(Module *M,
     return fn;
   }
 
-  BasicBlock *BB = BasicBlock::Create(Ctx, "entry", fn);
-  IRBuilder<> builder(BB);
+  BasicBlock *entryBB = BasicBlock::Create(Ctx, "entry", fn);
+  IRBuilder<> builder(entryBB);
 
   switch (strategy) {
   case Vulnerability::RemediationStrategies::EXIT: {
-    FunctionType *exitTy = FunctionType::get(void_ty, {i32_ty}, false);
-    FunctionCallee exitFn = M->getOrInsertFunction("_exit", exitTy);
+    FunctionType *exitType = FunctionType::get(voidType, {intType}, false);
+    FunctionCallee exitFn = M->getOrInsertFunction("_exit", exitType);
     builder.CreateCall(exitFn, {builder.getInt32(3)});
     builder.CreateUnreachable();
     break;
@@ -566,10 +512,10 @@ getOrCreateRemediationBehavior(Module *M,
 
   case Vulnerability::RemediationStrategies::RECOVER: {
     FunctionCallee longjmpFn = M->getOrInsertFunction(
-        "longjmp", FunctionType::get(void_ty, {ptr_ty, i32_ty}, false));
+        "longjmp", FunctionType::get(voidType, {ptrType, intType}, false));
 
-    Function *resolveRecoverFn = getOrCreateRecoverBufferFunction(M);
-    Value *buf = builder.CreateCall(resolveRecoverFn);
+    Function *recoverBufferFn = getOrCreateRecoverBufferFn(M);
+    Value *buf = builder.CreateCall(recoverBufferFn);
     builder.CreateCall(longjmpFn, {buf, builder.getInt32(42)});
     builder.CreateUnreachable();
     break;

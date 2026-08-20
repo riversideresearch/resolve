@@ -1,51 +1,74 @@
 // Copyright (c) 2025 Riverside Research.
 // LGPL-3; See LICENSE.txt in the repo root for details.
-use libc::{
-    c_char, c_void, calloc, free, malloc, realloc, strdup, strlen, strndup, strnlen,
+use libc::{c_char, c_void, calloc, free, malloc, realloc, strdup, strlen, strndup, strnlen};
+
+use crate::shadowobjs::{
+    lookup_global, AllocType, ShadowObject, Vaddr, ALIVE_OBJ_LIST, FREED_OBJ_LIST, GLOBALS,
+    SHADOW_STACK,
 };
 
-use crate::shadowobjs::{ALIVE_OBJ_LIST, AllocType, FREED_OBJ_LIST, GLOBALS, SHADOW_STACK, ShadowObject, Vaddr, lookup_global};
-
 use log::{info, warn};
+use std::ffi::CStr;
 
 /**
- * @brief - Allocator interface for stack objects
- * @input - size of the pointer allocation in bytes
- * @return - none
+ * @brief - Registers stack allocations in shadow memory
+ * @input
+ *  - ptr: ptr to stack allocation
+ *  - size: size of stack allocation
  */
 #[unsafe(no_mangle)]
 pub extern "C" fn __resolve_alloca(ptr: *mut c_void, size: usize) -> () {
     let base = ptr as Vaddr;
 
-    SHADOW_STACK.with_borrow_mut(
-        |ss|
-         ss.add_shadow_object(base, size)
+    SHADOW_STACK.with_borrow_mut(|ss| ss.add_shadow_object(base, size));
+
+    info!(
+        "[STACK] Registered stack object: addr={:p}, size={}",
+        ptr, size
     );
-
-    info!("[STACK] Object allocated with size: {size}, address: 0x{base:x}");
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn __resolve_register_global(ptr: *mut c_void, size: usize) {
-    GLOBALS.lock().push(ShadowObject::new(AllocType::Global, ptr as Vaddr, size));
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn __resolve_invalidate_stack_range(base: *mut c_void, size: usize) {
-    let base = base as Vaddr;
-
-    SHADOW_STACK.with_borrow_mut(
-        |ss|
-         ss.invalidate_at(base, size)
-    );
-
-    info!("[STACK] Free addr 0x{base:x} size {size}");
 }
 
 /**
- * @brief - Allocator logging interface for malloc
- * @input - size of the allocation in bytes
- * @return - ptr to the allocation
+ * @brief - Registers global allocations in shadow memory
+ * @input
+ *  - ptr: ptr to global allocation
+ *  - size: size of global allocation
+ */
+#[unsafe(no_mangle)]
+pub extern "C" fn __resolve_register_global(ptr: *mut c_void, size: usize) {
+    GLOBALS
+        .lock()
+        .push(ShadowObject::new(AllocType::Global, ptr as Vaddr, size));
+    info!(
+        "[GLOBAL] Registered global object: addr={:p}, size={}",
+        ptr, size
+    );
+}
+
+/**
+ * @brief - Unregisters stack allocations
+ * @input
+ *  - ptr: ptr to stack allocation
+ *  - size: size of stack allocation
+ */
+#[unsafe(no_mangle)]
+pub extern "C" fn __resolve_invalidate_stack_range(ptr: *mut c_void, size: usize) {
+    let base = ptr as Vaddr;
+
+    SHADOW_STACK.with_borrow_mut(|ss| ss.invalidate_at(base, size));
+
+    info!(
+        "[STACK] Unregistered stack object: addr={:p}, size={}",
+        ptr, size
+    );
+}
+
+/**
+ * @brief - RESOLVE wrapper for libc malloc
+ * @input
+ *  - size: size of requested heap allocation in bytes
+ * @return
+ *  - pointer to requested heap allocation
  */
 #[unsafe(no_mangle)]
 pub extern "C" fn __resolve_malloc(size: usize) -> *mut c_void {
@@ -61,29 +84,21 @@ pub extern "C" fn __resolve_malloc(size: usize) -> *mut c_void {
     }
 
     info!(
-        "[HEAP] Object allocated with size: {size}, address: 0x{:x}",
-        ptr as Vaddr
+        "[HEAP] Registered heap object (malloc): addr={:p}, size={}",
+        ptr, size
     );
 
     ptr
 }
 
 /**
- * @brief - Allocator logging interface for free
- * @input - ptr to the allocation
- * @return - none
+ * @brief - RESOLVE wrapper for libc free
+ * @input
+ *  - ptr: ptr to heap allocation
  */
 #[unsafe(no_mangle)]
 pub extern "C" fn __resolve_free(ptr: *mut c_void) -> () {
-    // Insert a function to find the object and return the pointer size
-    // Do I need to handle if the sobj cannot be found?
-
-    info!(
-        "[FREE] Allocated object freed at address: 0x{:x}",
-        ptr as Vaddr
-    );
-
-    let ptr_size = {
+    let obj_size = {
         let mut obj_list = ALIVE_OBJ_LIST.lock();
         let sobj_opt = obj_list.search_intersection(ptr as Vaddr);
         let size = sobj_opt.map(|o| o.size());
@@ -93,16 +108,21 @@ pub extern "C" fn __resolve_free(ptr: *mut c_void) -> () {
     };
 
     // Check if the shadow object exists
-    match ptr_size {
+    match obj_size {
         Some(size) => {
             info!(
-                "[FREE] Found shadow object for allocated object, 0x{:x}, size = {size}",
+                "[HEAP] Found shadow object for allocated object: 0x{:x}, size = {size}",
                 ptr as Vaddr,
+            );
+
+            info!(
+                "[HEAP] Unregistered heap object: addr={:p}, size={}",
+                ptr, size
             );
         }
         None => {
             warn!(
-                "[FREE] No shadow object found for allocated object: 0x{:x}",
+                "[HEAP] No shadow object found for allocated object: 0x{:x}",
                 ptr as Vaddr
             );
         }
@@ -111,26 +131,27 @@ pub extern "C" fn __resolve_free(ptr: *mut c_void) -> () {
     {
         // Insert shadow object into freed object list
         let mut freed_guard = FREED_OBJ_LIST.lock();
-        freed_guard.add_shadow_object(AllocType::Unallocated, ptr as Vaddr, ptr_size.unwrap_or(0));
+        freed_guard.add_shadow_object(AllocType::Unallocated, ptr as Vaddr, obj_size.unwrap_or(0));
     }
 
     let _ = unsafe { free(ptr) };
 }
 
 /**
- * @brief - Allocator logging interface for realloc
+ * @brief - RESOLVE wrapper for libc realloc
  * @input
- *  - ptr: ptr to the original allocation
- *  - size: size of the allocation in bytes
- * @return - none
+ *  - ptr: ptr to heap allocation
+ *  - size: size of requested reallocation in bytes
+ * @return a new pointer pointing the new object of the
+ *         requested size
  */
 #[unsafe(no_mangle)]
 pub extern "C" fn __resolve_realloc(ptr: *mut c_void, size: usize) -> *mut c_void {
     // Edge cases
-    // 1. returned memory may not be allocated 
+    // 1. returned memory may not be allocated
     // 2. pointer passed to realloc may be NULL
     // 3. size fits within original allocation (returns the original ptr)
-    
+
     // Consideration: Pointer passed in may be invalidated so we need a mechanism
     // to remove the shadow object for the orignal allocation
     let realloc_ptr = unsafe { realloc(ptr, size + 1) };
@@ -139,33 +160,33 @@ pub extern "C" fn __resolve_realloc(ptr: *mut c_void, size: usize) -> *mut c_voi
         return realloc_ptr;
     }
 
-
     {
         let mut obj_list = ALIVE_OBJ_LIST.lock();
         // Remove shadow object for original pointer
-        obj_list.invalidate_at(ptr as Vaddr); // if ptr == NULL this does not do anything 
+        obj_list.invalidate_at(ptr as Vaddr); // if ptr == NULL this does not do anything
         obj_list.add_shadow_object(AllocType::Heap, realloc_ptr as Vaddr, size);
     }
 
     info!(
-        "[HEAP] Allocated object reallocated mem from src: {ptr:?}, size: {size}, dst ptr: 0x{:x}",
-        realloc_ptr as Vaddr
+        "[HEAP] Registered heap object (realloc): addr={:p}, size={}",
+        realloc_ptr, size
     );
 
     realloc_ptr
 }
 
 /**
- * @brief - Allocator logging interface for calloc
+ * @brief - RESOLVE wrapper for libc calloc
  * @input
- *  - n_items: number of items in the allocation
- *  - size: size of the allocation in bytes
- * @return - none
+ *  - nelems: requested num of elements
+ *  - elsize: size of elements in bytes
+ * @return a new pointer pointing the new object of the
+ *         requested size
  */
 #[unsafe(no_mangle)]
-pub extern "C" fn __resolve_calloc(n_items: usize, item_size: usize) -> *mut c_void {
-    let ptr = unsafe { calloc(n_items, item_size) };
-    let size = n_items * item_size;
+pub extern "C" fn __resolve_calloc(nelems: usize, elsize: usize) -> *mut c_void {
+    let ptr = unsafe { calloc(nelems, elsize) };
+    let size = nelems * elsize;
 
     if ptr.is_null() {
         return ptr;
@@ -177,18 +198,19 @@ pub extern "C" fn __resolve_calloc(n_items: usize, item_size: usize) -> *mut c_v
     }
 
     info!(
-        "[HEAP] Logging allocation with {n_items} items, size (bytes): {size}, dst ptr: 0x{:x}",
-        ptr as Vaddr
+        "[HEAP] Registered heap object (calloc): addr={:p}, size={}",
+        ptr, size
     );
 
     ptr
 }
 
 /**
- * @brief - Allocator logging interface for strdup
+ * @brief - RESOLVE wrapper for libc strdup
  * @input
- *  - ptr: ptr to the original allocation
- * @return - pointer to the copied string
+ *  - ptr: ptr to heap allocation
+ * @return a new pointer pointing the new object of the
+ *         copied string
  */
 #[unsafe(no_mangle)]
 pub extern "C" fn __resolve_strdup(ptr: *mut c_char) -> *mut c_char {
@@ -208,19 +230,19 @@ pub extern "C" fn __resolve_strdup(ptr: *mut c_char) -> *mut c_char {
     }
 
     info!(
-        "[HEAP] Logging 'strdup' function call with dst ptr: 0x{:x}",
-        string_ptr as Vaddr
+        "[HEAP] Registered heap object (strdup): addr={:p}, size={}",
+        string_ptr, sizeofstr
     );
 
     string_ptr
 }
 
 /**
- * @brief - Allocator logging interface for strdup
+ * @brief - RESOLVE wrapper for libc strndup
  * @input
- *  - ptr: ptr to the original allocation
- *  - size: number of bytes to copied
- * @return - pointer to the copied string
+ *  - ptr: ptr to heap allocation
+ *  - size: number of bytes to be copied
+ * @return a new pointer pointing a new object of 'size' copied bytes
  * NOTE: Read this link to understand the nature of strdup & strndup
  * https://pubs.opengroup.org/onlinepubs/9699919799/functions/strdup.html
  */
@@ -244,13 +266,12 @@ pub extern "C" fn __resolve_strndup(ptr: *mut c_char, size: usize) -> *mut c_cha
     }
 
     info!(
-        "[HEAP] Logging 'strndup' function call with size (bytes): {size}, dst ptr: {:?}",
-        string_ptr as Vaddr
+        "[HEAP] Registered heap object (strndup): addr={:p}, size={}",
+        string_ptr, sizeofstr
     );
 
     string_ptr
 }
-
 
 #[derive(PartialEq)]
 #[repr(C)]
@@ -261,45 +282,49 @@ pub struct ShadowObjBounds {
 
 impl ShadowObjBounds {
     pub fn null() -> Self {
-        ShadowObjBounds { base: std::ptr::null_mut(), limit: std::ptr::null_mut() }
+        ShadowObjBounds {
+            base: std::ptr::null_mut(),
+            limit: std::ptr::null_mut(),
+        }
     }
 }
 
 impl From<&crate::shadowobjs::ShadowObject> for ShadowObjBounds {
     fn from(sobj: &crate::shadowobjs::ShadowObject) -> Self {
-        ShadowObjBounds { base: sobj.base as *mut c_void, limit: sobj.limit as *mut c_void }
+        ShadowObjBounds {
+            base: sobj.base as *mut c_void,
+            limit: sobj.limit as *mut c_void,
+        }
     }
 }
 
 /**
- * @brief - Helper function that queries the shadow stack
- *          to find a shadow obj where the ptr fits within
- *          its bounds of allocation 
+ * @brief - Queries the shadow stack to find a shadow obj
+ *          where the ptr is within bounds of allocation
  * @input
- *  - ptr: ptr to allocation 
- * @return struct containing the base and limit of the
- *         shadow object as pointers 
+ *  - ptr: ptr to stack allocation
+ * @return shadow object that satisfies base <= ptr && ptr < limit
+ * If shadow object cannot be found the function returns
+ * a shadow object with null base and limit pointers
  */
 #[unsafe(no_mangle)]
 pub extern "C" fn __resolve_get_bounds_stack(ptr: *mut c_void) -> ShadowObjBounds {
-    return SHADOW_STACK.with_borrow(
-        |ss| {
-            return match ss.search_intersection(ptr as Vaddr) {
-                Some(sobj) => { sobj.into() }
-                None => { ShadowObjBounds::null() }
-            }
-        }
-    );
+    return SHADOW_STACK.with_borrow(|ss| {
+        return match ss.search_intersection(ptr as Vaddr) {
+            Some(sobj) => sobj.into(),
+            None => ShadowObjBounds::null(),
+        };
+    });
 }
 
 /**
- * @brief - Helper function that queries heap sobj list
- *          to find a shadow obj where the ptr fits within
- *          its bounds of allocation 
+ * @brief - Queries heap table to find a shadow obj
+ *          where the ptr is within bounds of allocation
  * @input
- *  - ptr: ptr to allocation 
- * @return struct containing the base and limit of the
- *         shadow object as pointers 
+ *  - ptr: ptr to heap allocation
+ * @return shadow object that satisfies base <= ptr && ptr < limit
+ * If shadow object cannot be found the function returns
+ * a shadow object with null base and limit pointers
  */
 #[unsafe(no_mangle)]
 pub extern "C" fn __resolve_get_bounds_heap(ptr: *mut c_void) -> ShadowObjBounds {
@@ -311,28 +336,41 @@ pub extern "C" fn __resolve_get_bounds_heap(ptr: *mut c_void) -> ShadowObjBounds
     return sobj.into();
 }
 
+/**
+ * @brief - Queries recorded globals to find a shadow obj
+ *          where the ptr is within bounds of allocation
+ * @input
+ *  - ptr: ptr to global allocation
+ * @return shadow object that satisfies base <= ptr && ptr < limit
+ * If shadow object cannot be found the function returns
+ * a shadow object with null base and limit pointers
+ */
 #[unsafe(no_mangle)]
 pub extern "C" fn __resolve_get_bounds_global(ptr: *mut c_void) -> ShadowObjBounds {
     match lookup_global(ptr as Vaddr) {
         Some(obj) => (&obj).into(),
-        None => ShadowObjBounds::null()
+        None => ShadowObjBounds::null(),
     }
 }
 
 /**
- * @brief - Generic sobj lookup where we don't know the pointers
+ * @brief - Generic shadow object lookup where we don't know the pointers
  *          allocation type already. Searches stack table ( O(log n) )
- *          before searching the heap table.
+ *          before searching the heap table
  * @input
- *  - ptr: ptr to allocation 
+ *  - ptr: ptr to object allocation
  * @return struct containing the base and limit of the
- *         shadow object as pointers 
+ *         shadow object as pointers
  */
 #[unsafe(no_mangle)]
 pub extern "C" fn __resolve_get_bounds(ptr: *mut c_void) -> ShadowObjBounds {
     let mut sobj = __resolve_get_bounds_stack(ptr);
-    if sobj == ShadowObjBounds::null() { sobj = __resolve_get_bounds_heap(ptr)}
-    if sobj == ShadowObjBounds::null() { sobj = __resolve_get_bounds_global(ptr)}
+    if sobj == ShadowObjBounds::null() {
+        sobj = __resolve_get_bounds_heap(ptr)
+    }
+    if sobj == ShadowObjBounds::null() {
+        sobj = __resolve_get_bounds_global(ptr)
+    }
 
     sobj
 }
@@ -353,11 +391,26 @@ pub extern "C" fn resolve_obj_type(base_ptr: *mut c_void) -> AllocType {
 }
 
 /**
- * @brief - Logs when program enters sanitization basic block
+ * @brief - Logs invalid memory access for a given function
+ * @input
+ *  - ptr: ptr to allocation
+ *  - access_size: requested access size
+ *  - function: ptr to function name (string literal)
  */
 #[unsafe(no_mangle)]
-pub extern "C" fn __resolve_report_violation() -> () {
-    info!("[RESOLVE] sanitizer triggered");
+pub extern "C" fn __resolve_report_violation(
+    ptr: *mut c_void,
+    access_size: usize,
+    function: *mut c_char,
+) {
+    let function = unsafe { CStr::from_ptr(function).to_string_lossy() };
+
+    let bounds = __resolve_get_bounds(ptr);
+
+    info!(
+        "[RESOLVE] out-of-bounds error detected!\n\taddress = {:p}\n\tsize = {}\n\tbounds = [{:p}\n\t{:p})\n\tfunction = {}",
+        ptr, access_size, bounds.base, bounds.limit, function
+    );
 }
 
 #[cfg(test)]

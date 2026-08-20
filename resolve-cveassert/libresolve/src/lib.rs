@@ -3,11 +3,10 @@
 
 #![feature(btree_cursors)]
 
+mod file;
 mod remediate;
 mod shadowobjs;
 mod trace;
-mod file;
-
 
 use parking_lot::{Mutex, MutexGuard};
 
@@ -26,4 +25,3 @@ impl<T> MutexWrap<T> {
         self.mutex.lock()
     }
 }
-

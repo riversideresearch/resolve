@@ -1,15 +1,16 @@
+use crate::MutexWrap;
 use libc::{Dl_info, atexit, c_void, dladdr, dlsym};
 use std::ffi::{CStr, OsString};
 use std::fmt::Display;
 use std::fs::{self, File};
-use std::path::PathBuf;
 use std::io::{self, Seek, Write};
+use std::path::PathBuf;
 use std::sync::LazyLock;
 use std::{env, process};
-use crate::MutexWrap;
 
 fn idify_file_path(path: &mut PathBuf, id: impl Display) {
-    let file_name = path.file_name()
+    let file_name = path
+        .file_name()
         .expect("Path could not be found in file system.")
         .to_owned();
 
@@ -17,15 +18,14 @@ fn idify_file_path(path: &mut PathBuf, id: impl Display) {
 
     updated_file_name.push(file_name);
     updated_file_name.push("-");
-    updated_file_name.push(id.to_string()); 
+    updated_file_name.push(id.to_string());
 
     path.set_file_name(updated_file_name);
 }
 
 /// File for "resolve_dlsym.json"
 pub static DLSYM_LOG_FILE: LazyLock<MutexWrap<File>> = LazyLock::new(|| {
-    let log_dir = env::var("RESOLVE_DLSYM_LOG_DIR")
-        .unwrap_or_else(|_| ".".to_string());
+    let log_dir = env::var("RESOLVE_DLSYM_LOG_DIR").unwrap_or_else(|_| ".".to_string());
 
     let mut path = PathBuf::from(log_dir);
 
@@ -97,8 +97,7 @@ impl Write for LazyLogFile {
 }
 
 fn open_resolve_log_file() -> Result<File, io::Error> {
-    let log_dir = env::var("RESOLVE_RUNTIME_LOG_DIR")
-        .unwrap_or_else(|_| ".".to_string());
+    let log_dir = env::var("RESOLVE_RUNTIME_LOG_DIR").unwrap_or_else(|_| ".".to_string());
 
     let mut path = PathBuf::from(log_dir);
 

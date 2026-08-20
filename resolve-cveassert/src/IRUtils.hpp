@@ -13,18 +13,17 @@
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Type.h"
 
+#include "CVEAssert.hpp"
 #include <string>
 
 std::string getLLVMType(llvm::Type *ty);
-llvm::Function *getOrCreateResolveReportSanitizerTriggered(llvm::Module *M);
+llvm::Function *getOrCreateReportSanitizerTriggered(llvm::Module *M);
 llvm::Function *
 getOrCreateRemediationBehavior(llvm::Module *M,
                                Vulnerability::RemediationStrategies strategy);
-llvm::Function *
-getOrCreateResolveHelper(llvm::Module *M, std::string fn_name,
-                         llvm::FunctionType *fn_type,
-                         llvm::GlobalValue::LinkageTypes link_type =
-                             llvm::Function::InternalLinkage);
+llvm::Function *getOrCreateResolveHelper(
+    llvm::Module *M, std::string fnName, llvm::FunctionType *fnType,
+    llvm::GlobalValue::LinkageTypes linkType = llvm::Function::InternalLinkage);
 void validateIR(llvm::Function *F);
 
 void beginPatchRecording(void);
@@ -34,5 +33,5 @@ void endPatchRecordingAndWrite(llvm::Function *F);
 
 llvm::Function *getOrCreateSanitizerMapEntry(llvm::Module *M);
 void createSanitizerGateBranch(llvm::IRBuilder<> &Builder, llvm::Function *F,
-                               uint64_t Index, llvm::BasicBlock *DisabledBB,
+                               SanitizerFlag flag, llvm::BasicBlock *DisabledBB,
                                llvm::BasicBlock *EnabledBB);

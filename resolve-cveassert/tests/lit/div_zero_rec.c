@@ -7,8 +7,7 @@
 // RUN: -fpass-plugin=%plugin \
 // RUN: %s -o - | %FileCheck %s 
 // CHECK-LABEL: define dso_local i32 @div_zero_main 
-// CHECK: call void @__resolve_report_violation
-// CHECK: call void @__cve_recover
+// CHECK: call void @__resolve_recover
 // CHECK-LABEL: define dso_local i32 @main
 // CHECK: call i32 @_setjmp 
 // RUN: RESOLVE_LABEL_CVE=vulnerabilities/div_zero_rec_vuln.json %clang -fpass-plugin=%plugin %s -o %t.exe
@@ -22,8 +21,6 @@ static jmp_buf recover_longjmp_buf;
 jmp_buf* resolve_get_recover_longjmp_buf() {
     return &recover_longjmp_buf;
 }
-
-void __resolve_report_violation() { printf("Calling sanitizer!\n"); }
 
 int div_zero_main(int argc, const char* argv[]) {        
     int math = (int) (42.0 / (float)argc);
