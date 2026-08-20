@@ -21,7 +21,7 @@
       
       
       <link rel="icon" href="../../assets/resolve_square_white.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
@@ -29,7 +29,7 @@
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
       
         
         <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
@@ -1303,7 +1303,7 @@
 <span class="kt">void</span><span class="w"> </span><span class="nf">greet</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="w"> </span><span class="o">*</span><span class="n">name</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
 <span class="w">    </span><span class="kt">char</span><span class="w"> </span><span class="n">buf</span><span class="p">[</span><span class="mi">8</span><span class="p">];</span>
 <span class="w">    </span><span class="n">strcpy</span><span class="p">(</span><span class="n">buf</span><span class="p">,</span><span class="w"> </span><span class="n">name</span><span class="p">);</span>
-<span class="w">    </span><span class="n">printf</span><span class="p">(</span><span class="s">&quot;Hello, %s!</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">buf</span><span class="p">);</span>
+<span class="w">    </span><span class="n">printf</span><span class="p">(</span><span class="s">"Hello, %s!</span><span class="se">\n</span><span class="s">"</span><span class="p">,</span><span class="w"> </span><span class="n">buf</span><span class="p">);</span>
 <span class="p">}</span>
 
 <span class="kt">int</span><span class="w"> </span><span class="nf">main</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">argc</span><span class="p">,</span><span class="w"> </span><span class="kt">char</span><span class="w"> </span><span class="o">**</span><span class="n">argv</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
@@ -1327,7 +1327,7 @@ WRITE of size 29 at ... thread T0
     #2 ... in main main.c:15:5
 ...
   This frame has 1 object(s):
-    [32, 40) &#39;buf&#39; (line 7) &lt;== Memory access at offset 40 overflows this variable
+    [32, 40) 'buf' (line 7) &lt;== Memory access at offset 40 overflows this variable
 SUMMARY: AddressSanitizer: stack-buffer-overflow ... in strcpy
 </code></pre></div>
 <p>Everything the agent will inspect lives in a single <em>crash directory</em> (<code>crash/</code> here). Alongside the log, it helps to drop in a short note describing how the crash was produced:</p>
@@ -1364,18 +1364,18 @@ SUMMARY: AddressSanitizer: stack-buffer-overflow ... in strcpy
 <h2 id="interpreting-the-result">Interpreting the Result<a class="headerlink" href="#interpreting-the-result" title="Permanent link">&para;</a></h2>
 <p>The headline artifact is <code>out/vulnerabilities.json</code>. For our program, crash analysis will generate something like this:</p>
 <div class="highlight"><pre><span></span><code><span class="p">{</span>
-<span class="w">  </span><span class="nt">&quot;vulnerabilities&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">  </span><span class="nt">"vulnerabilities"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
 <span class="w">    </span><span class="p">{</span>
-<span class="w">      </span><span class="nt">&quot;cve-id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;CVE-greet-00001&quot;</span><span class="p">,</span>
-<span class="w">      </span><span class="nt">&quot;cve-description&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;The greet function ... copies a caller-supplied string (argv[1], forwarded from main) into a fixed 8-byte stack buffer using strcpy with no bounds check ... causing a stack out-of-bounds write (stack-buffer-overflow) that AddressSanitizer detects and aborts on.&quot;</span><span class="p">,</span>
-<span class="w">      </span><span class="nt">&quot;package-name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;UNKNOWN&quot;</span><span class="p">,</span>
-<span class="w">      </span><span class="nt">&quot;package-version&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;UNKNOWN&quot;</span><span class="p">,</span>
-<span class="w">      </span><span class="nt">&quot;cwe-id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;121&quot;</span><span class="p">,</span>
-<span class="w">      </span><span class="nt">&quot;cwe-name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Stack-based Buffer Overflow&quot;</span><span class="p">,</span>
-<span class="w">      </span><span class="nt">&quot;affected-function&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;greet&quot;</span><span class="p">,</span>
-<span class="w">      </span><span class="nt">&quot;affected-file&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;main.c&quot;</span><span class="p">,</span>
-<span class="w">      </span><span class="nt">&quot;undesirable-function&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;strcpy&quot;</span><span class="p">,</span>
-<span class="w">      </span><span class="nt">&quot;remediation-strategy&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;exit&quot;</span>
+<span class="w">      </span><span class="nt">"cve-id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"CVE-greet-00001"</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">"cve-description"</span><span class="p">:</span><span class="w"> </span><span class="s2">"The greet function ... copies a caller-supplied string (argv[1], forwarded from main) into a fixed 8-byte stack buffer using strcpy with no bounds check ... causing a stack out-of-bounds write (stack-buffer-overflow) that AddressSanitizer detects and aborts on."</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">"package-name"</span><span class="p">:</span><span class="w"> </span><span class="s2">"UNKNOWN"</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">"package-version"</span><span class="p">:</span><span class="w"> </span><span class="s2">"UNKNOWN"</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">"cwe-id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"121"</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">"cwe-name"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Stack-based Buffer Overflow"</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">"affected-function"</span><span class="p">:</span><span class="w"> </span><span class="s2">"greet"</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">"affected-file"</span><span class="p">:</span><span class="w"> </span><span class="s2">"main.c"</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">"undesirable-function"</span><span class="p">:</span><span class="w"> </span><span class="s2">"strcpy"</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">"remediation-strategy"</span><span class="p">:</span><span class="w"> </span><span class="s2">"exit"</span>
 <span class="w">    </span><span class="p">}</span>
 <span class="w">  </span><span class="p">]</span>
 <span class="p">}</span>
@@ -1438,7 +1438,7 @@ SUMMARY: AddressSanitizer: stack-buffer-overflow ... in strcpy
       <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["content.action.edit"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"alias": true, "default": "latest", "provider": "mike"}}</script>
     
     
-      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
       
     
   </body>

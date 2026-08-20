@@ -21,7 +21,7 @@
       
       
       <link rel="icon" href="../../assets/resolve_square_white.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
@@ -29,7 +29,7 @@
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
       
         
         <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
@@ -1387,16 +1387,16 @@
 <h2 id="a-vulnerability-specification">A Vulnerability Specification<a class="headerlink" href="#a-vulnerability-specification" title="Permanent link">&para;</a></h2>
 <p>First, describe the vulnerability we want to analyze in a JSON file (let's call it <a href="../../concepts/vulnerabilities-json/"><code>vulnerabilities.json</code></a> on disk). Each entry in the array is a <em>sink</em> (a function we would like to try to reach). All of the following fields are required, and will be fed-through into our final report:</p>
 <div class="highlight"><pre><span></span><code><span class="p">{</span>
-<span class="w">    </span><span class="nt">&quot;vulnerabilities&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">    </span><span class="nt">"vulnerabilities"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
 <span class="w">        </span><span class="p">{</span>
-<span class="w">            </span><span class="nt">&quot;cve-id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;CVE-0000-00000&quot;</span><span class="p">,</span>
-<span class="w">            </span><span class="nt">&quot;cve-description&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Null pointer dereference reachable from the program entry point.&quot;</span><span class="p">,</span>
-<span class="w">            </span><span class="nt">&quot;package-name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;reachability-example&quot;</span><span class="p">,</span>
-<span class="w">            </span><span class="nt">&quot;package-version&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;vers:generic/*&quot;</span><span class="p">,</span>
-<span class="w">            </span><span class="nt">&quot;cwe-id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;476&quot;</span><span class="p">,</span>
-<span class="w">            </span><span class="nt">&quot;cwe-name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;NULL Pointer Dereference&quot;</span><span class="p">,</span>
-<span class="w">            </span><span class="nt">&quot;affected-function&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;do_npd&quot;</span><span class="p">,</span>
-<span class="w">            </span><span class="nt">&quot;affected-file&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;main.c&quot;</span>
+<span class="w">            </span><span class="nt">"cve-id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"CVE-0000-00000"</span><span class="p">,</span>
+<span class="w">            </span><span class="nt">"cve-description"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Null pointer dereference reachable from the program entry point."</span><span class="p">,</span>
+<span class="w">            </span><span class="nt">"package-name"</span><span class="p">:</span><span class="w"> </span><span class="s2">"reachability-example"</span><span class="p">,</span>
+<span class="w">            </span><span class="nt">"package-version"</span><span class="p">:</span><span class="w"> </span><span class="s2">"vers:generic/*"</span><span class="p">,</span>
+<span class="w">            </span><span class="nt">"cwe-id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"476"</span><span class="p">,</span>
+<span class="w">            </span><span class="nt">"cwe-name"</span><span class="p">:</span><span class="w"> </span><span class="s2">"NULL Pointer Dereference"</span><span class="p">,</span>
+<span class="w">            </span><span class="nt">"affected-function"</span><span class="p">:</span><span class="w"> </span><span class="s2">"do_npd"</span><span class="p">,</span>
+<span class="w">            </span><span class="nt">"affected-file"</span><span class="p">:</span><span class="w"> </span><span class="s2">"main.c"</span>
 <span class="w">        </span><span class="p">}</span>
 <span class="w">    </span><span class="p">]</span>
 <span class="p">}</span>
@@ -1423,29 +1423,29 @@
 <p>If your entry point is not <code>main</code>, pass <code>-e &lt;function&gt;</code> to <code>resolve reach</code>. For projects with a vcpkg source tree, pass <code>-s &lt;src-dir&gt;</code> so the report can additionally check whether the pinned package version falls in the vulnerable range.</p>
 </div>
 <p><code>resolve reach</code> locates the entry point (<code>main</code> by default), locates each sink in the facts, and searches the control-flow graph for a path between them. Along the way it prints what it found:</p>
-<div class="highlight"><pre><span></span><code>Found function &#39;main&#39; in module &#39;src/main.c&#39;
-Found function &#39;do_npd&#39; in module &#39;src/main.c&#39;
-[RW]: Invoking reach &#39;reach -f main.facts -i reach_wrap_input.json -o reach_wrap_output.json&#39;
+<div class="highlight"><pre><span></span><code>Found function 'main' in module 'src/main.c'
+Found function 'do_npd' in module 'src/main.c'
+[RW]: Invoking reach 'reach -f main.facts -i reach_wrap_input.json -o reach_wrap_output.json'
 [RW]: Wrote out.json.
 </code></pre></div>
 <h2 id="interpreting-the-report">Interpreting the Report<a class="headerlink" href="#interpreting-the-report" title="Permanent link">&para;</a></h2>
 <p>The report in <code>out.json</code> classifies each sink and, when it is reachable, spells out the path that was found:</p>
 <div class="highlight"><pre><span></span><code><span class="p">{</span>
-<span class="w">    </span><span class="nt">&quot;reachability_results&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">    </span><span class="nt">"reachability_results"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
 <span class="w">        </span><span class="p">{</span>
-<span class="w">            </span><span class="nt">&quot;cve_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;CVE-0000-00000&quot;</span><span class="p">,</span>
-<span class="w">            </span><span class="nt">&quot;classification&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;potentially reachable&quot;</span><span class="p">,</span>
-<span class="w">            </span><span class="nt">&quot;justification&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<span class="w">                </span><span class="nt">&quot;conclusion&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Statically Reachable&quot;</span><span class="p">,</span>
-<span class="w">                </span><span class="nt">&quot;reason&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Control Flow Graph analysis found the following candidate path...&quot;</span><span class="p">,</span>
-<span class="w">                </span><span class="nt">&quot;call_path&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
-<span class="w">                    </span><span class="s2">&quot;Function(main) ((1556769911, 9))&quot;</span><span class="p">,</span>
-<span class="w">                    </span><span class="s2">&quot;DirectCall -&gt; Function(do_npd) ((1556769911, 1))&quot;</span>
+<span class="w">            </span><span class="nt">"cve_id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"CVE-0000-00000"</span><span class="p">,</span>
+<span class="w">            </span><span class="nt">"classification"</span><span class="p">:</span><span class="w"> </span><span class="s2">"potentially reachable"</span><span class="p">,</span>
+<span class="w">            </span><span class="nt">"justification"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">                </span><span class="nt">"conclusion"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Statically Reachable"</span><span class="p">,</span>
+<span class="w">                </span><span class="nt">"reason"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Control Flow Graph analysis found the following candidate path..."</span><span class="p">,</span>
+<span class="w">                </span><span class="nt">"call_path"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">                    </span><span class="s2">"Function(main) ((1556769911, 9))"</span><span class="p">,</span>
+<span class="w">                    </span><span class="s2">"DirectCall -&gt; Function(do_npd) ((1556769911, 1))"</span>
 <span class="w">                </span><span class="p">],</span>
-<span class="w">                </span><span class="nt">&quot;control_flow_path&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
-<span class="w">                    </span><span class="s2">&quot;Function(main) ((1556769911, 9))&quot;</span><span class="p">,</span>
-<span class="w">                    </span><span class="s2">&quot;Contains -&gt; BasicBlock() ((1556769911, 10))&quot;</span><span class="p">,</span>
-<span class="w">                    </span><span class="s2">&quot;DirectCall -&gt; Function(do_npd) ((1556769911, 1))&quot;</span>
+<span class="w">                </span><span class="nt">"control_flow_path"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">                    </span><span class="s2">"Function(main) ((1556769911, 9))"</span><span class="p">,</span>
+<span class="w">                    </span><span class="s2">"Contains -&gt; BasicBlock() ((1556769911, 10))"</span><span class="p">,</span>
+<span class="w">                    </span><span class="s2">"DirectCall -&gt; Function(do_npd) ((1556769911, 1))"</span>
 <span class="w">                </span><span class="p">]</span>
 <span class="w">            </span><span class="p">}</span>
 <span class="w">        </span><span class="p">}</span>
@@ -1546,7 +1546,7 @@ resolve<span class="w"> </span>reach<span class="w"> </span>-i<span class="w"> <
       <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["content.action.edit"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"alias": true, "default": "latest", "provider": "mike"}}</script>
     
     
-      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
       
     
   </body>

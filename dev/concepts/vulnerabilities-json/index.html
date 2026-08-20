@@ -21,7 +21,7 @@
       
       
       <link rel="icon" href="../../assets/resolve_square_white.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
@@ -29,7 +29,7 @@
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
       
         
         <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
@@ -1144,25 +1144,25 @@
 </div>
 <p>The basic format is like this:</p>
 <div class="highlight"><pre><span></span><code><span class="p">{</span>
-<span class="w">    </span><span class="nt">&quot;vulnerabilities&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">    </span><span class="nt">"vulnerabilities"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
 <span class="w">        </span><span class="p">{</span>
 <span class="w">            </span><span class="c1">// required fields:</span>
-<span class="w">            </span><span class="nt">&quot;cve-id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;String&quot;</span><span class="p">,</span><span class="w"> </span><span class="c1">// any identifier you want</span>
-<span class="w">            </span><span class="nt">&quot;cwe-id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Int in String&quot;</span><span class="p">,</span>
-<span class="w">            </span><span class="nt">&quot;affected-function&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;String&quot;</span><span class="p">,</span>
-<span class="w">            </span><span class="nt">&quot;affected-file&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;String&quot;</span><span class="p">,</span>
+<span class="w">            </span><span class="nt">"cve-id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"String"</span><span class="p">,</span><span class="w"> </span><span class="c1">// any identifier you want</span>
+<span class="w">            </span><span class="nt">"cwe-id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Int in String"</span><span class="p">,</span>
+<span class="w">            </span><span class="nt">"affected-function"</span><span class="p">:</span><span class="w"> </span><span class="s2">"String"</span><span class="p">,</span>
+<span class="w">            </span><span class="nt">"affected-file"</span><span class="p">:</span><span class="w"> </span><span class="s2">"String"</span><span class="p">,</span>
 
 <span class="w">            </span><span class="c1">// defaulting fields:</span>
-<span class="w">            </span><span class="nt">&quot;remediation-strategy&quot;</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;widen | sat | exit | continue | recover | none | wrap&quot;</span><span class="p">,</span><span class="w"> </span><span class="c1">// default: continue</span>
-<span class="w">            </span><span class="nt">&quot;output&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;inline | patch | toggle&quot;</span><span class="p">,</span><span class="w"> </span><span class="c1">// default: inline</span>
-<span class="w">            </span><span class="nt">&quot;gated&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">bool</span><span class="p">,</span><span class="w"> </span><span class="c1">// default: false</span>
+<span class="w">            </span><span class="nt">"remediation-strategy"</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="s2">"widen | sat | exit | continue | recover | none | wrap"</span><span class="p">,</span><span class="w"> </span><span class="c1">// default: continue</span>
+<span class="w">            </span><span class="nt">"output"</span><span class="p">:</span><span class="w"> </span><span class="s2">"inline | patch | toggle"</span><span class="p">,</span><span class="w"> </span><span class="c1">// default: inline</span>
+<span class="w">            </span><span class="nt">"gated"</span><span class="p">:</span><span class="w"> </span><span class="err">bool</span><span class="p">,</span><span class="w"> </span><span class="c1">// default: false</span>
 
 <span class="w">            </span><span class="c1">// optional fields:</span>
-<span class="w">            </span><span class="nt">&quot;cve-description&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;String&quot;</span><span class="p">,</span>
-<span class="w">            </span><span class="nt">&quot;package-name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;String&quot;</span><span class="p">,</span>
-<span class="w">            </span><span class="nt">&quot;package-version&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Int in String&quot;</span><span class="p">,</span>
-<span class="w">            </span><span class="nt">&quot;cwe-name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;String&quot;</span><span class="p">,</span>
-<span class="w">            </span><span class="nt">&quot;undesirable-function&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;String&quot;</span><span class="p">,</span><span class="w"> </span><span class="c1">// if set, operation masking is applied</span>
+<span class="w">            </span><span class="nt">"cve-description"</span><span class="p">:</span><span class="w"> </span><span class="s2">"String"</span><span class="p">,</span>
+<span class="w">            </span><span class="nt">"package-name"</span><span class="p">:</span><span class="w"> </span><span class="s2">"String"</span><span class="p">,</span>
+<span class="w">            </span><span class="nt">"package-version"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Int in String"</span><span class="p">,</span>
+<span class="w">            </span><span class="nt">"cwe-name"</span><span class="p">:</span><span class="w"> </span><span class="s2">"String"</span><span class="p">,</span>
+<span class="w">            </span><span class="nt">"undesirable-function"</span><span class="p">:</span><span class="w"> </span><span class="s2">"String"</span><span class="p">,</span><span class="w"> </span><span class="c1">// if set, operation masking is applied</span>
 <span class="w">        </span><span class="p">},</span>
 <span class="w">    </span><span class="p">]</span>
 <span class="p">}</span>
@@ -1223,7 +1223,7 @@
       <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["content.action.edit"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"alias": true, "default": "latest", "provider": "mike"}}</script>
     
     
-      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
       
     
   </body>

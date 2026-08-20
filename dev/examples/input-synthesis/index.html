@@ -21,7 +21,7 @@
       
       
       <link rel="icon" href="../../assets/resolve_square_white.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
@@ -29,7 +29,7 @@
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
       
         
         <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
@@ -1280,7 +1280,7 @@
 <span class="kt">void</span><span class="w"> </span><span class="nf">parse_record</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="kt">unsigned</span><span class="w"> </span><span class="kt">char</span><span class="w"> </span><span class="o">*</span><span class="n">payload</span><span class="p">,</span><span class="w"> </span><span class="kt">unsigned</span><span class="w"> </span><span class="kt">char</span><span class="w"> </span><span class="n">len</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
 <span class="w">    </span><span class="kt">char</span><span class="w"> </span><span class="n">buf</span><span class="p">[</span><span class="mi">16</span><span class="p">];</span>
 <span class="w">    </span><span class="n">memcpy</span><span class="p">(</span><span class="n">buf</span><span class="p">,</span><span class="w"> </span><span class="n">payload</span><span class="p">,</span><span class="w"> </span><span class="n">len</span><span class="p">);</span><span class="w">   </span><span class="c1">// len is attacker-controlled; buf is only 16 bytes</span>
-<span class="w">    </span><span class="n">printf</span><span class="p">(</span><span class="s">&quot;parsed %u bytes</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">len</span><span class="p">);</span>
+<span class="w">    </span><span class="n">printf</span><span class="p">(</span><span class="s">"parsed %u bytes</span><span class="se">\n</span><span class="s">"</span><span class="p">,</span><span class="w"> </span><span class="n">len</span><span class="p">);</span>
 <span class="p">}</span>
 
 <span class="kt">int</span><span class="w"> </span><span class="nf">main</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
@@ -1300,17 +1300,17 @@
 <p>Because this is an agentic pipeline, the more information you can provide in this context, the better. You can supply any additional json data in this file you'd like to the agent, it doesn <strong><em>not</em></strong> need to be valid <strong>RESOLVE</strong> metadata.</p>
 </div>
 <div class="highlight"><pre><span></span><code><span class="p">{</span>
-<span class="w">    </span><span class="nt">&quot;vulnerabilities&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">    </span><span class="nt">"vulnerabilities"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
 <span class="w">        </span><span class="p">{</span>
-<span class="w">            </span><span class="nt">&quot;cve-id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;CVE-recordparser-00001&quot;</span><span class="p">,</span>
-<span class="w">            </span><span class="nt">&quot;cve-description&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;recordparser 1.0.0 reads a length-prefixed record from stdin, where the first byte declares the payload length. parse_record copies that many bytes into a fixed 16-byte stack buffer with memcpy and no bounds check, so a declared length greater than 16 causes a stack-based buffer overflow (CWE-121).&quot;</span><span class="p">,</span>
-<span class="w">            </span><span class="nt">&quot;package-name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;recordparser&quot;</span><span class="p">,</span>
-<span class="w">            </span><span class="nt">&quot;package-version&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;1.0.0&quot;</span><span class="p">,</span>
-<span class="w">            </span><span class="nt">&quot;cwe-id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;121&quot;</span><span class="p">,</span>
-<span class="w">            </span><span class="nt">&quot;cwe-name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Stack-based Buffer Overflow&quot;</span><span class="p">,</span>
-<span class="w">            </span><span class="nt">&quot;affected-function&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;parse_record&quot;</span><span class="p">,</span>
-<span class="w">            </span><span class="nt">&quot;affected-file&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;main.c&quot;</span><span class="p">,</span>
-<span class="w">            </span><span class="nt">&quot;remediation-strategy&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;exit&quot;</span>
+<span class="w">            </span><span class="nt">"cve-id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"CVE-recordparser-00001"</span><span class="p">,</span>
+<span class="w">            </span><span class="nt">"cve-description"</span><span class="p">:</span><span class="w"> </span><span class="s2">"recordparser 1.0.0 reads a length-prefixed record from stdin, where the first byte declares the payload length. parse_record copies that many bytes into a fixed 16-byte stack buffer with memcpy and no bounds check, so a declared length greater than 16 causes a stack-based buffer overflow (CWE-121)."</span><span class="p">,</span>
+<span class="w">            </span><span class="nt">"package-name"</span><span class="p">:</span><span class="w"> </span><span class="s2">"recordparser"</span><span class="p">,</span>
+<span class="w">            </span><span class="nt">"package-version"</span><span class="p">:</span><span class="w"> </span><span class="s2">"1.0.0"</span><span class="p">,</span>
+<span class="w">            </span><span class="nt">"cwe-id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"121"</span><span class="p">,</span>
+<span class="w">            </span><span class="nt">"cwe-name"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Stack-based Buffer Overflow"</span><span class="p">,</span>
+<span class="w">            </span><span class="nt">"affected-function"</span><span class="p">:</span><span class="w"> </span><span class="s2">"parse_record"</span><span class="p">,</span>
+<span class="w">            </span><span class="nt">"affected-file"</span><span class="p">:</span><span class="w"> </span><span class="s2">"main.c"</span><span class="p">,</span>
+<span class="w">            </span><span class="nt">"remediation-strategy"</span><span class="p">:</span><span class="w"> </span><span class="s2">"exit"</span>
 <span class="w">        </span><span class="p">}</span>
 <span class="w">    </span><span class="p">]</span>
 <span class="p">}</span>
@@ -1413,7 +1413,7 @@
       <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["content.action.edit"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"alias": true, "default": "latest", "provider": "mike"}}</script>
     
     
-      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
       
     
   </body>

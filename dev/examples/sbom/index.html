@@ -21,7 +21,7 @@
       
       
       <link rel="icon" href="../../assets/resolve_square_white.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
@@ -29,7 +29,7 @@
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
       
         
         <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
@@ -1257,18 +1257,18 @@
 <p>CMake supports the <code>install(SBOM)</code> syntax for emitting SPDX since CMake version 4.3, though it is gated behind <code>CMAKE_EXPERIMENTAL_GENERATE_SBOM</code>. <a href="https://cmake.org/cmake/help/latest/command/install.html#sbom">See the CMake SBOM docs for more information</a>. </p>
 </div>
 <p>The only part the lookup cares about is the list of <code>software_Package</code> entries, where each contributes a <code>name</code> and a <code>software_packageVersion</code>. Here are the two dependencies from the example SBOM for a fictional <code>textkit</code> application (see the <a href="https://github.com/riversideresearch/resolve/tree/main/examples/sbom/example.spdx.json">full file</a> for the surrounding SPDX document structure):</p>
-<div class="highlight"><pre><span></span><code><span class="nt">&quot;element&quot;</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<div class="highlight"><pre><span></span><code><span class="nt">"element"</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
 <span class="w">    </span><span class="p">{</span>
-<span class="w">        </span><span class="nt">&quot;name&quot;</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;fontconfig:fontconfig_project::fontconfig&quot;</span><span class="p">,</span>
-<span class="w">        </span><span class="nt">&quot;software_packageVersion&quot;</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2.2.1&quot;</span><span class="p">,</span>
-<span class="w">        </span><span class="nt">&quot;spdxId&quot;</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;urn:fontconfig::fontconfig#Package&quot;</span><span class="p">,</span>
-<span class="w">        </span><span class="nt">&quot;type&quot;</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;software_Package&quot;</span>
+<span class="w">        </span><span class="nt">"name"</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="s2">"fontconfig:fontconfig_project::fontconfig"</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">"software_packageVersion"</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="s2">"2.2.1"</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">"spdxId"</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="s2">"urn:fontconfig::fontconfig#Package"</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">"type"</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="s2">"software_Package"</span>
 <span class="w">    </span><span class="p">},</span>
 <span class="w">    </span><span class="p">{</span>
-<span class="w">        </span><span class="nt">&quot;name&quot;</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;ZLIB:ZLIB::ZLIB&quot;</span><span class="p">,</span>
-<span class="w">        </span><span class="nt">&quot;software_packageVersion&quot;</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;1.3.1&quot;</span><span class="p">,</span>
-<span class="w">        </span><span class="nt">&quot;spdxId&quot;</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;urn:ZLIB::ZLIB#Package&quot;</span><span class="p">,</span>
-<span class="w">        </span><span class="nt">&quot;type&quot;</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;software_Package&quot;</span>
+<span class="w">        </span><span class="nt">"name"</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="s2">"ZLIB:ZLIB::ZLIB"</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">"software_packageVersion"</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="s2">"1.3.1"</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">"spdxId"</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="s2">"urn:ZLIB::ZLIB#Package"</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">"type"</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="s2">"software_Package"</span>
 <span class="w">    </span><span class="p">}</span>
 <span class="p">]</span>
 </code></pre></div>
@@ -1295,16 +1295,16 @@
 <h2 id="interpreting-the-result">Interpreting the Result<a class="headerlink" href="#interpreting-the-result" title="Permanent link">&para;</a></h2>
 <p>The tool writes a <a href="../../concepts/vulnerabilities-json/"><code>vulnerabilities.json</code></a> with one entry per CVE/CWE it found. For our SBOM, <code>fontconfig 2.2.1</code> matches a known off-by-one while <code>zlib 1.3.1</code> has no reported vulnerability at that version, so the report looks something like this:</p>
 <div class="highlight"><pre><span></span><code><span class="p">{</span>
-<span class="w">  </span><span class="nt">&quot;vulnerabilities&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">  </span><span class="nt">"vulnerabilities"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
 <span class="w">    </span><span class="p">{</span>
-<span class="w">      </span><span class="nt">&quot;cve_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;CVE-2026-34085&quot;</span><span class="p">,</span>
-<span class="w">      </span><span class="nt">&quot;cve_description&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;fontconfig before 2.17.1 has an off-by-one error in allocation during sfnt capability handling, leading to a one-byte out-of-bounds write, and potentially a crash or code execution. This is in FcFontCapabilities in fcfreetype.c.&quot;</span><span class="p">,</span>
-<span class="w">      </span><span class="nt">&quot;package_name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;fontconfig:fontconfig_project::fontconfig&quot;</span><span class="p">,</span>
-<span class="w">      </span><span class="nt">&quot;package_version&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2.2.1&quot;</span><span class="p">,</span>
-<span class="w">      </span><span class="nt">&quot;cwe_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;193&quot;</span><span class="p">,</span>
-<span class="w">      </span><span class="nt">&quot;cwe_name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Off-by-one Error&quot;</span><span class="p">,</span>
-<span class="w">      </span><span class="nt">&quot;affected_file&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;fcfreetype.c&quot;</span><span class="p">,</span>
-<span class="w">      </span><span class="nt">&quot;affected_function&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;FcFontCapabilities&quot;</span>
+<span class="w">      </span><span class="nt">"cve_id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"CVE-2026-34085"</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">"cve_description"</span><span class="p">:</span><span class="w"> </span><span class="s2">"fontconfig before 2.17.1 has an off-by-one error in allocation during sfnt capability handling, leading to a one-byte out-of-bounds write, and potentially a crash or code execution. This is in FcFontCapabilities in fcfreetype.c."</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">"package_name"</span><span class="p">:</span><span class="w"> </span><span class="s2">"fontconfig:fontconfig_project::fontconfig"</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">"package_version"</span><span class="p">:</span><span class="w"> </span><span class="s2">"2.2.1"</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">"cwe_id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"193"</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">"cwe_name"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Off-by-one Error"</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">"affected_file"</span><span class="p">:</span><span class="w"> </span><span class="s2">"fcfreetype.c"</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">"affected_function"</span><span class="p">:</span><span class="w"> </span><span class="s2">"FcFontCapabilities"</span>
 <span class="w">    </span><span class="p">}</span>
 <span class="w">  </span><span class="p">]</span>
 <span class="p">}</span>
@@ -1369,7 +1369,7 @@
       <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["content.action.edit"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"alias": true, "default": "latest", "provider": "mike"}}</script>
     
     
-      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
       
     
   </body>
