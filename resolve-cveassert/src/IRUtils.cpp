@@ -452,8 +452,6 @@ Function *getOrCreateRecoverBufferFn(Module *M) {
   auto ptrType = PointerType::get(Ctx, 0);
   FunctionType *fnTy = FunctionType::get(ptrType, {}, false);
 
-  // TODO: Before merging update the name of this function and update testcase
-  // names.
   auto recoverBufferFn = getOrCreateResolveHelper(
       M, "resolve_get_recover_longjmp_buf", fnTy, GlobalValue::WeakAnyLinkage);
   if (!recoverBufferFn->empty()) {
