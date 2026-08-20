@@ -3,6 +3,7 @@
  *   LGPL-3; See LICENSE.txt in the repo root for details.
  */
 
+#include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Twine.h"
@@ -47,11 +48,9 @@ static Constant *getContinueValue(Instruction *I) {
     }
   }
 
-  if (Ty->isFloatTy())
-    return ConstantFP::get(Ty, APFloat(std::numeric_limits<float>::max()));
-
-  if (Ty->isDoubleTy())
-    return ConstantFP::get(Ty, APFloat(std::numeric_limits<double>::max()));
+  if (Ty->isFloatTy()) {
+    return ConstantFP::get(Ty, APFloat::getLargest(Ty->getFltSemantics()));
+  }
 }
 
 static void widenIntOverflow(Function *F) {
