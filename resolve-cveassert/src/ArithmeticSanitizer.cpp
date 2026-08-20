@@ -197,7 +197,6 @@ void sanitizeDivideByZero(Function *F,
     builder.CreateCondBr(isZero, remedDivBB, preserveDivBB);
 
     builder.SetInsertPoint(remedDivBB);
-    builder.CreateCall(getOrCreateResolveReportSanitizerTriggered(M));
 
     Value *remedValue = nullptr;
     switch (strategy) {
