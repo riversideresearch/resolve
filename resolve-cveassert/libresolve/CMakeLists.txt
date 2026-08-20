@@ -24,7 +24,10 @@ file(GLOB_RECURSE RUST_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/sr
 add_custom_command(
     OUTPUT ${RUST_LIB}
     COMMAND 
-        ${CMAKE_COMMAND} -E env CARGO_TARGET_DIR=${RUST_OUT_DIR} cargo build ${CARGO_FLAGS} 
+        ${CMAKE_COMMAND} -E env
+        CARGO_TARGET_DIR=${RUST_OUT_DIR}
+        RUST_FLAGS="-Clink-arg=-Wl,--no-rosegment -Cforce-frame-pointers=yes"
+        cargo build ${CARGO_FLAGS} 
     WORKING_DIRECTORY ${RUST_CRATE_DIR}
     COMMENT "Building libresolve.so" VERBATIM
     DEPENDS ${RUST_SOURCES} ${CMAKE_CURRENT_SOURCE_DIR}/Cargo.lock ${CMAKE_CURRENT_SOURCE_DIR}/Cargo.toml ${CMAKE_CURRENT_SOURCE_DIR}/rust-toolchain.toml
