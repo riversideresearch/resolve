@@ -39,7 +39,7 @@ add_custom_command(
   COMMENT "Building facts-rs and generating its C++ ABI header"
   VERBATIM
 )
-add_custom_target(facts_rs_build DEPENDS "${FACTS_RS_STATICLIB}" "${FACTS_RS_HEADER}")
+add_custom_target(facts_rs_build ALL DEPENDS "${FACTS_RS_STATICLIB}" "${FACTS_RS_HEADER}")
 
 add_library(facts_rs STATIC IMPORTED GLOBAL)
 set_target_properties(facts_rs PROPERTIES
