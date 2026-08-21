@@ -58,7 +58,7 @@ check-with-klee:
 	$(MAKE) check RESOLVE_BUILD_KLEE=ON
 
 test: configure
-	cmake --build $(RESOLVE_CMAKE_BUILD_DIR) --target test-CVEAssert test-libresolve test-reach-rs
+	cmake --build $(RESOLVE_CMAKE_BUILD_DIR) --target test-CVEAssert test-libresolve test-resolve-reach
 
 test-with-klee:
 	$(MAKE) test RESOLVE_BUILD_KLEE=ON

@@ -5,14 +5,12 @@
 
 #pragma once
 
-#include <fstream>
-#include <iostream>
+#include <filesystem>
+#include <istream>
 #include <string>
 #include <string_view>
 #include <unordered_map>
 #include <vector>
-
-#include "json/json.hpp"
 
 #include "resolve_facts/resolve_facts.hpp"
 
@@ -89,26 +87,6 @@ namespace dlsym {
 struct loaded_symbol {
   std::string symbol;
   std::string library;
-  bool operator==(const loaded_symbol &rhs) const {
-    return symbol == rhs.symbol && library == rhs.library;
-  };
 };
 
-struct log {
-  std::vector<loaded_symbol> loaded_symbols;
-};
-
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(loaded_symbol, symbol, library);
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(log, loaded_symbols);
-
-inline std::optional<log>
-load_log_from_file(const std::filesystem::path &path) {
-  std::ifstream f(path);
-  if (!f.is_open()) {
-    return {};
-  }
-  nlohmann::json j;
-  f >> j;
-  return j.template get<log>();
-}
 } // namespace dlsym

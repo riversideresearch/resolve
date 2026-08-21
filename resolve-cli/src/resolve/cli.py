@@ -31,7 +31,9 @@ def find_subcommands(program: str):
         path_dirs.insert(0, argv0_path.resolve().parent)
     for file in files_in_path_dirs(path_dirs):
         if (sub := is_subcommand(file)) and os.access(file, os.X_OK):
-            subcommands[sub] = file
+            # Use the command from the first matching directory. This keeps
+            # the installed command ahead of stale commands later in PATH.
+            subcommands.setdefault(sub, file)
     return subcommands
 
 def subcommand_cli(program: str):

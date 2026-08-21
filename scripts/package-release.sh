@@ -109,7 +109,7 @@ for file in "$STAGED_PREFIX"/bin/*; do
 done
 
 cmake -E make_directory "$STAGE_DIR/usr/local/bin"
-for cmd in "$STAGED_PREFIX"/bin/resolve* "$STAGED_PREFIX"/bin/reach "$STAGED_PREFIX"/bin/resolve_read_props; do
+for cmd in "$STAGED_PREFIX"/bin/resolve* "$STAGED_PREFIX"/bin/resolve_read_props; do
     [ -e "$cmd" ] || continue
     cmd_name=$(basename "$cmd")
     ln -sfn "$INSTALL_PREFIX/bin/$cmd_name" "$STAGE_DIR/usr/local/bin/$cmd_name"
