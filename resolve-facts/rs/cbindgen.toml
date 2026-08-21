@@ -18,4 +18,8 @@ crates = ["facts-rs"]
 include = [
   "Node",
   "Edge",
+  "FactsPath",
+  "FactsReadResult",
+  "FactsModuleCursor",
+  "FactsModuleView",
 ]
