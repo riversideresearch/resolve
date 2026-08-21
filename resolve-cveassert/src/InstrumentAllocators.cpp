@@ -65,9 +65,6 @@ void instrumentLibraryAllocations(Function *F) {
   auto ptrType = PointerType::get(Ctx, 0);
   auto sizeType = Type::getInt64Ty(Ctx);
   auto voidType = Type::getVoidTy(Ctx);
-  auto ptr_ty = PointerType::get(Ctx, 0);
-  auto size_ty = Type::getInt64Ty(Ctx);
-  auto void_ty = Type::getVoidTy(Ctx);
   auto integerType = Type::getInt32Ty(Ctx);
 
   wrapLibraryFunction(F, "malloc",
@@ -80,14 +77,14 @@ void instrumentLibraryAllocations(Function *F) {
   wrapLibraryFunction(F, "strdup",
                       FunctionType::get(ptrType, {ptrType}, false));
   wrapLibraryFunction(F, "strndup",
-                      FunctionType::get(ptr_ty, {ptr_ty, size_ty}, false));
-  wrapLibraryFunction(F, "mmap",
-                      FunctionType::get(ptr_ty,
-                                        {ptr_ty, size_ty, integerType,
-                                         integerType, integerType, size_ty},
-                                        false));
-  wrapLibraryFunction(F, "munmap",
-                      FunctionType::get(integerType, {ptr_ty, size_ty}, false));
+                      FunctionType::get(ptrType, {ptrType, sizeType}, false));
+  wrapLibraryFunction(
+      F, "mmap",
+      FunctionType::get(ptrType,
+                        {ptrType, sizeType, integerType, integerType, sizeType},
+                        false));
+  wrapLibraryFunction(
+      F, "munmap", FunctionType::get(integerType, {ptrType, sizeType}, false));
 }
 
 void instrumentAlloca(Function *F) {
