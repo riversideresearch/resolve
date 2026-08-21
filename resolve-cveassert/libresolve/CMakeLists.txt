@@ -26,7 +26,7 @@ add_custom_command(
     COMMAND 
         ${CMAKE_COMMAND} -E env
         CARGO_TARGET_DIR=${RUST_OUT_DIR}
-        RUST_FLAGS="-Clink-arg=-Wl,--no-rosegment"
+        RUST_FLAGS="-Clink-arg=-Wl,--no-rosegment -Cforce-frame-pointers=yes"
         cargo build ${CARGO_FLAGS} 
     WORKING_DIRECTORY ${RUST_CRATE_DIR}
     COMMENT "Building libresolve.so" VERBATIM
