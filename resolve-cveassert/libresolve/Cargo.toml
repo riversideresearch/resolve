@@ -13,7 +13,7 @@ log = "0.4.29"
 parking_lot = "0.12.5"
 
 [profile.release]
-panic = "unwind"
+panic = "panic"
 debug = true
 overflow-checks = true
 

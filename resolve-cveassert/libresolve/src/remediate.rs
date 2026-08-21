@@ -34,10 +34,10 @@ pub extern "C" fn __resolve_register_global(ptr: *mut c_void, size: usize) {
 pub extern "C" fn __resolve_invalidate_stack_range(base: *mut c_void, size: usize) {
     let base = base as Vaddr;
 
-    //SHADOW_STACK.with_borrow_mut(
-    //    |ss|
-    //     ss.invalidate_at(base, size)
-    //);
+    SHADOW_STACK.with_borrow_mut(
+        |ss|
+         ss.invalidate_at(base, size)
+    );
 
     info!("[STACK] Free addr 0x{base:x} size {size}");
 }
