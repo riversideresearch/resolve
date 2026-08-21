@@ -1,10 +1,13 @@
 // Copyright (c) 2025 Riverside Research.
 // LGPL-3; See LICENSE.txt in the repo root for details.
-use libc::{c_char, c_void, calloc, free, malloc, realloc, strdup, strlen, strndup, strnlen};
+use libc::{
+    c_char, c_int, c_void, calloc, free, malloc, mmap, munmap, off_t, realloc, strdup, strlen,
+    strndup, strnlen,
+};
 
 use crate::shadowobjs::{
-    lookup_global, AllocType, ShadowObject, Vaddr, ALIVE_OBJ_LIST, FREED_OBJ_LIST, GLOBALS,
-    SHADOW_STACK,
+    ALIVE_OBJ_LIST, AllocType, FREED_OBJ_LIST, GLOBALS, SHADOW_STACK, ShadowObject, Vaddr,
+    lookup_global,
 };
 
 use log::{info, warn};
@@ -39,18 +42,8 @@ pub extern "C" fn __resolve_register_global(ptr: *mut c_void, size: usize) {
     GLOBALS
         .lock()
         .push(ShadowObject::new(AllocType::Global, ptr as Vaddr, size));
-    info!(
-        "[GLOBAL] Registered global object: addr={:p}, size={}",
-        ptr, size
-    );
 }
 
-/**
- * @brief - Unregisters stack allocations
- * @input
- *  - ptr: ptr to stack allocation
- *  - size: size of stack allocation
- */
 #[unsafe(no_mangle)]
 pub extern "C" fn __resolve_invalidate_stack_range(ptr: *mut c_void, size: usize) {
     let base = ptr as Vaddr;
@@ -273,6 +266,79 @@ pub extern "C" fn __resolve_strndup(ptr: *mut c_char, size: usize) -> *mut c_cha
     string_ptr
 }
 
+/**
+ * @brief - RESOLVE wrapper for libc mmap
+ */
+#[unsafe(no_mangle)]
+pub extern "C" fn __resolve_mmap(
+    addr: *mut c_void,
+    length: usize,
+    prot: c_int,
+    flags: c_int,
+    fd: c_int,
+    offset: off_t,
+) -> *mut c_void {
+    // NOTE: If addr is null then the kernel chooses the (page-aligned) address to create a new
+    // mapping.
+    let ptr = unsafe { mmap(addr, length + 1, prot, flags, fd, offset) };
+
+    {
+        let mut obj_list = ALIVE_OBJ_LIST.lock();
+        obj_list.add_shadow_object(AllocType::Heap, ptr as Vaddr, length);
+    }
+
+    info!(
+        "[HEAP] Registered heap object (mmap): addr={:p}, size={}",
+        ptr, length
+    );
+
+    ptr
+}
+
+/**
+ * @brief - RESOLVE wrapper for libc munmap
+ */
+#[unsafe(no_mangle)]
+pub extern "C" fn __resolve_munmap(addr: *mut c_void, length: usize) -> c_int {
+    let obj_size = {
+        let mut obj_list = ALIVE_OBJ_LIST.lock();
+        let sobj_opt = obj_list.search_intersection(addr as Vaddr);
+        let size = sobj_opt.map(|o| o.size());
+        // remove shadow obj from live list
+        obj_list.invalidate_at(addr as Vaddr);
+        size
+    };
+
+    // Check if the shadow object exists
+    match obj_size {
+        Some(size) => {
+            info!(
+                "[HEAP] Found shadow object for allocated object: addr={:p}, size={}",
+                addr, size
+            );
+
+            info!(
+                "[HEAP] Unregistered heap object: addr{:p}, size={}",
+                addr, size
+            );
+        }
+        None => {
+            warn!(
+                "[HEAP] No shadow object found for allocated object: addr={:p}",
+                addr
+            );
+        }
+    }
+
+    {
+        let mut freed_guard = FREED_OBJ_LIST.lock();
+        freed_guard.add_shadow_object(AllocType::Unallocated, addr as Vaddr, obj_size.unwrap_or(0));
+    }
+
+    let freed = unsafe { munmap(addr, length) };
+    freed
+}
+
 #[derive(PartialEq)]
 #[repr(C)]
 pub struct ShadowObjBounds {
@@ -299,13 +365,13 @@ impl From<&crate::shadowobjs::ShadowObject> for ShadowObjBounds {
 }
 
 /**
- * @brief - Queries the shadow stack to find a shadow obj
- *          where the ptr is within bounds of allocation
+ * @brief - Helper function that queries the shadow stack
+ *          to find a shadow obj where the ptr fits within
+ *          its bounds of allocation
  * @input
- *  - ptr: ptr to stack allocation
- * @return shadow object that satisfies base <= ptr && ptr < limit
- * If shadow object cannot be found the function returns
- * a shadow object with null base and limit pointers
+ *  - ptr: ptr to allocation
+ * @return struct containing the base and limit of the
+ *         shadow object as pointers
  */
 #[unsafe(no_mangle)]
 pub extern "C" fn __resolve_get_bounds_stack(ptr: *mut c_void) -> ShadowObjBounds {
@@ -318,13 +384,13 @@ pub extern "C" fn __resolve_get_bounds_stack(ptr: *mut c_void) -> ShadowObjBound
 }
 
 /**
- * @brief - Queries heap table to find a shadow obj
- *          where the ptr is within bounds of allocation
+ * @brief - Helper function that queries heap sobj list
+ *          to find a shadow obj where the ptr fits within
+ *          its bounds of allocation
  * @input
- *  - ptr: ptr to heap allocation
- * @return shadow object that satisfies base <= ptr && ptr < limit
- * If shadow object cannot be found the function returns
- * a shadow object with null base and limit pointers
+ *  - ptr: ptr to allocation
+ * @return struct containing the base and limit of the
+ *         shadow object as pointers
  */
 #[unsafe(no_mangle)]
 pub extern "C" fn __resolve_get_bounds_heap(ptr: *mut c_void) -> ShadowObjBounds {
@@ -358,7 +424,7 @@ pub extern "C" fn __resolve_get_bounds_global(ptr: *mut c_void) -> ShadowObjBoun
  *          allocation type already. Searches stack table ( O(log n) )
  *          before searching the heap table
  * @input
- *  - ptr: ptr to object allocation
+ *  - ptr: ptr to allocation
  * @return struct containing the base and limit of the
  *         shadow object as pointers
  */

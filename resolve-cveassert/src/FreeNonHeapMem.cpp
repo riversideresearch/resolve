@@ -63,13 +63,10 @@ Function *getOrCreateFreeOfNonHeapSanitizer(
   std::string handlerName = "__resolve_nonheap_free";
   Module *M = F->getParent();
   LLVMContext &Ctx = M->getContext();
-  GlobalVariable *sanitizerMap = SanitizerMaps[F];
 
   IRBuilder<> builder(Ctx);
   // TODO: handle address spaces other than 0
   auto ptrType = PointerType::get(Ctx, 0);
-  auto pointerIntegerType = Type::getInt64Ty(Ctx);
-  auto boolType = Type::getInt1Ty(Ctx);
 
   // TODO: write this in asm as some kind of sanitzer_rt?
   FunctionType *sanitizerType =

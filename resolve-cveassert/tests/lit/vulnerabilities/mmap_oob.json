@@ -1,0 +1,15 @@
+{
+    "vulnerabilities": [
+        {
+            "cve-id": "CVE-resolve-mmap-wrapper-1",
+            "cve-description": "",
+            "package-name": "resolve-test",
+            "package-version": "1.4.5",
+            "cwe-id": "125",
+            "cwe-name": "mmap() OOB write",
+            "affected-function": "main",
+            "affected-file": "mmap_oob.c",
+            "remediation-strategy": "exit"
+        }
+    ]
+}
