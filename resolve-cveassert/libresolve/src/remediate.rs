@@ -6,8 +6,8 @@ use libc::{
 };
 
 use crate::shadowobjs::{
-    lookup_global, AllocType, ShadowObject, Vaddr, ALIVE_OBJ_LIST, FREED_OBJ_LIST, GLOBALS,
-    SHADOW_STACK,
+    ALIVE_OBJ_LIST, AllocType, FREED_OBJ_LIST, GLOBALS, SHADOW_STACK, ShadowObject, Vaddr,
+    lookup_global,
 };
 
 use log::{info, warn};
@@ -348,10 +348,6 @@ pub struct ShadowObjBounds {
 
 impl ShadowObjBounds {
     pub fn null() -> Self {
-        ShadowObjBounds {
-            base: std::ptr::null_mut(),
-            limit: std::ptr::null_mut(),
-        }
         ShadowObjBounds {
             base: std::ptr::null_mut(),
             limit: std::ptr::null_mut(),
