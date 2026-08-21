@@ -13,6 +13,44 @@ endif()
 include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
 
+######################################################################
+# RUST FACTS ABI
+
+set(FACTS_RS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/rs")
+set(FACTS_RS_TARGET_DIR "${FACTS_RS_DIR}/target/release")
+set(FACTS_RS_STATICLIB "${FACTS_RS_TARGET_DIR}/libfacts_rs.a")
+set(FACTS_RS_GENERATED_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated")
+set(FACTS_RS_HEADER "${FACTS_RS_GENERATED_DIR}/facts_rs.hpp")
+file(MAKE_DIRECTORY "${FACTS_RS_GENERATED_DIR}")
+
+find_program(CARGO_EXECUTABLE cargo REQUIRED)
+find_program(CBINDGEN_EXECUTABLE cbindgen HINTS "$ENV{HOME}/.cargo/bin" REQUIRED)
+
+file(GLOB FACTS_RS_SOURCES CONFIGURE_DEPENDS "${FACTS_RS_DIR}/src/*.rs")
+add_custom_command(
+  OUTPUT "${FACTS_RS_STATICLIB}" "${FACTS_RS_HEADER}"
+  COMMAND "${CMAKE_COMMAND}" -E make_directory "${FACTS_RS_GENERATED_DIR}"
+  COMMAND "${CARGO_EXECUTABLE}" build --manifest-path "${FACTS_RS_DIR}/Cargo.toml" --release
+  COMMAND "${CBINDGEN_EXECUTABLE}" --config "${FACTS_RS_DIR}/cbindgen.toml"
+          --crate facts-rs --output "${FACTS_RS_HEADER}" "${FACTS_RS_DIR}"
+  DEPENDS ${FACTS_RS_SOURCES} "${FACTS_RS_DIR}/Cargo.toml" "${FACTS_RS_DIR}/Cargo.lock"
+          "${FACTS_RS_DIR}/cbindgen.toml"
+  WORKING_DIRECTORY "${FACTS_RS_DIR}"
+  COMMENT "Building facts-rs and generating its C++ ABI header"
+  VERBATIM
+)
+add_custom_target(facts_rs_build ALL DEPENDS "${FACTS_RS_STATICLIB}" "${FACTS_RS_HEADER}")
+
+add_library(facts_rs STATIC IMPORTED GLOBAL)
+set_target_properties(facts_rs PROPERTIES
+  IMPORTED_LOCATION "${FACTS_RS_STATICLIB}"
+  INTERFACE_INCLUDE_DIRECTORIES "${FACTS_RS_GENERATED_DIR}"
+)
+add_dependencies(facts_rs facts_rs_build)
+
+install(FILES "${FACTS_RS_STATICLIB}" DESTINATION ${CMAKE_INSTALL_LIBDIR})
+install(FILES "${FACTS_RS_HEADER}" DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+
 add_subdirectory(vendor/argparse)
 add_subdirectory(vendor/json)
 
@@ -39,7 +77,7 @@ file(GLOB_RECURSE SRC
 
 add_library(resolve_facts STATIC libs/resolve_facts/resolve_facts.cpp)
 target_include_directories(resolve_facts PUBLIC 
-    "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>/include"
+    "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
     "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>"
 )
 target_link_libraries(resolve_facts PRIVATE glaze::glaze)
@@ -70,12 +108,20 @@ file(GLOB_RECURSE SRC
 )
 
 # Build Targets
-add_library(resolve_facts_llvm STATIC libs/resolve_facts_llvm/resolve_facts_llvm.cpp)
+add_library(resolve_facts_llvm STATIC
+    libs/resolve_facts_llvm/binary_facts_llvm.cpp
+)
 target_include_directories(resolve_facts_llvm SYSTEM PUBLIC ${LLVM_INCLUDE_DIRS})
-target_link_libraries(resolve_facts_llvm PUBLIC resolve_facts)
+find_package(Threads REQUIRED)
+target_link_libraries(resolve_facts_llvm PUBLIC
+    facts_rs
+    Threads::Threads
+    ${CMAKE_DL_LIBS}
+    m
+)
 
 target_include_directories(resolve_facts_llvm PUBLIC
-    "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>/include"
+    "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
     "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>"
 )
 set_target_properties(resolve_facts_llvm PROPERTIES POSITION_INDEPENDENT_CODE ON)
@@ -95,21 +141,18 @@ install(DIRECTORY include/resolve_facts_llvm DESTINATION ${CMAKE_INSTALL_INCLUDE
 ######################################################################
 # REACH
 
-# Collect source files for checks
-file(GLOB_RECURSE SRC
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/reach/*.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/reach/*.hpp"
-)
-
 file(GLOB_RECURSE LIB
+    "${CMAKE_CURRENT_SOURCE_DIR}/include/reach/*.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/include/reach/*.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/libs/reach/*.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/libs/reach/*.hpp"
 )
 
 # reach lib
 add_library(libreach 
     libs/reach/distmap.cpp
     libs/reach/facts.cpp
+    libs/reach/ffi.cpp
     libs/reach/graph.cpp
     libs/reach/search.cpp
     libs/reach/util.cpp
@@ -118,24 +161,28 @@ add_library(libreach
 set_target_properties(libreach PROPERTIES OUTPUT_NAME "reach")
 
 target_include_directories(libreach PUBLIC
-    "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>/include"
+    "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
     "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>"
 )
-target_link_libraries(libreach PUBLIC resolve_facts json)
+target_include_directories(libreach PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/libs"
+)
+target_link_libraries(libreach PUBLIC
+    resolve_facts
+    facts_rs
+    json
+    Threads::Threads
+    ${CMAKE_DL_LIBS}
+    m
+)
 
 target_compile_features(libreach PUBLIC cxx_std_23)
 
-# reach executable
-add_executable(reach src/reach/main.cpp)
-
-target_link_libraries(reach PRIVATE libreach json argparse)
-
 if(COMMAND resolve_add_check_targets)
     resolve_add_check_targets(libreach ${LIB})
-    resolve_add_check_targets(reach ${SRC})
 endif()
 
-install(TARGETS reach libreach EXPORT resolve_facts_targets)
+install(TARGETS libreach EXPORT resolve_facts_targets)
 install(DIRECTORY include/reach DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 
 ######################################################################

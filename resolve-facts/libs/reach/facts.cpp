@@ -10,6 +10,7 @@
 #include <unordered_map>
 
 #include "reach/facts.hpp"
+#include "reach/facts_view.hpp"
 #include "reach/util.hpp"
 
 using namespace resolve_facts;
@@ -99,6 +100,25 @@ database reach_facts::load(const fs::path &facts_dir, LoadOptions options) {
   }
 
   return load(facts, options);
+}
+
+vector<NamespacedNodeId>
+reach_facts::find_functions_by_name_suffix(const facts_rs::FactsBuf *facts,
+                                           const string_view suffix) {
+  const ProgramFactsView pf{facts};
+  vector<NamespacedNodeId> matches;
+  for (uint32_t mid = 0; mid < pf.module_count(); ++mid) {
+    const auto module = pf.module(mid);
+    for (uint32_t nid = 0; nid < module.nodes().size(); ++nid) {
+      const auto node = module.node(nid);
+      const auto name = node.name();
+      if (node.type() == facts_rs::NodeType::Function && name &&
+          name->ends_with(suffix)) {
+        matches.emplace_back(mid, nid);
+      }
+    }
+  }
+  return matches;
 }
 
 // These checks ensure that the hashmap lookups in

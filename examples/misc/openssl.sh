@@ -11,7 +11,7 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 EXTRACT_FACTS_SCRIPT="/opt/resolve/bin/extract_facts.py"
-REACH_WRAPPER="/opt/resolve/bin/resolve-reach"
+REACH_COMMAND="/opt/resolve/bin/resolve-reach"
 
 export CC="/usr/bin/clang"
 export CXX="/usr/bin/clang++"
@@ -50,11 +50,10 @@ mkdir openssl_facts
 # Run reach analysis
 # -------------------
 echo "[+] Running reachability analysis." 
-"$REACH_WRAPPER" \
+"$REACH_COMMAND" \
     -i openssl_vulnerabilities.json \
     -o openssl_reach_out.json \
     -f openssl_facts/libcrypto.facts \
-    -e "CMS_RecipientInfo_decrypt" \
-    -r /opt/resolve/bin/reach
+    -e "CMS_RecipientInfo_decrypt"
 
 # TODO: Add remediation portion check for exit code 3 for successful remediation

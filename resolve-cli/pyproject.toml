@@ -11,12 +11,10 @@ dependencies = [
     "ollama>=0.6.1",
     "pydantic>=2.12.5",
     "pyelftools>=0.32",
-    "univers>=31.1.0",
 ]
 
 [project.scripts]
 resolve = "resolve.cli:main"
-resolve-reach = "resolve.reach:main"
 resolve-remediate = "resolve.remediate:main"
 resolve-get-facts = "resolve.get_facts:main"
 resolve-crash-analysis = "resolve.crash_analyzer.smith:main"

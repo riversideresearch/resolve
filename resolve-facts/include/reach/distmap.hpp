@@ -10,6 +10,7 @@
 #include <unordered_set>
 
 #include "reach/facts.hpp"
+#include "json/json.hpp"
 
 using NNodeId = resolve_facts::NamespacedNodeId;
 
@@ -25,4 +26,8 @@ namespace distmap {
 distmap_blacklist
 gen(const reach_facts::database &db, const NNodeId &dst, bool dynlink = false,
     const std::optional<std::vector<dlsym::loaded_symbol>> &loaded_syms = {});
-}
+
+distmap_blacklist
+gen(const facts_rs::FactsBuf *facts, const NNodeId &dst, bool dynlink = false,
+    const std::optional<std::vector<dlsym::loaded_symbol>> &loaded_syms = {});
+} // namespace distmap

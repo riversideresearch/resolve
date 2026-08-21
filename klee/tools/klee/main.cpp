@@ -26,8 +26,7 @@
 
 #include "reach/distmap.hpp"
 #include "reach/facts.hpp"
-#include "reach/graph.hpp"
-#include "resolve_facts_llvm/resolve_facts_llvm.hpp"
+#include "resolve_facts_llvm/binary_facts_llvm.hpp"
 
 #include "klee/Support/CompilerWarning.h"
 DISABLE_WARNING_PUSH
@@ -64,7 +63,6 @@ DISABLE_WARNING_POP
 #include <fstream>
 #include <iomanip>
 #include <iterator>
-#include <regex>
 #include <sstream>
 
 using namespace llvm;
@@ -654,13 +652,12 @@ void build_distmap_blacklist_for_module
  const std::unordered_set<resolve_facts::NamespacedNodeId, resolve_facts::pair_hash> &bl,
  std::unordered_map<const llvm::Instruction*, size_t> &distMap,
  std::unordered_set<const llvm::Instruction*> &blackList,
+ const resolve::BinaryLLVMFacts &facts,
  const llvm::Module &M) {
   for (const Function &F : M) {
     for (const BasicBlock &BB : F) {
       for (const Instruction &I : BB) {
-        const auto iid = resolve::facts.addNode(I);
-        const auto mid = resolve::facts.getModuleId(I);
-        const auto id = std::make_pair(mid, iid);
+        const auto id = facts.getId(I);
 
         if (dm.find(id) != dm.end()) {
           distMap[&I] = dm.at(id);
@@ -674,17 +671,12 @@ void build_distmap_blacklist_for_module
 }
 
 // Search for function node id that matches name
-std::optional<NNodeId> findMatchingFunctionNodeId(const reach_facts::database &db,
-						      const std::string functionName) {
-  //std::regex pattern(".*/__uClibc_main.c:f" + functionName);
-  // "/challenge/app/src/libc/misc/internals/__uClibc_main.c:ftarget"
-  std::vector<NNodeId> matches;
-  for (const auto &[node_id, node_type] : db.node_type) {
-    if (node_type == resolve_facts::NodeType::Function && db.name.at(node_id).ends_with(functionName)) {
-      matches.push_back(node_id);
-    }
-  }
-  if (!matches.size()) {
+std::optional<NNodeId>
+findMatchingFunctionNodeId(const facts_rs::FactsBuf *facts,
+                           const std::string &functionName) {
+  const auto matches =
+      reach_facts::find_functions_by_name_suffix(facts, functionName);
+  if (matches.empty()) {
     return {};
   }
   if (matches.size() > 1) {
@@ -706,27 +698,23 @@ bool KleeHandler::buildDistMapAndBlackList
     return false;
   }
 
+  resolve::BinaryLLVMFacts facts;
   for (const auto &M : loadedModules) {
-    resolve::getModuleFacts(*M);
+    resolve::getBinaryModuleFacts(facts, *M);
   }
-  resolve::getModuleFacts(*mainModule);
-
-  const auto fcts = resolve::facts;
-
-  auto json = fcts.serialize();
-
-  auto facts = std::istringstream(json);
-  const reach_facts::database db = reach_facts::load(facts, graph::CFG_LOAD_OPTIONS);
+  resolve::getBinaryModuleFacts(facts, *mainModule);
+  const auto serialized = facts.serialize();
 
   // Map target name to node ID
-  const auto targetNodeId_opt = findMatchingFunctionNodeId(db, targetFunctionName);
+  const auto targetNodeId_opt =
+      findMatchingFunctionNodeId(serialized.get(), targetFunctionName);
   if (!targetNodeId_opt.has_value()) {
     klee_warning("no matching node ID for target function %s", targetFunctionName.c_str());
     return false;
   }
   const auto targetNodeId = targetNodeId_opt.value();
 
-  const auto dm_bl = distmap::gen(db, targetNodeId);
+  const auto dm_bl = distmap::gen(serialized.get(), targetNodeId);
   const auto &dm = dm_bl.distmap;
   const auto &bl = dm_bl.blacklist;
 
@@ -738,9 +726,10 @@ bool KleeHandler::buildDistMapAndBlackList
   // }
 
   for (const auto &M : loadedModules) {
-    build_distmap_blacklist_for_module(dm, bl, distMap, blackList, *M);
+    build_distmap_blacklist_for_module(dm, bl, distMap, blackList, facts, *M);
   }
-  build_distmap_blacklist_for_module(dm, bl, distMap, blackList, *mainModule);
+  build_distmap_blacklist_for_module(dm, bl, distMap, blackList, facts,
+                                     *mainModule);
 
   // std::cout << "distMap.size() = " << distMap.size() << std::endl
   //           << "blackList.size() = " << blackList.size() << std::endl;

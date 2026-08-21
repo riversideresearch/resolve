@@ -5,13 +5,12 @@
 
 #pragma once
 
-#include <fstream>
-#include <iostream>
+#include <filesystem>
+#include <istream>
 #include <string>
+#include <string_view>
 #include <unordered_map>
 #include <vector>
-
-#include "json/json.hpp"
 
 #include "resolve_facts/resolve_facts.hpp"
 
@@ -22,6 +21,10 @@ template <typename T> using NodeMap = resolve_facts::NodeMap<T>;
 using NodeType = resolve_facts::NodeType;
 using Linkage = resolve_facts::Linkage;
 using CallType = resolve_facts::CallType;
+
+namespace facts_rs {
+struct FactsBuf;
+}
 
 namespace reach_facts {
 
@@ -71,6 +74,10 @@ struct database {
 database load(std::istream &facts, LoadOptions options);
 database load(const std::filesystem::path &facts_dir, LoadOptions options);
 
+std::vector<NamespacedNodeId>
+find_functions_by_name_suffix(const facts_rs::FactsBuf *facts,
+                              std::string_view suffix);
+
 bool validate(const database &db);
 } // namespace reach_facts
 
@@ -80,26 +87,6 @@ namespace dlsym {
 struct loaded_symbol {
   std::string symbol;
   std::string library;
-  bool operator==(const loaded_symbol &rhs) const {
-    return symbol == rhs.symbol && library == rhs.library;
-  };
 };
 
-struct log {
-  std::vector<loaded_symbol> loaded_symbols;
-};
-
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(loaded_symbol, symbol, library);
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(log, loaded_symbols);
-
-inline std::optional<log>
-load_log_from_file(const std::filesystem::path &path) {
-  std::ifstream f(path);
-  if (!f.is_open()) {
-    return {};
-  }
-  nlohmann::json j;
-  f >> j;
-  return j.template get<log>();
-}
 } // namespace dlsym
