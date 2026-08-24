@@ -120,6 +120,7 @@ static Function *getOrCreateAccessOk(Module *M, BoundsClass cls) {
 
   // Adding an attribute to always inline this function
   // resolveAccessOkFn->addFnAttr(Attribute::AlwaysInline);
+  resolveAccessOkFn->addFnAttr(Attribute::NoInline);
 
   BasicBlock *EntryBB = BasicBlock::Create(Ctx, "entry", resolveAccessOkFn);
   BasicBlock *CheckAccessBB =
@@ -511,6 +512,7 @@ static Function *getOrCreateResolveGep(Function *F, BoundsClass cls) {
   }
 
   // Adding attribute to always inline
+  resolveGepFn->addFnAttr(Attribute::NoInline);
   // resolveGepFn->addFnAttr(Attribute::AlwaysInline);
 
   BasicBlock *EntryBB = BasicBlock::Create(Ctx, "entry", resolveGepFn);
