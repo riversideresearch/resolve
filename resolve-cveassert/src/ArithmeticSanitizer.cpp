@@ -48,7 +48,7 @@ static Constant *getContinueValue(Instruction *I) {
     }
   }
 
-  if (Ty->isFloatTy()) {
+  if (Ty->isFloatingPointTy()) {
     return ConstantFP::get(Ty, APFloat::getLargest(Ty->getFltSemantics()));
   }
 }
