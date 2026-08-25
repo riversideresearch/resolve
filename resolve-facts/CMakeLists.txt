@@ -13,6 +13,44 @@ endif()
 include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
 
+######################################################################
+# RUST FACTS ABI
+
+set(FACTS_RS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/rs")
+set(FACTS_RS_TARGET_DIR "${FACTS_RS_DIR}/target/release")
+set(FACTS_RS_STATICLIB "${FACTS_RS_TARGET_DIR}/libfacts_rs.a")
+set(FACTS_RS_GENERATED_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated")
+set(FACTS_RS_HEADER "${FACTS_RS_GENERATED_DIR}/facts_rs.hpp")
+file(MAKE_DIRECTORY "${FACTS_RS_GENERATED_DIR}")
+
+find_program(CARGO_EXECUTABLE cargo REQUIRED)
+find_program(CBINDGEN_EXECUTABLE cbindgen HINTS "$ENV{HOME}/.cargo/bin" REQUIRED)
+
+file(GLOB FACTS_RS_SOURCES CONFIGURE_DEPENDS "${FACTS_RS_DIR}/src/*.rs")
+add_custom_command(
+  OUTPUT "${FACTS_RS_STATICLIB}" "${FACTS_RS_HEADER}"
+  COMMAND "${CMAKE_COMMAND}" -E make_directory "${FACTS_RS_GENERATED_DIR}"
+  COMMAND "${CARGO_EXECUTABLE}" build --manifest-path "${FACTS_RS_DIR}/Cargo.toml" --release
+  COMMAND "${CBINDGEN_EXECUTABLE}" --config "${FACTS_RS_DIR}/cbindgen.toml"
+          --crate facts-rs --output "${FACTS_RS_HEADER}" "${FACTS_RS_DIR}"
+  DEPENDS ${FACTS_RS_SOURCES} "${FACTS_RS_DIR}/Cargo.toml" "${FACTS_RS_DIR}/Cargo.lock"
+          "${FACTS_RS_DIR}/cbindgen.toml"
+  WORKING_DIRECTORY "${FACTS_RS_DIR}"
+  COMMENT "Building facts-rs and generating its C++ ABI header"
+  VERBATIM
+)
+add_custom_target(facts_rs_build ALL DEPENDS "${FACTS_RS_STATICLIB}" "${FACTS_RS_HEADER}")
+
+add_library(facts_rs STATIC IMPORTED GLOBAL)
+set_target_properties(facts_rs PROPERTIES
+  IMPORTED_LOCATION "${FACTS_RS_STATICLIB}"
+  INTERFACE_INCLUDE_DIRECTORIES "${FACTS_RS_GENERATED_DIR}"
+)
+add_dependencies(facts_rs facts_rs_build)
+
+install(FILES "${FACTS_RS_STATICLIB}" DESTINATION ${CMAKE_INSTALL_LIBDIR})
+install(FILES "${FACTS_RS_HEADER}" DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+
 add_subdirectory(vendor/argparse)
 add_subdirectory(vendor/json)
 
