@@ -498,6 +498,11 @@ getOrCreateRemediationBehavior(Module *M,
     return fn;
   }
 
+  AttrBuilder FnAttrs(Ctx);
+  FnAttrs.addAttribute(Attribute::NoReturn);
+  AttributeList attrs =
+      AttributeList::get(Ctx, AttributeList::FunctionIndex, FnAttrs);
+
   BasicBlock *entryBB = BasicBlock::Create(Ctx, "entry", fn);
   IRBuilder<> builder(entryBB);
 

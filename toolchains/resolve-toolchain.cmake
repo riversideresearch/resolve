@@ -17,7 +17,7 @@ set(RESOLVE_INTRINSICS_FLAGS
 
 # Keep basic debug info to make it eaiser to lookup function names and files for inlined functions
 set(RESOLVE_DEBUG_INFO_FLAGS
-  "-g1"
+  "-g1 -fno-omit-frame-pointer"
   )
 
 set(CMAKE_C_FLAGS_INIT   "${CMAKE_C_FLAGS} ${RESOLVE_PLUGINS} ${RESOLVE_INTRINSICS_FLAGS} ${RESOLVE_DEBUG_INFO_FLAGS}" CACHE STRING "c flags")
