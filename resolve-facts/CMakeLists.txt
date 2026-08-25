@@ -150,6 +150,7 @@ file(GLOB_RECURSE SRC
 )
 
 file(GLOB_RECURSE LIB
+    "${CMAKE_CURRENT_SOURCE_DIR}/include/reach/*.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/include/reach/*.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/libs/reach/*.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/libs/reach/*.hpp"
@@ -159,6 +160,7 @@ file(GLOB_RECURSE LIB
 add_library(libreach 
     libs/reach/distmap.cpp
     libs/reach/facts.cpp
+    libs/reach/ffi.cpp
     libs/reach/graph.cpp
     libs/reach/search.cpp
     libs/reach/util.cpp
