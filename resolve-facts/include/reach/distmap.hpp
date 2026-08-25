@@ -10,6 +10,7 @@
 #include <unordered_set>
 
 #include "reach/facts.hpp"
+#include "json/json.hpp"
 
 using NNodeId = resolve_facts::NamespacedNodeId;
 

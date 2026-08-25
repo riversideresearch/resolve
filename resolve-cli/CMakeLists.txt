@@ -4,51 +4,46 @@
 set(RESOLVE_PYTHON_VERSION "3.12" CACHE STRING "Python version used for the resolve CLI environment")
 option(RESOLVE_BUNDLE_PYTHON "Install a uv-managed Python into the resolve install prefix" OFF)
 
-# Build the Rust replacement for the Python reachability wrapper
+# Build the reachability command.
 find_program(CARGO_EXECUTABLE cargo REQUIRED)
 
 if(CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STREQUAL "")
-    set(REACH_RS_CARGO_PROFILE debug)
-    set(REACH_RS_CARGO_FLAGS)
+    set(REACH_CARGO_PROFILE debug)
+    set(REACH_CARGO_FLAGS)
 else()
-    set(REACH_RS_CARGO_PROFILE release)
-    set(REACH_RS_CARGO_FLAGS --release)
+    set(REACH_CARGO_PROFILE release)
+    set(REACH_CARGO_FLAGS --release)
 endif()
 
-set(REACH_RS_CRATE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src/resolve/reach")
-set(REACH_RS_TARGET_DIR "${CMAKE_CURRENT_BINARY_DIR}/reach-rs-target")
-set(REACH_RS_BINARY "${REACH_RS_TARGET_DIR}/${REACH_RS_CARGO_PROFILE}/reach")
-set(REACH_RS_CARGO_ENV
-    "CARGO_TARGET_DIR=${REACH_RS_TARGET_DIR}"
+set(REACH_CRATE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src/resolve/reach")
+set(REACH_TARGET_DIR "${CMAKE_CURRENT_BINARY_DIR}/reach-target")
+set(REACH_BINARY "${REACH_TARGET_DIR}/${REACH_CARGO_PROFILE}/resolve-reach")
+set(REACH_CARGO_ENV
+    "CARGO_TARGET_DIR=${REACH_TARGET_DIR}"
     "RESOLVE_LIBREACH_DIR=$<TARGET_FILE_DIR:libreach>"
 )
 
-add_custom_target(reach-rs ALL
+add_custom_target(resolve-reach ALL
     COMMAND ${CMAKE_COMMAND} -E env
-        ${REACH_RS_CARGO_ENV}
-        ${CARGO_EXECUTABLE} build --locked ${REACH_RS_CARGO_FLAGS}
-    WORKING_DIRECTORY "${REACH_RS_CRATE_DIR}"
-    BYPRODUCTS "${REACH_RS_BINARY}"
+        ${REACH_CARGO_ENV}
+        ${CARGO_EXECUTABLE} build --locked ${REACH_CARGO_FLAGS}
+    WORKING_DIRECTORY "${REACH_CRATE_DIR}"
+    BYPRODUCTS "${REACH_BINARY}"
     DEPENDS libreach
-    COMMENT "Building the Rust reach binary"
+    COMMENT "Building resolve-reach"
     USES_TERMINAL
     VERBATIM
 )
 
-add_custom_target(test-reach-rs
+add_custom_target(test-resolve-reach
     COMMAND ${CMAKE_COMMAND} -E env
-        ${REACH_RS_CARGO_ENV}
+        ${REACH_CARGO_ENV}
         ${CARGO_EXECUTABLE} test --locked
-    WORKING_DIRECTORY "${REACH_RS_CRATE_DIR}"
+    WORKING_DIRECTORY "${REACH_CRATE_DIR}"
     DEPENDS libreach
-    COMMENT "Running the Rust reach tests"
+    COMMENT "Running the resolve-reach tests"
     USES_TERMINAL
     VERBATIM
-)
-
-install(PROGRAMS "${REACH_RS_BINARY}"
-    DESTINATION "${CMAKE_INSTALL_BINDIR}"
-    RENAME reach-rs
 )
 
 # Make the install prefix a Python environment for the resolve CLI tools.
@@ -140,3 +135,22 @@ install(CODE "
         message(FATAL_ERROR \"uv pip install failed with exit code \${_uv_result}\")
     endif()
 ")
+
+# Install the Rust command after the Python package. This replaces the legacy
+# Python entry point during an in-place upgrade.
+install(CODE "
+    set(_install_prefix \"\${CMAKE_INSTALL_PREFIX}\")
+    if(DEFINED ENV{DESTDIR} AND NOT \"\$ENV{DESTDIR}\" STREQUAL \"\")
+        if(IS_ABSOLUTE \"\${_install_prefix}\")
+            set(_install_prefix \"\$ENV{DESTDIR}\${_install_prefix}\")
+        else()
+            set(_install_prefix \"\$ENV{DESTDIR}/\${_install_prefix}\")
+        endif()
+    endif()
+
+    file(REMOVE \"\${_install_prefix}/${CMAKE_INSTALL_BINDIR}/resolve-reach\")
+")
+
+install(PROGRAMS "${REACH_BINARY}"
+    DESTINATION "${CMAKE_INSTALL_BINDIR}"
+)

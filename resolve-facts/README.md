@@ -5,12 +5,12 @@
 
 # Resolve facts
 
-Tools for creating and querying RESOLVE binary metadata, including the `reach` tool, which provides fast graph reachability for RESOLVE.
+Libraries for creating and querying RESOLVE binary metadata. The `libreach` library provides graph construction and path search for the `resolve reach` command.
 
 **Full documentation:**
 
 - Facts: <https://riversideresearch.github.io/resolve/latest/components/facts/>
-- `reach` tool: <https://riversideresearch.github.io/resolve/latest/components/reach/>
+- Reachability analysis: <https://riversideresearch.github.io/resolve/latest/components/reach/>
 
 ## Future Improvements
 

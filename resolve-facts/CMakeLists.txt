@@ -110,12 +110,10 @@ file(GLOB_RECURSE SRC
 # Build Targets
 add_library(resolve_facts_llvm STATIC
     libs/resolve_facts_llvm/binary_facts_llvm.cpp
-    libs/resolve_facts_llvm/resolve_facts_llvm.cpp
 )
 target_include_directories(resolve_facts_llvm SYSTEM PUBLIC ${LLVM_INCLUDE_DIRS})
 find_package(Threads REQUIRED)
 target_link_libraries(resolve_facts_llvm PUBLIC
-    resolve_facts
     facts_rs
     Threads::Threads
     ${CMAKE_DL_LIBS}
@@ -142,12 +140,6 @@ install(DIRECTORY include/resolve_facts_llvm DESTINATION ${CMAKE_INSTALL_INCLUDE
 
 ######################################################################
 # REACH
-
-# Collect source files for checks
-file(GLOB_RECURSE SRC
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/reach/*.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/reach/*.hpp"
-)
 
 file(GLOB_RECURSE LIB
     "${CMAKE_CURRENT_SOURCE_DIR}/include/reach/*.h"
@@ -186,17 +178,11 @@ target_link_libraries(libreach PUBLIC
 
 target_compile_features(libreach PUBLIC cxx_std_23)
 
-# reach executable
-add_executable(reach src/reach/main.cpp)
-
-target_link_libraries(reach PRIVATE libreach json argparse)
-
 if(COMMAND resolve_add_check_targets)
     resolve_add_check_targets(libreach ${LIB})
-    resolve_add_check_targets(reach ${SRC})
 endif()
 
-install(TARGETS reach libreach EXPORT resolve_facts_targets)
+install(TARGETS libreach EXPORT resolve_facts_targets)
 install(DIRECTORY include/reach DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 
 ######################################################################

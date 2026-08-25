@@ -5,7 +5,7 @@ fn main() {
 
     let library_dir = PathBuf::from(
         env::var_os("RESOLVE_LIBREACH_DIR").expect(
-            "RESOLVE_LIBREACH_DIR is not set; build through the CMake reach-rs target or set it to the native library directory",
+            "RESOLVE_LIBREACH_DIR is not set; build through the CMake resolve-reach target or set it to the native library directory",
         ),
     );
 
