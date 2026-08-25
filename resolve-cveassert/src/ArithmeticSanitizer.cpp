@@ -211,6 +211,14 @@ void sanitizeDivideByZero(Function *F,
       // EXIT/RECOVER transfer control elsewhere
       builder.CreateUnreachable();
       break;
+
+    // The only remediation policies that work with this sanitizer
+    // are CONTINUE, EXIT, and RECOVER.
+    // This default case should never be triggered because
+    // the beginning of the function checks for the correct
+    // sanitizer-policy combination
+    default:
+      break;
     }
 
     builder.SetInsertPoint(preserveDivBB);
