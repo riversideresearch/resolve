@@ -77,7 +77,7 @@ file(GLOB_RECURSE SRC
 
 add_library(resolve_facts STATIC libs/resolve_facts/resolve_facts.cpp)
 target_include_directories(resolve_facts PUBLIC 
-    "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>/include"
+    "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
     "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>"
 )
 target_link_libraries(resolve_facts PRIVATE glaze::glaze)
@@ -108,12 +108,22 @@ file(GLOB_RECURSE SRC
 )
 
 # Build Targets
-add_library(resolve_facts_llvm STATIC libs/resolve_facts_llvm/resolve_facts_llvm.cpp)
+add_library(resolve_facts_llvm STATIC
+    libs/resolve_facts_llvm/binary_facts_llvm.cpp
+    libs/resolve_facts_llvm/resolve_facts_llvm.cpp
+)
 target_include_directories(resolve_facts_llvm SYSTEM PUBLIC ${LLVM_INCLUDE_DIRS})
-target_link_libraries(resolve_facts_llvm PUBLIC resolve_facts)
+find_package(Threads REQUIRED)
+target_link_libraries(resolve_facts_llvm PUBLIC
+    resolve_facts
+    facts_rs
+    Threads::Threads
+    ${CMAKE_DL_LIBS}
+    m
+)
 
 target_include_directories(resolve_facts_llvm PUBLIC
-    "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>/include"
+    "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
     "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>"
 )
 set_target_properties(resolve_facts_llvm PROPERTIES POSITION_INDEPENDENT_CODE ON)
