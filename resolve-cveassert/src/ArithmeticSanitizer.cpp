@@ -218,7 +218,7 @@ void sanitizeDivideByZero(Function *F,
     // the beginning of the function checks for the correct
     // sanitizer-policy combination
     default:
-      break;
+      llvm_unreachable();
     }
 
     builder.SetInsertPoint(preserveDivBB);
