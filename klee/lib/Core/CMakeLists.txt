@@ -35,8 +35,6 @@ target_link_libraries(kleeCore PRIVATE
   kleaverSolver
   kleaverExpr
   kleeSupport
-  libreach
-  resolve_facts_llvm
 )
 
 llvm_config(kleeCore "${USE_LLVM_SHARED}" core executionengine mcjit native support)

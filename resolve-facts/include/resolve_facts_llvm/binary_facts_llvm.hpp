@@ -3,8 +3,7 @@
  *   LGPL-3; See LICENSE.txt in the repo root for details.
  */
 
-#include "resolve_facts/resolve_facts.hpp"
-#include "resolve_facts_llvm/LLVMFacts.hpp"
+#include "resolve_facts_llvm/BinaryLLVMFacts.hpp"
 
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/SmallVector.h"
@@ -21,28 +20,19 @@
 #include "llvm/IR/PassManager.h"
 #include "llvm/Passes/PassBuilder.h"
 #include "llvm/Passes/PassPlugin.h"
-#include "llvm/Support/Compression.h"
-#include "llvm/Support/FileSystem.h"
-#include "llvm/Support/Path.h"
-#include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/Utils/ModuleUtils.h"
 
 using namespace llvm;
 
 namespace resolve {
-extern ProgramFacts all_facts;
-extern LLVMFacts facts;
+std::string binaryTypeToString(const Type &type);
 
-std::string debugLocToString(DebugLoc dbgLoc);
+void getBinaryGlobalFacts(BinaryLLVMFacts &facts, GlobalVariable &G);
 
-std::string typeToString(const Type &type);
+void getBinaryFunctionFacts(BinaryLLVMFacts &facts, Function &F);
 
-void getGlobalFacts(GlobalVariable &G);
-
-void getFunctionFacts(Function &F);
-
-void getModuleFacts(Module &M);
+void getBinaryModuleFacts(BinaryLLVMFacts &facts, Module &M);
 
 // Embed the accumulated facts into custom ELF sections.
-void embedFacts(Module &M);
+void embedBinaryFacts(Module &M, ArrayRef<uint8_t> facts);
 } // namespace resolve

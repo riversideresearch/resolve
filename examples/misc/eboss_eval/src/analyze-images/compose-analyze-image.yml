@@ -92,7 +92,6 @@ services:
       /opt/resolve/bin/resolve-reach \
       -i /challenge/vulnerabilities.json \
       -o /facts-dir/reach_out.json \
-      -f /facts-dir/build/ \
-      -r /opt/resolve/bin/reach
+      -f /facts-dir/build/analyze-image.facts
       "
     depends_on: [server-remediated]

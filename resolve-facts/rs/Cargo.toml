@@ -1,0 +1,15 @@
+[package]
+name = "facts-rs"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+crate-type = ["rlib", "staticlib", "cdylib"]
+
+[dependencies]
+bytemuck = { version = "1", features = ["derive"] }
+object = { version = "0.39.1", default-features = false, features = ["read_core", "elf", "std"] }
+zstd = "0.13.3"
+
+[dev-dependencies]
+object = { version = "0.39.1", default-features = false, features = ["write"] }
