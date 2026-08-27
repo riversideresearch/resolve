@@ -331,10 +331,9 @@ pub extern "C" fn __resolve_get_bounds_global(ptr: *mut c_void) -> ShadowObjBoun
 #[unsafe(no_mangle)]
 #[inline(never)]
 pub extern "C" fn __resolve_get_bounds(ptr: *mut c_void) -> ShadowObjBounds {
-    // let mut sobj = __resolve_get_bounds_stack(ptr);
-    //if sobj == ShadowObjBounds::null() { sobj = __resolve_get_bounds_heap(ptr)}
+    let mut sobj = __resolve_get_bounds_stack(ptr);
+    if sobj == ShadowObjBounds::null() { sobj = __resolve_get_bounds_heap(ptr)}
     //if sobj == ShadowObjBounds::null() { sobj = __resolve_get_bounds_global(ptr)}
-    __resolve_get_bounds_heap(ptr)
 }
 
 #[unsafe(no_mangle)]
