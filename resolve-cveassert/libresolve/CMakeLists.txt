@@ -3,6 +3,31 @@
 
 include(GNUInstallDirs)
 include(ExternalProject)
+include(FetchContent)
+
+#### Fetching and building mimalloc project 
+FetchContent_Declare(
+    mimalloc
+    GIT_REPOSITORY https://github.com/microsoft/mimalloc.git
+    GIT_TAG v3.3.2
+)
+
+## Force static build 
+set(MI_BUILD_SHARED OFF CACHE BOOL "" FORCE)
+set(MI_BUILD_STATIC ON CACHE BOOL "" FORCE)
+
+FetchContent_MakeAvailable(mimalloc)
+
+# Add the shim source to the mimalloc proj
+target_sources(mimalloc-static PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/mi_shim.c
+)
+
+## mimalloc proj must be PIC to ensure compatibility with libresolve
+set_target_properties(mimalloc-static PROPERTIES
+    POSITION_INDEPENDENT_CODE ON
+    OUTPUT_NAME mimalloc
+)
 
 # Map CMake build type to Cargo flags
 if(CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STREQUAL "")
@@ -24,17 +49,24 @@ file(GLOB_RECURSE RUST_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/sr
 add_custom_command(
     OUTPUT ${RUST_LIB}
     COMMAND 
-        ${CMAKE_COMMAND} -E env CARGO_TARGET_DIR=${RUST_OUT_DIR} cargo build ${CARGO_FLAGS} 
+        ${CMAKE_COMMAND} -E env
+        CARGO_TARGET_DIR=${RUST_OUT_DIR}
+        MIMALLOC_LIB_DIR=$<TARGET_FILE_DIR:mimalloc-static>
+        cargo build ${CARGO_FLAGS} 
     WORKING_DIRECTORY ${RUST_CRATE_DIR}
     COMMENT "Building libresolve.so" VERBATIM
-    DEPENDS ${RUST_SOURCES} ${CMAKE_CURRENT_SOURCE_DIR}/Cargo.lock ${CMAKE_CURRENT_SOURCE_DIR}/Cargo.toml ${CMAKE_CURRENT_SOURCE_DIR}/rust-toolchain.toml
+    DEPENDS mimalloc-static ${RUST_SOURCES} ${CMAKE_CURRENT_SOURCE_DIR}/Cargo.lock ${CMAKE_CURRENT_SOURCE_DIR}/Cargo.toml ${CMAKE_CURRENT_SOURCE_DIR}/rust-toolchain.toml
 )
 
 add_custom_target(test-libresolve
-    COMMAND cargo test
+    COMMAND 
+        ${CMAKE_COMMAND} -E env
+        MIMALLOC_LIB_DIR=${MIMALLOC_LIB_DIR} # Note: Pass the static mimalloc loc so that build.rs does not panic
+        cargo test
     WORKING_DIRECTORY ${RUST_CRATE_DIR}
     COMMENT "Running regression tests for libresolve"
 )
 
 add_custom_target(libresolve ALL DEPENDS ${RUST_LIB})
+add_dependencies(libresolve mimalloc-static)
 install(FILES ${RUST_LIB} DESTINATION ${CMAKE_INSTALL_LIBDIR})

@@ -1,9 +1,12 @@
 // Copyright (c) 2025 Riverside Research.
 // LGPL-3; See LICENSE.txt in the repo root for details.
+
 use libc::{
     c_char, c_int, c_void, calloc, free, malloc, mmap, munmap, off_t, realloc, strdup, strlen,
     strndup, strnlen,
 };
+
+use std::ffi::{CStr, VaList};
 
 use crate::shadowobjs::{
     ALIVE_OBJ_LIST, AllocType, FREED_OBJ_LIST, GLOBALS, SHADOW_STACK, ShadowObject, Vaddr,
@@ -11,7 +14,48 @@ use crate::shadowobjs::{
 };
 
 use log::{info, warn};
-use std::ffi::CStr;
+
+#[derive(PartialEq)]
+#[repr(C)]
+pub struct AllocBounds {
+    base: *mut c_void,
+    limit: *mut c_void,
+    size: usize,
+}
+
+impl From<AllocBounds> for ShadowObjBounds {
+    fn from(bounds: AllocBounds) -> Self {
+        ShadowObjBounds {
+            base: bounds.base,
+            limit: bounds.limit,
+        }
+    }
+}
+// implement the From Trait for AllocBounds
+
+#[link(name = "mimalloc")]
+unsafe extern "C" {
+    // Mimalloc public API
+    fn mi_malloc(size: usize) -> *mut c_void;
+    fn mi_calloc(size: usize, count: usize) -> *mut c_void;
+    fn mi_realloc(ptr: *mut c_void, size: usize) -> *mut c_void;
+    fn mi_strdup(ptr: *mut c_char) -> *mut c_char;
+    fn mi_strndup(ptr: *mut c_char, size: usize) -> *mut c_char;
+
+    fn mi_aligned_alloc(alignment: usize, n: usize) -> *mut c_void;
+    fn mi_reallocarray(ptr: *mut c_void, n: usize, size: usize) -> *mut c_void;
+    fn mi_posix_memalign(memptr: *mut *mut c_void, alignment: usize, size: usize) -> c_int;
+
+    fn mi_free(ptr: *mut c_void);
+    fn mi_new(size: usize) -> *mut c_void;
+    fn mi_delete(ptr: *mut c_void);
+
+    // mi_shim.c API
+    fn mi_is_in_heap_region(ptr: *mut c_void) -> bool;
+    fn mi_get_alloc_bounds(ptr: *mut c_void) -> AllocBounds;
+    fn __vasprintf(strp: *mut *mut c_char, fmt: *const c_char, args: VaList<'_>) -> c_int;
+    fn mi_is_block_start(ptr: *mut c_void) -> bool;
+}
 
 /**
  * @brief - Registers stack allocations in shadow memory
@@ -50,22 +94,164 @@ pub extern "C" fn __resolve_invalidate_stack_range(ptr: *mut c_void, size: usize
 
     SHADOW_STACK.with_borrow_mut(|ss| ss.invalidate_at(base, size));
 
-    info!(
-        "[STACK] Unregistered stack object: addr={:p}, size={}",
-        ptr, size
-    );
+    info!("[STACK] Free addr={:p}, size={}", ptr, size);
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn __resolve_getline(
+    lineptr: *mut *mut c_char,
+    size: *mut size_t,
+    stream: *mut FILE,
+) -> ssize_t {
+    if lineptr.is_null() || size.is_null() || stream.is_null() {
+        return -1;
+    }
+
+    unsafe {
+        if (*lineptr).is_null() || *size == 0 {
+            *size = 128;
+            *lineptr = __resolve_malloc(*size) as *mut c_char;
+
+            // check if the pointer is null
+            if (*lineptr).is_null() {
+                return -1;
+            }
+        }
+
+        let mut pos: size_t = 0;
+        let mut c: c_int;
+
+        loop {
+            c = fgetc(stream);
+            if c == EOF {
+                break;
+            }
+
+            if pos + 1 >= *size {
+                // Expand buffer
+                let new_size = *size * 2;
+                let new_buf = __resolve_realloc(*lineptr as *mut c_void, new_size);
+
+                if new_buf.is_null() {
+                    return -1;
+                }
+
+                *lineptr = new_buf as *mut c_char;
+                *size = new_size;
+            }
+
+            // (*lineptr)[pos++] = (char)c;
+            (*lineptr).add(pos).write(c as c_char);
+            pos += 1;
+
+            if c == b'\n' as c_int {
+                break;
+            }
+        }
+
+        if pos == 0 && c == EOF {
+            // No data read
+            return -1;
+        }
+
+        (*lineptr).add(pos).write(0); // (*lineptr)[pos] = '\0'
+    }
+    pos as ssize_t
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn __resolve_getdelim(
+    lineptr: *mut *mut c_char,
+    size: *mut size_t,
+    delim: c_int,
+    stream: *mut FILE,
+) -> ssize_t {
+    if lineptr.is_null() || size.is_null() || stream.is_null() {
+        return -1;
+    }
+
+    unsafe {
+        if (*lineptr).is_null() || *size == 0 {
+            *size = 128;
+            *lineptr = __resolve_malloc(*size) as *mut c_char;
+
+            if (*lineptr).is_null() {
+                return -1;
+            }
+        }
+
+        let mut pos: size_t = 0;
+        let mut c: c_int;
+
+        loop {
+            c = fgetc(stream);
+            if c == EOF {
+                break;
+            }
+
+            if pos + 1 >= *size {
+                let new_size = *size * 2;
+                let new_buf = __resolve_realloc(*lineptr as *mut c_void, new_size);
+
+                if new_buf.is_null() {
+                    return -1;
+                }
+
+                *lineptr = new_buf as *mut c_char;
+                *size = new_size;
+            }
+
+            (*lineptr).add(pos).write(c as c_char);
+            pos += 1;
+
+            if c == delim {
+                break;
+            }
+        }
+
+        (*lineptr).add(pos).write(0);
+        pos as ssize_t
+    }
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __resolve_asprintf(
+    strp: *mut *mut c_char,
+    fmt: *const c_char,
+    args: ...
+) -> c_int {
+    return unsafe { __vasprintf(strp, fmt, args) };
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn __resolve_aligned_alloc(alignment: usize, n: usize) -> *mut c_void {
+    return unsafe { mi_aligned_alloc(alignment, n) };
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn __resolve_posix_memalign(
+    memptr: *mut *mut c_void,
+    alignment: usize,
+    size: usize,
+) -> c_int {
+    return unsafe { mi_posix_memalign(memptr, alignment, size) };
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn __resolve_reallocarray(ptr: *mut c_void, n: usize, size: usize) -> *mut c_void {
+    return unsafe { mi_reallocarray(ptr, n, size) };
 }
 
 /**
- * @brief - RESOLVE wrapper for libc malloc
- * @input
- *  - size: size of requested heap allocation in bytes
- * @return
- *  - pointer to requested heap allocation
+ * @brief - Allocator logging interface for malloc
+ * @input - size of the allocation in bytes
+ * @return - ptr to the allocation
  */
 #[unsafe(no_mangle)]
 pub extern "C" fn __resolve_malloc(size: usize) -> *mut c_void {
-    let ptr = unsafe { malloc(size + 1) };
+    // SAFETY:
+    // - 'ptr' allocated by mimalloc
+    let ptr = unsafe { mi_malloc(size) };
 
     if ptr.is_null() {
         return ptr;
@@ -77,9 +263,23 @@ pub extern "C" fn __resolve_malloc(size: usize) -> *mut c_void {
     }
 
     info!(
-        "[HEAP] Registered heap object (malloc): addr={:p}, size={}",
+        "[HEAP] Registered heap object (mi_malloc): addr={:p}, size={}",
         ptr, size
     );
+
+    //info!("[RESOLVE] bounds: (0x{:x}, 0x{:x})", bounds_info.base as Vaddr, bounds_info.limit as Vaddr);
+    //info!("[RESOLVE] block index: {}", bounds_info.block_index);
+    //info!("[RESOLVE] block size: {}", bounds_info.block_size);
+    ptr
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn __resolve_new(size: usize) -> *mut c_void {
+    let ptr = unsafe { mi_new(size) };
+
+    if ptr.is_null() {
+        return ptr;
+    }
 
     ptr
 }
@@ -127,9 +327,16 @@ pub extern "C" fn __resolve_free(ptr: *mut c_void) -> () {
         freed_guard.add_shadow_object(AllocType::Unallocated, ptr as Vaddr, obj_size.unwrap_or(0));
     }
 
-    let _ = unsafe { free(ptr) };
+    let _ = unsafe { mi_free(ptr) };
 }
 
+#[unsafe(no_mangle)]
+pub extern "C" fn __resolve_delete(ptr: *mut c_void) -> () {
+    if ptr.is_null() {
+        return;
+    }
+    let _ = unsafe { mi_free(ptr) };
+}
 /**
  * @brief - RESOLVE wrapper for libc realloc
  * @input
@@ -147,8 +354,12 @@ pub extern "C" fn __resolve_realloc(ptr: *mut c_void, size: usize) -> *mut c_voi
 
     // Consideration: Pointer passed in may be invalidated so we need a mechanism
     // to remove the shadow object for the orignal allocation
-    let realloc_ptr = unsafe { realloc(ptr, size + 1) };
+    let realloc_ptr = unsafe { mi_realloc(ptr, size) };
 
+    info!(
+        "[RESOLVE] old = 0x{:x}, new = 0x{:x}, size = {}",
+        ptr as Vaddr, realloc_ptr as Vaddr, size
+    );
     if realloc_ptr.is_null() {
         return realloc_ptr;
     }
@@ -177,18 +388,18 @@ pub extern "C" fn __resolve_realloc(ptr: *mut c_void, size: usize) -> *mut c_voi
  *         requested size
  */
 #[unsafe(no_mangle)]
-pub extern "C" fn __resolve_calloc(nelems: usize, elsize: usize) -> *mut c_void {
-    let ptr = unsafe { calloc(nelems, elsize) };
-    let size = nelems * elsize;
+pub extern "C" fn __resolve_calloc(n_items: usize, item_size: usize) -> *mut c_void {
+    let ptr = unsafe { mi_calloc(n_items, item_size) };
+    //let size = n_items * item_size;
 
     if ptr.is_null() {
         return ptr;
     }
 
-    {
-        let mut obj_list = ALIVE_OBJ_LIST.lock();
-        obj_list.add_shadow_object(AllocType::Heap, ptr as Vaddr, size);
-    }
+    //{
+    //    let mut obj_list = ALIVE_OBJ_LIST.lock();
+    //    obj_list.add_shadow_object(AllocType::Heap, ptr as Vaddr, size);
+    //}
 
     info!(
         "[HEAP] Registered heap object (calloc): addr={:p}, size={}",
@@ -207,7 +418,7 @@ pub extern "C" fn __resolve_calloc(nelems: usize, elsize: usize) -> *mut c_void 
  */
 #[unsafe(no_mangle)]
 pub extern "C" fn __resolve_strdup(ptr: *mut c_char) -> *mut c_char {
-    let string_ptr = unsafe { strdup(ptr) };
+    let string_ptr = unsafe { mi_strdup(ptr) };
 
     if string_ptr.is_null() {
         return string_ptr;
@@ -216,11 +427,11 @@ pub extern "C" fn __resolve_strdup(ptr: *mut c_char) -> *mut c_char {
     // +1 to include null termination byte. We should allow program to read this value.
     // Otherwise how would the program find the end of the string?
     // Although writing it to something else is probably a bad idea, this too should be allowed.
-    let sizeofstr = unsafe { strlen(ptr) + 1 };
-    {
-        let mut obj_list = ALIVE_OBJ_LIST.lock();
-        obj_list.add_shadow_object(AllocType::Heap, string_ptr as Vaddr, sizeofstr);
-    }
+    // let sizeofstr = unsafe { strlen(ptr) + 1 };
+    // {
+    //     let mut obj_list = ALIVE_OBJ_LIST.lock();
+    //     obj_list.add_shadow_object(AllocType::Heap, string_ptr as Vaddr, sizeofstr);
+    // }
 
     info!(
         "[HEAP] Registered heap object (strdup): addr={:p}, size={}",
@@ -241,7 +452,7 @@ pub extern "C" fn __resolve_strdup(ptr: *mut c_char) -> *mut c_char {
  */
 #[unsafe(no_mangle)]
 pub extern "C" fn __resolve_strndup(ptr: *mut c_char, size: usize) -> *mut c_char {
-    let string_ptr = unsafe { strndup(ptr, size + 1) };
+    let string_ptr = unsafe { mi_strndup(ptr, size) };
 
     if string_ptr.is_null() {
         return string_ptr;
@@ -251,12 +462,12 @@ pub extern "C" fn __resolve_strndup(ptr: *mut c_char, size: usize) -> *mut c_cha
     // We don't actually know how much memory the libc will allocate, but
     // strnlen(ptr, size) + 1 is a safe lower bound.
     // strlen(string_ptr) + 1 would also be valid I think.
-    let sizeofstr = unsafe { strnlen(ptr, size) + 1 };
+    //let sizeofstr = unsafe { strnlen(ptr, size) + 1 };
 
-    {
-        let mut obj_list = ALIVE_OBJ_LIST.lock();
-        obj_list.add_shadow_object(AllocType::Heap, string_ptr as Vaddr, sizeofstr);
-    }
+    //{
+    //    let mut obj_list = ALIVE_OBJ_LIST.lock();
+    //    obj_list.add_shadow_object(AllocType::Heap, string_ptr as Vaddr, sizeofstr);
+    //}
 
     info!(
         "[HEAP] Registered heap object (strndup): addr={:p}, size={}",
@@ -394,33 +605,23 @@ pub extern "C" fn __resolve_get_bounds_stack(ptr: *mut c_void) -> ShadowObjBound
  */
 #[unsafe(no_mangle)]
 pub extern "C" fn __resolve_get_bounds_heap(ptr: *mut c_void) -> ShadowObjBounds {
-    let sobj_table = ALIVE_OBJ_LIST.lock();
-    let Some(sobj) = sobj_table.search_intersection(ptr as Vaddr) else {
+    if ptr.is_null() {
         return ShadowObjBounds::null();
-    };
+    }
+
+    // SAFETY:
+    // 'ptr' must point to valid allocation owned by mimalloc
+    let bounds = unsafe { mi_get_alloc_bounds(ptr) };
+    info!(
+        "[RESOLVE] (ptr: 0x{:x}, lower: 0x{:x}, upper: 0x{:x})",
+        ptr as Vaddr, bounds.base as Vaddr, bounds.limit as Vaddr
+    );
 
     return sobj.into();
 }
 
 /**
- * @brief - Queries recorded globals to find a shadow obj
- *          where the ptr is within bounds of allocation
- * @input
- *  - ptr: ptr to global allocation
- * @return shadow object that satisfies base <= ptr && ptr < limit
- * If shadow object cannot be found the function returns
- * a shadow object with null base and limit pointers
- */
-#[unsafe(no_mangle)]
-pub extern "C" fn __resolve_get_bounds_global(ptr: *mut c_void) -> ShadowObjBounds {
-    match lookup_global(ptr as Vaddr) {
-        Some(obj) => (&obj).into(),
-        None => ShadowObjBounds::null(),
-    }
-}
-
-/**
- * @brief - Generic shadow object lookup where we don't know the pointers
+ * @brief - Generic sobj lookup where we don't know the pointers
  *          allocation type already. Searches stack table ( O(log n) )
  *          before searching the heap table
  * @input
@@ -438,7 +639,7 @@ pub extern "C" fn __resolve_get_bounds(ptr: *mut c_void) -> ShadowObjBounds {
         sobj = __resolve_get_bounds_global(ptr)
     }
 
-    sobj
+    bounds
 }
 
 #[unsafe(no_mangle)]

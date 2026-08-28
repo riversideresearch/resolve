@@ -85,6 +85,31 @@ void instrumentLibraryAllocations(Function *F) {
                         false));
   wrapLibraryFunction(
       F, "munmap", FunctionType::get(integerType, {ptrType, sizeType}, false));
+  wrapLibraryFunction(
+      F, "getline",
+      FunctionType::get(sizeType, {ptrType, ptrType, ptrType}, false));
+  wrapLibraryFunction(F, "getdelim",
+                      FunctionType::get(sizeType,
+                                        {ptrType, ptrType, sizeType, ptrType},
+                                        false));
+  wrapLibraryFunction(F, "new", FunctionType::get(ptrType, {sizeType}, false));
+  wrapLibraryFunction(F, "delete",
+                      FunctionType::get(voidType, {ptrType}, false));
+  wrapLibraryFunction(F, "asprintf",
+                      FunctionType::get(sizeType,
+                                        {
+                                            ptrType,
+                                            ptrType,
+                                        },
+                                        true));
+  wrapLibraryFunction(F, "aligned_alloc",
+                      FunctionType::get(ptrType, {sizeType, sizeType}, false));
+  wrapLibraryFunction(
+      F, "reallocarray",
+      FunctionType::get(ptrType, {ptrType, sizeType, sizeType}, false));
+  wrapLibraryFunction(
+      F, "posix_memalign",
+      FunctionType::get(sizeType, {ptrType, sizeType, sizeType}, false));
 }
 
 void instrumentAlloca(Function *F) {
