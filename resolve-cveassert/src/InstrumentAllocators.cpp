@@ -87,27 +87,29 @@ void instrumentLibraryAllocations(Function *F) {
       F, "munmap", FunctionType::get(integerType, {ptrType, sizeType}, false));
   wrapLibraryFunction(
       F, "getline",
-      FunctionType::get(size_ty, {ptr_ty, ptr_ty, ptr_ty}, false));
-  wrapLibraryFunction(
-      F, "getdelim",
-      FunctionType::get(size_ty, {ptr_ty, ptr_ty, size_ty, ptr_ty}, false));
-  wrapLibraryFunction(F, "new", FunctionType::get(ptr_ty, {size_ty}, false));
-  wrapLibraryFunction(F, "delete", FunctionType::get(void_ty, {ptr_ty}, false));
+      FunctionType::get(sizeType, {ptrType, ptrType, ptrType}, false));
+  wrapLibraryFunction(F, "getdelim",
+                      FunctionType::get(sizeType,
+                                        {ptrType, ptrType, sizeType, ptrType},
+                                        false));
+  wrapLibraryFunction(F, "new", FunctionType::get(ptrType, {sizeType}, false));
+  wrapLibraryFunction(F, "delete",
+                      FunctionType::get(voidType, {ptrType}, false));
   wrapLibraryFunction(F, "asprintf",
-                      FunctionType::get(size_ty,
+                      FunctionType::get(sizeType,
                                         {
-                                            ptr_ty,
-                                            ptr_ty,
+                                            ptrType,
+                                            ptrType,
                                         },
                                         true));
   wrapLibraryFunction(F, "aligned_alloc",
-                      FunctionType::get(ptr_ty, {size_ty, size_ty}, false));
+                      FunctionType::get(ptrType, {sizeType, sizeType}, false));
   wrapLibraryFunction(
       F, "reallocarray",
-      FunctionType::get(ptr_ty, {ptr_ty, size_ty, size_ty}, false));
+      FunctionType::get(ptrType, {ptrType, sizeType, sizeType}, false));
   wrapLibraryFunction(
       F, "posix_memalign",
-      FunctionType::get(size_ty, {ptr_ty, size_ty, size_ty}, false));
+      FunctionType::get(sizeType, {ptrType, sizeType, sizeType}, false));
 }
 
 void instrumentAlloca(Function *F) {
